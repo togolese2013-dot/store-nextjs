@@ -1,0 +1,131 @@
+/* ─── Google Fonts — MUST come before @import "tailwindcss" ─── */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&display=swap");
+
+@import "tailwindcss";
+
+/* ─── Design Tokens ─── */
+@theme {
+  /* Fonts */
+  --font-display: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "Montserrat", ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand colors */
+  --color-brand-50:   #eef1ff;
+  --color-brand-100:  #dce3ff;
+  --color-brand-200:  #c0cbff;
+  --color-brand-300:  #9aaaff;
+  --color-brand-400:  #717eff;
+  --color-brand-500:  #4d56f8;
+  --color-brand-600:  #3b38ee;
+  --color-brand-700:  #2f27d4;
+  --color-brand-800:  #1E2B8A;
+  --color-brand-900:  #0A2463;
+  --color-brand-950:  #070f38;
+
+  /* Accent (terracotta / orange) */
+  --color-accent-50:  #fff4ee;
+  --color-accent-100: #ffe4d0;
+  --color-accent-200: #ffc4a0;
+  --color-accent-300: #ff9c6b;
+  --color-accent-400: #ff7040;
+  --color-accent-500: #F4623A;
+  --color-accent-600: #e04820;
+  --color-accent-700: #bc3518;
+  --color-accent-800: #962c1a;
+  --color-accent-900: #7a2718;
+
+  /* WhatsApp */
+  --color-wa: #25D366;
+  --color-wa-dark: #1da851;
+
+  /* Neutrals */
+  --color-canvas:   #FAFAF8;
+  --color-surface:  #FFFFFF;
+  --color-border:   rgba(10, 36, 99, 0.08);
+  --color-border-strong: rgba(10, 36, 99, 0.18);
+
+  /* Text */
+  --color-text:       #0F1629;
+  --color-text-muted: #64748B;
+  --color-text-light: #94A3B8;
+
+  /* Shadows (warm tinted) */
+  --shadow-xs: 0 1px 2px rgba(10,36,99,.06);
+  --shadow-sm: 0 2px 8px rgba(10,36,99,.08);
+  --shadow-md: 0 4px 16px rgba(10,36,99,.10);
+  --shadow-lg: 0 8px 32px rgba(10,36,99,.12);
+  --shadow-xl: 0 16px 48px rgba(10,36,99,.14);
+  --shadow-accent: 0 8px 24px rgba(244,98,58,.30);
+  --shadow-brand:  0 8px 24px rgba(10,36,99,.25);
+}
+
+/* ─── Base ─── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: var(--font-display);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+img { display: block; max-width: 100%; }
+a   { color: inherit; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar          { width: 5px; height: 5px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: #CBD5E1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ─── Animations ─── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: .8; }
+  70%  { transform: scale(1.5); opacity: 0; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.animate-fade-up  { animation: fade-up .5s ease both; }
+.animate-shimmer  {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 1200px 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+/* ─── Gradient text utility ─── */
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-brand-900) 0%, var(--color-accent-500) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Section rule ─── */
+.section-rule {
+  display: inline-block;
+  width: 48px; height: 4px;
+  border-radius: 9999px;
+  background: var(--color-accent-500);
+  margin-bottom: 1rem;
+}

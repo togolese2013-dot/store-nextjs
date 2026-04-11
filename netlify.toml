@@ -1,0 +1,19 @@
+[build]
+  command   = "npm run build"
+  publish   = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Increase function timeout for API routes (default 10s, max 26s on free tier)
+[functions]
+  node_bundler = "nft"
+
+[[headers]]
+  for = "/api/admin/orders/sse"
+  [headers.values]
+    X-Accel-Buffering = "no"
+    Cache-Control     = "no-cache, no-transform"
