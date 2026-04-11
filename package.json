@@ -13,6 +13,7 @@
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
     "clsx": "^2.1.1",
+    "csv-parse": "^6.2.1",
     "framer-motion": "^12.6.3",
     "jose": "^6.2.2",
     "lucide-react": "^0.487.0",
