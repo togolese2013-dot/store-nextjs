@@ -128,6 +128,25 @@ async function networkFirstOrders(request) {
   }
 }
 
+// ─── Notification click (PWA installed app) ──────────────────────────────────
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Focus existing admin tab if open
+      for (const client of clientList) {
+        if (client.url.includes("/admin") && "focus" in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open a new tab
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("/admin/orders");
+      }
+    })
+  );
+});
+
 async function networkFirstAdmin(request) {
   try {
     const response = await fetch(request);

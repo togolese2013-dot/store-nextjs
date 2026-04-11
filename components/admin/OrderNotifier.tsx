@@ -32,20 +32,77 @@ function playNotificationSound() {
       osc.start(ctx.currentTime + start);
       osc.stop(ctx.currentTime + start + duration);
     };
-    // Two-tone ding: 880Hz then 1100Hz
     playBeep(880,  0,    0.15);
     playBeep(1100, 0.18, 0.2);
   } catch {
-    // AudioContext blocked (e.g. no user interaction yet) — silent fail
+    // AudioContext blocked — silent fail
   }
 }
 
+function showNativeNotification(order: NewOrder) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  try {
+    const n = new Notification("🛍️ Nouvelle commande", {
+      body: `${order.reference} · ${order.nom || "Client"} · ${formatPrice(order.total)}`,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: `order-${order.id}`,   // replace previous notif for the same order
+      renotify: true,
+    });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  } catch { /* blocked */ }
+}
+
+function vibrate() {
+  try { navigator.vibrate?.([200, 100, 200]); } catch { /* not supported */ }
+}
+
 export default function OrderNotifier() {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const toastIdRef = useRef(0);
-  const esRef      = useRef<EventSource | null>(null);
-  const sinceRef   = useRef<string>("");
-  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toasts, setToasts]       = useState<Toast[]>([]);
+  const [unread, setUnread]       = useState(0);
+  const toastIdRef                = useRef(0);
+  const esRef                     = useRef<EventSource | null>(null);
+  const sinceRef                  = useRef<string>("");
+  const retryTimer                = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const originalTitleRef          = useRef<string>("");
+
+  // ── Request notification permission once (needs prior user gesture) ──────
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      // Defer to first user interaction so browsers don't block the prompt
+      const requestOnce = () => {
+        Notification.requestPermission();
+        window.removeEventListener("click", requestOnce);
+      };
+      window.addEventListener("click", requestOnce, { once: true });
+    }
+  }, []);
+
+  // ── Badge: update document title with unread count ───────────────────────
+  useEffect(() => {
+    if (!originalTitleRef.current) {
+      originalTitleRef.current = document.title;
+    }
+    if (unread > 0) {
+      document.title = `(${unread}) ${originalTitleRef.current}`;
+    } else {
+      document.title = originalTitleRef.current;
+    }
+  }, [unread]);
+
+  // ── Reset unread when tab becomes visible ────────────────────────────────
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setUnread(0);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -64,29 +121,32 @@ export default function OrderNotifier() {
     es.onmessage = (e) => {
       try {
         const order: NewOrder = JSON.parse(e.data);
-        // Update since pointer
         sinceRef.current = order.created_at;
 
-        // Play sound
+        // Sound + vibration
         playNotificationSound();
+        vibrate();
 
-        // Add toast
+        // Native browser notification (works hors-onglet)
+        showNativeNotification(order);
+
+        // Badge on tab title when hidden
+        if (document.visibilityState !== "visible") {
+          setUnread(prev => prev + 1);
+        }
+
+        // In-page toast
         const toastId = ++toastIdRef.current;
         setToasts(prev => [...prev, { id: toastId, order }]);
-
-        // Auto-dismiss after 8s
         setTimeout(() => removeToast(toastId), 8000);
       } catch { /* malformed data */ }
     };
 
-    es.addEventListener("heartbeat", () => {
-      // Connection alive — no action needed
-    });
+    es.addEventListener("heartbeat", () => { /* keepalive */ });
 
     es.onerror = () => {
       es.close();
       esRef.current = null;
-      // Reconnect after 5s
       retryTimer.current = setTimeout(connect, 5000);
     };
   }, [removeToast]);
