@@ -42,7 +42,7 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
   return (
     <section
       className="relative overflow-hidden"
-      style={{ minHeight: "clamp(420px, 56vw, 600px)" }}
+      style={{ minHeight: "clamp(294px, 39vw, 420px)" }}
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
     >
@@ -103,17 +103,6 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
             )}
           </div>
 
-          <div className="flex items-center gap-4 mt-8">
-            <div className="flex -space-x-2">
-              {["KA", "AM", "EK", "DS"].map((av, i) => (
-                <div key={i}
-                  className="w-8 h-8 rounded-full border-2 border-white/30 flex items-center justify-center text-[10px] font-bold text-white"
-                  style={{ background: ["#1E3A8A", "#F4623A", "#1E3A8A", "#F59E0B"][i] }}
-                >{av}</div>
-              ))}
-            </div>
-            <p className="text-white/70 text-sm"><span className="text-white font-bold">+500</span> clients satisfaits</p>
-          </div>
         </div>
       </div>
 

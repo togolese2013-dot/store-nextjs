@@ -13,7 +13,7 @@ const DEFAULTS = [
     title:    "Capturez chaque\nmoment parfait",
     sub:      "Caméras, drones et accessoires de qualité professionnelle. Livraison rapide à Lomé.",
     cta1:     { label: "Découvrir le catalogue", href: "/products" },
-    cta2:     { label: "Commander via WhatsApp", href: `https://wa.me/${WA}` },
+    cta2:     null,
     gradient: "from-[#0A2463] via-[#1E3A8A] to-[#1e40af]",
     accent:   "#F4623A",
     image:    "/hero_1.png",
