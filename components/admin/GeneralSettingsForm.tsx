@@ -12,6 +12,8 @@ export default function GeneralSettingsForm({ settings }: Props) {
   const [siteName,    setSiteName]    = useState(settings.site_name ?? "Togolese Shop");
   const [tagline,     setTagline]     = useState(settings.site_tagline ?? "");
   const [annBar,      setAnnBar]      = useState(settings.announcement_bar ?? "");
+  const [annStart,    setAnnStart]    = useState(settings.announcement_bar_start ?? "");
+  const [annEnd,      setAnnEnd]      = useState(settings.announcement_bar_end ?? "");
   const [waNums,      setWaNums]      = useState<string[]>(() => {
     try { return JSON.parse(settings.whatsapp_numbers ?? "[]"); } catch { return []; }
   });
@@ -25,11 +27,13 @@ export default function GeneralSettingsForm({ settings }: Props) {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({
-        site_name:          siteName,
-        site_tagline:       tagline,
-        announcement_bar:   annBar,
-        whatsapp_number:    mainWa,
-        whatsapp_numbers:   JSON.stringify(waNums.filter(Boolean)),
+        site_name:                  siteName,
+        site_tagline:               tagline,
+        announcement_bar:           annBar,
+        announcement_bar_start:     annStart,
+        announcement_bar_end:       annEnd,
+        whatsapp_number:            mainWa,
+        whatsapp_numbers:           JSON.stringify(waNums.filter(Boolean)),
       }),
     });
     setLoading(false);
@@ -58,7 +62,23 @@ export default function GeneralSettingsForm({ settings }: Props) {
           <label className={labelCls}>Texte de la barre d'annonce (en-tête)</label>
           <input type="text" value={annBar} onChange={e => setAnnBar(e.target.value)}
             placeholder="🚚 Livraison rapide · Paiement à la livraison ✅" className={inputCls} />
+          <p className="text-xs text-slate-400 mt-1">Laisser vide pour masquer la bannière.</p>
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Date de début (optionnel)</label>
+            <input type="date" value={annStart} onChange={e => setAnnStart(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Date de fin (optionnel)</label>
+            <input type="date" value={annEnd} onChange={e => setAnnEnd(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+        {annBar && (
+          <div className="rounded-xl bg-brand-900 text-white text-xs font-medium py-2 px-4 text-center">
+            Aperçu : {annBar}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">

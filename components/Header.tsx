@@ -45,19 +45,6 @@ export default function Header() {
 
   return (
     <>
-      {/* ── Top ribbon ── */}
-      <div className="bg-brand-900 text-white text-xs font-medium py-2 px-4 text-center">
-        🚚&nbsp; Livraison rapide à Lomé &nbsp;·&nbsp;
-        <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}`}
-          className="underline font-semibold hover:text-accent-300 transition-colors"
-          target="_blank" rel="noreferrer"
-        >
-          Commander sur WhatsApp
-        </a>
-        &nbsp;·&nbsp; Paiement à la livraison ✅
-      </div>
-
       {/* ── Sticky header ── */}
       <header
         className={clsx(
