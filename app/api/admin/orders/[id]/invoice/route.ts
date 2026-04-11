@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     React.createElement(InvoiceDocument, { order: orderData }) as React.ReactElement<DocumentProps>
   );
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
