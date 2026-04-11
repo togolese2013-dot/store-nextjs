@@ -199,3 +199,40 @@ export async function getCategories(): Promise<Category[]> {
 function tryParse(json: string) {
   try { return JSON.parse(json); } catch { return null; }
 }
+
+/* ─── Product Variants ─── */
+export interface ProductVariant {
+  id: number;
+  produit_id: number;
+  nom: string;
+  options: Record<string, string>;
+  prix: number;
+  stock: number;
+  reference_sku: string | null;
+}
+
+export async function getProductVariants(productId: number): Promise<ProductVariant[]> {
+  try {
+    const [tableCheck] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'product_variants'`
+    );
+    if (!Number(tableCheck[0]?.cnt)) return [];
+
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT * FROM product_variants WHERE produit_id = ? ORDER BY id ASC",
+      [productId]
+    );
+    return rows.map((r) => ({
+      id:            Number(r.id),
+      produit_id:    Number(r.produit_id),
+      nom:           r.nom as string,
+      options:       typeof r.options === "string" ? JSON.parse(r.options) : r.options ?? {},
+      prix:          Number(r.prix),
+      stock:         Number(r.stock),
+      reference_sku: (r.reference_sku ?? null) as string | null,
+    }));
+  } catch {
+    return [];
+  }
+}

@@ -80,7 +80,7 @@ export default function CartPage() {
                 : null;
 
               return (
-                <div key={item.id}
+                <div key={item.cartKey}
                   className="bg-white rounded-3xl border border-slate-100 p-4 sm:p-5 flex gap-4"
                 >
                   {/* Thumbnail */}
@@ -108,6 +108,9 @@ export default function CartPage() {
                         {item.nom}
                       </h3>
                     </Link>
+                    {item.variantNom && (
+                      <p className="text-xs text-slate-500 mb-2 font-medium">{item.variantNom}</p>
+                    )}
 
                     {/* Price */}
                     <div className="flex items-center gap-2 mb-3">
@@ -123,7 +126,7 @@ export default function CartPage() {
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center border-2 border-slate-200 rounded-2xl px-1">
                         <button
-                          onClick={() => updateQty(item.id, item.qty - 1)}
+                          onClick={() => updateQty(item.cartKey, item.qty - 1)}
                           className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors text-slate-600"
                           aria-label="Diminuer"
                         >
@@ -131,7 +134,7 @@ export default function CartPage() {
                         </button>
                         <span className="w-8 text-center text-sm font-bold text-slate-900">{item.qty}</span>
                         <button
-                          onClick={() => updateQty(item.id, item.qty + 1)}
+                          onClick={() => updateQty(item.cartKey, item.qty + 1)}
                           className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors text-slate-600"
                           aria-label="Augmenter"
                         >
@@ -144,7 +147,7 @@ export default function CartPage() {
                           {formatPrice(itemPrice * item.qty)}
                         </span>
                         <button
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => removeItem(item.cartKey)}
                           className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
                           aria-label="Supprimer"
                         >
@@ -176,8 +179,8 @@ export default function CartPage() {
               {/* Lines */}
               <div className="space-y-3 mb-5">
                 {items.map(i => (
-                  <div key={i.id} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-slate-600 line-clamp-1 flex-1">{i.nom} × {i.qty}</span>
+                  <div key={i.cartKey} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-600 line-clamp-1 flex-1">{i.nom}{i.variantNom ? ` · ${i.variantNom}` : ""} × {i.qty}</span>
                     <span className="font-semibold text-slate-800 shrink-0">{formatPrice(calcPrice(i) * i.qty)}</span>
                   </div>
                 ))}

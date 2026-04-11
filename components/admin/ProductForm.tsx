@@ -6,6 +6,7 @@ import type { Category } from "@/lib/utils";
 import { Loader2, Save } from "lucide-react";
 import { clsx } from "clsx";
 import RelatedProductsManager from "./RelatedProductsManager";
+import VariantsManager from "./VariantsManager";
 
 interface ProductData {
   id?:            number;
@@ -301,6 +302,16 @@ export default function ProductForm({ categories, initial }: Props) {
           </label>
         </div>
       </div>
+
+      {/* Section variantes (uniquement en mode édition) */}
+      {isEdit && initial?.id && (
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+          <h2 className="font-display font-700 text-slate-900 text-base border-b border-slate-100 pb-3">
+            Variantes (taille, couleur, modèle…)
+          </h2>
+          <VariantsManager productId={initial.id} />
+        </div>
+      )}
 
       {/* Section produits liés (uniquement en mode édition) */}
       {isEdit && initial?.id && (

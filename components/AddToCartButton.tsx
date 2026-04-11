@@ -3,20 +3,28 @@
 import { useState } from "react";
 import { ShoppingBag, Check, Minus, Plus } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import type { SelectedVariant } from "@/context/CartContext";
 import type { Product } from "@/lib/utils";
 import { clsx } from "clsx";
 import Link from "next/link";
 
-export default function AddToCartButton({ product }: { product: Product }) {
+interface Props {
+  product: Product;
+  variant?: SelectedVariant;
+  stock?: number;  // override product stock when a variant is selected
+}
+
+export default function AddToCartButton({ product, variant, stock }: Props) {
   const { addItem } = useCart();
   const [qty,   setQty]   = useState(1);
   const [added, setAdded] = useState(false);
 
-  const outOf = product.stock_boutique === 0;
+  const effectiveStock = stock !== undefined ? stock : product.stock_boutique;
+  const outOf = effectiveStock === 0;
 
   const handleAdd = () => {
     if (outOf) return;
-    addItem(product, qty);
+    addItem(product, qty, variant);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -46,7 +54,7 @@ export default function AddToCartButton({ product }: { product: Product }) {
           </button>
           <span className="w-8 text-center text-sm font-bold text-slate-900">{qty}</span>
           <button
-            onClick={() => setQty(q => Math.min(product.stock_boutique, q + 1))}
+            onClick={() => setQty(q => Math.min(effectiveStock, q + 1))}
             className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors text-slate-600"
             aria-label="Augmenter"
           >

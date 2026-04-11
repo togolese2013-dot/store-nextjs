@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProductBySlug, getProducts, finalPrice, formatPrice } from "@/lib/db";
+import { getProductBySlug, getProducts, getProductVariants, finalPrice, formatPrice } from "@/lib/db";
 import { getRelatedProductsWithDetails } from "@/lib/related-products";
 import ProductCard from "@/components/ProductCard";
 import AddToCartButton from "@/components/AddToCartButton";
+import ProductVariantSelector from "@/components/ProductVariantSelector";
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
 import Image from "next/image";
 import Link from "next/link";
@@ -62,6 +63,10 @@ export default async function ProductPage({ params }: PageProps) {
   const waText = encodeURIComponent(
     `Bonjour, je veux commander :\n*${product.nom}*\n💰 Prix : ${formatPrice(price)}\n🔗 Réf : ${product.reference}\n\nPouvez-vous confirmer la disponibilité ?`
   );
+
+  /* Variants */
+  const variants = await getProductVariants(product.id);
+  const hasVariants = variants.length > 0;
 
   /* Related products (same category, excluding this one) */
   const related = product.categorie_id
@@ -158,43 +163,6 @@ export default async function ProductPage({ params }: PageProps) {
                 <span className="text-sm text-slate-500 font-medium">5.0 · 12 avis</span>
               </div>
 
-              {/* Price */}
-              <div className="flex items-end gap-3 mb-6">
-                <span className={`font-display text-4xl font-800 ${isPromo ? "text-accent-500" : "text-brand-900"}`}>
-                  {formatPrice(price)}
-                </span>
-                {isPromo && (
-                  <div className="flex flex-col">
-                    <span className="text-lg text-slate-400 line-through mb-0.5">
-                      {formatPrice(product.prix_unitaire)}
-                    </span>
-                    <span className="text-xs font-bold text-accent-500 bg-accent-50 px-2 py-0.5 rounded-full">
-                      Vous économisez {formatPrice(product.prix_unitaire - price)}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Stock badge */}
-              <div className="mb-6">
-                {outOf ? (
-                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-100 text-slate-500 text-sm font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-slate-400" />
-                    Rupture de stock
-                  </span>
-                ) : isLow ? (
-                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-50 text-amber-700 text-sm font-semibold border border-amber-200">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    Plus que {product.stock_boutique} en stock !
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-green-50 text-green-700 text-sm font-semibold border border-green-200">
-                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                    En stock · Expédié sous 24h
-                  </span>
-                )}
-              </div>
-
               {/* Description */}
               {product.description && (
                 <div className="mb-6 pb-6 border-b border-slate-100">
@@ -202,18 +170,66 @@ export default async function ProductPage({ params }: PageProps) {
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-auto">
-                <AddToCartButton product={product} />
+              {hasVariants ? (
+                /* Variant selector (handles price, stock, add-to-cart) */
+                <ProductVariantSelector
+                  product={product}
+                  variants={variants}
+                  waText={waText}
+                />
+              ) : (
+                <>
+                  {/* Price */}
+                  <div className="flex items-end gap-3 mb-6">
+                    <span className={`font-display text-4xl font-800 ${isPromo ? "text-accent-500" : "text-brand-900"}`}>
+                      {formatPrice(price)}
+                    </span>
+                    {isPromo && (
+                      <div className="flex flex-col">
+                        <span className="text-lg text-slate-400 line-through mb-0.5">
+                          {formatPrice(product.prix_unitaire)}
+                        </span>
+                        <span className="text-xs font-bold text-accent-500 bg-accent-50 px-2 py-0.5 rounded-full">
+                          Vous économisez {formatPrice(product.prix_unitaire - price)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                <a
-                  href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${waText}`}
-                  target="_blank" rel="noreferrer"
-                  className="flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#25D366] text-white font-bold text-sm hover:bg-[#1da851] transition-all hover:shadow-lg"
-                >
-                  <WaIcon /> Commander sur WhatsApp
-                </a>
-              </div>
+                  {/* Stock badge */}
+                  <div className="mb-6">
+                    {outOf ? (
+                      <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-100 text-slate-500 text-sm font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        Rupture de stock
+                      </span>
+                    ) : isLow ? (
+                      <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-50 text-amber-700 text-sm font-semibold border border-amber-200">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        Plus que {product.stock_boutique} en stock !
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-green-50 text-green-700 text-sm font-semibold border border-green-200">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        En stock · Expédié sous 24h
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3 mt-auto">
+                    <AddToCartButton product={product} />
+
+                    <a
+                      href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${waText}`}
+                      target="_blank" rel="noreferrer"
+                      className="flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#25D366] text-white font-bold text-sm hover:bg-[#1da851] transition-all hover:shadow-lg"
+                    >
+                      <WaIcon /> Commander sur WhatsApp
+                    </a>
+                  </div>
+                </>
+              )}
 
               {/* Trust badges */}
               <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-2 gap-3">
