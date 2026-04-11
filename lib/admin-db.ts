@@ -527,7 +527,7 @@ export async function getCRMStats() {
 
   return {
     newClients30d: Number(newClients[0]?.cnt ?? 0),
-    topClients: topClients,
+    topClients: topClients as unknown as Record<string, unknown>[],
   };
 }
 

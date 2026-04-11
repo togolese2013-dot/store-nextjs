@@ -37,7 +37,7 @@ export default async function CRMPage() {
           <div>
             <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Top client</p>
             <p className="text-sm font-bold text-slate-900 truncate">
-              {stats.topClients[0]?.nom || stats.topClients[0]?.telephone || "—"}
+              {String(stats.topClients[0]?.nom || stats.topClients[0]?.telephone || "—")}
             </p>
             {stats.topClients[0] && (
               <p className="text-xs text-slate-400">{formatPrice(Number(stats.topClients[0].total_spent))}</p>
