@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { getOrderById } from "@/lib/admin-db";
 import { renderToBuffer } from "@react-pdf/renderer";
+import type { DocumentProps } from "@react-pdf/renderer";
 import { InvoiceDocument } from "@/lib/pdf/InvoiceDocument";
 import React from "react";
 
@@ -19,7 +20,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     items: typeof order.items === "string" ? JSON.parse(order.items) : order.items,
   };
 
-  const buffer = await renderToBuffer(React.createElement(InvoiceDocument, { order: orderData }));
+  const buffer = await renderToBuffer(
+    React.createElement(InvoiceDocument, { order: orderData }) as React.ReactElement<DocumentProps>
+  );
 
   return new NextResponse(buffer, {
     status: 200,
