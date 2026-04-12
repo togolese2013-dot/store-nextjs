@@ -18,8 +18,8 @@ interface Produit {
   id: number;
   nom: string;
   reference: string;
-  prix: number;
-  stock: number;
+  prix_unitaire: number;
+  stock_boutique: number;
 }
 
 export default function NouvelleVentePage() {
@@ -38,7 +38,7 @@ export default function NouvelleVentePage() {
   const search = useCallback(async (q: string) => {
     setQuery(q);
     if (q.length < 2) { setResults([]); return; }
-    const res = await fetch(`/api/admin/products?search=${encodeURIComponent(q)}&limit=8`);
+    const res = await fetch(`/api/admin/products?q=${encodeURIComponent(q)}&limit=8`);
     if (res.ok) {
       const data = await res.json();
       setResults(data.products ?? data.produits ?? []);
@@ -58,7 +58,7 @@ export default function NouvelleVentePage() {
       }
       return [...prev, {
         produit_id: p.id, produit_nom: p.nom, produit_ref: p.reference,
-        prix_unitaire: p.prix, quantite: 1, total: p.prix,
+        prix_unitaire: p.prix_unitaire, quantite: 1, total: p.prix_unitaire,
       }];
     });
   }
@@ -171,8 +171,8 @@ export default function NouvelleVentePage() {
                       <p className="text-xs text-slate-400">{p.reference}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-sm text-brand-800">{formatPrice(p.prix)}</p>
-                      <p className="text-xs text-slate-400">Stock: {p.stock ?? "—"}</p>
+                      <p className="font-bold text-sm text-brand-800">{formatPrice(p.prix_unitaire)}</p>
+                      <p className="text-xs text-slate-400">Stock: {p.stock_boutique ?? "—"}</p>
                     </div>
                   </button>
                 ))}

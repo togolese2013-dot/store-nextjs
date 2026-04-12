@@ -34,8 +34,8 @@ interface Produit {
   id: number;
   nom: string;
   reference: string;
-  prix: number;
-  stock: number;
+  prix_unitaire: number;
+  stock_boutique: number;
 }
 
 type View = "list" | "new";
@@ -80,7 +80,7 @@ export default function ProformatPage() {
   async function search(q: string) {
     setQuery(q);
     if (q.length < 2) { setResults([]); return; }
-    const res = await fetch(`/api/admin/products?search=${encodeURIComponent(q)}&limit=6`);
+    const res = await fetch(`/api/admin/products?q=${encodeURIComponent(q)}&limit=6`);
     if (res.ok) {
       const data = await res.json();
       setResults(data.products ?? data.produits ?? []);
@@ -94,7 +94,7 @@ export default function ProformatPage() {
       if (idx >= 0) {
         return prev.map((i, j) => j === idx ? { ...i, quantite: i.quantite + 1, total: (i.quantite + 1) * i.prix_unitaire } : i);
       }
-      return [...prev, { produit_id: p.id, produit_nom: p.nom, produit_ref: p.reference, prix_unitaire: p.prix, quantite: 1, total: p.prix }];
+      return [...prev, { produit_id: p.id, produit_nom: p.nom, produit_ref: p.reference, prix_unitaire: p.prix_unitaire, quantite: 1, total: p.prix_unitaire }];
     });
   }
 
@@ -332,7 +332,7 @@ export default function ProformatPage() {
                         <p className="font-semibold text-sm text-slate-900">{p.nom}</p>
                         <p className="text-xs text-slate-400">{p.reference}</p>
                       </div>
-                      <p className="font-bold text-sm text-amber-700">{formatPrice(p.prix)}</p>
+                      <p className="font-bold text-sm text-amber-700">{formatPrice(p.prix_unitaire)}</p>
                     </button>
                   ))}
                 </div>
