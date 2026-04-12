@@ -109,7 +109,6 @@ export async function DELETE(
 ) {
   const { id } = params;
 
-  // récupère relatedId depuis l'URL ou body
   const { searchParams } = new URL(req.url);
   const relatedId = searchParams.get("relatedId");
 
