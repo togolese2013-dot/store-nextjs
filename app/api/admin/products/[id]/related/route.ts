@@ -101,27 +101,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 /* DELETE /api/admin/products/[id]/related/[relatedId] — supprimer une association */
-import { NextRequest, NextResponse } from "next/server";
-
 export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest, 
+  { params }: { params: Promise<{ id: string; relatedId: string }> }
 ) {
-  const { id } = params;
-
-  const { searchParams } = new URL(req.url);
-  const relatedId = searchParams.get("relatedId");
-
-  if (!relatedId) {
-    return NextResponse.json(
-      { error: "relatedId manquant" },
-      { status: 400 }
-    );
+  const session = await getAdminSession();
+  if (!session) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
 
-  return NextResponse.json({
-    message: "OK",
-    id,
-    relatedId,
-  });
+  const { id, relatedId } = await params;
+  
+  try {
+    await db.execute(
+      "DELETE FROM produits_liés WHERE produit_id = ? AND id = ?",
+      [Number(id), Number(relatedId)]
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur.";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
