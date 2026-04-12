@@ -137,8 +137,8 @@ export default function ProformatPage() {
         note: note || null,
       }),
     });
-    const data = await res.json();
     if (res.ok) {
+      const data = await res.json();
       setCreated(data.reference);
       setItems([]); setClientNom(""); setClientTel(""); setClientAdresse(""); setClientEmail("");
       setRemise(0); setNote(""); setValidite(30);

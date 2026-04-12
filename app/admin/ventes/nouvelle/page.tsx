@@ -95,8 +95,8 @@ export default function NouvelleVentePage() {
           note: note || null,
         }),
       });
-      const data = await res.json();
       if (res.ok) {
+        const data = await res.json();
         setSuccess(data.reference);
         setCart([]);
         setRemise(0);
