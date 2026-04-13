@@ -4,32 +4,14 @@ import { getAdminSession } from "@/lib/auth";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
-// ─── Cloudinary upload (production) ──────────────────────────────────────────
-async function uploadToCloudinary(file: File): Promise<string> {
-  const { v2: cloudinary } = await import("cloudinary");
+async function saveFile(file: File): Promise<string> {
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new Error(`Type non autorisé: ${file.type}`);
+  }
+  if (file.size > MAX_SIZE) {
+    throw new Error("Fichier trop volumineux (max 5 Mo)");
+  }
 
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key:    process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-
-  const bytes  = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload_stream(
-      { folder: "togolese-shop/products", resource_type: "image" },
-      (error, result) => {
-        if (error || !result) reject(error ?? new Error("Upload échoué"));
-        else resolve(result.secure_url);
-      }
-    ).end(buffer);
-  });
-}
-
-// ─── Local disk upload (development fallback) ─────────────────────────────────
-async function uploadToLocal(file: File): Promise<string> {
   const { writeFile, mkdir } = await import("fs/promises");
   const { join }             = await import("path");
   const { randomUUID }       = await import("crypto");
@@ -43,21 +25,6 @@ async function uploadToLocal(file: File): Promise<string> {
   await writeFile(join(dir, filename), Buffer.from(bytes));
 
   return `/uploads/${filename}`;
-}
-
-async function saveFile(file: File): Promise<string> {
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error(`Type non autorisé: ${file.type}`);
-  }
-  if (file.size > MAX_SIZE) {
-    throw new Error("Fichier trop volumineux (max 5 Mo)");
-  }
-
-  // Use Cloudinary when credentials are configured, otherwise local disk
-  if (process.env.CLOUDINARY_CLOUD_NAME) {
-    return uploadToCloudinary(file);
-  }
-  return uploadToLocal(file);
 }
 
 /* POST /api/admin/upload — single or multiple files */

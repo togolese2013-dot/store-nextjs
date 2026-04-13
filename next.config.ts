@@ -5,10 +5,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["mysql2"],
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "store.togolese.net" },
       { protocol: "http",  hostname: "localhost" },
-      // Cloudinary — production image hosting
-      { protocol: "https", hostname: "res.cloudinary.com" },
     ],
     unoptimized: process.env.NODE_ENV === "development",
   },

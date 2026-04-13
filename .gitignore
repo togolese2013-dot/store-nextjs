@@ -17,7 +17,7 @@ build/
 .env.test.local
 .env.production.local
 
-# Uploads (local dev only — production uses Cloudinary)
+# Uploaded images (local storage)
 public/uploads/
 
 # Misc
@@ -31,5 +31,3 @@ yarn-error.log*
 tsconfig.tsbuildinfo
 next-env.d.ts
 
-# Netlify
-.netlify/

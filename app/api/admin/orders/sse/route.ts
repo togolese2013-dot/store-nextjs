@@ -39,12 +39,6 @@ export async function GET(req: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Close after 25s so Netlify serverless functions don't timeout.
-      // EventSource reconnects automatically — the ?since param keeps no orders missed.
-      const timeout = setTimeout(() => {
-        try { controller.close(); } catch { /* already closed */ }
-      }, 25_000);
-
       const interval = setInterval(async () => {
         try {
           const orders = await getNewOrders(since);
@@ -77,7 +71,6 @@ export async function GET(req: Request) {
       // Clean up when client disconnects
       req.signal.addEventListener("abort", () => {
         clearInterval(interval);
-        clearTimeout(timeout);
         try { controller.close(); } catch { /* already closed */ }
       });
     },

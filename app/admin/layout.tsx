@@ -20,7 +20,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {children}
         </main>
       </div>
-      {/* Real-time order notifications (SSE) */}
       <OrderNotifier />
     </div>
   );
