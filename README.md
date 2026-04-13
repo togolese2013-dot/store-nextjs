@@ -1,6 +1,6 @@
 # Togolese Shop — Document de handoff
 
-> Boutique e-commerce Next.js 15 déployée sur Netlify · Base de données MySQL cloud · Paiement à la livraison
+> Boutique e-commerce Next.js 15 · Base de données MySQL · Paiement à la livraison · Upload local
 
 ---
 
@@ -14,9 +14,9 @@
 | Base de données | MySQL (cloud — Railway ou PlanetScale) |
 | Auth admin | JWT via `jose` + cookies httpOnly |
 | Passwords | bcryptjs |
-| Upload images | Cloudinary |
+| Upload images | Local (`public/uploads/`) |
 | PDF factures | @react-pdf/renderer |
-| Déploiement | Netlify + `@netlify/plugin-nextjs` |
+| Déploiement | Vercel / Railway (auto-detect Next.js) |
 | Dev local | `npx next dev` (webpack, **pas** Turbopack) |
 
 ---
@@ -27,7 +27,7 @@ Créer un fichier `.env.local` à la racine (non commité) :
 
 ```env
 # Base de données MySQL
-DB_HOST=your-host
+DB_HOST=localhost
 DB_PORT=3306
 DB_USER=your-user
 DB_PASSWORD=your-password
@@ -37,18 +37,11 @@ DB_NAME=your-database
 JWT_SECRET=change-me-in-production
 
 # URL publique du site
-NEXT_PUBLIC_SITE_URL=https://your-site.netlify.app
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 # WhatsApp (numéro principal, format international sans +)
 NEXT_PUBLIC_WHATSAPP_NUMBER=22890000000
-
-# Cloudinary (upload images)
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
 ```
-
-Sur Netlify, ces variables se définissent dans **Site Settings → Environment Variables**.
 
 ---
 
@@ -61,7 +54,7 @@ npm install
 # 2. Créer le .env.local (voir ci-dessus)
 
 # 3. Initialiser la base de données
-# Exécuter scripts/schema.sql sur ta base MySQL cloud
+# Exécuter scripts/schema.sql sur ta base MySQL
 # Puis scripts/features-migration.sql (colonnes supplémentaires)
 # Puis scripts/gallery-migration.sql (galerie images)
 # Puis scripts/related-products-migration.sql (produits liés)
@@ -84,8 +77,15 @@ app/
 │   ├── cart/            # Panier
 │   └── checkout/        # Commande
 ├── admin/               # Back-office (protégé par JWT)
-│   ├── page.tsx         # Dashboard
-│   ├── products/        # Gestion produits
+│   ├── page.tsx         # Landing 4 modules (MAGASIN, BOUTIQUE, STORE, CRM)
+│   ├── layout.tsx       # Layout avec sidebar contextuelle par module
+│   ├── products/        # Tous les produits + dashboard stock
+│   ├── stock/           # Mouvements de stock (en construction)
+│   ├── stock-boutique/  # Stock boutique (en construction)
+│   ├── ventes/          # Ventes (en construction)
+│   ├── factures/        # Factures clients (en construction)
+│   ├── proforma/        # Devis proforma (en construction)
+│   ├── finance/         # Finance (en construction)
 │   ├── orders/          # Gestion commandes
 │   ├── categories/      # Catégories
 │   ├── coupons/         # Codes promo
@@ -101,6 +101,8 @@ app/
 
 components/
 ├── admin/               # Composants back-office
+│   ├── AdminSidebar.tsx         # Sidebar contextuelle par module
+│   ├── AdminProductActions.tsx  # Actions ligne produit
 │   ├── ProductForm.tsx          # Formulaire produit (+ variantes + produits liés)
 │   ├── VariantsManager.tsx      # Gestion variantes par SKU
 │   ├── RelatedProductsManager.tsx
@@ -119,13 +121,40 @@ context/
 
 lib/
 ├── db.ts                # Pool MySQL + queries publiques + getProductVariants
-├── admin-db.ts          # Queries admin (orders, clients, settings…)
+├── admin-db.ts          # Queries admin (orders, clients, settings, getStockStats…)
 ├── auth.ts              # JWT session
 └── utils.ts             # Types Product, formatPrice, finalPrice
 
 public/
+├── uploads/             # Images produits uploadées en local
 └── sw.js                # Service Worker PWA (offline + push notifs)
 ```
+
+---
+
+## Architecture admin — Modules
+
+La page `/admin` est une landing avec **4 cartes modules** :
+
+| Module | Couleur | Chemin | Pages disponibles |
+|---|---|---|---|
+| MAGASIN | `brand-900` | `/admin/products`, `/admin/stock`, `/admin/categories`… | Tous les produits ✅, Niveau de stock 🚧, Catégories ✅… |
+| BOUTIQUE | `amber-500` | `/admin/orders`, `/admin/ventes`… | Commandes ✅, Ventes 🚧, Stock boutique 🚧, Factures 🚧, Proformat 🚧, Finance 🚧 |
+| STORE | `emerald-700` | — | En construction |
+| CRM | `indigo-700` | `/admin/crm`… | En construction |
+
+La **sidebar** détecte le module actif via le préfixe d'URL (`ROUTE_TO_MODULE` dans `AdminSidebar.tsx`) et n'affiche que les menus du module courant. Sur la landing `/admin`, un overlay CSS masque la sidebar.
+
+---
+
+## Dashboard stock (page produits)
+
+La page `/admin/products` affiche en haut :
+
+- **4 boutons d'action** : Ajouter un produit, Nouvelle Entrée, Nouvelle Sortie, Ajustement
+- **6 cartes de stats** : Produits en stock, Valeur totale du stock, Articles stock faible, Articles en rupture, Entrées aujourd'hui, Sorties aujourd'hui
+
+Les stats sont calculées par `getStockStats()` dans `lib/admin-db.ts`. Les mouvements (entrées/sorties) renvoient 0 pour l'instant — à implémenter avec la table de mouvements.
 
 ---
 
@@ -195,8 +224,9 @@ Password : admin123
 - [x] PWA : Service Worker, mode hors-ligne, icônes
 
 ### Back-office (/admin)
-- [x] Dashboard avec stats 30 jours et dernières commandes
-- [x] Gestion produits (CRUD, galerie multi-images via Cloudinary, actif/inactif)
+- [x] Landing 4 modules (MAGASIN, BOUTIQUE, STORE, CRM) avec sidebar contextuelle
+- [x] Dashboard stock sur la page produits (6 stats + 4 actions)
+- [x] Gestion produits (CRUD, galerie multi-images upload local, actif/inactif)
 - [x] **Variantes produit** — ajout/modification/suppression par produit
 - [x] Import/Export CSV produits
 - [x] Gestion commandes avec timeline, statuts, génération de facture PDF
@@ -212,26 +242,22 @@ Password : admin123
 ### Infrastructure
 - [x] Auth JWT httpOnly (expiration 7 jours, refresh automatique)
 - [x] Protection middleware sur `/admin` et `/api/admin`
-- [x] Upload Cloudinary avec transformations auto
+- [x] Upload images local (dossier `public/uploads/`) — plus de dépendance Cloudinary
 - [x] Introspection dynamique du schéma DB (colonnes optionnelles)
 - [x] Service Worker PWA avec `notificationclick` → `/admin/orders`
 
 ---
 
-## Déploiement Netlify
+## Pages en construction (à implémenter)
 
-Le repo est connecté à Netlify sur la branche `main`.  
-Chaque `git push origin main` déclenche un build automatique.
-
-```bash
-# Vérifier le build en local avant de pousser
-npm run build
-
-# Pousser
-git push origin main
-```
-
-Le fichier `netlify.toml` est configuré avec `@netlify/plugin-nextjs`.
+| Page | Chemin | Module | Description |
+|---|---|---|---|
+| Niveau de stock | `/admin/stock` | MAGASIN | Mouvements entrées/sorties avec historique |
+| Ventes | `/admin/ventes` | BOUTIQUE | Tableau de bord des ventes |
+| Stock boutique | `/admin/stock-boutique` | BOUTIQUE | Suivi stock en boutique physique |
+| Factures | `/admin/factures` | BOUTIQUE | Création et gestion des factures clients |
+| Proformat | `/admin/proforma` | BOUTIQUE | Création et gestion des devis proforma |
+| Finance | `/admin/finance` | BOUTIQUE | Vue d'ensemble financière — recettes, dépenses, marges |
 
 ---
 
@@ -239,18 +265,25 @@ Le fichier `netlify.toml` est configuré avec `@netlify/plugin-nextjs`.
 
 | # | Fonctionnalité | Priorité |
 |---|---|---|
-| 11 | Programme de fidélité (points clients) | Moyenne |
-| 12 | Récupération paniers abandonnés | Moyenne |
-| 13 | Analytics intégrées (ventes, conversions) | Basse |
-| 14 | Notifications email commandes | Basse |
-| 15 | Intégration paiement mobile (Flooz, T-Money) | Haute |
+| 1 | Mouvements de stock (entrées/sorties) avec historique | Haute |
+| 2 | Tableau de bord ventes | Haute |
+| 3 | Génération de factures et proforma | Haute |
+| 4 | Intégration paiement mobile (Flooz, T-Money) | Haute |
+| 5 | Module STORE et CRM complets | Moyenne |
+| 6 | Programme de fidélité (points clients) | Moyenne |
+| 7 | Récupération paniers abandonnés | Moyenne |
+| 8 | Analytics intégrées (ventes, conversions) | Basse |
+| 9 | Notifications email commandes | Basse |
 
 ---
 
 ## Notes techniques importantes
 
 - **Turbopack** est désactivé en dev local (`npx next dev` au lieu de `npm run dev`) — il panique dans les git worktrees avec des `node_modules` symlinkés.
+- **Worktree** : `app/` est lu depuis le worktree, mais `@/components` et `@/lib` résolvent depuis le repo principal. Après modification d'un fichier `components/` ou `lib/` dans le worktree, copier vers le repo principal : `cp worktree/components/admin/X.tsx main/components/admin/X.tsx`.
+- **Cache webpack** : si un nouveau composant n'est pas pris en compte, supprimer `.next/` et relancer.
 - **`unstable_noStore()`** est utilisé sur `AnnouncementBar` pour forcer le rendu dynamique (paramètres lus en temps réel).
 - **`product_variants`** ne nécessite pas de migration manuelle — la table est créée automatiquement.
 - **CartContext** supporte la migration transparente des anciens paniers localStorage (items sans `cartKey`).
 - Le champ `items` des commandes est un JSON contenant le snapshot des produits au moment de la commande (nom, prix, qty, variante).
+- **Upload images** : les images sont sauvegardées dans `public/uploads/`. En production, ce dossier doit être persistant (non géré par Vercel — utiliser un volume ou S3).
