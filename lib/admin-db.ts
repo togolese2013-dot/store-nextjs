@@ -605,3 +605,25 @@ export async function updateProductStock(produit_id: number, entrepot_id: number
     [produit_id, entrepot_id, stock]
   );
 }
+
+/* ─── Stock dashboard stats ─── */
+export async function getStockStats() {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(`
+    SELECT
+      SUM(CASE WHEN stock_boutique > 0 THEN 1 ELSE 0 END)                         AS en_stock,
+      SUM(CASE WHEN stock_boutique = 0  THEN 1 ELSE 0 END)                         AS en_rupture,
+      SUM(CASE WHEN stock_boutique > 0 AND stock_boutique <= 5 THEN 1 ELSE 0 END)  AS stock_faible,
+      COALESCE(SUM(prix_unitaire * stock_boutique), 0)                              AS valeur_totale
+    FROM produits
+    WHERE actif = 1
+  `);
+  const r = rows[0];
+  return {
+    en_stock:      Number(r.en_stock      ?? 0),
+    en_rupture:    Number(r.en_rupture    ?? 0),
+    stock_faible:  Number(r.stock_faible  ?? 0),
+    valeur_totale: Number(r.valeur_totale ?? 0),
+    entrees_jour:  0,
+    sorties_jour:  0,
+  };
+}

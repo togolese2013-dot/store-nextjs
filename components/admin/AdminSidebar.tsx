@@ -7,6 +7,7 @@ import {
   Package, ShoppingBag, Settings, Users, MessageCircle, Send, Star, Tag,
   LogOut, Menu, X, ChevronRight, Globe, Palette, MapPin, CreditCard, Link2,
   FolderOpen, Image, Warehouse, Zap, ArrowLeft, ShoppingCart,
+  BarChart2, TrendingUp, Archive, FileText, FilePlus, DollarSign,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -25,11 +26,12 @@ const MODULES: Record<string, {
     color:     "bg-brand-900",
     textColor: "text-brand-900",
     items: [
-      { label: "Produits",         href: "/admin/products",      icon: Package },
-      { label: "Catégories",       href: "/admin/categories",    icon: FolderOpen },
-      { label: "Entrepôts",        href: "/admin/entrepots",     icon: Warehouse },
-      { label: "Avis clients",     href: "/admin/reviews",       icon: Star },
-      { label: "Import / Export",  href: "/admin/import-export", icon: Zap },
+      { label: "Tous les produits", href: "/admin/products",      icon: Package },
+      { label: "Niveau de stock",   href: "/admin/stock",         icon: BarChart2 },
+      { label: "Catégories",        href: "/admin/categories",    icon: FolderOpen },
+      { label: "Entrepôts",         href: "/admin/entrepots",     icon: Warehouse },
+      { label: "Avis clients",      href: "/admin/reviews",       icon: Star },
+      { label: "Import / Export",   href: "/admin/import-export", icon: Zap },
     ],
   },
   boutique: {
@@ -37,8 +39,13 @@ const MODULES: Record<string, {
     color:     "bg-amber-500",
     textColor: "text-amber-600",
     items: [
-      { label: "Commandes",  href: "/admin/orders",  icon: ShoppingCart },
-      { label: "Coupons",    href: "/admin/coupons", icon: Tag },
+      { label: "Commandes",      href: "/admin/orders",          icon: ShoppingCart },
+      { label: "Ventes",         href: "/admin/ventes",          icon: TrendingUp },
+      { label: "Stock boutique", href: "/admin/stock-boutique",  icon: Archive },
+      { label: "Facture",        href: "/admin/factures",        icon: FileText },
+      { label: "Proformat",      href: "/admin/proforma",        icon: FilePlus },
+      { label: "Finance",        href: "/admin/finance",         icon: DollarSign },
+      { label: "Coupons",        href: "/admin/coupons",         icon: Tag },
     ],
   },
   store: {
@@ -75,7 +82,13 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/entrepots",     "magasin"],
   ["/admin/reviews",       "magasin"],
   ["/admin/import-export", "magasin"],
+  ["/admin/stock",         "magasin"],
   ["/admin/orders",        "boutique"],
+  ["/admin/ventes",        "boutique"],
+  ["/admin/stock-boutique","boutique"],
+  ["/admin/factures",      "boutique"],
+  ["/admin/proforma",      "boutique"],
+  ["/admin/finance",       "boutique"],
   ["/admin/coupons",       "boutique"],
   ["/admin/settings",      "store"],
   ["/admin/users",         "store"],

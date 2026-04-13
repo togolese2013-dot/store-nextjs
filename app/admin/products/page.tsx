@@ -1,11 +1,16 @@
 import { getProducts, getProductCount, getCategories } from "@/lib/db";
+import { getStockStats } from "@/lib/admin-db";
 import { finalPrice, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import AdminProductActions from "@/components/admin/AdminProductActions";
 import Image from "next/image";
-import { Plus, Search, Package } from "lucide-react";
+import {
+  Plus, Search, Package,
+  PackagePlus, PackageMinus, ArrowLeftRight,
+  Boxes, AlertTriangle, XCircle, TrendingDown, TrendingUp, DollarSign,
+} from "lucide-react";
 
-export const metadata = { title: "Produits" };
+export const metadata = { title: "Tous les produits" };
 
 interface PageProps {
   searchParams: Promise<{ q?: string; category?: string; page?: string }>;
@@ -19,10 +24,11 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   const limit  = 20;
   const offset = (page - 1) * limit;
 
-  const [products, total, categories] = await Promise.all([
+  const [products, total, categories, stats] = await Promise.all([
     getProducts({ search: q, categoryId: catId, limit, offset }),
     getProductCount({ search: q, categoryId: catId }),
     getCategories(),
+    getStockStats(),
   ]);
 
   const totalPages = Math.ceil(total / limit);
@@ -38,20 +44,102 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display font-800 text-2xl text-slate-900">Produits</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{total} produit{total > 1 ? "s" : ""} au total</p>
+          <h1 className="font-display font-800 text-2xl text-slate-900">Tous les produits</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Niveaux de stock actuels</p>
         </div>
-        <Link href="/admin/products/new"
-          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Nouveau produit
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/products/new"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Ajouter un produit
+          </Link>
+          <Link href="/admin/stock"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
+          >
+            <PackagePlus className="w-4 h-4" /> Nouvelle Entrée
+          </Link>
+          <Link href="/admin/stock"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors"
+          >
+            <PackageMinus className="w-4 h-4" /> Nouvelle Sortie
+          </Link>
+          <Link href="/admin/stock"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 text-white font-bold text-sm hover:bg-amber-500 transition-colors"
+          >
+            <ArrowLeftRight className="w-4 h-4" /> Ajustement
+          </Link>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* ── Stat cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Produits en stock */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Produits en stock</p>
+            <Boxes className="w-5 h-5 text-slate-300" />
+          </div>
+          <p className="font-display font-800 text-3xl text-slate-900">{stats.en_stock}</p>
+        </div>
+
+        {/* Valeur totale */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Valeur totale du stock</p>
+            <DollarSign className="w-5 h-5 text-slate-300" />
+          </div>
+          <p className="font-display font-800 text-3xl text-slate-900">{formatPrice(stats.valeur_totale)}</p>
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wide">FCFA</span>
+        </div>
+
+        {/* Stock faible */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Articles stock faible</p>
+            <AlertTriangle className="w-5 h-5 text-amber-400" />
+          </div>
+          <p className="font-display font-800 text-3xl text-slate-900">{stats.stock_faible}</p>
+          {stats.stock_faible > 0 && (
+            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">Action requise</span>
+          )}
+        </div>
+
+        {/* En rupture */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Articles en rupture</p>
+            <XCircle className="w-5 h-5 text-red-400" />
+          </div>
+          <p className="font-display font-800 text-3xl text-slate-900">{stats.en_rupture}</p>
+          {stats.en_rupture > 0 && (
+            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">Épuisé</span>
+          )}
+        </div>
+
+        {/* Entrées aujourd'hui */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Entrées aujourd&apos;hui</p>
+            <TrendingDown className="w-5 h-5 text-emerald-400" />
+          </div>
+          <p className="font-display font-800 text-3xl text-slate-900">{stats.entrees_jour}</p>
+        </div>
+
+        {/* Sorties aujourd'hui */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sorties aujourd&apos;hui</p>
+            <TrendingUp className="w-5 h-5 text-red-400" />
+          </div>
+          <p className="font-display font-800 text-3xl text-slate-900">{stats.sorties_jour}</p>
+        </div>
+      </div>
+
+      {/* ── Filters ── */}
       <form method="GET" className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -83,7 +171,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         )}
       </form>
 
-      {/* Table */}
+      {/* ── Table ── */}
       <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
         {products.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-slate-400">
@@ -92,7 +180,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           </div>
         ) : (
           <>
-            {/* Desktop table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -166,7 +253,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
               </table>
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100">
                 <p className="text-sm text-slate-500">
