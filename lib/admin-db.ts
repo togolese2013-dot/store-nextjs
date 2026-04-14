@@ -794,3 +794,188 @@ export async function getRecentBoutiqueMovements(limit = 30): Promise<BoutiqueMo
   );
   return rows as BoutiqueMouvement[];
 }
+
+/* ─── Ventes : Factures ─── */
+export interface FactureItem {
+  nom:       string;
+  reference: string;
+  qty:       number;
+  prix:      number;
+  total:     number;
+}
+
+export interface Facture {
+  id:           number;
+  reference:    string;
+  client_nom:   string;
+  client_tel:   string | null;
+  client_email: string | null;
+  items:        string;
+  sous_total:   number;
+  remise:       number;
+  total:        number;
+  statut:       "brouillon" | "valide" | "paye" | "annule";
+  note:         string | null;
+  admin_id:     number | null;
+  created_at:   string;
+  updated_at:   string;
+}
+
+export async function listFactures(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Facture[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut } = opts;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (statut) { conditions.push("statut = ?"); params.push(statut); }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT * FROM factures ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+  );
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures ${where}`, params);
+  return { items: rows as Facture[], total: Number(cnt[0]?.cnt ?? 0) };
+}
+
+export async function getFactureById(id: number): Promise<Facture | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT * FROM factures WHERE id = ? LIMIT 1", [id]);
+  return (rows[0] as Facture) ?? null;
+}
+
+function generateVenteRef(prefix: string): string {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const time = now.toTimeString().slice(0, 8).replace(/:/g, "");
+  const seq  = String(Math.floor(1 + Math.random() * 9999)).padStart(4, "0");
+  return `${prefix}-${date}_${time}-${seq}`;
+}
+
+export async function createFacture(data: {
+  client_nom: string; client_tel?: string; client_email?: string;
+  items: FactureItem[]; sous_total: number; remise?: number; total: number;
+  statut?: Facture["statut"]; note?: string; admin_id?: number;
+}): Promise<number> {
+  const reference = generateVenteRef("FV");
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO factures (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, note, admin_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [reference, data.client_nom, data.client_tel ?? null, data.client_email ?? null,
+     JSON.stringify(data.items), data.sous_total, data.remise ?? 0, data.total,
+     data.statut ?? "brouillon", data.note ?? null, data.admin_id ?? null]
+  );
+  return result.insertId;
+}
+
+export async function updateFactureStatut(id: number, statut: Facture["statut"]) {
+  await db.execute("UPDATE factures SET statut = ? WHERE id = ?", [statut, id]);
+}
+
+export async function deleteFacture(id: number) {
+  await db.execute("DELETE FROM factures WHERE id = ?", [id]);
+}
+
+/* ─── Ventes : Devis ─── */
+export interface Devis {
+  id:           number;
+  reference:    string;
+  client_nom:   string;
+  client_tel:   string | null;
+  client_email: string | null;
+  items:        string;
+  sous_total:   number;
+  remise:       number;
+  total:        number;
+  statut:       "brouillon" | "envoye" | "accepte" | "refuse" | "expire";
+  valide_jusqu: string | null;
+  note:         string | null;
+  admin_id:     number | null;
+  created_at:   string;
+  updated_at:   string;
+}
+
+export async function listDevis(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Devis[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut } = opts;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (statut) { conditions.push("statut = ?"); params.push(statut); }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT * FROM devis ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+  );
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM devis ${where}`, params);
+  return { items: rows as Devis[], total: Number(cnt[0]?.cnt ?? 0) };
+}
+
+export async function createDevis(data: {
+  client_nom: string; client_tel?: string; client_email?: string;
+  items: FactureItem[]; sous_total: number; remise?: number; total: number;
+  statut?: Devis["statut"]; valide_jusqu?: string; note?: string; admin_id?: number;
+}): Promise<number> {
+  const reference = generateVenteRef("DV");
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO devis (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, valide_jusqu, note, admin_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [reference, data.client_nom, data.client_tel ?? null, data.client_email ?? null,
+     JSON.stringify(data.items), data.sous_total, data.remise ?? 0, data.total,
+     data.statut ?? "brouillon", data.valide_jusqu ?? null, data.note ?? null, data.admin_id ?? null]
+  );
+  return result.insertId;
+}
+
+export async function updateDevisStatut(id: number, statut: Devis["statut"]) {
+  await db.execute("UPDATE devis SET statut = ? WHERE id = ?", [statut, id]);
+}
+
+export async function deleteDevis(id: number) {
+  await db.execute("DELETE FROM devis WHERE id = ?", [id]);
+}
+
+/* ─── Ventes : Livraisons ─── */
+export interface Livraison {
+  id:          number;
+  reference:   string;
+  facture_id:  number | null;
+  client_nom:  string;
+  client_tel:  string | null;
+  adresse:     string | null;
+  statut:      "en_attente" | "en_cours" | "livre" | "echoue";
+  livreur:     string | null;
+  note:        string | null;
+  livree_le:   string | null;
+  created_at:  string;
+  updated_at:  string;
+}
+
+export async function listLivraisons(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Livraison[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut } = opts;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (statut) { conditions.push("statut = ?"); params.push(statut); }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT * FROM livraisons ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+  );
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM livraisons ${where}`, params);
+  return { items: rows as Livraison[], total: Number(cnt[0]?.cnt ?? 0) };
+}
+
+export async function updateLivraisonStatut(id: number, statut: Livraison["statut"]) {
+  await db.execute("UPDATE livraisons SET statut = ? WHERE id = ?", [statut, id]);
+}
+
+export async function deleteLivraison(id: number) {
+  await db.execute("DELETE FROM livraisons WHERE id = ?", [id]);
+}
+
+export async function getVentesStats(): Promise<{ factures: number; devis: number; livraisons: number }> {
+  const [[f], [d], [l]] = await Promise.all([
+    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures"),
+    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM devis"),
+    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons"),
+  ]);
+  return {
+    factures:   Number((f as mysql.RowDataPacket[])[0]?.cnt ?? 0),
+    devis:      Number((d as mysql.RowDataPacket[])[0]?.cnt ?? 0),
+    livraisons: Number((l as mysql.RowDataPacket[])[0]?.cnt ?? 0),
+  };
+}
