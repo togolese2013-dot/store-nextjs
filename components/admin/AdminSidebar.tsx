@@ -8,6 +8,7 @@ import {
   LogOut, Menu, X, ChevronRight, Globe, Palette, MapPin, CreditCard, Link2,
   FolderOpen, Image, Warehouse, Zap, ArrowLeft, ShoppingCart,
   BarChart2, TrendingUp, Archive, FileText, FilePlus, DollarSign,
+  Truck, Building2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -28,7 +29,8 @@ const MODULES: Record<string, {
     items: [
       { label: "Tous les produits", href: "/admin/products",      icon: Package },
       { label: "Catégories",        href: "/admin/categories",    icon: FolderOpen },
-      { label: "Avis clients",      href: "/admin/reviews",       icon: Star },
+      { label: "Fournisseurs",      href: "/admin/fournisseurs",  icon: Building2 },
+      { label: "Achats",            href: "/admin/achats",        icon: Truck },
       { label: "Import / Export",   href: "/admin/import-export", icon: Zap },
     ],
   },
@@ -67,6 +69,7 @@ const MODULES: Record<string, {
     textColor: "text-indigo-700",
     items: [
       { label: "Clients",         href: "/admin/crm",      icon: Users },
+      { label: "Avis clients",    href: "/admin/reviews",  icon: Star },
       { label: "Messages reçus",  href: "/admin/messages", icon: MessageCircle },
       { label: "Diffusion",       href: "/admin/whatsapp", icon: Send },
     ],
@@ -78,7 +81,8 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/products",      "magasin"],
   ["/admin/categories",    "magasin"],
   ["/admin/entrepots",     "magasin"],
-  ["/admin/reviews",       "magasin"],
+  ["/admin/fournisseurs",  "magasin"],
+  ["/admin/achats",        "magasin"],
   ["/admin/import-export", "magasin"],
   ["/admin/stock-boutique","boutique"],
   ["/admin/stock",         "magasin"],
@@ -90,6 +94,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/coupons",       "boutique"],
   ["/admin/settings",      "store"],
   ["/admin/users",         "store"],
+  ["/admin/reviews",       "crm"],
   ["/admin/crm",           "crm"],
   ["/admin/messages",      "crm"],
   ["/admin/whatsapp",      "crm"],

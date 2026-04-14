@@ -1,25 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, PackagePlus, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, PackagePlus, CheckCircle2, AlertCircle, Search, X } from "lucide-react";
 
 interface Produit { id: number; reference: string; nom: string; stock_boutique: number; }
 
 export default function NouvelleEntreePage() {
   const router = useRouter();
-  const [produits, setProduits] = useState<Produit[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [saving,   setSaving]   = useState(false);
-  const [success,  setSuccess]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [produits, setProduits]       = useState<Produit[]>([]);
+  const [loading,  setLoading]        = useState(true);
+  const [saving,   setSaving]         = useState(false);
+  const [success,  setSuccess]        = useState(false);
+  const [error,    setError]          = useState<string | null>(null);
+  const [search,   setSearch]         = useState("");
+  const [showList, setShowList]       = useState(false);
+  const [selected, setSelected]       = useState<Produit | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState({
-    produit_id: "",
-    quantite:   "",
-    reference:  "",
-    note:       "",
+    quantite:  "",
+    reference: "",
+    note:      "",
   });
 
   useEffect(() => {
@@ -29,8 +32,32 @@ export default function NouvelleEntreePage() {
     }).catch(() => setLoading(false));
   }, []);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowList(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = produits.filter(p =>
+    search.trim() === "" ? false :
+    p.nom.toLowerCase().includes(search.toLowerCase()) ||
+    p.reference.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function selectProduit(p: Produit) {
+    setSelected(p);
+    setSearch("");
+    setShowList(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!selected) return;
     setError(null);
     setSaving(true);
     try {
@@ -38,7 +65,7 @@ export default function NouvelleEntreePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          produit_id:  Number(form.produit_id),
+          produit_id:  selected.id,
           entrepot_id: 1,
           quantite:    Number(form.quantite),
           reference:   form.reference || undefined,
@@ -91,23 +118,55 @@ export default function NouvelleEntreePage() {
               </div>
             )}
 
+            {/* Product search */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                 Produit <span className="text-red-400">*</span>
               </label>
-              <select
-                required
-                value={form.produit_id}
-                onChange={e => setForm(f => ({ ...f, produit_id: e.target.value }))}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-emerald-400 outline-none text-sm transition-all"
-              >
-                <option value="">Sélectionner un produit</option>
-                {produits.map(p => (
-                  <option key={p.id} value={p.id}>
-                    [{p.reference}] {p.nom} — stock: {p.stock_boutique}
-                  </option>
-                ))}
-              </select>
+
+              {selected ? (
+                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50">
+                  <div>
+                    <p className="font-semibold text-slate-800 text-sm">{selected.nom}</p>
+                    <p className="text-xs text-slate-500 font-mono">{selected.reference} — stock actuel : {selected.stock_boutique}</p>
+                  </div>
+                  <button type="button" onClick={() => setSelected(null)}
+                    className="p-1.5 rounded-xl hover:bg-emerald-100 text-slate-400 hover:text-slate-700 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div ref={searchRef} className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => { setSearch(e.target.value); setShowList(true); }}
+                    onFocus={() => setShowList(true)}
+                    placeholder="Rechercher un produit par nom ou référence…"
+                    className="w-full pl-9 pr-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-emerald-400 outline-none text-sm transition-all"
+                  />
+                  {showList && filtered.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-56 overflow-y-auto">
+                      {filtered.map(p => (
+                        <li key={p.id}>
+                          <button type="button" onClick={() => selectProduit(p)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors text-sm">
+                            <span className="font-semibold text-slate-800">{p.nom}</span>
+                            <span className="ml-2 text-xs text-slate-400 font-mono">{p.reference}</span>
+                            <span className="ml-2 text-xs text-slate-500">stock: {p.stock_boutique}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {showList && search.trim() !== "" && filtered.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg px-4 py-3 text-sm text-slate-400">
+                      Aucun produit trouvé
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -159,7 +218,7 @@ export default function NouvelleEntreePage() {
               </Link>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || !selected}
                 className="flex-1 px-5 py-3 rounded-2xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-colors disabled:opacity-50"
               >
                 {saving ? "Enregistrement…" : "Enregistrer l'entrée"}

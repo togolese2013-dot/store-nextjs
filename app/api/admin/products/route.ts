@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { nom, reference, description, categorie_id, prix_unitaire,
-            stock_boutique, remise, neuf, actif, image_url, images } = body;
+            stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
     if (!nom || !reference || !prix_unitaire) {
       return NextResponse.json({ error: "Champs obligatoires manquants." }, { status: 400 });
@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const hasRemise = colNames.has("remise");
     const hasNeuf = colNames.has("neuf");
     const hasImagesJson = colNames.has("images_json");
+    const hasStockMinimum = colNames.has("stock_minimum");
 
     // Construire la requête dynamiquement
     const columns = ["reference", "nom", "description", "categorie_id", "prix_unitaire", "stock_boutique"];
@@ -67,10 +68,14 @@ export async function POST(req: NextRequest) {
       columns.push("neuf");
       values.push(neuf ? 1 : 0);
     }
-    
+    if (hasStockMinimum) {
+      columns.push("stock_minimum");
+      values.push(Number(stock_minimum ?? 5));
+    }
+
     columns.push("actif", "image");
     values.push(actif !== false ? 1 : 0, image_url ?? null);
-    
+
     if (hasImagesJson) {
       columns.push("images_json");
       values.push(imagesJson);

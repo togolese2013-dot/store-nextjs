@@ -5,7 +5,7 @@ import Link from "next/link";
 import AdminProductActions from "@/components/admin/AdminProductActions";
 import Image from "next/image";
 import {
-  Plus, Search, Package,
+  Search, Package,
   PackagePlus, PackageMinus, ArrowLeftRight,
   Boxes, AlertTriangle, XCircle, TrendingDown, TrendingUp, DollarSign,
   Activity, Tag, Ruler,
@@ -113,24 +113,24 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/products/new"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
           >
-            <Plus className="w-4 h-4" /> Ajouter un produit
+            <PackagePlus className="w-3.5 h-3.5" /> Ajouter un produit
           </Link>
           <Link href="/admin/stock/entree"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
           >
-            <PackagePlus className="w-4 h-4" /> Nouvelle Entrée
+            <PackagePlus className="w-3.5 h-3.5" /> Nouvelle Entrée
           </Link>
           <Link href="/admin/stock/sortie"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
           >
-            <PackageMinus className="w-4 h-4" /> Nouvelle Sortie
+            <PackageMinus className="w-3.5 h-3.5" /> Nouvelle Sortie
           </Link>
           <Link href="/admin/stock/ajustement"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
           >
-            <ArrowLeftRight className="w-4 h-4" /> Ajustement
+            <ArrowLeftRight className="w-3.5 h-3.5" /> Ajustement
           </Link>
         </div>
       </div>

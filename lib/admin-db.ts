@@ -623,13 +623,19 @@ export interface AdminCategory {
   id:          number;
   nom:         string;
   description: string;
+  nb_produits: number;
 }
 
 export async function listAdminCategories(): Promise<AdminCategory[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, COALESCE(description,'') as description FROM categories ORDER BY nom ASC"
+    `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
+            COUNT(p.id) AS nb_produits
+     FROM categories c
+     LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
+     GROUP BY c.id
+     ORDER BY c.nom ASC`
   );
-  return rows as AdminCategory[];
+  return rows.map(r => ({ ...r, nb_produits: Number(r.nb_produits) })) as AdminCategory[];
 }
 
 export async function createCategory(nom: string, description: string) {
@@ -1330,4 +1336,164 @@ export async function getVentesStats(): Promise<{ factures: number; devis: numbe
     devis:      Number((d as mysql.RowDataPacket[])[0]?.cnt ?? 0),
     livraisons: Number((l as mysql.RowDataPacket[])[0]?.cnt ?? 0),
   };
+}
+
+// ─── Fournisseurs ─────────────────────────────────────────────────────────────
+
+export interface Fournisseur {
+  id:         number;
+  nom:        string;
+  contact:    string | null;
+  telephone:  string | null;
+  email:      string | null;
+  adresse:    string | null;
+  note:       string | null;
+  created_at: string;
+}
+
+export async function listFournisseurs(): Promise<Fournisseur[]> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    "SELECT * FROM fournisseurs ORDER BY nom"
+  );
+  return rows as Fournisseur[];
+}
+
+export async function createFournisseur(data: Omit<Fournisseur, "id" | "created_at">): Promise<number> {
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note) VALUES (?,?,?,?,?,?)`,
+    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null]
+  );
+  return result.insertId;
+}
+
+export async function updateFournisseur(id: number, data: Partial<Omit<Fournisseur, "id" | "created_at">>) {
+  await db.execute(
+    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=?`,
+    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id]
+  );
+}
+
+export async function deleteFournisseur(id: number) {
+  await db.execute("DELETE FROM fournisseurs WHERE id = ?", [id]);
+}
+
+// ─── Achats ───────────────────────────────────────────────────────────────────
+
+export interface Achat {
+  id:             number;
+  fournisseur_id: number | null;
+  fournisseur_nom?: string;
+  nom_fournisseur?: string;
+  reference:      string;
+  date_achat:     string;
+  statut:         "en_attente" | "recu" | "valide";
+  montant_total:  number;
+  notes:          string | null;
+}
+
+export interface AchatItem {
+  id:            number;
+  achat_id:      number;
+  produit_id:    number | null;
+  produit_nom?:  string;
+  designation:   string;
+  quantite:      number;
+  prix_unitaire: number;
+}
+
+export async function listAchats(limit = 50, offset = 0): Promise<Achat[]> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT a.*, f.nom AS fournisseur_nom
+     FROM achats a
+     LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id
+     ORDER BY a.date_achat DESC, a.id DESC
+     LIMIT ${limit} OFFSET ${offset}`
+  );
+  return rows as Achat[];
+}
+
+export async function countAchats(): Promise<number> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) as cnt FROM achats");
+  return Number(rows[0]?.cnt ?? 0);
+}
+
+export async function getAchatStats(): Promise<{ total: number; en_attente: number; recu: number; montant_total: number }> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(statut = 'en_attente') AS en_attente,
+       SUM(statut = 'recu') AS recu,
+       COALESCE(SUM(montant_total), 0) AS montant_total
+     FROM achats`
+  );
+  const r = rows[0] as mysql.RowDataPacket;
+  return {
+    total:        Number(r.total ?? 0),
+    en_attente:   Number(r.en_attente ?? 0),
+    recu:         Number(r.recu ?? 0),
+    montant_total: Number(r.montant_total ?? 0),
+  };
+}
+
+export async function getAchatById(id: number): Promise<{ achat: Achat; items: AchatItem[] } | null> {
+  const [aRows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT a.*, f.nom AS fournisseur_nom FROM achats a LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id WHERE a.id = ?`, [id]
+  );
+  if (!aRows[0]) return null;
+  const [iRows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT ai.*, p.nom AS produit_nom FROM achat_items ai LEFT JOIN produits p ON p.id = ai.produit_id WHERE ai.achat_id = ?`, [id]
+  );
+  return { achat: aRows[0] as Achat, items: iRows as AchatItem[] };
+}
+
+export async function createAchat(data: {
+  fournisseur_id: number | null;
+  reference:      string;
+  date_achat:     string;
+  statut:         string;
+  note:           string | null;
+  items: Array<{ produit_id: number | null; designation: string; quantite: number; prix_unitaire: number }>;
+}): Promise<number> {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
+    const [res] = await conn.execute<mysql.ResultSetHeader>(
+      `INSERT INTO achats (fournisseur_id, reference, date_achat, statut, montant_total, notes) VALUES (?,?,?,?,?,?)`,
+      [data.fournisseur_id ?? null, data.reference, data.date_achat, data.statut, montant_total, data.note ?? null]
+    );
+    const achatId = res.insertId;
+    for (const item of data.items) {
+      await conn.execute(
+        `INSERT INTO achat_items (achat_id, produit_id, designation, quantite, prix_unitaire) VALUES (?,?,?,?,?)`,
+        [achatId, item.produit_id ?? null, item.designation, item.quantite, item.prix_unitaire]
+      );
+    }
+    await conn.commit();
+    return achatId;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function updateAchatStatut(id: number, statut: string) {
+  await db.execute("UPDATE achats SET statut = ? WHERE id = ?", [statut, id]);
+}
+
+export async function deleteAchat(id: number) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute("DELETE FROM achat_items WHERE achat_id = ?", [id]);
+    await conn.execute("DELETE FROM achats WHERE id = ?", [id]);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }

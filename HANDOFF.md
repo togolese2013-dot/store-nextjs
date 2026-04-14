@@ -1,6 +1,6 @@
 # HANDOFF — Togolese Shop Admin
 > Dernière mise à jour : 2026-04-14
-> Commit actuel : `0fe8c97`
+> Commit actuel : `aaee656`
 
 ---
 
@@ -13,10 +13,12 @@
 │   │   ├── page.tsx                  ← Dashboard admin (4 cartes modules)
 │   │   ├── products/page.tsx         ← Catalogue + filtres + tableau stock
 │   │   ├── stock/
-│   │   │   ├── entree/page.tsx       ← Formulaire nouvelle entrée stock
-│   │   │   ├── sortie/page.tsx       ← Formulaire nouvelle sortie stock
-│   │   │   └── ajustement/page.tsx   ← Formulaire ajustement stock ±
-│   │   ├── categories/               ← CRUD catégories
+│   │   │   ├── entree/page.tsx       ← Formulaire nouvelle entrée stock (recherche produit)
+│   │   │   ├── sortie/page.tsx       ← Formulaire nouvelle sortie stock (recherche produit)
+│   │   │   └── ajustement/page.tsx   ← Formulaire ajustement stock ± (recherche produit)
+│   │   ├── categories/               ← CRUD catégories (grille cartes + KPIs)
+│   │   ├── fournisseurs/             ← CRUD fournisseurs (grille cartes)
+│   │   ├── achats/                   ← Achats fournisseurs (KPIs + tableau + création)
 │   │   ├── orders/                   ← Commandes
 │   │   ├── ventes/                   ← Gestion des ventes (tabs: Factures/Devis/Livraisons)
 │   │   ├── stock-boutique/           ← Stock boutique (module BOUTIQUE)
@@ -24,7 +26,7 @@
 │   │   ├── factures/                 ← Factures
 │   │   ├── proforma/                 ← Proformat
 │   │   ├── coupons/                  ← Coupons
-│   │   ├── reviews/                  ← Avis clients
+│   │   ├── reviews/                  ← Avis clients (module CRM)
 │   │   ├── import-export/            ← Import/Export CSV
 │   │   ├── users/                    ← Utilisateurs
 │   │   ├── crm/                      ← Clients CRM
@@ -33,7 +35,7 @@
 │   │   └── settings/                 ← Réglages (général, hero, livraison, thème, etc.)
 │   └── api/admin/
 │       ├── auth/                     ← login/logout (JWT cookie)
-│       ├── products/                 ← CRUD produits
+│       ├── products/                 ← CRUD produits (supporte stock_minimum)
 │       ├── stock/
 │       │   ├── entree/route.ts       ← POST entrée stock
 │       │   ├── sortie/route.ts       ← POST sortie stock
@@ -43,6 +45,8 @@
 │       ├── stock-boutique/           ← Mouvements stock boutique
 │       ├── finance/                  ← CRUD entrées finance
 │       ├── categories/               ← CRUD catégories
+│       ├── fournisseurs/             ← CRUD fournisseurs (GET/POST/PUT/DELETE)
+│       ├── achats/                   ← Achats fournisseurs (GET/POST/PATCH/DELETE)
 │       ├── orders/                   ← Commandes
 │       └── ventes/                   ← Ventes / livraisons
 ├── components/admin/
@@ -50,6 +54,9 @@
 │   ├── AdminProductActions.tsx       ← Icônes inline Eye/Pencil/Trash par ligne produit
 │   ├── ProductQuickViewModal.tsx     ← Modal aperçu rapide produit
 │   ├── ProductForm.tsx               ← Formulaire création/édition produit
+│   ├── CategoriesManager.tsx         ← Grille cartes catégories + KPIs + modal CRUD
+│   ├── FournisseursManager.tsx       ← Grille cartes fournisseurs + modal CRUD
+│   ├── AchatsManager.tsx             ← Tableau achats + KPIs + modal création
 │   ├── FinanceManager.tsx            ← Client component Finance (CRUD)
 │   ├── StockBoutiqueManager.tsx      ← Gestion stock boutique
 │   ├── StockParEntrepot.tsx          ← Stock par entrepôt
@@ -58,7 +65,7 @@
 │   └── CreateOrderForm.tsx           ← Formulaire création commande
 ├── lib/
 │   ├── db.ts                         ← MySQL pool (mysql2/promise), requêtes produits/catégories
-│   ├── admin-db.ts                   ← Toutes les fonctions DB admin (stock, finance, ventes…)
+│   ├── admin-db.ts                   ← Toutes les fonctions DB admin (stock, finance, ventes, fournisseurs, achats…)
 │   ├── auth.ts                       ← getAdminSession() via cookie JWT
 │   └── utils.ts                      ← finalPrice(), formatPrice()
 ├── prisma/                           ← NON UTILISÉ (Prisma absent, MySQL direct)
@@ -109,48 +116,84 @@ const pool = mysql.createPool({ host, user, password, database, ... });
 ### Tables principales
 | Table | Description |
 |---|---|
-| `produits` | Catalogue produits (nom, reference, prix, stock_boutique, remise…) |
+| `produits` | Catalogue produits (nom, reference, prix, stock_boutique, stock_minimum, remise…) |
 | `categories` | Catégories produits |
 | `produit_stocks` | Stock par entrepôt (`produit_id`, `entrepot_id`, `quantite`) |
 | `stock_mouvements` | Journal de tous les mouvements de stock |
 | `entrepots` | Entrepôts / lieux de stockage |
+| `fournisseurs` | Fournisseurs (nom, contact, telephone, email, adresse, note) |
+| `achats` | Commandes fournisseurs (fournisseur_id, reference, date_achat, statut, montant_total, notes) |
+| `achat_items` | Lignes d'un achat (achat_id, produit_id, designation, quantite, prix_unitaire) |
 | `livraisons_ventes` | Livraisons (renommé depuis `livraisons` pour éviter conflit) |
 | `finance_entries` | Entrées finance (type: depense/recette, montant, date…) |
 | `commandes` | Commandes clients |
 | `commande_items` | Lignes de commande |
 
+### Schéma `achats` (table préexistante avec colonnes spécifiques)
+```sql
+-- Colonnes importantes à connaître :
+id, fournisseur_id (FK ajouté), reference, date_achat,
+nom_fournisseur (varchar, legacy), montant_total,
+utilisateur_id, notes (TEXT — pas "note"), mode_transport,
+statut ENUM('en_attente','recu','valide')  -- pas 'annule'
+-- Pas de colonne created_at sur cette table
+```
+
 ### Fonctions DB clés (`lib/admin-db.ts`)
 
 **Stock :**
 ```ts
-getEntrepots()                          // Liste des entrepôts
-getProduitsWithStock()                  // Produits avec stock_boutique
-getStockStats()                         // KPIs stock (en_stock, valeur_totale, faible, rupture…)
-getStockMovements({ type, search, limit, offset })  // Mouvements paginés
-getStockMovementCounts()                // { total, entrees, sorties, ajustements }
+getEntrepots()
+getProduitsWithStock()
+getStockStats()
+getStockMovements({ type, search, limit, offset })
+getStockMovementCounts()
 createStockEntree({ produit_id, entrepot_id, quantite, reference?, note? })
 createStockSortie({ produit_id, entrepot_id, quantite, reference?, note? })
-  // ↳ Valide stock disponible, lève erreur si insuffisant
 createStockAjustement({ produit_id, entrepot_id, quantite, motif })
-  // ↳ quantite peut être négatif (réduction) ou positif (augmentation)
-  // ↳ Toutes ces fonctions utilisent des transactions MySQL
 ```
 
 **Finance :**
 ```ts
-getFinanceStats()                       // Solde, total dépenses, total recettes
+getFinanceStats()
 listFinanceEntries({ type?, limit, offset })
 createFinanceEntry({ type, montant, libelle, date, note? })
 updateFinanceEntry(id, data)
 deleteFinanceEntry(id)
 ```
 
+**Catégories :**
+```ts
+listAdminCategories()   // inclut nb_produits (actifs) par catégorie
+createCategory(nom, description)
+updateCategory(id, nom, description)
+deleteCategory(id)
+```
+
+**Fournisseurs :**
+```ts
+listFournisseurs()
+createFournisseur({ nom, contact, telephone, email, adresse, note })
+updateFournisseur(id, data)
+deleteFournisseur(id)
+```
+
+**Achats :**
+```ts
+listAchats(limit, offset)           // JOIN fournisseurs, ORDER BY date_achat DESC, id DESC
+countAchats()
+getAchatStats()                     // { total, en_attente, recu, montant_total }
+getAchatById(id)                    // { achat, items[] }
+createAchat({ fournisseur_id, reference, date_achat, statut, note, items[] })
+updateAchatStatut(id, statut)
+deleteAchat(id)                     // supprime aussi les achat_items (transaction)
+```
+
 **Produits (`lib/db.ts`) :**
 ```ts
 getProducts({ search, categoryId, limit, offset, statut? })
-  // statut: "disponible" (>5) | "faible" (1-5) | "epuise" (0)
 getProductCount({ search, categoryId, statut? })
-getProductStatusCounts()                // { total, disponible, faible, epuise }
+getProductStatusCounts()
 ```
 
 ---
@@ -170,15 +213,16 @@ La sidebar est **modulaire** : elle affiche uniquement les items du module actif
 ### Modules
 | Clé | Label | Couleur | Items |
 |---|---|---|---|
-| `magasin` | MAGASIN | brand-900 (noir) | Tous les produits, Catégories, Avis clients, Import/Export |
+| `magasin` | MAGASIN | brand-900 (noir) | Tous les produits, Catégories, Fournisseurs, Achats, Import/Export |
 | `boutique` | BOUTIQUE | amber-500 | Commandes, Ventes, Stock boutique, Facture, Proformat, Finance, Coupons |
 | `store` | STORE | emerald-700 | Réglages, Hero, Livraison, Apparence, WhatsApp, Paiements, Domaine, Utilisateurs |
-| `crm` | CRM | indigo-700 | Clients, Messages, Diffusion |
+| `crm` | CRM | indigo-700 | Clients, **Avis clients**, Messages, Diffusion |
 
 ### Règle critique du routing sidebar
 `ROUTE_TO_MODULE` utilise `startsWith()` → **les routes plus spécifiques doivent être placées AVANT les routes générales**.
 
-Exemple : `/admin/stock-boutique` doit précéder `/admin/stock` dans le tableau, sinon stock-boutique serait classé dans MAGASIN.
+`/admin/stock-boutique` précède `/admin/stock` dans le tableau.
+`/admin/reviews` est mappé vers `"crm"` (déplacé depuis magasin).
 
 ---
 
@@ -189,52 +233,65 @@ Exemple : `/admin/stock-boutique` doit précéder `/admin/stock` dans le tableau
 - `view` : `stock` | `mouvements` | `entrees` | `sorties` | `ajustements`
 - `statut` : `all` | `disponible` | `faible` | `epuise`
 
-### Tab-bar gauche (vue)
-```
-[📦 Produits N] [📈 Mouvements N] [➕ Entrées N] [➖ Sorties N] [↔ Ajustements N]
-```
-Style actif : `bg-blue-600 text-white`
-
-### Tab-bar droite (statut stock)
-```
-[Tous N] [Disponible N] [Faible N] [Épuisé N]
-```
-Couleurs actives : vert / amber / rouge
-
-### Boutons header (style neutre, bordure)
-| Bouton | Destination |
-|---|---|
-| Ajouter un produit | `/admin/products/new` |
-| Nouvelle Entrée | `/admin/stock/entree` |
-| Nouvelle Sortie | `/admin/stock/sortie` |
-| Ajustement | `/admin/stock/ajustement` |
-
-### Colonne ACTIONS
-Icônes inline (pas de menu 3 points) :
-- 👁 **Eye** → ouvre `ProductQuickViewModal`
-- ✏️ **Pencil** → `/admin/products/[id]/edit`
-- 🗑 **Trash2** → suppression avec confirmation
+### Boutons header (taille réduite `px-3 py-2 text-xs`)
+| Bouton | Icône | Destination |
+|---|---|---|
+| Ajouter un produit | `PackagePlus` | `/admin/products/new` |
+| Nouvelle Entrée | `PackagePlus` | `/admin/stock/entree` |
+| Nouvelle Sortie | `PackageMinus` | `/admin/stock/sortie` |
+| Ajustement | `ArrowLeftRight` | `/admin/stock/ajustement` |
 
 ---
 
-## 📋 Pages Stock
+## 📋 Pages Stock (Entrée / Sortie / Ajustement)
 
-### `/admin/stock/entree`
-- Champs : Produit (select avec stock affiché), Quantité, Référence BL, Note
-- `entrepot_id: 1` passé automatiquement (champ supprimé de l'UI)
-- POST → `/api/admin/stock/entree`
-- Succès → redirect `/admin/products`
+### Recherche produit (autocomplete)
+Les 3 pages utilisent un **champ de recherche** au lieu d'un `<select>` déroulant :
+- Filtre local sur les produits chargés (par nom ou référence)
+- Dropdown de résultats sous le champ
+- Produit sélectionné affiché dans un badge coloré avec bouton "×" pour changer
+- Couleur du badge : vert (entrée), rouge (sortie), bleu (ajustement)
+- `entrepot_id: 1` toujours passé automatiquement
 
-### `/admin/stock/sortie`
-- Champs : Produit (avec stock disponible affiché en temps réel), Quantité (max = stock dispo), Référence, Motif/Note
-- `entrepot_id: 1` passé automatiquement
-- POST → `/api/admin/stock/sortie`
-- API vérifie stock suffisant, renvoie erreur si insuffisant
+---
 
-### `/admin/stock/ajustement`
-- Champs : Produit (avec prévisualisation nouveau stock en temps réel), Quantité ± (bordure verte/rouge selon signe), Motif (obligatoire)
-- `entrepot_id: 1` passé automatiquement
-- POST → `/api/admin/stock/ajustement`
+## 🛍️ Page Produit — Formulaire (`ProductForm.tsx`)
+
+Champs dans la section "Prix & stock" :
+- Prix unitaire (FCFA)
+- Remise (%)
+- **Stock magasin** (anciennement "Stock boutique")
+- **Stock minimum** — seuil d'alerte stock faible (défaut : 5)
+
+Le champ `stock_minimum` est enregistré dynamiquement (vérifie la présence de la colonne comme les autres).
+
+---
+
+## 🏪 Page Catégories (`/admin/categories`)
+
+- **KPIs** : nombre de catégories + total produits catalogués
+- **Grille de cartes** : nom, description, nb produits actifs liés
+- Lien "Voir les produits →" par carte (filtre `/admin/products?category=ID`)
+- **Modal** création/édition (plus d'édition inline dans tableau)
+- CRUD complet via `CategoriesManager.tsx`
+
+---
+
+## 🏢 Page Fournisseurs (`/admin/fournisseurs`)
+
+- Grille de cartes : nom, contact, téléphone, email, adresse, note
+- **Modal** création/édition
+- CRUD via `FournisseursManager.tsx` + API `/api/admin/fournisseurs`
+
+---
+
+## 🚚 Page Achats (`/admin/achats`)
+
+- **KPIs** : total achats, en attente, reçus, montant total
+- **Tableau** avec changement de statut inline (select par ligne)
+- **Modal** création : référence, fournisseur, date, statut, lignes articles (désignation / qté / prix)
+- Statuts : `en_attente` / `recu` / `valide`
+- CRUD via `AchatsManager.tsx` + API `/api/admin/achats`
 
 ---
 
@@ -243,14 +300,14 @@ Icônes inline (pas de menu 3 points) :
 - KPIs : Solde caisse, Total dépenses, Total recettes
 - Tabs : Dépenses / Recettes
 - 3 boutons : Caisse, Dépense, Rentrée
-- CRUD complet via `FinanceManager.tsx` (client component)
+- CRUD complet via `FinanceManager.tsx`
 - API : `GET/POST /api/admin/finance`, `PUT/DELETE /api/admin/finance/[id]`
 
 ---
 
 ## 🛒 Page Ventes (`/admin/ventes`)
 
-- Table `livraisons_ventes` (renommée depuis `livraisons` — l'ancienne table PHP avait un schéma incompatible)
+- Table `livraisons_ventes` (renommée depuis `livraisons`)
 - Tabs : Factures, Devis, Livraisons
 
 ---
@@ -285,16 +342,47 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3003
 4. **Toujours expliquer avant d'appliquer** — attendre la validation explicite de l'utilisateur
 5. **Transactions MySQL** pour toutes les opérations de stock (atomicité)
 6. **`entrepot_id: 1`** par défaut dans les formulaires stock (le champ entrepôt a été retiré de l'UI)
+7. **Table `achats`** : pas de colonne `created_at`, colonne `notes` (pas `note`), statut sans `annule` (utilise `valide`)
 
 ---
 
 ## 📝 Historique des commits récents
 
 ```
+aaee656  docs: handoff complet
 0fe8c97  feat: filtres produits, actions inline, pages stock entree/sortie/ajustement
 f77607b  feat: page Finance avec KPIs, tabs Dépenses/Recettes et CRUD
 d9e957c  feat: add Gestion des Ventes page avec Factures, Devis et Livraisons tabs
 6468ddb  feat: Stock Boutique — page dédiée avec KPIs, mouvements et retraits clients
-4f25a3c  docs: mise à jour complète du handoff
-b8e3df6  feat: stock dashboard on products page + BOUTIQUE module pages
+```
+
+## 🆕 Modifications session 2026-04-14 (non encore commitées)
+
+### Sidebar
+- "Avis clients" déplacé de MAGASIN → CRM
+- Ajout "Fournisseurs" et "Achats" dans MAGASIN
+
+### Page Produits
+- Boutons header réduits (`px-3 py-2 text-xs`)
+- Icône "Ajouter un produit" changée : `Plus` → `PackagePlus`
+
+### Formulaire Produit
+- "Stock boutique" renommé → "Stock magasin"
+- Nouveau champ "Stock minimum" (seuil alerte, défaut 5)
+- APIs POST/PUT produits mises à jour pour accepter `stock_minimum`
+
+### Pages Stock
+- Remplacement des `<select>` déroulants par une recherche autocomplete
+
+### Nouvelles pages
+- `/admin/categories` — refonte complète (grille cartes, KPIs, modal)
+- `/admin/fournisseurs` — nouvelle page CRUD complète
+- `/admin/achats` — nouvelle page achats fournisseurs
+
+### DB (migrations exécutées)
+```sql
+-- stock_minimum déjà présent sur produits
+ALTER TABLE achats ADD COLUMN fournisseur_id INT NULL; -- ajouté
+CREATE TABLE fournisseurs (...);   -- créée
+-- achats et achat_items préexistantes, adaptées au schéma réel
 ```

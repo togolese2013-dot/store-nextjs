@@ -15,7 +15,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const body = await req.json();
     const { nom, reference, description, categorie_id, prix_unitaire,
-            stock_boutique, remise, neuf, actif, image_url, images } = body;
+            stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
     const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
 
@@ -29,6 +29,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const hasRemise = colNames.has("remise");
     const hasNeuf = colNames.has("neuf");
     const hasImagesJson = colNames.has("images_json");
+    const hasStockMinimum = colNames.has("stock_minimum");
 
     // Construire la requête dynamiquement
     const sets = ["reference=?", "nom=?", "description=?", "categorie_id=?", "prix_unitaire=?", "stock_boutique=?"];
@@ -42,10 +43,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       sets.push("neuf=?");
       values.push(neuf ? 1 : 0);
     }
-    
+    if (hasStockMinimum) {
+      sets.push("stock_minimum=?");
+      values.push(Number(stock_minimum ?? 5));
+    }
+
     sets.push("actif=?", "image=?");
     values.push(actif !== false ? 1 : 0, image_url ?? null);
-    
+
     if (hasImagesJson) {
       sets.push("images_json=?");
       values.push(imagesJson);

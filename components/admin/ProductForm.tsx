@@ -16,6 +16,7 @@ interface ProductData {
   categorie_id:   number | "";
   prix_unitaire:  number | "";
   stock_boutique: number | "";
+  stock_minimum:  number | "";
   remise:         number | "";
   neuf:           boolean;
   actif:          boolean;
@@ -42,6 +43,7 @@ export default function ProductForm({ categories, initial }: Props) {
     categorie_id:   initial?.categorie_id   ?? "",
     prix_unitaire:  initial?.prix_unitaire   ?? "",
     stock_boutique: initial?.stock_boutique  ?? "",
+    stock_minimum:  initial?.stock_minimum   ?? 5,
     remise:         initial?.remise          ?? "",
     neuf:           initial?.neuf            ?? false,
     actif:          initial?.actif           ?? true,
@@ -127,6 +129,7 @@ export default function ProductForm({ categories, initial }: Props) {
         categorie_id: form.categorie_id || null,
         prix_unitaire: form.prix_unitaire,
         stock_boutique: form.stock_boutique,
+        stock_minimum: form.stock_minimum !== "" ? form.stock_minimum : 5,
         actif: form.actif,
         image_url: form.image_url,
       };
@@ -206,7 +209,7 @@ export default function ProductForm({ categories, initial }: Props) {
       <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
         <h2 className="font-display font-700 text-slate-900 text-base border-b border-slate-100 pb-3">Prix & stock</h2>
 
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className={labelCls}>Prix unitaire (FCFA) *</label>
             <input type="number" min="0" value={form.prix_unitaire}
@@ -222,10 +225,17 @@ export default function ProductForm({ categories, initial }: Props) {
             </div>
           )}
           <div>
-            <label className={labelCls}>Stock boutique</label>
+            <label className={labelCls}>Stock magasin</label>
             <input type="number" min="0" value={form.stock_boutique}
               onChange={e => set("stock_boutique", e.target.value ? Number(e.target.value) : "")}
               placeholder="10" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Stock minimum</label>
+            <input type="number" min="0" value={form.stock_minimum}
+              onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
+              placeholder="5" className={inputCls} />
+            <p className="text-xs text-slate-400 mt-1">Seuil d'alerte stock faible</p>
           </div>
         </div>
       </div>
