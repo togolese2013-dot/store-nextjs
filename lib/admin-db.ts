@@ -2,6 +2,263 @@ import "server-only";
 import { db } from "./db";
 import type mysql from "mysql2/promise";
 
+// ─── Stock Operations ─────────────────────────────────────────────────────────
+
+export interface Entrepot {
+  id:          number;
+  nom:         string;
+  adresse:     string | null;
+  responsable: string | null;
+  actif:       boolean;
+}
+
+export async function getEntrepots(): Promise<Entrepot[]> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, adresse, responsable, actif FROM entrepots WHERE actif = 1 ORDER BY sort_order, nom"
+  );
+  return rows as Entrepot[];
+}
+
+export interface ProduitStock {
+  produit_id:  number;
+  nom:         string;
+  reference:   string;
+  entrepot_id: number;
+  stock:       number;
+}
+
+export async function getProduitsWithStock(): Promise<ProduitStock[]> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT p.id AS produit_id, p.nom, p.reference, ps.entrepot_id, COALESCE(ps.stock, 0) AS stock
+     FROM produits p
+     LEFT JOIN produit_stocks ps ON ps.produit_id = p.id
+     WHERE p.actif = 1
+     ORDER BY p.nom`
+  );
+  return rows as ProduitStock[];
+}
+
+// Entrée stock magasin
+export async function createStockEntree(data: {
+  produit_id:  number;
+  entrepot_id: number;
+  quantite:    number;
+  reference?:  string;
+  note?:       string;
+  user_id?:    number;
+}) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Upsert produit_stocks
+    await conn.execute(
+      `INSERT INTO produit_stocks (produit_id, entrepot_id, stock)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock)`,
+      [data.produit_id, data.entrepot_id, data.quantite]
+    );
+
+    // Get stock after
+    const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
+      `SELECT stock FROM produit_stocks WHERE produit_id = ? AND entrepot_id = ?`,
+      [data.produit_id, data.entrepot_id]
+    );
+    const stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
+
+    // Log mouvement
+    await conn.execute(
+      `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
+       VALUES (?, 'entree', ?, ?, ?, ?, ?)`,
+      [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// Sortie stock magasin → boutique
+export async function createStockSortie(data: {
+  produit_id:  number;
+  entrepot_id: number;
+  quantite:    number;
+  reference?:  string;
+  note?:       string;
+  user_id?:    number;
+}) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Check available stock
+    const [[row]] = await conn.execute<mysql.RowDataPacket[]>(
+      `SELECT stock FROM produit_stocks WHERE produit_id = ? AND entrepot_id = ?`,
+      [data.produit_id, data.entrepot_id]
+    );
+    const available = Number((row as mysql.RowDataPacket)?.stock ?? 0);
+    if (available < data.quantite) {
+      throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demandé(s)`);
+    }
+
+    // Decrement magasin stock
+    await conn.execute(
+      `UPDATE produit_stocks SET stock = stock - ? WHERE produit_id = ? AND entrepot_id = ?`,
+      [data.quantite, data.produit_id, data.entrepot_id]
+    );
+
+    // Increment boutique stock
+    await conn.execute(
+      `UPDATE produits SET stock_boutique = stock_boutique + ? WHERE id = ?`,
+      [data.quantite, data.produit_id]
+    );
+
+    const stockApres = available - data.quantite;
+
+    // Log mouvement
+    await conn.execute(
+      `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
+       VALUES (?, 'retrait', ?, ?, ?, ?, ?)`,
+      [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// Ajustement stock magasin (correction)
+export async function createStockAjustement(data: {
+  produit_id:  number;
+  entrepot_id: number;
+  quantite:    number; // positif = ajout, négatif = retrait
+  motif:       string;
+  user_id?:    number;
+}) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const abs = Math.abs(data.quantite);
+    const type = data.quantite >= 0 ? "entree" : "retrait";
+
+    // Upsert/update produit_stocks
+    if (data.quantite >= 0) {
+      await conn.execute(
+        `INSERT INTO produit_stocks (produit_id, entrepot_id, stock)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock)`,
+        [data.produit_id, data.entrepot_id, abs]
+      );
+    } else {
+      await conn.execute(
+        `UPDATE produit_stocks SET stock = GREATEST(0, stock - ?) WHERE produit_id = ? AND entrepot_id = ?`,
+        [abs, data.produit_id, data.entrepot_id]
+      );
+    }
+
+    // Get stock after
+    const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(stock, 0) AS stock FROM produit_stocks WHERE produit_id = ? AND entrepot_id = ?`,
+      [data.produit_id, data.entrepot_id]
+    );
+    const stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
+
+    // Log mouvement
+    await conn.execute(
+      `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note, user_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [data.produit_id, type, abs, stockApres, data.motif, data.user_id ?? null]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// ─── Stock Movements ───────────────────────────────────────────────────────────
+
+export interface StockMouvement {
+  id:          number;
+  produit_id:  number;
+  nom_produit: string;
+  type:        "entree" | "retrait" | "vente" | "ajustement";
+  quantite:    number;
+  stock_apres: number;
+  reference:   string | null;
+  note:        string | null;
+  user_id:     number | null;
+  created_at:  string;
+}
+
+export async function getStockMovementCounts(): Promise<{
+  total: number; entrees: number; sorties: number; ajustements: number;
+}> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(type = 'entree')              AS entrees,
+       SUM(type IN ('retrait','vente'))  AS sorties,
+       SUM(type NOT IN ('entree','retrait','vente')) AS ajustements
+     FROM stock_mouvements`
+  );
+  const r = (rows as mysql.RowDataPacket[])[0];
+  return {
+    total:       Number(r?.total       ?? 0),
+    entrees:     Number(r?.entrees     ?? 0),
+    sorties:     Number(r?.sorties     ?? 0),
+    ajustements: Number(r?.ajustements ?? 0),
+  };
+}
+
+export async function getStockMovements(opts: {
+  type?:   "entree" | "retrait" | "vente" | "sortie" | "tous" | "ajustement";
+  search?: string;
+  limit?:  number;
+  offset?: number;
+} = {}): Promise<{ items: StockMouvement[]; total: number }> {
+  const { limit = 50, offset = 0, type, search } = opts;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (type && type !== "tous") {
+    if (type === "sortie") {
+      conditions.push("sm.type IN ('retrait','vente')");
+    } else {
+      conditions.push("sm.type = ?"); params.push(type);
+    }
+  }
+  if (search) { conditions.push("(p.nom LIKE ? OR sm.reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT sm.*, p.nom AS nom_produit
+     FROM stock_mouvements sm
+     LEFT JOIN produits p ON p.id = sm.produit_id
+     ${where}
+     ORDER BY sm.created_at DESC
+     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+    params
+  );
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM stock_mouvements sm LEFT JOIN produits p ON p.id = sm.produit_id ${where}`,
+    params
+  );
+  return { items: rows as StockMouvement[], total: Number(cnt[0]?.cnt ?? 0) };
+}
+
 /* ─── Admin Users ─── */
 export interface AdminUser {
   id:           number;

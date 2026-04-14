@@ -59,10 +59,11 @@ export async function getProducts(opts?: {
   newOnly?: boolean;
   limit?: number;
   offset?: number;
+  statut?: "disponible" | "faible" | "epuise";
 }): Promise<Product[]> {
   const {
     categoryId, search, promoOnly, newOnly,
-    limit = 60, offset = 0,
+    limit = 60, offset = 0, statut,
   } = opts ?? {};
 
   const cols = await produitCols();
@@ -74,6 +75,9 @@ export async function getProducts(opts?: {
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise)  { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)    { conditions.push("p.neuf = 1"); }
+  if (statut === "disponible")   { conditions.push("p.stock_boutique > 5"); }
+  if (statut === "faible")       { conditions.push("p.stock_boutique > 0 AND p.stock_boutique <= 5"); }
+  if (statut === "epuise")       { conditions.push("p.stock_boutique = 0"); }
 
   const where    = conditions.join(" AND ");
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -170,8 +174,9 @@ export async function getProductCount(opts?: {
   search?: string;
   promoOnly?: boolean;
   newOnly?: boolean;
+  statut?: "disponible" | "faible" | "epuise";
 }): Promise<number> {
-  const { categoryId, search, promoOnly, newOnly } = opts ?? {};
+  const { categoryId, search, promoOnly, newOnly, statut } = opts ?? {};
   const cols = await produitCols();
 
   const conditions: string[] = ["p.actif = 1"];
@@ -181,12 +186,35 @@ export async function getProductCount(opts?: {
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise) { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)   { conditions.push("p.neuf = 1"); }
+  if (statut === "disponible")  { conditions.push("p.stock_boutique > 5"); }
+  if (statut === "faible")      { conditions.push("p.stock_boutique > 0 AND p.stock_boutique <= 5"); }
+  if (statut === "epuise")      { conditions.push("p.stock_boutique = 0"); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.join(" AND ")}`,
     params
   );
   return Number(rows[0]?.cnt ?? 0);
+}
+
+export async function getProductStatusCounts(): Promise<{
+  total: number; disponible: number; faible: number; epuise: number;
+}> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(stock_boutique > 5) AS disponible,
+       SUM(stock_boutique > 0 AND stock_boutique <= 5) AS faible,
+       SUM(stock_boutique = 0) AS epuise
+     FROM produits WHERE actif = 1`
+  );
+  const r = (rows as mysql.RowDataPacket[])[0];
+  return {
+    total:      Number(r?.total      ?? 0),
+    disponible: Number(r?.disponible ?? 0),
+    faible:     Number(r?.faible     ?? 0),
+    epuise:     Number(r?.epuise     ?? 0),
+  };
 }
 
 export async function getCategories(): Promise<Category[]> {
