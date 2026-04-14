@@ -6,7 +6,7 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "dev"],
       "port": 3000,
-      "cwd": "/Volumes/LOCAL/CLAUDE CODE/store-nextjs"
+      "cwd": "."
     }
   ]
 }

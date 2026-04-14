@@ -1,23 +1,34 @@
-import { DollarSign } from "lucide-react";
+import { getAdminSession } from "@/lib/auth";
+import { listFinanceEntries, getFinanceStats } from "@/lib/admin-db";
+import FinanceManager from "@/components/admin/FinanceManager";
 
 export const metadata = { title: "Finance" };
 
-export default function FinancePage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display font-800 text-2xl text-slate-900">Finance</h1>
-        <p className="text-slate-500 text-sm mt-1">Vue d&apos;ensemble financière — recettes, dépenses, marges.</p>
-      </div>
-      <div className="bg-white rounded-3xl border border-slate-100 flex flex-col items-center justify-center py-24 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center">
-          <DollarSign className="w-8 h-8 text-amber-600" />
+export default async function FinancePage() {
+  try {
+    const [{ items, total }, stats] = await Promise.all([
+      listFinanceEntries({ limit: 200 }),
+      getFinanceStats(),
+    ]);
+
+    return (
+      <FinanceManager
+        initialItems={items}
+        initialStats={stats}
+        initialTotal={total}
+      />
+    );
+  } catch (err) {
+    return (
+      <div className="space-y-4 max-w-xl">
+        <h1 className="font-display font-800 text-2xl text-slate-900">Finances</h1>
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
+          <p className="font-bold mb-2">Erreur de chargement</p>
+          <code className="block bg-red-100 text-red-900 px-4 py-2 rounded-xl font-mono text-xs whitespace-pre-wrap">
+            {err instanceof Error ? err.message : String(err)}
+          </code>
         </div>
-        <h2 className="font-display font-700 text-lg text-slate-700">Page en construction</h2>
-        <p className="text-slate-400 text-sm text-center max-w-xs">
-          Le tableau de bord financier sera disponible prochainement.
-        </p>
       </div>
-    </div>
-  );
+    );
+  }
 }

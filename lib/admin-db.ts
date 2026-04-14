@@ -953,25 +953,120 @@ export async function listLivraisons(opts: { limit?: number; offset?: number; se
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM livraisons ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+    `SELECT * FROM livraisons_ventes ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
-  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM livraisons ${where}`, params);
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM livraisons_ventes ${where}`, params);
   return { items: rows as Livraison[], total: Number(cnt[0]?.cnt ?? 0) };
 }
 
 export async function updateLivraisonStatut(id: number, statut: Livraison["statut"]) {
-  await db.execute("UPDATE livraisons SET statut = ? WHERE id = ?", [statut, id]);
+  await db.execute("UPDATE livraisons_ventes SET statut = ? WHERE id = ?", [statut, id]);
 }
 
 export async function deleteLivraison(id: number) {
-  await db.execute("DELETE FROM livraisons WHERE id = ?", [id]);
+  await db.execute("DELETE FROM livraisons_ventes WHERE id = ?", [id]);
+}
+
+// ─── Finance ───────────────────────────────────────────────────────────────────
+
+export interface FinanceEntry {
+  id:          number;
+  reference:   string;
+  type:        "caisse" | "depense" | "rentree";
+  categorie:   string | null;
+  description: string | null;
+  montant:     number;
+  date_entree: string;
+  created_at:  string;
+  updated_at:  string;
+}
+
+export interface FinanceStats {
+  total_recettes: number;
+  total_depenses: number;
+  solde_net:      number;
+}
+
+export async function listFinanceEntries(opts: {
+  type?:   string;
+  search?: string;
+  limit?:  number;
+  offset?: number;
+} = {}): Promise<{ items: FinanceEntry[]; total: number }> {
+  const { limit = 50, offset = 0, type, search } = opts;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (type)   { conditions.push("type = ?");                                         params.push(type); }
+  if (search) { conditions.push("(categorie LIKE ? OR reference LIKE ?)");           params.push(`%${search}%`, `%${search}%`); }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT * FROM finance_entries ${where} ORDER BY date_entree DESC, id DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+  );
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM finance_entries ${where}`, params);
+  const items = (rows as mysql.RowDataPacket[]).map(r => ({ ...r, montant: Number(r.montant) }));
+  return { items: items as FinanceEntry[], total: Number(cnt[0]?.cnt ?? 0) };
+}
+
+export async function getFinanceStats(): Promise<FinanceStats> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT
+       SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
+       SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
+     FROM finance_entries`
+  );
+  const r = (rows as mysql.RowDataPacket[])[0];
+  const recettes = Number(r?.recettes ?? 0);
+  const depenses = Number(r?.depenses ?? 0);
+  return { total_recettes: recettes, total_depenses: depenses, solde_net: recettes - depenses };
+}
+
+function genFinanceRef(type: string) {
+  const prefix = type === "depense" ? "DEP" : type === "caisse" ? "CAI" : "ENT";
+  return `${prefix}-${Date.now()}`;
+}
+
+export async function createFinanceEntry(data: {
+  type:        FinanceEntry["type"];
+  categorie?:  string;
+  description?: string;
+  montant:     number;
+  date_entree: string;
+}): Promise<number> {
+  const reference = genFinanceRef(data.type);
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO finance_entries (reference, type, categorie, description, montant, date_entree)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [reference, data.type, data.categorie ?? null, data.description ?? null, data.montant, data.date_entree]
+  );
+  return result.insertId;
+}
+
+export async function updateFinanceEntry(id: number, data: {
+  categorie?:   string;
+  description?: string;
+  montant?:     number;
+  date_entree?: string;
+}) {
+  const fields: string[] = [];
+  const params: unknown[] = [];
+  if (data.categorie   !== undefined) { fields.push("categorie = ?");   params.push(data.categorie); }
+  if (data.description !== undefined) { fields.push("description = ?"); params.push(data.description); }
+  if (data.montant     !== undefined) { fields.push("montant = ?");     params.push(data.montant); }
+  if (data.date_entree !== undefined) { fields.push("date_entree = ?"); params.push(data.date_entree); }
+  if (!fields.length) return;
+  params.push(id);
+  await db.execute(`UPDATE finance_entries SET ${fields.join(", ")} WHERE id = ?`, params);
+}
+
+export async function deleteFinanceEntry(id: number) {
+  await db.execute("DELETE FROM finance_entries WHERE id = ?", [id]);
 }
 
 export async function getVentesStats(): Promise<{ factures: number; devis: number; livraisons: number }> {
   const [[f], [d], [l]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures"),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM devis"),
-    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons"),
+    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
   ]);
   return {
     factures:   Number((f as mysql.RowDataPacket[])[0]?.cnt ?? 0),
