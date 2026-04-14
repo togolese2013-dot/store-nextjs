@@ -627,3 +627,170 @@ export async function getStockStats() {
     sorties_jour:  0,
   };
 }
+
+/* ─── Stock Boutique (tables dédiées boutique_stock + boutique_mouvements) ─── */
+export interface BoutiqueStockItem {
+  produit_id:    number;
+  nom:           string;
+  reference:     string;
+  image_url:     string | null;
+  categorie_nom: string;
+  prix_unitaire: number;
+  remise:        number;
+  quantite:      number;
+  seuil_alerte:  number;
+  valeur:        number;
+}
+
+export interface BoutiqueStats {
+  total_produits:  number;
+  valeur_boutique: number;
+  stock_faible:    number;
+  epuises:         number;
+}
+
+export interface BoutiqueMouvement {
+  id:           number;
+  produit_id:   number;
+  nom_produit:  string;
+  type:         "entree" | "sortie" | "retrait" | "ajustement";
+  quantite:     number;
+  motif:        string | null;
+  ref_commande: string | null;
+  admin_id:     number | null;
+  created_at:   string;
+}
+
+async function getProduitColsAdmin() {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produits'`
+  );
+  const names = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
+  return {
+    image_url: names.has("image_url"),
+    image:     names.has("image"),
+    remise:    names.has("remise"),
+  };
+}
+
+export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(`
+    SELECT
+      COUNT(bs.produit_id)                                                                  AS total_produits,
+      COALESCE(SUM(bs.quantite * p.prix_unitaire), 0)                                      AS valeur_boutique,
+      SUM(CASE WHEN bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte THEN 1 ELSE 0 END) AS stock_faible,
+      SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
+    FROM boutique_stock bs
+    JOIN produits p ON p.id = bs.produit_id
+  `);
+  const r = rows[0] ?? {};
+  return {
+    total_produits:  Number(r.total_produits  ?? 0),
+    valeur_boutique: Number(r.valeur_boutique ?? 0),
+    stock_faible:    Number(r.stock_faible    ?? 0),
+    epuises:         Number(r.epuises         ?? 0),
+  };
+}
+
+export async function getStockBoutiqueList(opts: {
+  search?: string;
+  filter?: "all" | "faible" | "epuise";
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: BoutiqueStockItem[]; total: number }> {
+  const { search, filter = "all", limit = 50, offset = 0 } = opts;
+
+  const cols = await getProduitColsAdmin();
+  const imageCol  = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
+  const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
+
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (search) {
+    conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (filter === "faible") conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
+  if (filter === "epuise") conditions.push("bs.quantite = 0");
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT bs.produit_id, p.nom, p.reference,
+            ${imageCol}  AS image_url,
+            ${remiseCol} AS remise,
+            p.prix_unitaire,
+            COALESCE(c.nom, '') AS categorie_nom,
+            bs.quantite, bs.seuil_alerte,
+            (bs.quantite * p.prix_unitaire) AS valeur
+     FROM boutique_stock bs
+     JOIN produits p ON p.id = bs.produit_id
+     LEFT JOIN categories c ON c.id = p.categorie_id
+     ${where}
+     ORDER BY bs.quantite ASC, p.nom ASC
+     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+    params
+  );
+
+  const [countRows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt
+     FROM boutique_stock bs
+     JOIN produits p ON p.id = bs.produit_id
+     ${where}`,
+    params
+  );
+
+  return {
+    items: rows.map(r => ({
+      produit_id:    Number(r.produit_id),
+      nom:           String(r.nom),
+      reference:     String(r.reference ?? ""),
+      image_url:     r.image_url ?? null,
+      categorie_nom: String(r.categorie_nom ?? ""),
+      prix_unitaire: Number(r.prix_unitaire),
+      remise:        Number(r.remise ?? 0),
+      quantite:      Number(r.quantite),
+      seuil_alerte:  Number(r.seuil_alerte),
+      valeur:        Number(r.valeur),
+    })),
+    total: Number(countRows[0]?.cnt ?? 0),
+  };
+}
+
+export async function createBoutiqueMouvement(data: {
+  produit_id:    number;
+  type:          "entree" | "sortie" | "retrait" | "ajustement";
+  quantite:      number;
+  motif?:        string;
+  ref_commande?: string;
+  admin_id?:     number;
+}): Promise<void> {
+  await db.execute(
+    `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+     VALUES (?,?,?,?,?,?)`,
+    [data.produit_id, data.type, Math.abs(data.quantite),
+     data.motif ?? null, data.ref_commande ?? null, data.admin_id ?? null]
+  );
+  const delta = data.type === "entree" ? Math.abs(data.quantite) : -Math.abs(data.quantite);
+  await db.execute(
+    `UPDATE boutique_stock SET quantite = GREATEST(0, quantite + ?), updated_at = NOW() WHERE produit_id = ?`,
+    [delta, data.produit_id]
+  );
+  await db.execute(
+    `UPDATE produits p JOIN boutique_stock bs ON bs.produit_id = p.id SET p.stock_boutique = bs.quantite WHERE p.id = ?`,
+    [data.produit_id]
+  );
+}
+
+export async function getRecentBoutiqueMovements(limit = 30): Promise<BoutiqueMouvement[]> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT bm.*, p.nom AS nom_produit
+     FROM boutique_mouvements bm
+     JOIN produits p ON p.id = bm.produit_id
+     ORDER BY bm.created_at DESC
+     LIMIT ${Number(limit)}`
+  );
+  return rows as BoutiqueMouvement[];
+}
