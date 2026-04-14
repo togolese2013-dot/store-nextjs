@@ -1,6 +1,6 @@
 # HANDOFF — Togolese Shop Admin
 > Dernière mise à jour : 2026-04-14
-> Commit actuel : `aaee656`
+> Commit actuel : `d333dc2`
 
 ---
 
@@ -349,40 +349,10 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3003
 ## 📝 Historique des commits récents
 
 ```
+d333dc2  feat: pages Fournisseurs, Achats, refonte Catégories + améliorations MAGASIN
 aaee656  docs: handoff complet
 0fe8c97  feat: filtres produits, actions inline, pages stock entree/sortie/ajustement
 f77607b  feat: page Finance avec KPIs, tabs Dépenses/Recettes et CRUD
 d9e957c  feat: add Gestion des Ventes page avec Factures, Devis et Livraisons tabs
 6468ddb  feat: Stock Boutique — page dédiée avec KPIs, mouvements et retraits clients
-```
-
-## 🆕 Modifications session 2026-04-14 (non encore commitées)
-
-### Sidebar
-- "Avis clients" déplacé de MAGASIN → CRM
-- Ajout "Fournisseurs" et "Achats" dans MAGASIN
-
-### Page Produits
-- Boutons header réduits (`px-3 py-2 text-xs`)
-- Icône "Ajouter un produit" changée : `Plus` → `PackagePlus`
-
-### Formulaire Produit
-- "Stock boutique" renommé → "Stock magasin"
-- Nouveau champ "Stock minimum" (seuil alerte, défaut 5)
-- APIs POST/PUT produits mises à jour pour accepter `stock_minimum`
-
-### Pages Stock
-- Remplacement des `<select>` déroulants par une recherche autocomplete
-
-### Nouvelles pages
-- `/admin/categories` — refonte complète (grille cartes, KPIs, modal)
-- `/admin/fournisseurs` — nouvelle page CRUD complète
-- `/admin/achats` — nouvelle page achats fournisseurs
-
-### DB (migrations exécutées)
-```sql
--- stock_minimum déjà présent sur produits
-ALTER TABLE achats ADD COLUMN fournisseur_id INT NULL; -- ajouté
-CREATE TABLE fournisseurs (...);   -- créée
--- achats et achat_items préexistantes, adaptées au schéma réel
 ```
