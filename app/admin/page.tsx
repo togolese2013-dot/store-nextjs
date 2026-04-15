@@ -17,8 +17,8 @@ const MODULES = [
   {
     key:         "boutique",
     label:       "BOUTIQUE",
-    description: "Commandes, coupons, livraisons",
-    href:        "/admin/orders",
+    description: "Ventes, stock boutique, finance, coupons",
+    href:        "/admin/ventes",
     icon:        ShoppingBag,
     bg:          "bg-amber-500",
     ring:        "ring-amber-400",
@@ -26,7 +26,7 @@ const MODULES = [
   {
     key:         "store",
     label:       "STORE",
-    description: "Réglages, thème, paiements, domaine",
+    description: "Commandes, réglages, thème, paiements, domaine",
     href:        "/admin/settings",
     icon:        Settings,
     bg:          "bg-emerald-700",
