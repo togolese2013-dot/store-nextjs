@@ -3,17 +3,18 @@ import { getStockStats, getStockMovements, getStockMovementCounts } from "@/lib/
 import { finalPrice, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import AdminProductActions from "@/components/admin/AdminProductActions";
+import MouvementModal from "@/components/admin/MouvementModal";
 import Image from "next/image";
 import {
   Search, Package,
-  PackagePlus, PackageMinus, ArrowLeftRight,
+  PackagePlus,
   Boxes, AlertTriangle, XCircle, TrendingDown, TrendingUp, DollarSign,
-  Activity, Tag, Ruler,
+  Activity,
 } from "lucide-react";
 
 export const metadata = { title: "Tous les produits" };
 
-type View   = "stock" | "mouvements" | "entrees" | "sorties" | "ajustements";
+type View   = "stock" | "mouvements";
 type Statut = "all" | "disponible" | "faible" | "epuise";
 
 interface PageProps {
@@ -68,11 +69,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       getProductCount({ search: q, categoryId: catId, statut: statutFilter }),
     ]);
   } else {
-    const movType = view === "mouvements" ? "tous"
-      : view === "entrees"    ? "entree"
-      : view === "sorties"    ? "sortie"
-      : "ajustement";
-    const res = await getStockMovements({ type: movType as Parameters<typeof getStockMovements>[0]["type"], search: q, limit, offset });
+    const res = await getStockMovements({ type: "tous", search: q, limit, offset });
     movements = res.items;
     movTotal  = res.total;
     total     = movTotal;
@@ -88,11 +85,8 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewTabs: { key: View; label: string; icon: any; count: number }[] = [
-    { key: "stock",       label: "Produits",          icon: Package,  count: prodTotal },
-    { key: "mouvements",  label: "Mouvements",        icon: Activity, count: movCounts.total },
-    { key: "entrees",     label: "Entrées",            icon: PackagePlus,  count: movCounts.entrees },
-    { key: "sorties",     label: "Sorties",            icon: PackageMinus, count: movCounts.sorties },
-    { key: "ajustements", label: "Ajustements",        icon: ArrowLeftRight, count: movCounts.ajustements },
+    { key: "stock",      label: "Produits",   icon: Package,  count: prodTotal },
+    { key: "mouvements", label: "Mouvements", icon: Activity, count: movCounts.total },
   ];
 
   const statutTabs: { key: Statut; label: string; count: number }[] = [
@@ -112,26 +106,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           <p className="text-slate-500 text-sm mt-0.5">Niveaux de stock actuels</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/products/new"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
-          >
-            <PackagePlus className="w-3.5 h-3.5" /> Ajouter un produit
-          </Link>
-          <Link href="/admin/stock/entree"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
-          >
-            <PackagePlus className="w-3.5 h-3.5" /> Nouvelle Entrée
-          </Link>
-          <Link href="/admin/stock/sortie"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
-          >
-            <PackageMinus className="w-3.5 h-3.5" /> Nouvelle Sortie
-          </Link>
-          <Link href="/admin/stock/ajustement"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
-          >
-            <ArrowLeftRight className="w-3.5 h-3.5" /> Ajustement
-          </Link>
+          {view === "stock" && (
+            <Link href="/admin/products/new"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
+            >
+              <PackagePlus className="w-3.5 h-3.5" /> Ajouter un produit
+            </Link>
+          )}
+          {view === "mouvements" && <MouvementModal />}
         </div>
       </div>
 
@@ -345,19 +327,19 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right hidden sm:table-cell">
-                            <span className={`font-semibold ${p.stock_boutique === 0 ? "text-red-500" : p.stock_boutique <= 5 ? "text-amber-500" : "text-green-600"}`}>
-                              {p.stock_boutique}
+                            <span className={`font-semibold ${p.stock_magasin === 0 ? "text-red-500" : p.stock_magasin <= 5 ? "text-amber-500" : "text-green-600"}`}>
+                              {p.stock_magasin}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center hidden lg:table-cell">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              p.stock_boutique === 0
+                              p.stock_magasin === 0
                                 ? "bg-red-100 text-red-700"
-                                : p.stock_boutique <= 5
+                                : p.stock_magasin <= 5
                                 ? "bg-amber-100 text-amber-700"
                                 : "bg-green-100 text-green-700"
                             }`}>
-                              {p.stock_boutique === 0 ? "Épuisé" : p.stock_boutique <= 5 ? "Faible" : "Disponible"}
+                              {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
                             </span>
                           </td>
                           <td className="px-4 py-3">

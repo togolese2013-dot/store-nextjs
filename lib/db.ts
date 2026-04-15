@@ -75,9 +75,9 @@ export async function getProducts(opts?: {
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise)  { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)    { conditions.push("p.neuf = 1"); }
-  if (statut === "disponible")   { conditions.push("p.stock_boutique > 5"); }
-  if (statut === "faible")       { conditions.push("p.stock_boutique > 0 AND p.stock_boutique <= 5"); }
-  if (statut === "epuise")       { conditions.push("p.stock_boutique = 0"); }
+  if (statut === "disponible")   { conditions.push("COALESCE(ps.stock_magasin, 0) > 5"); }
+  if (statut === "faible")       { conditions.push("COALESCE(ps.stock_magasin, 0) > 0 AND COALESCE(ps.stock_magasin, 0) <= 5"); }
+  if (statut === "epuise")       { conditions.push("COALESCE(ps.stock_magasin, 0) = 0"); }
 
   const where    = conditions.join(" AND ");
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -92,6 +92,7 @@ export async function getProducts(opts?: {
        p.id, p.reference, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                          AS prix_unitaire,
        CAST(p.stock_boutique AS SIGNED)                                         AS stock_boutique,
+       COALESCE(ps.stock_magasin, 0)                                            AS stock_magasin,
        ${cols.remise         ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)"  : "0"    } AS remise,
        ${cols.neuf           ? "COALESCE(p.neuf, 1)"                           : "1"    } AS neuf,
        ${imageCol}                                                                          AS image_url,
@@ -101,6 +102,7 @@ export async function getProducts(opts?: {
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
+     LEFT JOIN (SELECT produit_id, COALESCE(SUM(stock), 0) AS stock_magasin FROM produit_stocks GROUP BY produit_id) ps ON ps.produit_id = p.id
      WHERE ${where}
      ORDER BY ${orderCol} DESC
      LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -116,6 +118,7 @@ export async function getProducts(opts?: {
     categorie_nom:  (r.categorie_nom ?? null) as string | null,
     prix_unitaire:  Number(r.prix_unitaire),
     stock_boutique: Number(r.stock_boutique),
+    stock_magasin:  Number(r.stock_magasin ?? 0),
     remise:         Number(r.remise),
     neuf:           Boolean(r.neuf),
     image_url:      (r.image_url ?? null) as string | null,
@@ -186,9 +189,9 @@ export async function getProductCount(opts?: {
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise) { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)   { conditions.push("p.neuf = 1"); }
-  if (statut === "disponible")  { conditions.push("p.stock_boutique > 5"); }
-  if (statut === "faible")      { conditions.push("p.stock_boutique > 0 AND p.stock_boutique <= 5"); }
-  if (statut === "epuise")      { conditions.push("p.stock_boutique = 0"); }
+  if (statut === "disponible")  { conditions.push("(SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) > 5"); }
+  if (statut === "faible")      { conditions.push("(SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) > 0 AND (SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) <= 5"); }
+  if (statut === "epuise")      { conditions.push("(SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) = 0"); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.join(" AND ")}`,
@@ -203,10 +206,10 @@ export async function getProductStatusCounts(): Promise<{
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total,
-       SUM(stock_boutique > 5) AS disponible,
-       SUM(stock_boutique > 0 AND stock_boutique <= 5) AS faible,
-       SUM(stock_boutique = 0) AS epuise
-     FROM produits WHERE actif = 1`
+       SUM((SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) > 5)               AS disponible,
+       SUM((SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) BETWEEN 1 AND 5)   AS faible,
+       SUM((SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) = 0)               AS epuise
+     FROM produits p WHERE p.actif = 1`
   );
   const r = (rows as mysql.RowDataPacket[])[0];
   return {

@@ -42,7 +42,6 @@ const MODULES: Record<string, {
       { label: "Commandes",      href: "/admin/orders",          icon: ShoppingCart },
       { label: "Ventes",         href: "/admin/ventes",          icon: TrendingUp },
       { label: "Stock boutique", href: "/admin/stock-boutique",  icon: Archive },
-      { label: "Facture",        href: "/admin/factures",        icon: FileText },
       { label: "Proformat",      href: "/admin/proforma",        icon: FilePlus },
       { label: "Finance",        href: "/admin/finance",         icon: DollarSign },
       { label: "Coupons",        href: "/admin/coupons",         icon: Tag },

@@ -9,6 +9,7 @@ export interface Product {
   categorie_nom: string | null;
   prix_unitaire: number;
   stock_boutique: number;
+  stock_magasin:  number;
   remise: number;
   neuf: boolean;
   image_url: string | null;
