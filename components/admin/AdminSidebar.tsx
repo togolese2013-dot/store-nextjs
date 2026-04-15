@@ -39,7 +39,6 @@ const MODULES: Record<string, {
     color:     "bg-amber-500",
     textColor: "text-amber-600",
     items: [
-      { label: "Commandes",      href: "/admin/orders",          icon: ShoppingCart },
       { label: "Ventes",         href: "/admin/ventes",          icon: TrendingUp },
       { label: "Stock boutique", href: "/admin/stock-boutique",  icon: Archive },
       { label: "Proformat",      href: "/admin/proforma",        icon: FilePlus },
@@ -52,6 +51,7 @@ const MODULES: Record<string, {
     color:     "bg-emerald-700",
     textColor: "text-emerald-700",
     items: [
+      { label: "Commandes",          href: "/admin/orders",            icon: ShoppingCart },
       { label: "Réglages généraux",  href: "/admin/settings",          icon: Settings },
       { label: "Hero & Bannières",   href: "/admin/settings/hero",     icon: Image },
       { label: "Zones de livraison", href: "/admin/settings/delivery", icon: MapPin },
@@ -85,7 +85,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/import-export", "magasin"],
   ["/admin/stock-boutique","boutique"],
   ["/admin/stock",         "magasin"],
-  ["/admin/orders",        "boutique"],
+  ["/admin/orders",        "store"],
   ["/admin/ventes",        "boutique"],
   ["/admin/factures",      "boutique"],
   ["/admin/proforma",      "boutique"],

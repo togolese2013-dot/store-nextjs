@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import {
   TrendingUp, TrendingDown, Wallet,
-  Search, Filter, Pencil, Trash2, X, Plus,
+  Search, Pencil, Trash2, X, Plus,
 } from "lucide-react";
 import type { FinanceEntry, FinanceStats } from "@/lib/admin-db";
 
@@ -208,26 +208,11 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
               className="pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-400 w-48"
             />
           </div>
-          <button className="p-2 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors">
-            <Filter className="w-4 h-4" />
-          </button>
           <button
-            onClick={() => setModal({ type: "caisse" })}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors"
+            onClick={() => setModal({ type: tab === "depense" ? "depense" : "rentree" })}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 hover:bg-brand-800 text-white text-sm font-semibold transition-colors"
           >
-            <Plus className="w-4 h-4" /> Caisse
-          </button>
-          <button
-            onClick={() => setModal({ type: "depense" })}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Dépense
-          </button>
-          <button
-            onClick={() => setModal({ type: "rentree" })}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Rentrée
+            <Plus className="w-4 h-4" /> Nouvelle entrée
           </button>
         </div>
       </div>
@@ -277,7 +262,7 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            {t === "depense" ? "Dépenses" : "Recettes"}
+            {t === "depense" ? "Dépenses" : "Rentrées"}
           </button>
         ))}
       </div>

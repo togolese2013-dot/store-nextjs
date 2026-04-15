@@ -2,27 +2,25 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import {
-  TrendingUp, BookOpen, Truck, Plus, Search,
+  TrendingUp, Truck, Plus, Search,
   Eye, Trash2, Printer, Loader2, ChevronLeft, ChevronRight,
   X, Check, AlertTriangle, RefreshCw, Pencil,
   CreditCard, Banknote, Smartphone, Building2, Package,
   ShoppingCart, Minus,
 } from "lucide-react";
-import type { Facture, Devis, Livraison, BoutiqueStockItem } from "@/lib/admin-db";
+import type { Facture, Livraison, BoutiqueStockItem } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 
 /* ─── Types ─── */
-type Tab = "ventes" | "devis" | "livraisons";
+type Tab = "ventes" | "livraisons";
 
-interface Stats { factures: number; devis: number; livraisons: number }
+interface Stats { factures: number; livraisons: number }
 
 interface Props {
   initialFactures:   Facture[];
-  initialDevis:      Devis[];
   initialLivraisons: Livraison[];
   initialStats:      Stats;
   totalFactures:     number;
-  totalDevis:        number;
   totalLivraisons:   number;
 }
 
@@ -36,15 +34,19 @@ interface VenteItem {
 }
 
 interface NewVenteModal {
-  clientNom:      string;
-  clientTel:      string;
-  avecLivraison:  boolean;
-  modePaiement:   string;
-  statutPaiement: string;
-  montantAcompte: string;
-  note:           string;
-  saving:         boolean;
-  error:          string;
+  clientNom:        string;
+  clientTel:        string;
+  avecLivraison:    boolean;
+  adresseLivraison: string;
+  contactLivraison: string;
+  lienLocalisation: string;
+  modePaiement:     string;
+  statutPaiement:   string;
+  montantAcompte:   string;
+  remiseGlobale:    string;
+  note:             string;
+  saving:           boolean;
+  error:            string;
 }
 
 /* ─── Constants ─── */
@@ -68,13 +70,6 @@ const FACTURE_STATUTS: { value: Facture["statut"]; label: string; color: string 
   { value: "annule",    label: "Annulé",    color: "bg-red-100 text-red-700" },
 ];
 
-const DEVIS_STATUTS: { value: Devis["statut"]; label: string; color: string }[] = [
-  { value: "brouillon", label: "Brouillon", color: "bg-slate-100 text-slate-600" },
-  { value: "envoye",    label: "Envoyé",    color: "bg-blue-100 text-blue-700" },
-  { value: "accepte",   label: "Accepté",   color: "bg-emerald-100 text-emerald-700" },
-  { value: "refuse",    label: "Refusé",    color: "bg-red-100 text-red-700" },
-  { value: "expire",    label: "Expiré",    color: "bg-orange-100 text-orange-700" },
-];
 
 const LIVRAISON_STATUTS: { value: Livraison["statut"]; label: string; color: string }[] = [
   { value: "en_attente", label: "En attente", color: "bg-slate-100 text-slate-600" },
@@ -100,32 +95,35 @@ function formatDate(d: string) {
 const LIMIT = 50;
 
 const emptyModal = (): NewVenteModal => ({
-  clientNom:      "",
-  clientTel:      "",
-  avecLivraison:  false,
-  modePaiement:   "especes",
-  statutPaiement: "paye_total",
-  montantAcompte: "",
-  note:           "",
-  saving:         false,
-  error:          "",
+  clientNom:        "",
+  clientTel:        "",
+  avecLivraison:    false,
+  adresseLivraison: "",
+  contactLivraison: "",
+  lienLocalisation: "",
+  modePaiement:     "especes",
+  statutPaiement:   "paye_total",
+  montantAcompte:   "",
+  remiseGlobale:    "",
+  note:             "",
+  saving:           false,
+  error:            "",
 });
 
 /* ══════════════════════════════════════════════════════════════════
    COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 export default function VentesManager({
-  initialFactures, initialDevis, initialLivraisons,
-  initialStats, totalFactures, totalDevis, totalLivraisons,
+  initialFactures, initialLivraisons,
+  initialStats, totalFactures, totalLivraisons,
 }: Props) {
 
   /* ── State principal ── */
   const [tab,        setTab]        = useState<Tab>("ventes");
   const [stats,      setStats]      = useState<Stats>(initialStats);
   const [factures,   setFactures]   = useState<Facture[]>(initialFactures);
-  const [devis,      setDevis]      = useState<Devis[]>(initialDevis);
   const [livraisons, setLivraisons] = useState<Livraison[]>(initialLivraisons);
-  const [totals,     setTotals]     = useState({ factures: totalFactures, devis: totalDevis, livraisons: totalLivraisons });
+  const [totals,     setTotals]     = useState({ factures: totalFactures, livraisons: totalLivraisons });
   const [offset,     setOffset]     = useState(0);
   const [search,     setSearch]     = useState("");
   const [loading,    setLoading]    = useState(false);
@@ -144,7 +142,8 @@ export default function VentesManager({
 
   /* ── Totaux calculés ── */
   const sousTotal   = items.reduce((s, i) => s + i.prix_unitaire * i.qty, 0);
-  const totalVente  = sousTotal;
+  const remise      = modal ? (Number(modal.remiseGlobale) || 0) : 0;
+  const totalVente  = Math.max(0, sousTotal - remise);
   const acompte     = modal ? Number(modal.montantAcompte) || 0 : 0;
   const resteAPayer = Math.max(0, totalVente - acompte);
 
@@ -249,10 +248,6 @@ export default function VentesManager({
       const res  = await fetch(`/api/admin/ventes/factures?${params}`);
       const data = await res.json();
       if (res.ok) { setFactures(data.items); setStats(data.stats); setTotals(p => ({ ...p, factures: data.total })); }
-    } else if (t === "devis") {
-      const res  = await fetch(`/api/admin/ventes/devis?${params}`);
-      const data = await res.json();
-      if (res.ok) { setDevis(data.items); setTotals(p => ({ ...p, devis: data.total })); }
     } else {
       const res  = await fetch(`/api/admin/ventes/livraisons?${params}`);
       const data = await res.json();
@@ -268,13 +263,12 @@ export default function VentesManager({
   /* ── Delete ── */
   async function handleDelete(type: Tab, id: number) {
     if (!confirm("Supprimer cet élément ?")) return;
-    const url = type === "ventes"    ? `/api/admin/ventes/factures/${id}`
-              : type === "devis"     ? `/api/admin/ventes/devis/${id}`
-              : `/api/admin/ventes/livraisons/${id}`;
+    const url = type === "ventes"
+      ? `/api/admin/ventes/factures/${id}`
+      : `/api/admin/ventes/livraisons/${id}`;
     const res = await fetch(url, { method: "DELETE" });
     if (res.ok) {
       if (type === "ventes")     setFactures(p => p.filter(x => x.id !== id));
-      if (type === "devis")      setDevis(p => p.filter(x => x.id !== id));
       if (type === "livraisons") setLivraisons(p => p.filter(x => x.id !== id));
       showFlash("Supprimé ✓");
     }
@@ -299,15 +293,19 @@ export default function VentesManager({
     setModal(m => m ? { ...m, saving: true, error: "" } : m);
 
     const payload = {
-      client_nom:      modal.clientNom,
-      client_tel:      modal.clientTel || undefined,
-      avec_livraison:  modal.avecLivraison,
-      mode_paiement:   modal.modePaiement,
-      statut_paiement: modal.statutPaiement,
-      montant_acompte: modal.statutPaiement === "acompte" ? Number(modal.montantAcompte) : undefined,
-      sous_total:      sousTotal,
-      total:           totalVente,
-      note:            modal.note || undefined,
+      client_nom:        modal.clientNom,
+      client_tel:        modal.clientTel || undefined,
+      avec_livraison:    modal.avecLivraison,
+      adresse_livraison: modal.avecLivraison ? modal.adresseLivraison || undefined : undefined,
+      contact_livraison: modal.avecLivraison ? modal.contactLivraison || undefined : undefined,
+      lien_localisation: modal.avecLivraison ? modal.lienLocalisation || undefined : undefined,
+      mode_paiement:     modal.modePaiement,
+      statut_paiement:   modal.statutPaiement,
+      montant_acompte:   modal.statutPaiement === "acompte" ? Number(modal.montantAcompte) : undefined,
+      sous_total:        sousTotal,
+      remise:            remise > 0 ? remise : undefined,
+      total:             totalVente,
+      note:              modal.note || undefined,
       items: items.map(i => ({
         produit_id: i.produit_id,
         nom:        i.nom,
@@ -337,10 +335,10 @@ export default function VentesManager({
   function handlePrint(ref: string) { window.print(); void ref; }
 
   /* ── Pagination ── */
-  const currentTotal = tab === "ventes" ? totals.factures : tab === "devis" ? totals.devis : totals.livraisons;
+  const currentTotal = tab === "ventes" ? totals.factures : totals.livraisons;
   const totalPages   = Math.ceil(currentTotal / LIMIT);
   const currentPage  = Math.floor(offset / LIMIT) + 1;
-  const rows = tab === "ventes" ? factures : tab === "devis" ? devis : livraisons;
+  const rows = tab === "ventes" ? factures : livraisons;
 
   /* ════════════════════════════════════
      RENDER
@@ -358,8 +356,8 @@ export default function VentesManager({
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-display font-800 text-2xl text-slate-900">Gestion des ventes</h1>
-          <p className="text-slate-400 text-sm mt-1">Gérez ventes, devis et livraisons</p>
+          <h1 className="font-display font-800 text-2xl text-slate-900">Ventes</h1>
+          <p className="text-slate-400 text-sm mt-1">Gérez vos ventes et livraisons</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
@@ -393,9 +391,8 @@ export default function VentesManager({
       {/* ── Tabs ── */}
       <div className="bg-white rounded-2xl border border-slate-100 p-1.5 flex gap-1 w-fit">
         {([
-          { key: "ventes",     label: "Ventes",    icon: TrendingUp, count: stats.factures },
-          { key: "devis",      label: "Devis",      icon: BookOpen,   count: stats.devis },
-          { key: "livraisons", label: "Livraisons", icon: Truck,      count: stats.livraisons },
+          { key: "ventes",     label: "Ventes",     icon: TrendingUp, count: stats.factures },
+          { key: "livraisons", label: "Livraisons",  icon: Truck,      count: stats.livraisons },
         ] as const).map(({ key, label, icon: Icon, count }) => (
           <button
             key={key}
@@ -454,10 +451,8 @@ export default function VentesManager({
                 <tbody className="divide-y divide-slate-50">
                   {rows.map(row => {
                     const isVente     = tab === "ventes";
-                    const isDevis     = tab === "devis";
                     const isLivraison = tab === "livraisons";
                     const f = row as Facture;
-                    const d = row as Devis;
                     const l = row as Livraison;
 
                     return (
@@ -475,8 +470,8 @@ export default function VentesManager({
 
                         <td className="px-4 py-3.5">
                           <p className="font-semibold text-slate-800">{row.client_nom}</p>
-                          {(isVente || isDevis) && (f.client_tel || d.client_tel) && (
-                            <p className="text-xs text-slate-400">{isVente ? f.client_tel : d.client_tel}</p>
+                          {isVente && f.client_tel && (
+                            <p className="text-xs text-slate-400">{f.client_tel}</p>
                           )}
                           {isLivraison && l.client_tel && (
                             <p className="text-xs text-slate-400">{l.client_tel}</p>
@@ -487,9 +482,9 @@ export default function VentesManager({
                           {formatDate(row.created_at)}
                         </td>
 
-                        {(isVente || isDevis) && (
+                        {isVente && (
                           <td className="px-4 py-3.5 text-right font-display font-700 text-brand-700 hidden md:table-cell">
-                            {formatPrice(isVente ? f.total : d.total)}
+                            {formatPrice(f.total)}
                           </td>
                         )}
                         {isLivraison && (
@@ -525,7 +520,6 @@ export default function VentesManager({
 
                         <td className="px-4 py-3.5">
                           {isVente     && statutBadge(f.statut, FACTURE_STATUTS)}
-                          {isDevis     && statutBadge(d.statut, DEVIS_STATUTS)}
                           {isLivraison && statutBadge(l.statut, LIVRAISON_STATUTS)}
                         </td>
 
@@ -565,75 +559,46 @@ export default function VentesManager({
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[92vh]">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ maxHeight: "92vh" }}>
 
-            {/* ── En-tête modal ── */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
+            {/* ── En-tête ── */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-brand-50 flex items-center justify-center">
-                  <ShoppingCart className="w-5 h-5 text-brand-700" />
+                <div className="w-9 h-9 rounded-2xl bg-brand-50 flex items-center justify-center">
+                  <ShoppingCart className="w-4.5 h-4.5 text-brand-700" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-lg">Nouvelle vente</h3>
-                  <p className="text-xs text-slate-400">Référence générée automatiquement</p>
+                  <h3 className="font-bold text-slate-900 text-lg leading-none">Nouvelle vente</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Référence générée automatiquement</p>
                 </div>
               </div>
-              <button onClick={closeModal} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+              <button onClick={closeModal} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* ── Corps modal scrollable ── */}
-            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            {/* ── Corps 2 colonnes ── */}
+            <div className="flex-1 grid grid-cols-[3fr_2fr] min-h-0 overflow-hidden">
 
-              {/* Client */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Nom du client *</label>
-                  <input
-                    type="text"
-                    value={modal.clientNom}
-                    onChange={e => setModal(m => m ? { ...m, clientNom: e.target.value } : m)}
-                    placeholder="Ex : WADADA"
-                    autoFocus
-                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all"
-                  />
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Téléphone</label>
-                  <input
-                    type="text"
-                    value={modal.clientTel}
-                    onChange={e => setModal(m => m ? { ...m, clientTel: e.target.value } : m)}
-                    placeholder="+228 90 00 00 00"
-                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
+              {/* ── Colonne gauche : Articles ── */}
+              <div className="overflow-y-auto px-6 py-5 space-y-4 border-r border-slate-100">
 
-              {/* ── Articles ── */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2">Articles (stock boutique)</label>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Articles</p>
 
                 {/* Recherche produit */}
                 <div className="relative" ref={searchRef}>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder={loadingStock ? "Chargement du stock…" : "Rechercher un produit…"}
-                      value={prodSearch}
-                      disabled={loadingStock}
-                      onChange={e => { setProdSearch(e.target.value); setShowDropdown(true); }}
-                      onFocus={() => setShowDropdown(true)}
-                      className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all disabled:opacity-50"
-                    />
-                    {loadingStock && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
-                    )}
-                  </div>
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder={loadingStock ? "Chargement du stock…" : "Ajouter un produit…"}
+                    value={prodSearch}
+                    disabled={loadingStock}
+                    onChange={e => { setProdSearch(e.target.value); setShowDropdown(true); }}
+                    onFocus={() => setShowDropdown(true)}
+                    className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all disabled:opacity-50"
+                  />
+                  {loadingStock && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />}
 
-                  {/* Dropdown produits */}
                   {showDropdown && filteredProducts.length > 0 && (
                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-10 max-h-52 overflow-y-auto">
                       {filteredProducts.map(p => (
@@ -668,239 +633,233 @@ export default function VentesManager({
                   )}
                 </div>
 
-                {/* Liste des articles ajoutés */}
+                {/* Panier vide */}
+                {items.length === 0 && (
+                  <div className="flex flex-col items-center py-12 text-slate-300 gap-2">
+                    <ShoppingCart className="w-10 h-10" strokeWidth={1} />
+                    <p className="text-sm font-semibold">Aucun article ajouté</p>
+                  </div>
+                )}
+
+                {/* Liste articles */}
                 {items.length > 0 && (
-                  <div className="mt-3 border border-slate-200 rounded-2xl overflow-hidden">
-                    {/* Header */}
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2 bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <div className="grid grid-cols-[minmax(0,1fr)_108px_96px_112px] gap-2 px-4 py-2 bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                       <span>Produit</span>
-                      <span className="text-center w-24">Quantité</span>
-                      <span className="text-right w-24">P.U.</span>
-                      <span className="text-right w-24">Total</span>
+                      <span className="text-center">Qté</span>
+                      <span className="text-right">Prix unit.</span>
+                      <span className="text-right">Total</span>
                     </div>
                     {items.map(item => (
-                      <div key={item.produit_id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center px-4 py-2.5 border-t border-slate-100 hover:bg-slate-50/60">
-                        {/* Nom */}
+                      <div key={item.produit_id} className="grid grid-cols-[minmax(0,1fr)_108px_96px_112px] gap-2 items-center px-4 py-3 border-t border-slate-100 hover:bg-slate-50/60">
                         <div className="min-w-0">
                           <p className="font-semibold text-sm text-slate-800 truncate">{item.nom}</p>
                           <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
                         </div>
-                        {/* Qty stepper */}
-                        <div className="flex items-center gap-1 w-24 justify-center">
-                          <button
-                            type="button"
-                            onClick={() => changeQty(item.produit_id, -1)}
-                            disabled={item.qty <= 1}
-                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors"
-                          >
+                        <div className="flex items-center gap-1 justify-center">
+                          <button type="button" onClick={() => changeQty(item.produit_id, -1)} disabled={item.qty <= 1}
+                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
                             <Minus className="w-3 h-3" />
                           </button>
-                          <input
-                            type="number"
-                            min={1}
-                            max={item.stock_dispo}
-                            value={item.qty}
+                          <input type="number" min={1} max={item.stock_dispo} value={item.qty}
                             onChange={e => setQtyDirect(item.produit_id, e.target.value)}
-                            className="w-10 text-center text-sm font-bold border border-slate-200 rounded-lg py-0.5 outline-none focus:border-brand-400"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => changeQty(item.produit_id, +1)}
-                            disabled={item.qty >= item.stock_dispo}
-                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors"
-                          >
+                            className="w-10 text-center text-sm font-bold border border-slate-200 rounded-lg py-0.5 outline-none focus:border-brand-400" />
+                          <button type="button" onClick={() => changeQty(item.produit_id, +1)} disabled={item.qty >= item.stock_dispo}
+                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
-                        {/* P.U. */}
-                        <span className="text-sm font-semibold text-slate-700 text-right w-24">
-                          {formatPrice(item.prix_unitaire)}
-                        </span>
-                        {/* Total + supprimer */}
-                        <div className="flex items-center gap-2 w-24 justify-end">
-                          <span className="text-sm font-bold text-brand-700">
-                            {formatPrice(item.prix_unitaire * item.qty)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.produit_id)}
-                            className="p-1 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
-                          >
+                        <span className="text-sm text-slate-600 text-right truncate">{formatPrice(item.prix_unitaire)}</span>
+                        <div className="flex items-center gap-1 justify-end">
+                          <span className="text-sm font-bold text-brand-700 truncate">{formatPrice(item.prix_unitaire * item.qty)}</span>
+                          <button type="button" onClick={() => removeItem(item.produit_id)}
+                            className="p-0.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors shrink-0">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
                     ))}
-                  </div>
-                )}
-              </div>
 
-              {/* ── Livraison ── */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2">Livraison</label>
-                <div className="flex gap-3">
-                  {[
-                    { val: false, label: "Non", desc: "Retrait en boutique", icon: Package },
-                    { val: true,  label: "Oui", desc: "Livraison à domicile", icon: Truck },
-                  ].map(opt => {
-                    const Icon = opt.icon;
-                    const active = modal.avecLivraison === opt.val;
-                    return (
-                      <button
-                        key={String(opt.val)}
-                        type="button"
-                        onClick={() => setModal(m => m ? { ...m, avecLivraison: opt.val } : m)}
-                        className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                          active
-                            ? opt.val ? "border-indigo-400 bg-indigo-50" : "border-brand-400 bg-brand-50"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          active ? opt.val ? "bg-indigo-100 text-indigo-600" : "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-400"
-                        }`}>
-                          <Icon className="w-4 h-4" />
+                    {/* Totaux panier */}
+                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 space-y-2">
+                      <div className="flex justify-between text-xs text-slate-500">
+                        <span>{items.reduce((s, i) => s + i.qty, 0)} article{items.reduce((s, i) => s + i.qty, 0) > 1 ? "s" : ""} — Sous-total</span>
+                        <span className="font-semibold">{formatPrice(sousTotal)}</span>
+                      </div>
+                      {/* Remise globale */}
+                      <div className="flex justify-between items-center text-xs text-slate-500">
+                        <label className="font-semibold">Remise (FCFA)</label>
+                        <input
+                          type="number" min={0} max={sousTotal}
+                          value={modal.remiseGlobale}
+                          onChange={e => setModal(m => m ? { ...m, remiseGlobale: e.target.value } : m)}
+                          placeholder="0"
+                          className="w-28 text-right text-sm font-semibold border border-slate-200 rounded-lg px-2 py-0.5 bg-white outline-none focus:border-brand-400"
+                        />
+                      </div>
+                      {remise > 0 && (
+                        <div className="flex justify-between text-xs text-emerald-600 font-semibold">
+                          <span>Économie</span><span>− {formatPrice(remise)}</span>
                         </div>
-                        <div>
-                          <p className={`font-bold text-sm ${active ? opt.val ? "text-indigo-700" : "text-brand-700" : "text-slate-600"}`}>{opt.label}</p>
-                          <p className="text-[11px] text-slate-400">{opt.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ── Mode de paiement ── */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2">Mode de paiement</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {MODES_PAIEMENT.map(mode => {
-                    const Icon   = mode.icon;
-                    const active = modal.modePaiement === mode.value;
-                    return (
-                      <button
-                        key={mode.value}
-                        type="button"
-                        onClick={() => setModal(m => m ? { ...m, modePaiement: mode.value } : m)}
-                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
-                          active ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <Icon className={`w-4 h-4 shrink-0 ${active ? "text-emerald-600" : "text-slate-400"}`} />
-                        <span className={`text-sm font-semibold ${active ? "text-emerald-700" : "text-slate-600"}`}>{mode.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ── Statut du paiement ── */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2">Statut du paiement</label>
-                <div className="flex gap-2">
-                  {STATUTS_PAIEMENT.map(s => (
-                    <button
-                      key={s.value}
-                      type="button"
-                      onClick={() => setModal(m => m ? { ...m, statutPaiement: s.value } : m)}
-                      className={`flex-1 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-                        modal.statutPaiement === s.value ? s.color : "border-slate-200 text-slate-500 hover:border-slate-300"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Champ acompte */}
-                {modal.statutPaiement === "acompte" && (
-                  <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold text-amber-700 mb-1.5">Montant de l'acompte (FCFA) *</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={totalVente}
-                        value={modal.montantAcompte}
-                        onChange={e => setModal(m => m ? { ...m, montantAcompte: e.target.value } : m)}
-                        placeholder="0"
-                        className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-amber-300 focus:border-amber-500 outline-none transition-all font-display font-700 text-lg"
-                      />
+                      )}
+                      <div className="flex justify-between font-display font-800 text-slate-900 text-sm border-t border-slate-200 pt-1.5">
+                        <span>Total</span>
+                        <span className="text-base">{formatPrice(totalVente)}</span>
+                      </div>
+                      {modal.statutPaiement === "acompte" && acompte > 0 && (
+                        <>
+                          <div className="flex justify-between text-xs text-amber-600 font-semibold">
+                            <span>Acompte</span><span>{formatPrice(acompte)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-bold text-red-600 border-t border-slate-200 pt-1">
+                            <span>Reste à payer</span><span>{formatPrice(resteAPayer)}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
-                    {totalVente > 0 && acompte > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-amber-700 font-semibold">Reste à payer :</span>
-                        <span className="font-display font-800 text-amber-800 text-lg">{formatPrice(resteAPayer)}</span>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
 
-              {/* Note */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">Note <span className="font-normal text-slate-400">(optionnel)</span></label>
-                <textarea
-                  rows={2}
-                  value={modal.note}
-                  onChange={e => setModal(m => m ? { ...m, note: e.target.value } : m)}
-                  placeholder="Remarques…"
-                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all resize-none"
-                />
-              </div>
+              {/* ── Colonne droite : Client + Paiement ── */}
+              <div className="overflow-y-auto px-6 py-5 space-y-5 flex flex-col">
 
-              {/* Erreur */}
-              {modal.error && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                  <AlertTriangle className="w-4 h-4 shrink-0" /> {modal.error}
+                {/* Client */}
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Client</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Nom *</label>
+                      <input type="text" value={modal.clientNom}
+                        onChange={e => setModal(m => m ? { ...m, clientNom: e.target.value } : m)}
+                        placeholder="Ex : WADADA" autoFocus
+                        className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Téléphone</label>
+                      <input type="text" value={modal.clientTel}
+                        onChange={e => setModal(m => m ? { ...m, clientTel: e.target.value } : m)}
+                        placeholder="+228 90 00 00 00"
+                        className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all" />
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* ── Footer : totaux + boutons ── */}
-            <div className="border-t border-slate-100 px-6 py-4 shrink-0 space-y-3">
-              {/* Totaux */}
-              {items.length > 0 && (
-                <div className="bg-slate-50 rounded-2xl px-4 py-3 space-y-1.5">
-                  <div className="flex justify-between text-sm text-slate-500">
-                    <span>Sous-total ({items.reduce((s, i) => s + i.qty, 0)} article{items.reduce((s, i) => s + i.qty, 0) > 1 ? "s" : ""})</span>
-                    <span className="font-semibold text-slate-700">{formatPrice(sousTotal)}</span>
-                  </div>
-                  <div className="flex justify-between font-display font-800 text-slate-900">
-                    <span>Total</span>
-                    <span className="text-xl">{formatPrice(totalVente)}</span>
-                  </div>
-                  {modal.statutPaiement === "acompte" && acompte > 0 && (
-                    <>
-                      <div className="flex justify-between text-sm text-amber-600">
-                        <span>Acompte versé</span>
-                        <span className="font-bold">{formatPrice(acompte)}</span>
+                {/* Livraison */}
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Livraison</p>
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={modal.avecLivraison}
+                      onChange={e => setModal(m => m ? { ...m, avecLivraison: e.target.checked } : m)}
+                      className="w-4 h-4 rounded border-slate-300 accent-indigo-600"
+                    />
+                    <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5 text-indigo-500" /> Livraison à domicile
+                    </span>
+                  </label>
+
+                  {modal.avecLivraison && (
+                    <div className="mt-3 space-y-2.5 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                      <div>
+                        <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Adresse de livraison</label>
+                        <input type="text" value={modal.adresseLivraison}
+                          onChange={e => setModal(m => m ? { ...m, adresseLivraison: e.target.value } : m)}
+                          placeholder="Ex : Lomé, Tokoin, rue 123…"
+                          className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
                       </div>
-                      <div className="flex justify-between text-sm font-bold text-red-600 border-t border-slate-200 pt-1.5">
-                        <span>Reste à payer</span>
-                        <span>{formatPrice(resteAPayer)}</span>
+                      <div>
+                        <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Contact à livrer</label>
+                        <input type="text" value={modal.contactLivraison}
+                          onChange={e => setModal(m => m ? { ...m, contactLivraison: e.target.value } : m)}
+                          placeholder="+228 90 00 00 00"
+                          className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
                       </div>
-                    </>
+                      <div>
+                        <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Lien de localisation</label>
+                        <input type="text" value={modal.lienLocalisation}
+                          onChange={e => setModal(m => m ? { ...m, lienLocalisation: e.target.value } : m)}
+                          placeholder="https://maps.app.goo.gl/..."
+                          className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={submitVente}
-                  disabled={modal.saving || !modal.clientNom.trim() || items.length === 0}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 disabled:opacity-50 transition-all"
-                >
-                  {modal.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  Enregistrer la vente
-                </button>
-                <button
-                  onClick={closeModal}
-                  className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors"
-                >
-                  Annuler
-                </button>
+                {/* Mode de paiement */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mode de paiement</label>
+                  <select
+                    value={modal.modePaiement}
+                    onChange={e => setModal(m => m ? { ...m, modePaiement: e.target.value } : m)}
+                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-semibold text-slate-700"
+                  >
+                    {MODES_PAIEMENT.map(mode => (
+                      <option key={mode.value} value={mode.value}>{mode.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Statut paiement */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Statut du paiement</label>
+                  <select
+                    value={modal.statutPaiement}
+                    onChange={e => setModal(m => m ? { ...m, statutPaiement: e.target.value } : m)}
+                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-semibold text-slate-700"
+                  >
+                    {STATUTS_PAIEMENT.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+
+                  {modal.statutPaiement === "acompte" && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
+                      <label className="block text-xs font-bold text-amber-700">Montant acompte (FCFA) *</label>
+                      <input type="number" min={0} max={totalVente} value={modal.montantAcompte}
+                        onChange={e => setModal(m => m ? { ...m, montantAcompte: e.target.value } : m)}
+                        placeholder="0"
+                        className="w-full px-3 py-2 text-sm bg-white rounded-xl border-2 border-amber-300 focus:border-amber-500 outline-none font-bold" />
+                      {totalVente > 0 && acompte > 0 && (
+                        <div className="flex justify-between text-sm font-semibold text-amber-700">
+                          <span>Reste :</span>
+                          <span className="font-bold">{formatPrice(resteAPayer)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Note */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Note <span className="font-normal text-slate-400">(optionnel)</span></label>
+                  <textarea rows={2} value={modal.note}
+                    onChange={e => setModal(m => m ? { ...m, note: e.target.value } : m)}
+                    placeholder="Remarques…"
+                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all resize-none" />
+                </div>
+
+                {/* Erreur */}
+                {modal.error && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                    <AlertTriangle className="w-4 h-4 shrink-0" /> {modal.error}
+                  </div>
+                )}
+
+                {/* Boutons */}
+                <div className="mt-auto pt-2 flex gap-2">
+                  <button onClick={submitVente}
+                    disabled={modal.saving || !modal.clientNom.trim() || items.length === 0}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 disabled:opacity-50 transition-all">
+                    {modal.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    Enregistrer
+                  </button>
+                  <button onClick={closeModal}
+                    className="px-4 py-3 rounded-2xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                    Annuler
+                  </button>
+                </div>
               </div>
             </div>
           </div>

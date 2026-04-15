@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
-import { getProductBySlug, getCategories } from "@/lib/db";
+import { getCategories } from "@/lib/db";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
 import ProductForm from "@/components/admin/ProductForm";
-import StockParEntrepot from "@/components/admin/StockParEntrepot";
 import Link from "next/link";
-import { ChevronLeft, Warehouse } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 export const metadata = { title: "Modifier un produit" };
 
@@ -22,11 +21,20 @@ async function getProductById(id: number) {
 
 interface PageProps { params: Promise<{ id: string }> }
 
+async function getStockMagasin(produitId: number): Promise<number> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT COALESCE(SUM(stock), 0) AS stock_magasin FROM produit_stocks WHERE produit_id = ?`,
+    [produitId]
+  );
+  return Number(rows[0]?.stock_magasin ?? 0);
+}
+
 export default async function EditProductPage({ params }: PageProps) {
   const { id } = await params;
-  const [product, categories] = await Promise.all([
+  const [product, categories, stockMagasin] = await Promise.all([
     getProductById(Number(id)),
     getCategories(),
+    getStockMagasin(Number(id)),
   ]);
   if (!product) notFound();
 
@@ -37,7 +45,7 @@ export default async function EditProductPage({ params }: PageProps) {
     description:    product.description ?? "",
     categorie_id:   product.categorie_id ? Number(product.categorie_id) : ("" as const),
     prix_unitaire:  Number(product.prix_unitaire),
-    stock_boutique: Number(product.stock_boutique),
+    stock_magasin:  stockMagasin,
     remise:         Number(product.remise ?? 0),
     neuf:           Boolean(product.neuf),
     actif:          Boolean(product.actif),
@@ -58,14 +66,6 @@ export default async function EditProductPage({ params }: PageProps) {
         </div>
       </div>
       <ProductForm categories={categories} initial={initial} />
-
-      <div className="bg-white rounded-3xl border border-slate-100 p-6">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-          <Warehouse className="w-5 h-5 text-slate-500" />
-          <h2 className="font-display font-700 text-slate-900">Stocks par entrepôt</h2>
-        </div>
-        <StockParEntrepot produitId={Number(id)} />
-      </div>
     </div>
   );
 }

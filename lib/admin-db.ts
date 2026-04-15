@@ -966,6 +966,7 @@ export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
       SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
     FROM boutique_stock bs
     JOIN produits p ON p.id = bs.produit_id
+    WHERE bs.from_magasin = 1
   `);
   const r = rows[0] ?? {};
   return {
@@ -988,7 +989,7 @@ export async function getStockBoutiqueList(opts: {
   const imageCol  = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
 
-  const conditions: string[] = [];
+  const conditions: string[] = ["bs.from_magasin = 1"];
   const params: unknown[] = [];
 
   if (search) {
@@ -998,7 +999,7 @@ export async function getStockBoutiqueList(opts: {
   if (filter === "faible") conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
   if (filter === "epuise") conditions.push("bs.quantite = 0");
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
 
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT bs.produit_id, p.nom, p.reference,
@@ -1345,15 +1346,13 @@ export async function deleteFinanceEntry(id: number) {
   await db.execute("DELETE FROM finance_entries WHERE id = ?", [id]);
 }
 
-export async function getVentesStats(): Promise<{ factures: number; devis: number; livraisons: number }> {
-  const [[f], [d], [l]] = await Promise.all([
+export async function getVentesStats(): Promise<{ factures: number; livraisons: number }> {
+  const [[f], [l]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures"),
-    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM devis"),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
   ]);
   return {
     factures:   Number((f as mysql.RowDataPacket[])[0]?.cnt ?? 0),
-    devis:      Number((d as mysql.RowDataPacket[])[0]?.cnt ?? 0),
     livraisons: Number((l as mysql.RowDataPacket[])[0]?.cnt ?? 0),
   };
 }

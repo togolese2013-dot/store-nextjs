@@ -36,13 +36,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { nom, reference, description, categorie_id, prix_unitaire,
-            stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
+            stock_magasin, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
     if (!nom || !reference || !prix_unitaire) {
       return NextResponse.json({ error: "Champs obligatoires manquants." }, { status: 400 });
     }
 
     const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
+    const stockMagasin = Number(stock_magasin ?? 0);
 
     // Vérifier dynamiquement les colonnes
     const [colRows] = await db.execute<mysql.RowDataPacket[]>(
@@ -56,9 +57,9 @@ export async function POST(req: NextRequest) {
     const hasImagesJson = colNames.has("images_json");
     const hasStockMinimum = colNames.has("stock_minimum");
 
-    // Construire la requête dynamiquement
+    // Construire la requête dynamiquement (stock_boutique reste 0 — géré par les opérations boutique)
     const columns = ["reference", "nom", "description", "categorie_id", "prix_unitaire", "stock_boutique"];
-    const values = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire), Number(stock_boutique ?? 0)];
+    const values: unknown[] = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire), 0];
 
     if (hasRemise) {
       columns.push("remise");
@@ -82,10 +83,27 @@ export async function POST(req: NextRequest) {
     }
 
     const placeholders = columns.map(() => "?").join(",");
-    await db.execute(
+    const [result] = await db.execute<mysql.ResultSetHeader>(
       `INSERT INTO produits (${columns.join(", ")}) VALUES (${placeholders})`,
       values
     );
+    const newId = result.insertId;
+
+    // Insert stock magasin initial in produit_stocks (entrepot_id=1)
+    if (stockMagasin > 0) {
+      await db.execute(
+        `INSERT INTO produit_stocks (produit_id, entrepot_id, stock)
+         VALUES (?, 1, ?)
+         ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock)`,
+        [newId, stockMagasin]
+      );
+      await db.execute(
+        `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note)
+         VALUES (?, 'entree', ?, ?, 'Stock initial à la création du produit')`,
+        [newId, stockMagasin, stockMagasin]
+      );
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erreur serveur.";

@@ -1,28 +1,25 @@
-import { listFactures, listDevis, listLivraisons, getVentesStats } from "@/lib/admin-db";
+import { listFactures, listLivraisons, getVentesStats } from "@/lib/admin-db";
 import VentesManager from "@/components/admin/VentesManager";
 
 export const metadata = { title: "Ventes" };
 
 export default async function VentesPage() {
   let factures:   Awaited<ReturnType<typeof listFactures>>["items"]   = [];
-  let devis:      Awaited<ReturnType<typeof listDevis>>["items"]      = [];
   let livraisons: Awaited<ReturnType<typeof listLivraisons>>["items"] = [];
-  let stats      = { factures: 0, devis: 0, livraisons: 0 };
-  let totals     = { factures: 0, devis: 0, livraisons: 0 };
+  let stats      = { factures: 0, livraisons: 0 };
+  let totals     = { factures: 0, livraisons: 0 };
   let migrationNeeded = false;
 
   try {
-    const [f, d, l, s] = await Promise.all([
+    const [f, l, s] = await Promise.all([
       listFactures({ limit: 50 }),
-      listDevis({ limit: 50 }),
       listLivraisons({ limit: 50 }),
       getVentesStats(),
     ]);
     factures   = f.items;
-    devis      = d.items;
     livraisons = l.items;
     stats      = s;
-    totals     = { factures: f.total, devis: d.total, livraisons: l.total };
+    totals     = { factures: f.total, livraisons: l.total };
   } catch {
     migrationNeeded = true;
   }
@@ -48,11 +45,9 @@ export default async function VentesPage() {
   return (
     <VentesManager
       initialFactures={factures}
-      initialDevis={devis}
       initialLivraisons={livraisons}
       initialStats={stats}
       totalFactures={totals.factures}
-      totalDevis={totals.devis}
       totalLivraisons={totals.livraisons}
     />
   );

@@ -15,9 +15,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const body = await req.json();
     const { nom, reference, description, categorie_id, prix_unitaire,
-            stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
+            stock_magasin, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
     const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
+    const newStockMagasin = Number(stock_magasin ?? 0);
 
     // Vérifier dynamiquement les colonnes
     const [colRows] = await db.execute<mysql.RowDataPacket[]>(
@@ -31,9 +32,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const hasImagesJson = colNames.has("images_json");
     const hasStockMinimum = colNames.has("stock_minimum");
 
-    // Construire la requête dynamiquement
-    const sets = ["reference=?", "nom=?", "description=?", "categorie_id=?", "prix_unitaire=?", "stock_boutique=?"];
-    const values = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire), Number(stock_boutique ?? 0)];
+    // Construire la requête dynamiquement (ne pas toucher stock_boutique — géré par boutique)
+    const sets = ["reference=?", "nom=?", "description=?", "categorie_id=?", "prix_unitaire=?"];
+    const values: unknown[] = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire)];
 
     if (hasRemise) {
       sets.push("remise=?");
@@ -57,11 +58,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     values.push(Number(id));
-    
-    await db.execute(
-      `UPDATE produits SET ${sets.join(", ")} WHERE id=?`,
-      values
+    await db.execute(`UPDATE produits SET ${sets.join(", ")} WHERE id=?`, values);
+
+    // Auto-adjust stock magasin if changed
+    const [stockRows] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(stock), 0) AS current_stock FROM produit_stocks WHERE produit_id = ?`,
+      [Number(id)]
     );
+    const currentStock = Number(stockRows[0]?.current_stock ?? 0);
+    const diff = newStockMagasin - currentStock;
+
+    if (diff !== 0) {
+      await db.execute(
+        `INSERT INTO produit_stocks (produit_id, entrepot_id, stock)
+         VALUES (?, 1, ?)
+         ON DUPLICATE KEY UPDATE stock = GREATEST(0, stock + VALUES(stock))`,
+        [Number(id), diff]
+      );
+      await db.execute(
+        `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note)
+         VALUES (?, 'ajustement', ?, ?, 'Ajustement via fiche produit')`,
+        [Number(id), Math.abs(diff), newStockMagasin]
+      );
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erreur serveur.";

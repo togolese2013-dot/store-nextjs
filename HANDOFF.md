@@ -1,5 +1,5 @@
 # HANDOFF — Togolese Shop Admin
-> Dernière mise à jour : 2026-04-15
+> Dernière mise à jour : 2026-04-15 (session 2)
 > Commit actuel : voir `git log --oneline -1`
 
 ---
@@ -176,11 +176,11 @@ La sidebar est **modulaire** : elle affiche uniquement les items du module actif
 | Clé | Label | Couleur | Items |
 |---|---|---|---|
 | `magasin` | MAGASIN | brand-900 (noir) | Tous les produits, Catégories, Fournisseurs, Achats, Import/Export |
-| `boutique` | BOUTIQUE | amber-500 | Commandes, Ventes, Stock boutique, Proformat, Finance, Coupons |
-| `store` | STORE | emerald-700 | Réglages, Hero, Livraison, Apparence, WhatsApp, Paiements, Domaine, Utilisateurs |
+| `boutique` | BOUTIQUE | amber-500 | Ventes, Stock boutique, Proformat, Finance, Coupons |
+| `store` | STORE | emerald-700 | **Commandes**, Réglages, Hero, Livraison, Apparence, WhatsApp, Paiements, Domaine, Utilisateurs |
 | `crm` | CRM | indigo-700 | Clients, Avis clients, Messages, Diffusion |
 
-> Note : "Facture" a été supprimé du menu BOUTIQUE (maintenant intégré dans Ventes).
+> Note : "Commandes" a été déplacé de BOUTIQUE → STORE. "Facture" supprimé du menu (intégré dans Ventes).
 
 ### Règle critique du routing sidebar
 `ROUTE_TO_MODULE` utilise `startsWith()` → **les routes plus spécifiques doivent être placées AVANT les routes générales**.
@@ -208,14 +208,16 @@ Affiche `produits.stock_magasin` = `SUM(produit_stocks.stock)` par produit.
 
 ## 🔄 MouvementModal (`components/admin/MouvementModal.tsx`)
 
-Modal client unifié pour les 3 types de mouvements de stock magasin.
+Modal client unifié pour les 3 types de mouvements de stock magasin. **Supporte plusieurs produits en une seule soumission.**
 
 ### Fonctionnement
 - Bouton trigger : style identique à "Ajouter un produit" (`border-2 border-slate-200 text-slate-700 text-xs`)
 - Fetch produits depuis `/api/admin/stock/produits` (stock magasin réel)
 - `entrepot_id` supprimé de toute la chaîne — hardcodé à `1` dans `admin-db.ts`
-- Submit : `{ produit_id, quantite, reference?, note? }` (sans entrepot_id)
+- State : liste `items: MouvItem[]` (chaque item = produit + qty + champ recherche indépendant)
+- Submit : boucle de `fetch` séquentiels pour chaque item, affiche le compte "N mouvements enregistrés"
 - `router.refresh()` après succès pour recharger la page server component
+- Bouton "+ Ajouter un produit" pour ajouter une ligne supplémentaire
 
 ### Types disponibles
 | Type | API | Effet |
@@ -232,17 +234,30 @@ Modal client unifié pour les 3 types de mouvements de stock magasin.
 ## 🛍️ Page Ventes (`/admin/ventes`)
 
 ### Architecture
-- `VentesManager.tsx` : client component, tab unique "VENTES"
+- `VentesManager.tsx` : client component, 2 tabs : **VENTES** + **LIVRAISONS**
+- Tab Devis supprimé — `listDevis` / `getVentesStats.devis` supprimés de `admin-db.ts`
 - Bouton "Nouvelle vente" visible uniquement sur le tab VENTES
-- "Facture" supprimé du menu sidebar BOUTIQUE
 
-### Modal Nouvelle Vente
-- **Produits** : sélection depuis stock boutique (`boutique_stock` avec `from_magasin=1`)
-- **Livraison** : toggle avec/sans livraison
-- **Mode de paiement** : Espèces / Mix by Yas / Moov Money / Virement bancaire
-- **Statut paiement** : Payé en totalité / Acompte / Non payé
-- Si **Acompte** : champ `montant_acompte` + affichage du reste à payer
-- Auto-calcul du total depuis les produits sélectionnés
+### Modal Nouvelle Vente (2 colonnes, max-w-5xl)
+**Colonne gauche — Articles**
+- Recherche produit depuis stock boutique (`boutique_stock` avec `from_magasin=1`)
+- Tableau colonnes fixes : `minmax(0,1fr)` / `108px` / `96px` / `112px` (évite chevauchement P.U./Total)
+- Récap : sous-total → champ remise globale (FCFA) → économie si remise > 0 → total net
+- Champ acompte + reste à payer si statut = "acompte"
+
+**Colonne droite — Client / Livraison / Paiement**
+- Client : Nom (requis) + Téléphone
+- **Livraison** : case à cocher "Livraison à domicile". Si cochée → 3 champs : adresse, contact, lien de localisation
+- **Mode de paiement** : `<select>` (Espèces / Mix by Yas / Moov Money / Virement bancaire)
+- **Statut du paiement** : `<select>` (Payé en totalité / Acompte / Non payé)
+- Note (optionnel)
+
+### Payload API vente
+```ts
+{ client_nom, client_tel, avec_livraison, adresse_livraison?, contact_livraison?,
+  lien_localisation?, mode_paiement, statut_paiement, montant_acompte?,
+  sous_total, remise?, total, note?, items[] }
+```
 
 ### Création d'une vente (`createVenteWithStock`)
 Transaction atomique :
@@ -268,8 +283,10 @@ Eye (voir) / Pencil (modifier) / Printer (imprimer, masqué si livraison) / Tras
 
 ## 💰 Page Finance (`/admin/finance`)
 
-- KPIs : Solde caisse, Total dépenses, Total recettes
-- Tabs : Dépenses / Recettes
+- KPIs : Solde caisse, Total dépenses, Total rentrées
+- Tabs : **Dépenses** / **Rentrées** (anciennement "Recettes")
+- Header : un seul bouton **"Nouvelle entrée"** (supprimé : CAISSE, DÉPENSES, RENTRÉES séparés)
+  - Le type de modal ouvert dépend du tab actif : tab "depense" → modal dépense, sinon → modal rentrée
 - CRUD complet via `FinanceManager.tsx`
 - API : `GET/POST /api/admin/finance`, `PUT/DELETE /api/admin/finance/[id]`
 
@@ -306,9 +323,17 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3003
 ## 📝 Historique des commits récents
 
 ```
-feat: stock magasin — MouvementModal, suppression entrepot_id, page produits restructurée
-feat: ventes v2 — modal nouvelle vente avec produits boutique, paiement, livraison
+feat: ventes modal redesign — livraison checkbox, selects paiement, remise globale, colonnes fixes
+feat: stock magasin, MouvementModal multi-produits, ventes v2
 feat: pages Fournisseurs, Achats, refonte Catégories + améliorations MAGASIN
 feat: filtres produits, actions inline, pages stock entree/sortie/ajustement
 feat: page Finance avec KPIs, tabs Dépenses/Recettes et CRUD
 ```
+
+### Résumé session 2 (2026-04-15)
+- **MAGASIN** : Suppression "Stock par entrepôt" de la fiche produit ; `stock_magasin` écrit dans `produit_stocks` (plus `stock_boutique`) ; `stock_mouvements` sans `entrepot_id`
+- **MouvementModal** : multi-produits (liste `items[]`, recherche indépendante par ligne, submit en boucle)
+- **Stock boutique** : filtré `from_magasin = 1` dans `getStockBoutiqueStats` et `getStockBoutiqueList`
+- **Sidebar** : "Commandes" déplacé BOUTIQUE → STORE
+- **Finance** : 3 boutons header → 1 "Nouvelle entrée" ; tab "Recettes" → "Rentrées"
+- **Ventes** : tab Devis supprimé ; modal redesign 2 colonnes : livraison checkbox+champs, selects mode/statut paiement, remise globale sur total, colonnes articles avec largeurs fixes

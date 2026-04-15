@@ -15,7 +15,7 @@ interface ProductData {
   description:    string;
   categorie_id:   number | "";
   prix_unitaire:  number | "";
-  stock_boutique: number | "";
+  stock_magasin:  number | "";
   stock_minimum:  number | "";
   remise:         number | "";
   neuf:           boolean;
@@ -37,18 +37,18 @@ export default function ProductForm({ categories, initial }: Props) {
   const isEdit = !!initial?.id;
 
   const [form, setForm] = useState<ProductData>({
-    reference:      initial?.reference      ?? "",
-    nom:            initial?.nom            ?? "",
-    description:    initial?.description    ?? "",
-    categorie_id:   initial?.categorie_id   ?? "",
-    prix_unitaire:  initial?.prix_unitaire   ?? "",
-    stock_boutique: initial?.stock_boutique  ?? "",
-    stock_minimum:  initial?.stock_minimum   ?? 5,
-    remise:         initial?.remise          ?? "",
-    neuf:           initial?.neuf            ?? false,
-    actif:          initial?.actif           ?? true,
-    image_url:      initial?.image_url       ?? "",
-    images:         initial?.images          ?? [],
+    reference:     initial?.reference     ?? "",
+    nom:           initial?.nom           ?? "",
+    description:   initial?.description   ?? "",
+    categorie_id:  initial?.categorie_id  ?? "",
+    prix_unitaire: initial?.prix_unitaire ?? "",
+    stock_magasin: initial?.stock_magasin ?? "",
+    stock_minimum: initial?.stock_minimum ?? 5,
+    remise:        initial?.remise        ?? "",
+    neuf:          initial?.neuf          ?? false,
+    actif:         initial?.actif         ?? true,
+    image_url:     initial?.image_url     ?? "",
+    images:        initial?.images        ?? [],
     ...initial,
   });
   const [loading, setLoading] = useState(false);
@@ -128,7 +128,7 @@ export default function ProductForm({ categories, initial }: Props) {
         description: form.description,
         categorie_id: form.categorie_id || null,
         prix_unitaire: form.prix_unitaire,
-        stock_boutique: form.stock_boutique,
+        stock_magasin: form.stock_magasin !== "" ? Number(form.stock_magasin) : 0,
         stock_minimum: form.stock_minimum !== "" ? form.stock_minimum : 5,
         actif: form.actif,
         image_url: form.image_url,
@@ -226,8 +226,8 @@ export default function ProductForm({ categories, initial }: Props) {
           )}
           <div>
             <label className={labelCls}>Stock magasin</label>
-            <input type="number" min="0" value={form.stock_boutique}
-              onChange={e => set("stock_boutique", e.target.value ? Number(e.target.value) : "")}
+            <input type="number" min="0" value={form.stock_magasin}
+              onChange={e => set("stock_magasin", e.target.value ? Number(e.target.value) : "")}
               placeholder="10" className={inputCls} />
           </div>
           <div>
