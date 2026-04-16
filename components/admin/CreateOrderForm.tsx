@@ -139,7 +139,7 @@ export default function CreateOrderForm({ zones }: Props) {
       <div className="lg:col-span-2 space-y-5">
 
         {/* Search */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <h2 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
             <ShoppingCart className="w-4 h-4" /> Articles
           </h2>
@@ -231,7 +231,7 @@ export default function CreateOrderForm({ zones }: Props) {
       <div className="space-y-5">
 
         {/* Client */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
           <h2 className="font-bold text-slate-700 flex items-center gap-2">
             <User className="w-4 h-4" /> Client
           </h2>
@@ -276,7 +276,7 @@ export default function CreateOrderForm({ zones }: Props) {
         </div>
 
         {/* Summary */}
-        <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-3">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
           <h2 className="font-bold text-slate-700">Récapitulatif</h2>
           <div className="flex justify-between text-sm text-slate-500">
             <span>Sous-total</span>

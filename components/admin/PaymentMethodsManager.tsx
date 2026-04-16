@@ -62,7 +62,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   card:       <CreditCard className="w-5 h-5" />,
 };
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all";
+const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all";
 const labelCls = "block text-xs font-bold text-slate-600 mb-1";
 
 export default function PaymentMethodsManager({ settings }: { settings: Record<string, string> }) {
@@ -105,7 +105,7 @@ export default function PaymentMethodsManager({ settings }: { settings: Record<s
 
       <div className="space-y-3">
         {methods.map(m => (
-          <div key={m.id} className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+          <div key={m.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             {/* Header row */}
             <div className="flex items-center gap-4 p-5">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${m.enabled ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-400"}`}>
@@ -118,7 +118,7 @@ export default function PaymentMethodsManager({ settings }: { settings: Record<s
               {/* Toggle */}
               <button
                 onClick={() => toggle(m.id)}
-                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${m.enabled ? "bg-brand-900" : "bg-slate-200"}`}
+                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${m.enabled ? "bg-emerald-700" : "bg-slate-200"}`}
               >
                 <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${m.enabled ? "translate-x-5" : ""}`} />
               </button>
@@ -161,7 +161,7 @@ export default function PaymentMethodsManager({ settings }: { settings: Record<s
       </div>
 
       <button onClick={save} disabled={loading}
-        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60"
+        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-emerald-700 text-white font-bold text-sm hover:bg-emerald-800 transition-colors disabled:opacity-60"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {loading ? "Enregistrement…" : "Sauvegarder"}

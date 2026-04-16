@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, Save, Copy, CheckCircle, Globe, Server, AlertCircle } from "lucide-react";
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans";
 const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
 
 interface DnsRecord {
@@ -74,7 +74,7 @@ export default function DomainSettingsForm({ settings }: { settings: Record<stri
       )}
 
       {/* URL Settings */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
           <Globe className="w-4 h-4 text-brand-700" /> URL du site
         </h2>
@@ -110,7 +110,7 @@ export default function DomainSettingsForm({ settings }: { settings: Record<stri
       </div>
 
       {/* DNS Instructions */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
           <Server className="w-4 h-4 text-brand-700" /> Enregistrements DNS
         </h2>
@@ -179,7 +179,7 @@ export default function DomainSettingsForm({ settings }: { settings: Record<stri
       </div>
 
       {/* SSL Note */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-3">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-3">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">Certificat SSL</h2>
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
@@ -207,7 +207,7 @@ export default function DomainSettingsForm({ settings }: { settings: Record<stri
       </div>
 
       <button onClick={save} disabled={loading}
-        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60"
+        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-emerald-700 text-white font-bold text-sm hover:bg-emerald-800 transition-colors disabled:opacity-60"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {loading ? "Enregistrement…" : "Sauvegarder"}

@@ -5,7 +5,7 @@ import { Loader2, Save, Plus, Trash2 } from "lucide-react";
 
 interface Props { settings: Record<string, string> }
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans";
 const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
 
 export default function GeneralSettingsForm({ settings }: Props) {
@@ -48,7 +48,7 @@ export default function GeneralSettingsForm({ settings }: Props) {
         </div>
       )}
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">Site</h2>
         <div>
           <label className={labelCls}>Nom du site</label>
@@ -75,13 +75,13 @@ export default function GeneralSettingsForm({ settings }: Props) {
           </div>
         </div>
         {annBar && (
-          <div className="rounded-xl bg-brand-900 text-white text-xs font-medium py-2 px-4 text-center">
+          <div className="rounded-xl bg-emerald-700 text-white text-xs font-medium py-2 px-4 text-center">
             Aperçu : {annBar}
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">WhatsApp (bouton flottant)</h2>
         <div>
           <label className={labelCls}>Numéro principal (format : 22890000000)</label>
@@ -97,14 +97,14 @@ export default function GeneralSettingsForm({ settings }: Props) {
                   placeholder="22890000000 — Nom du contact" className={`${inputCls} flex-1`}
                 />
                 <button onClick={() => setWaNums(waNums.filter((_, j) => j !== i))}
-                  className="p-2.5 rounded-2xl border-2 border-red-100 text-red-500 hover:bg-red-50 transition-colors"
+                  className="p-2.5 rounded-xl border border-red-100 text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             ))}
             <button onClick={() => setWaNums([...waNums, ""])}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl border-2 border-dashed border-slate-300 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-sm text-slate-500 hover:border-emerald-400 hover:text-emerald-700 transition-colors"
             >
               <Plus className="w-4 h-4" /> Ajouter un numéro
             </button>
@@ -113,7 +113,7 @@ export default function GeneralSettingsForm({ settings }: Props) {
       </div>
 
       <button onClick={save} disabled={loading}
-        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60"
+        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-emerald-700 text-white font-bold text-sm hover:bg-emerald-800 transition-colors disabled:opacity-60"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {loading ? "Enregistrement…" : "Sauvegarder"}

@@ -9,7 +9,7 @@ export default function StockPage() {
         <h1 className="font-display font-800 text-2xl text-slate-900">Niveau de stock</h1>
         <p className="text-slate-500 text-sm mt-1">Suivi des stocks par produit et par entrepôt.</p>
       </div>
-      <div className="bg-white rounded-3xl border border-slate-100 flex flex-col items-center justify-center py-24 gap-4">
+      <div className="bg-white rounded-2xl border border-slate-100 flex flex-col items-center justify-center py-24 gap-4">
         <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center">
           <BarChart2 className="w-8 h-8 text-brand-700" />
         </div>

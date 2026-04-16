@@ -22,8 +22,8 @@ export default async function CRMPage() {
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
-          <div className="w-11 h-11 rounded-2xl bg-brand-50 flex items-center justify-center">
-            <Users className="w-5 h-5 text-brand-700" />
+          <div className="w-11 h-11 rounded-2xl bg-indigo-50 flex items-center justify-center">
+            <Users className="w-5 h-5 text-indigo-700" />
           </div>
           <div>
             <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Nouveaux (30j)</p>
@@ -48,9 +48,9 @@ export default async function CRMPage() {
 
       {/* Top 5 clients */}
       {stats.topClients.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-accent-500" />
+            <TrendingUp className="w-4 h-4 text-indigo-500" />
             <h2 className="font-bold text-slate-900 text-sm">Top 10 clients (CA total)</h2>
           </div>
           <table className="w-full text-sm">
@@ -67,7 +67,7 @@ export default async function CRMPage() {
                 <tr key={String(c.id)} className="hover:bg-slate-50/60 transition-colors">
                   <td className="px-5 py-3 text-slate-400 font-semibold text-xs">{i + 1}</td>
                   <td className="px-5 py-3">
-                    <Link href={`/admin/crm/${c.id}`} className="hover:text-brand-800 transition-colors">
+                    <Link href={`/admin/crm/${c.id}`} className="hover:text-indigo-700 transition-colors">
                       <p className="font-semibold text-slate-900">{String(c.nom || "Sans nom")}</p>
                       <p className="text-xs text-slate-400">{String(c.telephone)}</p>
                     </Link>

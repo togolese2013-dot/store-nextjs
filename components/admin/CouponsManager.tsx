@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Coupon } from "@/lib/admin-db";
 import { Plus, Trash2, Save, Tag, Loader2 } from "lucide-react";
+import PageHeader from "@/components/admin/PageHeader";
 
-const inputCls = "px-3 py-2 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+const inputCls = "px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-colors font-sans";
 const empty: Omit<Coupon, "id" | "uses_count" | "created_at"> = {
   code: "", type: "percent", valeur: 10, min_order: 0, max_uses: 0, expires_at: null, actif: true,
 };
@@ -51,15 +52,20 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
 
   return (
     <div className="space-y-5">
+      <PageHeader
+        title="Coupons"
+        subtitle="Gérez vos codes de réduction"
+        accent="emerald"
+        onRefresh={() => router.refresh()}
+        ctaLabel="Nouveau coupon"
+        ctaIcon={Plus}
+        onCtaClick={() => setForm({ ...empty })}
+      />
+
       {/* List */}
-      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
           <h2 className="font-display font-700 text-slate-900">Coupons actifs</h2>
-          <button onClick={() => setForm({ ...empty })}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Nouveau coupon
-          </button>
         </div>
 
         {coupons.length === 0 && !form ? (
@@ -71,7 +77,7 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
           <div className="divide-y divide-slate-50">
             {coupons.map(c => (
               <div key={c.id} className="px-5 py-4 flex items-center gap-4 flex-wrap">
-                <span className="font-mono font-bold text-brand-900 bg-brand-50 px-3 py-1 rounded-xl text-sm">{c.code}</span>
+                <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl text-sm">{c.code}</span>
                 <span className="text-sm text-slate-600">
                   -{c.type === "percent" ? `${c.valeur}%` : `${c.valeur} FCFA`}
                   {c.min_order > 0 ? ` · min ${c.min_order} FCFA` : ""}
@@ -93,7 +99,7 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
 
       {/* New coupon form */}
       {form && (
-        <div className="bg-white rounded-3xl border border-brand-100 p-6 space-y-4">
+        <div className="bg-white rounded-2xl border border-emerald-100 p-6 space-y-4">
           <h3 className="font-display font-700 text-slate-900">Nouveau coupon</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -128,13 +134,13 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
           </div>
           <div className="flex gap-3">
             <button onClick={add} disabled={saving === "new" || !form.code.trim()}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-emerald-700 text-white font-bold text-sm hover:bg-emerald-800 transition-colors disabled:opacity-50"
             >
               {saving === "new" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Créer le coupon
             </button>
             <button onClick={() => setForm(null)}
-              className="px-5 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
+              className="px-5 py-2.5 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
             >Annuler</button>
           </div>
         </div>

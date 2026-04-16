@@ -8,7 +8,7 @@ import {
   LogOut, Menu, X, ChevronRight, Globe, Palette, MapPin, CreditCard, Link2,
   FolderOpen, Image, Warehouse, Zap, ArrowLeft, ShoppingCart,
   BarChart2, TrendingUp, Archive, FileText, FilePlus, DollarSign,
-  Truck, Building2,
+  Truck, Building2, PieChart,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -39,11 +39,13 @@ const MODULES: Record<string, {
     color:     "bg-amber-500",
     textColor: "text-amber-600",
     items: [
-      { label: "Ventes",         href: "/admin/ventes",          icon: TrendingUp },
-      { label: "Stock boutique", href: "/admin/stock-boutique",  icon: Archive },
-      { label: "Proformat",      href: "/admin/proforma",        icon: FilePlus },
-      { label: "Finance",        href: "/admin/finance",         icon: DollarSign },
-      { label: "Coupons",        href: "/admin/coupons",         icon: Tag },
+      { label: "Ventes",         href: "/admin/ventes",                icon: TrendingUp },
+      { label: "Livraisons",     href: "/admin/livraisons",            icon: Truck },
+      { label: "Stock boutique", href: "/admin/stock-boutique",        icon: Archive },
+      { label: "Proformat",      href: "/admin/proforma",              icon: FilePlus },
+      { label: "Finance",        href: "/admin/finance",               icon: DollarSign },
+      { label: "Clients",        href: "/admin/boutique-clients",      icon: Users },
+      { label: "Segmentation",   href: "/admin/boutique-segmentation", icon: PieChart },
     ],
   },
   store: {
@@ -52,6 +54,7 @@ const MODULES: Record<string, {
     textColor: "text-emerald-700",
     items: [
       { label: "Commandes",          href: "/admin/orders",            icon: ShoppingCart },
+      { label: "Coupons",            href: "/admin/coupons",           icon: Tag },
       { label: "Réglages généraux",  href: "/admin/settings",          icon: Settings },
       { label: "Hero & Bannières",   href: "/admin/settings/hero",     icon: Image },
       { label: "Zones de livraison", href: "/admin/settings/delivery", icon: MapPin },
@@ -83,14 +86,17 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/fournisseurs",  "magasin"],
   ["/admin/achats",        "magasin"],
   ["/admin/import-export", "magasin"],
-  ["/admin/stock-boutique","boutique"],
+  ["/admin/boutique-clients",      "boutique"],
+  ["/admin/boutique-segmentation", "boutique"],
+  ["/admin/livraisons",            "boutique"],
+  ["/admin/stock-boutique",        "boutique"],
   ["/admin/stock",         "magasin"],
   ["/admin/orders",        "store"],
   ["/admin/ventes",        "boutique"],
   ["/admin/factures",      "boutique"],
   ["/admin/proforma",      "boutique"],
   ["/admin/finance",       "boutique"],
-  ["/admin/coupons",       "boutique"],
+  ["/admin/coupons",       "store"],
   ["/admin/settings",      "store"],
   ["/admin/users",         "store"],
   ["/admin/reviews",       "crm"],
@@ -255,7 +261,7 @@ export default function AdminSidebar({ nom, role }: Props) {
       {open && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col">
+          <div className="relative w-72 bg-white h-full shadow-xl flex flex-col">
             <button
               onClick={() => setOpen(false)}
               className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100 text-slate-500"

@@ -339,6 +339,108 @@ export async function updateAdminPassword(id: number, password_hash: string) {
   await db.execute("UPDATE admin_users SET password_hash = ? WHERE id = ?", [password_hash, id]);
 }
 
+// ─── Utilisateurs métier ───────────────────────────────────────────────────────
+
+export interface Utilisateur {
+  id:             number;
+  nom:            string;
+  email:          string | null;
+  telephone:      string | null;
+  poste:          "Administrateur" | "Commercial" | "Responsable" | "Livreur";
+  actif:          number;
+  date_creation:  string;
+}
+
+export interface Permission {
+  id:          number;
+  nom:         string;
+  description: string | null;
+  module:      string | null;
+}
+
+export async function listUtilisateurs(): Promise<Utilisateur[]> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, email, telephone, poste, actif, date_creation FROM utilisateurs ORDER BY date_creation DESC"
+  );
+  return rows as Utilisateur[];
+}
+
+export async function getUtilisateurById(id: number): Promise<Utilisateur | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, email, telephone, poste, actif, date_creation FROM utilisateurs WHERE id = ? LIMIT 1",
+    [id]
+  );
+  return (rows[0] as Utilisateur) ?? null;
+}
+
+export async function createUtilisateur(data: {
+  nom: string; email?: string; telephone?: string;
+  poste: string; motDePasse: string;
+}): Promise<number> {
+  const [res] = await db.execute<mysql.ResultSetHeader>(
+    "INSERT INTO utilisateurs (nom, email, telephone, poste, mot_de_passe) VALUES (?,?,?,?,?)",
+    [data.nom, data.email ?? null, data.telephone ?? null, data.poste, data.motDePasse]
+  );
+  return res.insertId;
+}
+
+export async function updateUtilisateur(id: number, data: {
+  nom?: string; email?: string; telephone?: string;
+  poste?: string; actif?: number; motDePasse?: string;
+}) {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  if (data.nom       !== undefined) { fields.push("nom = ?");         values.push(data.nom); }
+  if (data.email     !== undefined) { fields.push("email = ?");       values.push(data.email); }
+  if (data.telephone !== undefined) { fields.push("telephone = ?");   values.push(data.telephone); }
+  if (data.poste     !== undefined) { fields.push("poste = ?");       values.push(data.poste); }
+  if (data.actif     !== undefined) { fields.push("actif = ?");       values.push(data.actif); }
+  if (data.motDePasse !== undefined){ fields.push("mot_de_passe = ?");values.push(data.motDePasse); }
+  if (fields.length === 0) return;
+  values.push(id);
+  await db.execute(`UPDATE utilisateurs SET ${fields.join(", ")} WHERE id = ?`, values);
+}
+
+export async function deleteUtilisateur(id: number) {
+  await db.execute("DELETE FROM utilisateur_permissions WHERE utilisateur_id = ?", [id]);
+  await db.execute("DELETE FROM utilisateurs WHERE id = ?", [id]);
+}
+
+export async function listPermissions(): Promise<Permission[]> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, description, module FROM permissions ORDER BY module, id ASC"
+  );
+  return rows as Permission[];
+}
+
+export async function getUtilisateurPermissions(utilisateurId: number): Promise<number[]> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT permission_id FROM utilisateur_permissions WHERE utilisateur_id = ?",
+    [utilisateurId]
+  );
+  return (rows as mysql.RowDataPacket[]).map(r => Number(r.permission_id));
+}
+
+export async function setUtilisateurPermissions(utilisateurId: number, permissionIds: number[]) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute("DELETE FROM utilisateur_permissions WHERE utilisateur_id = ?", [utilisateurId]);
+    for (const pid of permissionIds) {
+      await conn.execute(
+        "INSERT IGNORE INTO utilisateur_permissions (utilisateur_id, permission_id) VALUES (?,?)",
+        [utilisateurId, pid]
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 /* ─── Settings ─── */
 export async function getSettings(): Promise<Record<string, string>> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -522,6 +624,87 @@ export async function getDashboardStats() {
     productsActive:  Number(productsRow[0]?.cnt ?? 0),
     unreadMessages:  Number(messagesRow[0]?.cnt ?? 0),
     recentOrders:    recentOrders as Order[],
+  };
+}
+
+/* ─── Orders Stats (dashboard) ─── */
+export interface OrdersStats {
+  totalOrders:     number;
+  totalRevenue:    number;
+  avgOrderValue:   number;
+  ordersToday:     number;
+  orders7d:        number;
+  orders30d:       number;
+  revenue30d:      number;
+  byStatus:        Record<string, number>;
+  trend7d:         { date: string; count: number; revenue: number }[];
+  recentOrders:    Order[];
+}
+
+export async function getOrdersStats(): Promise<OrdersStats> {
+  const [
+    [totalRow],
+    [todayRow],
+    [week7Row],
+    [month30Row],
+    statusRows,
+    trendRows,
+    recentRows,
+  ] = await Promise.all([
+    db.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders"
+    ),
+    db.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) as cnt FROM orders WHERE DATE(created_at) = CURDATE()"
+    ),
+    db.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+    ),
+    db.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+    ),
+    db.execute<mysql.RowDataPacket[]>(
+      "SELECT status, COUNT(*) as cnt FROM orders GROUP BY status"
+    ),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT DATE(created_at) as date,
+              COUNT(*) as count,
+              COALESCE(SUM(total),0) as revenue
+       FROM orders
+       WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY date ASC`
+    ),
+    db.query<mysql.RowDataPacket[]>(
+      "SELECT * FROM orders ORDER BY created_at DESC LIMIT 8"
+    ),
+  ]);
+
+  const total    = Number(totalRow[0]?.cnt ?? 0);
+  const revenue  = Number(totalRow[0]?.rev ?? 0);
+
+  const byStatus: Record<string, number> = {};
+  for (const r of statusRows[0] as mysql.RowDataPacket[]) {
+    byStatus[r.status] = Number(r.cnt);
+  }
+
+  const trend7d = (trendRows[0] as mysql.RowDataPacket[]).map(r => ({
+    date:    String(r.date).slice(0, 10),
+    count:   Number(r.count),
+    revenue: Number(r.revenue),
+  }));
+
+  return {
+    totalOrders:   total,
+    totalRevenue:  revenue,
+    avgOrderValue: total > 0 ? revenue / total : 0,
+    ordersToday:   Number(todayRow[0]?.cnt ?? 0),
+    orders7d:      Number(week7Row[0]?.cnt ?? 0),
+    orders30d:     Number(month30Row[0]?.cnt ?? 0),
+    revenue30d:    Number(month30Row[0]?.rev ?? 0),
+    byStatus,
+    trend7d,
+    recentOrders:  recentRows[0] as Order[],
   };
 }
 
@@ -1089,20 +1272,27 @@ export interface FactureItem {
 }
 
 export interface Facture {
-  id:           number;
-  reference:    string;
-  client_nom:   string;
-  client_tel:   string | null;
-  client_email: string | null;
-  items:        string;
-  sous_total:   number;
-  remise:       number;
-  total:        number;
-  statut:       "brouillon" | "valide" | "paye" | "annule";
-  note:         string | null;
-  admin_id:     number | null;
-  created_at:   string;
-  updated_at:   string;
+  id:                number;
+  reference:         string;
+  client_nom:        string;
+  client_tel:        string | null;
+  client_email:      string | null;
+  items:             string;
+  sous_total:        number;
+  remise:            number;
+  total:             number;
+  avec_livraison:    number;          // 0 | 1
+  adresse_livraison: string | null;
+  contact_livraison: string | null;
+  lien_localisation: string | null;
+  mode_paiement:     string | null;
+  statut_paiement:   string | null;
+  montant_acompte:   number | null;
+  statut:            "brouillon" | "valide" | "paye" | "annule";
+  note:              string | null;
+  admin_id:          number | null;
+  created_at:        string;
+  updated_at:        string;
 }
 
 export async function listFactures(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Facture[]; total: number }> {
@@ -1146,6 +1336,106 @@ export async function createFacture(data: {
      data.statut ?? "brouillon", data.note ?? null, data.admin_id ?? null]
   );
   return result.insertId;
+}
+
+export async function createVenteWithStock(data: {
+  client_nom:         string;
+  client_tel?:        string;
+  avec_livraison?:    boolean;
+  adresse_livraison?: string;
+  contact_livraison?: string;
+  lien_localisation?: string;
+  mode_paiement?:     string;
+  statut_paiement?:   string;
+  montant_acompte?:   number;
+  sous_total:         number;
+  remise?:            number;
+  total:              number;
+  note?:              string;
+  admin_id?:          number;
+  items: Array<{ produit_id: number; nom: string; reference: string; qty: number; prix: number; total: number }>;
+}): Promise<number> {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1. Verify boutique stock for each item
+    for (const item of data.items) {
+      const [rows] = await conn.execute<mysql.RowDataPacket[]>(
+        "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1", [item.produit_id]
+      );
+      const dispo = Number(rows[0]?.quantite ?? 0);
+      if (dispo < item.qty) {
+        throw new Error(`Stock insuffisant pour "${item.nom}" (dispo: ${dispo}, demandé: ${item.qty})`);
+      }
+    }
+
+    // 2. Insert facture
+    const reference = generateVenteRef("VT");
+    const [result] = await conn.execute<mysql.ResultSetHeader>(
+      `INSERT INTO factures
+         (reference, client_nom, client_tel, items,
+          sous_total, remise, total,
+          avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
+          mode_paiement, statut_paiement, montant_acompte,
+          statut, note, admin_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        reference, data.client_nom, data.client_tel ?? null,
+        JSON.stringify(data.items),
+        data.sous_total, data.remise ?? 0, data.total,
+        data.avec_livraison ? 1 : 0,
+        data.adresse_livraison ?? null, data.contact_livraison ?? null, data.lien_localisation ?? null,
+        data.mode_paiement ?? null, data.statut_paiement ?? null, data.montant_acompte ?? null,
+        "valide", data.note ?? null, data.admin_id ?? null,
+      ]
+    );
+    const factureId = result.insertId;
+
+    // 3. Decrement boutique_stock + log mouvements
+    for (const item of data.items) {
+      await conn.execute(
+        "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
+        [item.qty, item.produit_id]
+      );
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?,?,?,?,?,?)`,
+        [item.produit_id, "sortie", item.qty, "Vente", reference, data.admin_id ?? null]
+      );
+      // Sync produits.stock_boutique
+      await conn.execute(
+        `UPDATE produits p
+         JOIN boutique_stock bs ON bs.produit_id = p.id
+         SET p.stock_boutique = bs.quantite
+         WHERE p.id = ?`,
+        [item.produit_id]
+      );
+    }
+
+    // 4. If delivery, create livraison entry
+    if (data.avec_livraison) {
+      const livRef = generateVenteRef("LV");
+      await conn.execute(
+        `INSERT INTO livraisons_ventes
+           (reference, facture_id, client_nom, client_tel, adresse, contact_livraison, lien_localisation, statut)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [
+          livRef, factureId, data.client_nom, data.client_tel ?? null,
+          data.adresse_livraison ?? null, data.contact_livraison ?? null,
+          data.lien_localisation ?? null, "en_attente",
+        ]
+      );
+    }
+
+    await conn.commit();
+    return factureId;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 export async function updateFactureStatut(id: number, statut: Facture["statut"]) {
@@ -1254,21 +1544,26 @@ export async function deleteLivraison(id: number) {
 // ─── Finance ───────────────────────────────────────────────────────────────────
 
 export interface FinanceEntry {
-  id:          number;
-  reference:   string;
-  type:        "caisse" | "depense" | "rentree";
-  categorie:   string | null;
-  description: string | null;
-  montant:     number;
-  date_entree: string;
-  created_at:  string;
-  updated_at:  string;
+  id:             number;
+  reference:      string;
+  type:           "caisse" | "depense" | "rentree";
+  mode_paiement:  "especes" | "moov_money" | "tmoney" | "virement_bancaire" | null;
+  categorie:      string | null;
+  description:    string | null;
+  montant:        number;
+  date_entree:    string;
+  created_at:     string;
+  updated_at:     string;
 }
 
 export interface FinanceStats {
-  total_recettes: number;
-  total_depenses: number;
-  solde_net:      number;
+  total_recettes:   number;
+  total_depenses:   number;
+  solde_net:        number;
+  especes:          number;
+  moov_money:       number;
+  tmoney:           number;
+  virement_bancaire: number;
 }
 
 export async function listFinanceEntries(opts: {
@@ -1291,17 +1586,57 @@ export async function listFinanceEntries(opts: {
   return { items: items as FinanceEntry[], total: Number(cnt[0]?.cnt ?? 0) };
 }
 
-export async function getFinanceStats(): Promise<FinanceStats> {
-  const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT
-       SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
-       SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
-     FROM finance_entries`
+// Cached column check for finance_entries
+let _finCols: { mode_paiement: boolean } | null = null;
+async function financeEntrieCols() {
+  if (_finCols) return _finCols;
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'finance_entries'`
   );
-  const r = (rows as mysql.RowDataPacket[])[0];
+  const names  = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
+  _finCols = { mode_paiement: names.has("mode_paiement") };
+  return _finCols;
+}
+
+export async function getFinanceStats(): Promise<FinanceStats> {
+  const cols = await financeEntrieCols();
+
+  const [[totals], modes] = await Promise.all([
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT
+         SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
+         SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
+       FROM finance_entries`
+    ),
+    cols.mode_paiement
+      ? db.query<mysql.RowDataPacket[]>(
+          `SELECT mode_paiement, SUM(montant) AS total
+           FROM finance_entries
+           WHERE type IN ('caisse','rentree')
+           GROUP BY mode_paiement`
+        ).then(([rows]) => rows as mysql.RowDataPacket[])
+      : Promise.resolve([] as mysql.RowDataPacket[]),
+  ]);
+
+  const modeMap: Record<string, number> = {};
+  (modes as mysql.RowDataPacket[]).forEach(r => {
+    if (r.mode_paiement) modeMap[r.mode_paiement as string] = Number(r.total ?? 0);
+  });
+
+  const r        = (totals as mysql.RowDataPacket[])[0];
   const recettes = Number(r?.recettes ?? 0);
   const depenses = Number(r?.depenses ?? 0);
-  return { total_recettes: recettes, total_depenses: depenses, solde_net: recettes - depenses };
+
+  return {
+    total_recettes:    recettes,
+    total_depenses:    depenses,
+    solde_net:         recettes - depenses,
+    especes:           modeMap["especes"]           ?? 0,
+    moov_money:        modeMap["moov_money"]        ?? 0,
+    tmoney:            modeMap["tmoney"]             ?? 0,
+    virement_bancaire: modeMap["virement_bancaire"] ?? 0,
+  };
 }
 
 function genFinanceRef(type: string) {
@@ -1310,13 +1645,25 @@ function genFinanceRef(type: string) {
 }
 
 export async function createFinanceEntry(data: {
-  type:        FinanceEntry["type"];
-  categorie?:  string;
-  description?: string;
-  montant:     number;
-  date_entree: string;
+  type:           FinanceEntry["type"];
+  mode_paiement?: string;
+  categorie?:     string;
+  description?:   string;
+  montant:        number;
+  date_entree:    string;
 }): Promise<number> {
+  const cols      = await financeEntrieCols();
   const reference = genFinanceRef(data.type);
+
+  if (cols.mode_paiement) {
+    const [result] = await db.execute<mysql.ResultSetHeader>(
+      `INSERT INTO finance_entries (reference, type, mode_paiement, categorie, description, montant, date_entree)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [reference, data.type, data.mode_paiement ?? "especes", data.categorie ?? null, data.description ?? null, data.montant, data.date_entree]
+    );
+    return result.insertId;
+  }
+
   const [result] = await db.execute<mysql.ResultSetHeader>(
     `INSERT INTO finance_entries (reference, type, categorie, description, montant, date_entree)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -1326,17 +1673,20 @@ export async function createFinanceEntry(data: {
 }
 
 export async function updateFinanceEntry(id: number, data: {
-  categorie?:   string;
-  description?: string;
-  montant?:     number;
-  date_entree?: string;
+  mode_paiement?: string;
+  categorie?:     string;
+  description?:   string;
+  montant?:       number;
+  date_entree?:   string;
 }) {
+  const cols   = await financeEntrieCols();
   const fields: string[] = [];
   const params: unknown[] = [];
-  if (data.categorie   !== undefined) { fields.push("categorie = ?");   params.push(data.categorie); }
-  if (data.description !== undefined) { fields.push("description = ?"); params.push(data.description); }
-  if (data.montant     !== undefined) { fields.push("montant = ?");     params.push(data.montant); }
-  if (data.date_entree !== undefined) { fields.push("date_entree = ?"); params.push(data.date_entree); }
+  if (cols.mode_paiement && data.mode_paiement !== undefined) { fields.push("mode_paiement = ?"); params.push(data.mode_paiement); }
+  if (data.categorie     !== undefined) { fields.push("categorie = ?");     params.push(data.categorie); }
+  if (data.description   !== undefined) { fields.push("description = ?");   params.push(data.description); }
+  if (data.montant       !== undefined) { fields.push("montant = ?");       params.push(data.montant); }
+  if (data.date_entree   !== undefined) { fields.push("date_entree = ?");   params.push(data.date_entree); }
   if (!fields.length) return;
   params.push(id);
   await db.execute(`UPDATE finance_entries SET ${fields.join(", ")} WHERE id = ?`, params);
@@ -1515,4 +1865,358 @@ export async function deleteAchat(id: number) {
   } finally {
     conn.release();
   }
+}
+
+// ─── Livreurs ──────────────────────────────────────────────────────────────────
+
+export interface Livreur {
+  id:         number;
+  nom:        string;
+  telephone:  string | null;
+  code_acces: string;
+  statut:     "disponible" | "indisponible";
+  created_at: string;
+}
+
+export async function listLivreurs(): Promise<Livreur[]> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    "SELECT * FROM livreurs ORDER BY nom ASC"
+  );
+  return rows as Livreur[];
+}
+
+export async function getLivreurByCode(code: string): Promise<Livreur | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM livreurs WHERE code_acces = ? LIMIT 1", [code]
+  );
+  return (rows[0] as Livreur) ?? null;
+}
+
+function generateCode(): string {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+export async function createLivreur(data: { nom: string; telephone?: string }): Promise<Livreur> {
+  let code = generateCode();
+  // Ensure uniqueness
+  let [existing] = await db.execute<mysql.RowDataPacket[]>("SELECT id FROM livreurs WHERE code_acces = ?", [code]);
+  while ((existing as mysql.RowDataPacket[]).length > 0) {
+    code = generateCode();
+    [existing] = await db.execute<mysql.RowDataPacket[]>("SELECT id FROM livreurs WHERE code_acces = ?", [code]);
+  }
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    "INSERT INTO livreurs (nom, telephone, code_acces) VALUES (?,?,?)",
+    [data.nom, data.telephone ?? null, code]
+  );
+  const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT * FROM livreurs WHERE id = ?", [result.insertId]);
+  return rows[0] as Livreur;
+}
+
+export async function updateLivreur(id: number, data: { nom?: string; telephone?: string; statut?: Livreur["statut"] }) {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  if (data.nom      !== undefined) { fields.push("nom = ?");      values.push(data.nom); }
+  if (data.telephone !== undefined) { fields.push("telephone = ?"); values.push(data.telephone); }
+  if (data.statut   !== undefined) { fields.push("statut = ?");   values.push(data.statut); }
+  if (fields.length === 0) return;
+  values.push(id);
+  await db.execute(`UPDATE livreurs SET ${fields.join(", ")} WHERE id = ?`, values);
+}
+
+export async function deleteLivreur(id: number) {
+  await db.execute("DELETE FROM livreurs WHERE id = ?", [id]);
+}
+
+// ─── Livraisons (enrichi) ──────────────────────────────────────────────────────
+
+export interface LivraisonAdmin {
+  id:                number;
+  reference:         string;
+  facture_id:        number | null;
+  client_nom:        string;
+  client_tel:        string | null;
+  adresse:           string | null;
+  contact_livraison: string | null;
+  lien_localisation: string | null;
+  livreur_id:        number | null;
+  livreur:           string | null;
+  statut:            "en_attente" | "acceptee" | "en_cours" | "livre" | "echoue";
+  note:              string | null;
+  livree_le:         string | null;
+  created_at:        string;
+}
+
+export async function listLivraisonsAdmin(opts: {
+  limit?: number; offset?: number; search?: string; statut?: string;
+} = {}): Promise<{ items: LivraisonAdmin[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut } = opts;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (search) { conditions.push("(lv.client_nom LIKE ? OR lv.reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (statut) { conditions.push("lv.statut = ?"); params.push(statut); }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT lv.*, li.nom AS livreur_nom
+     FROM livraisons_ventes lv
+     LEFT JOIN livreurs li ON li.id = lv.livreur_id
+     ${where}
+     ORDER BY lv.created_at DESC
+     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+    params
+  );
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM livraisons_ventes lv ${where}`, params
+  );
+  return {
+    items: (rows as mysql.RowDataPacket[]).map(r => ({ ...r, livreur: r.livreur_nom ?? r.livreur })) as LivraisonAdmin[],
+    total: Number(cnt[0]?.cnt ?? 0),
+  };
+}
+
+export async function updateLivraisonAdmin(id: number, data: {
+  statut?: LivraisonAdmin["statut"];
+  livreur_id?: number | null;
+  note?: string;
+}) {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  if (data.statut     !== undefined) { fields.push("statut = ?");     values.push(data.statut); }
+  if (data.livreur_id !== undefined) { fields.push("livreur_id = ?"); values.push(data.livreur_id); }
+  if (data.note       !== undefined) { fields.push("note = ?");       values.push(data.note); }
+  if (data.statut === "livre") { fields.push("livree_le = NOW()"); }
+  if (fields.length === 0) return;
+  values.push(id);
+  await db.execute(`UPDATE livraisons_ventes SET ${fields.join(", ")} WHERE id = ?`, values);
+}
+
+// Called by driver: accept a delivery (atomic — only if still en_attente)
+export async function accepterLivraison(livraisonId: number, livreurId: number): Promise<boolean> {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.execute<mysql.RowDataPacket[]>(
+      "SELECT id, statut FROM livraisons_ventes WHERE id = ? FOR UPDATE", [livraisonId]
+    );
+    const liv = rows[0] as mysql.RowDataPacket | undefined;
+    if (!liv || liv.statut !== "en_attente") {
+      await conn.rollback();
+      return false; // already taken
+    }
+    const [livreurRow] = await conn.execute<mysql.RowDataPacket[]>(
+      "SELECT nom FROM livreurs WHERE id = ?", [livreurId]
+    );
+    const nomLivreur = (livreurRow[0] as mysql.RowDataPacket)?.nom ?? null;
+    await conn.execute(
+      "UPDATE livraisons_ventes SET statut = 'acceptee', livreur_id = ?, livreur = ? WHERE id = ?",
+      [livreurId, nomLivreur, livraisonId]
+    );
+    await conn.commit();
+    return true;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// For driver page: get deliveries available (en_attente) + their own accepted ones
+export async function getLivraisonsForLivreur(livreurId: number): Promise<LivraisonAdmin[]> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT lv.*, li.nom AS livreur_nom
+     FROM livraisons_ventes lv
+     LEFT JOIN livreurs li ON li.id = lv.livreur_id
+     WHERE lv.statut = 'en_attente'
+        OR (lv.livreur_id = ? AND lv.statut NOT IN ('livre','echoue'))
+     ORDER BY lv.created_at DESC`,
+    [livreurId]
+  );
+  return (rows as mysql.RowDataPacket[]).map(r => ({ ...r, livreur: r.livreur_nom ?? r.livreur })) as LivraisonAdmin[];
+}
+
+// ─── Boutique Clients ─────────────────────────────────────────────────────────
+
+export interface BoutiqueClient {
+  id:           number;
+  nom:          string;
+  telephone:    string | null;
+  email:        string | null;
+  localisation: string | null;
+  type_client:  "particulier" | "professionnel";
+  solde:        number;
+  notes:        string | null;
+  created_at:   string;
+  updated_at:   string;
+}
+
+export interface BoutiqueClientStats {
+  total:          number;
+  en_avance:      number;   // solde > 0
+  debiteurs:      number;   // solde < 0
+  solde_moyen:    number;
+  segments:       { type_client: string; count: number }[];
+  acquisitions:   { mois: string; count: number }[];  // last 6 months
+  top_debiteurs:  BoutiqueClient[];
+  top_depensiers: { id: number; nom: number; telephone: string | null; type_client: string; total_achats: number }[];
+  derniers:       BoutiqueClient[];
+}
+
+export async function listBoutiqueClients(
+  limit: number,
+  offset: number,
+  search: string,
+  filtre: "tous" | "debiteurs" | "dettes"
+): Promise<BoutiqueClient[]> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (search) {
+    conditions.push("(nom LIKE ? OR telephone LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (filtre === "debiteurs") {
+    conditions.push("solde < 0");
+  } else if (filtre === "dettes") {
+    conditions.push("solde > 0");
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT * FROM boutique_clients ${where} ORDER BY nom ASC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+  return rows as BoutiqueClient[];
+}
+
+export async function countBoutiqueClients(
+  search: string,
+  filtre: "tous" | "debiteurs" | "dettes"
+): Promise<number> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (search) {
+    conditions.push("(nom LIKE ? OR telephone LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (filtre === "debiteurs") {
+    conditions.push("solde < 0");
+  } else if (filtre === "dettes") {
+    conditions.push("solde > 0");
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM boutique_clients ${where}`,
+    params
+  );
+  return (rows[0] as mysql.RowDataPacket).cnt as number;
+}
+
+export async function getBoutiqueClientById(id: number): Promise<BoutiqueClient | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM boutique_clients WHERE id = ?", [id]
+  );
+  return (rows[0] as BoutiqueClient) ?? null;
+}
+
+export async function createBoutiqueClient(data: Partial<BoutiqueClient>): Promise<number> {
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO boutique_clients (nom, telephone, email, localisation, type_client, solde, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.nom ?? "",
+      data.telephone ?? null,
+      data.email ?? null,
+      data.localisation ?? null,
+      data.type_client ?? "particulier",
+      data.solde ?? 0,
+      data.notes ?? null,
+    ]
+  );
+  return result.insertId;
+}
+
+export async function updateBoutiqueClient(id: number, data: Partial<BoutiqueClient>): Promise<void> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  if (data.nom          !== undefined) { fields.push("nom = ?");          values.push(data.nom); }
+  if (data.telephone    !== undefined) { fields.push("telephone = ?");    values.push(data.telephone); }
+  if (data.email        !== undefined) { fields.push("email = ?");        values.push(data.email); }
+  if (data.localisation !== undefined) { fields.push("localisation = ?"); values.push(data.localisation); }
+  if (data.type_client  !== undefined) { fields.push("type_client = ?");  values.push(data.type_client); }
+  if (data.solde        !== undefined) { fields.push("solde = ?");        values.push(data.solde); }
+  if (data.notes        !== undefined) { fields.push("notes = ?");        values.push(data.notes); }
+
+  if (fields.length === 0) return;
+  values.push(id);
+  await db.execute(`UPDATE boutique_clients SET ${fields.join(", ")} WHERE id = ?`, values);
+}
+
+export async function deleteBoutiqueClient(id: number): Promise<void> {
+  await db.execute("DELETE FROM boutique_clients WHERE id = ?", [id]);
+}
+
+export async function getBoutiqueClientsStats(): Promise<BoutiqueClientStats> {
+  const [[kpis], [segments], [acquisitions], [topDebiteurs], [topDepensiers], [derniers]] =
+    await Promise.all([
+      // KPIs
+      db.query<mysql.RowDataPacket[]>(
+        `SELECT
+           COUNT(*) AS total,
+           SUM(solde > 0) AS en_avance,
+           SUM(solde < 0) AS debiteurs,
+           ROUND(AVG(solde), 2) AS solde_moyen
+         FROM boutique_clients`
+      ),
+      // Segment distribution
+      db.query<mysql.RowDataPacket[]>(
+        `SELECT type_client, COUNT(*) AS count
+         FROM boutique_clients
+         GROUP BY type_client`
+      ),
+      // New acquisitions last 6 months
+      db.query<mysql.RowDataPacket[]>(
+        `SELECT DATE_FORMAT(created_at, '%b') AS mois,
+                COUNT(*) AS count
+         FROM boutique_clients
+         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+         GROUP BY YEAR(created_at), MONTH(created_at), mois
+         ORDER BY YEAR(created_at), MONTH(created_at)`
+      ),
+      // Top debiteurs (solde le plus négatif)
+      db.query<mysql.RowDataPacket[]>(
+        `SELECT id, nom, telephone, type_client, solde
+         FROM boutique_clients
+         WHERE solde < 0
+         ORDER BY solde ASC
+         LIMIT 5`
+      ),
+      // Top dépensiers (solde le plus positif = en avance = ont payé le plus)
+      db.query<mysql.RowDataPacket[]>(
+        `SELECT id, nom, telephone, type_client, solde AS total_achats
+         FROM boutique_clients
+         WHERE solde > 0
+         ORDER BY solde DESC
+         LIMIT 5`
+      ),
+      // Derniers clients ajoutés
+      db.query<mysql.RowDataPacket[]>(
+        `SELECT * FROM boutique_clients ORDER BY created_at DESC LIMIT 8`
+      ),
+    ]);
+
+  const kpi = kpis[0] as mysql.RowDataPacket;
+  return {
+    total:          Number(kpi?.total ?? 0),
+    en_avance:      Number(kpi?.en_avance ?? 0),
+    debiteurs:      Number(kpi?.debiteurs ?? 0),
+    solde_moyen:    Number(kpi?.solde_moyen ?? 0),
+    segments:       segments as { type_client: string; count: number }[],
+    acquisitions:   acquisitions as { mois: string; count: number }[],
+    top_debiteurs:  topDebiteurs as BoutiqueClient[],
+    top_depensiers: topDepensiers as { id: number; nom: number; telephone: string | null; type_client: string; total_achats: number }[],
+    derniers:       derniers as BoutiqueClient[],
+  };
 }

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { Achat, Fournisseur } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import PageHeader from "@/components/admin/PageHeader";
 
 interface Props {
   initialAchats: Achat[];
@@ -25,8 +26,8 @@ interface LineItem {
   prix_unitaire: number | "";
 }
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all";
-const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
+const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-colors";
+const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 
 const STATUT_LABELS: Record<string, string> = {
   en_attente: "En attente",
@@ -129,42 +130,40 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
   return (
     <div className="space-y-6">
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display font-800 text-2xl text-slate-900">Achats fournisseurs</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Suivi des commandes fournisseurs</p>
-        </div>
-        <button onClick={() => { setShowForm(true); setError(""); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors">
-          <Plus className="w-4 h-4" /> Nouvel achat
-        </button>
-      </div>
+      <PageHeader
+        title="Achats fournisseurs"
+        subtitle="Suivi des commandes fournisseurs"
+        accent="brand"
+        onRefresh={() => router.refresh()}
+        ctaLabel="Nouvel achat"
+        ctaIcon={Plus}
+        onCtaClick={() => { setShowForm(true); setError(""); }}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Total achats</p>
             <ShoppingCart className="w-5 h-5 text-slate-300" />
           </div>
           <p className="font-display font-800 text-3xl text-slate-900">{stats.total}</p>
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">En attente</p>
             <Clock className="w-5 h-5 text-amber-400" />
           </div>
           <p className="font-display font-800 text-3xl text-slate-900">{stats.en_attente}</p>
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Reçus</p>
             <CheckCircle2 className="w-5 h-5 text-green-400" />
           </div>
           <p className="font-display font-800 text-3xl text-slate-900">{stats.recu}</p>
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Montant total</p>
             <DollarSign className="w-5 h-5 text-slate-300" />
@@ -175,7 +174,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         {achats.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-slate-400">
             <Truck className="w-12 h-12 mb-3 opacity-30" />
@@ -244,13 +243,13 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
             <div className="flex gap-2">
               {page > 1 && (
                 <a href={`?page=${page - 1}`}
-                  className="px-4 py-2 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors">
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors">
                   ← Précédent
                 </a>
               )}
               {page < totalPages && (
                 <a href={`?page=${page + 1}`}
-                  className="px-4 py-2 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors">
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors">
                   Suivant →
                 </a>
               )}
@@ -262,7 +261,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
       {/* Create modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl my-8 p-6 space-y-5">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8 p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display font-700 text-lg text-slate-900">Nouvel achat fournisseur</h2>
               <button onClick={() => setShowForm(false)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
@@ -327,15 +326,15 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                     <input type="text" value={ln.designation}
                       onChange={e => setLine(i, "designation", e.target.value)}
                       placeholder="Désignation article"
-                      className="w-full px-3 py-2 text-sm rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none" />
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500" />
                     <input type="number" min="1" value={ln.quantite}
                       onChange={e => setLine(i, "quantite", e.target.value)}
                       placeholder="Qté"
-                      className="w-full px-3 py-2 text-sm rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none text-center" />
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 text-center" />
                     <input type="number" min="0" value={ln.prix_unitaire}
                       onChange={e => setLine(i, "prix_unitaire", e.target.value)}
                       placeholder="Prix u."
-                      className="w-full px-3 py-2 text-sm rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none" />
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500" />
                     <button type="button" onClick={() => removeLine(i)} disabled={lines.length === 1}
                       className="p-1.5 rounded-xl hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-30">
                       <X className="w-4 h-4" />
@@ -353,11 +352,11 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
 
             <div className="flex gap-3 pt-1">
               <button onClick={() => setShowForm(false)}
-                className="flex-1 px-5 py-3 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors">
+                className="flex-1 px-5 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
                 Annuler
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Enregistrement…" : "Enregistrer"}
               </button>

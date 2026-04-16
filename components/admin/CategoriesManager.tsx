@@ -5,14 +5,15 @@ import {
   FolderOpen, Plus, Pencil, Trash2, X, Save, Loader2, AlertCircle, Package,
 } from "lucide-react";
 import type { AdminCategory } from "@/lib/admin-db";
+import PageHeader from "@/components/admin/PageHeader";
 
 interface Props {
   initialCategories: AdminCategory[];
 }
 
 const empty = { nom: "", description: "" };
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all";
-const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
+const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-colors";
+const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 
 export default function CategoriesManager({ initialCategories }: Props) {
   const [list,    setList]    = useState<AdminCategory[]>(initialCategories);
@@ -92,30 +93,25 @@ export default function CategoriesManager({ initialCategories }: Props) {
   return (
     <div className="space-y-6">
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display font-800 text-2xl text-slate-900">Catégories</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Organisez vos produits par catégorie
-          </p>
-        </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors">
-          <Plus className="w-4 h-4" /> Ajouter une catégorie
-        </button>
-      </div>
+      <PageHeader
+        title="Catégories"
+        subtitle="Organisez vos produits par catégorie"
+        accent="brand"
+        ctaLabel="Ajouter une catégorie"
+        ctaIcon={Plus}
+        onCtaClick={openCreate}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Catégories</p>
             <FolderOpen className="w-5 h-5 text-slate-300" />
           </div>
           <p className="font-display font-800 text-3xl text-slate-900">{list.length}</p>
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Produits catalogués</p>
             <Package className="w-5 h-5 text-slate-300" />
@@ -126,7 +122,7 @@ export default function CategoriesManager({ initialCategories }: Props) {
 
       {/* Grid */}
       {list.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
+        <div className="bg-white rounded-2xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
           <FolderOpen className="w-12 h-12 mb-3 opacity-30" />
           <p className="font-semibold">Aucune catégorie</p>
           <p className="text-sm mt-1">Créez votre première catégorie pour organiser vos produits.</p>
@@ -135,7 +131,7 @@ export default function CategoriesManager({ initialCategories }: Props) {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {list.map(cat => (
             <div key={cat.id}
-              className="bg-white rounded-3xl border border-slate-100 p-5 flex flex-col gap-3 hover:border-slate-200 transition-colors">
+              className="bg-white rounded-2xl border border-slate-100 p-5 flex flex-col gap-3 hover:border-slate-200 transition-colors">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
@@ -190,7 +186,7 @@ export default function CategoriesManager({ initialCategories }: Props) {
       {/* Modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-5">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display font-700 text-lg text-slate-900">
                 {modal === "create" ? "Nouvelle catégorie" : "Modifier la catégorie"}
@@ -234,11 +230,11 @@ export default function CategoriesManager({ initialCategories }: Props) {
 
             <div className="flex gap-3 pt-1">
               <button onClick={closeModal}
-                className="flex-1 px-5 py-3 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors">
+                className="flex-1 px-5 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
                 Annuler
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Enregistrement…" : "Enregistrer"}
               </button>

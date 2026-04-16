@@ -51,7 +51,7 @@ export default function AdminLoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl p-8 shadow-2xl">
+        <div className="bg-white rounded-2xl p-8 shadow-xl">
           <h2 className="font-display font-800 text-slate-900 text-xl mb-6">Connexion</h2>
 
           {error && (
@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="admin@togolese.net" required autoFocus
-                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-sm transition-all font-sans"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-brand-500 outline-none text-sm transition-all font-sans"
               />
             </div>
             <div>
@@ -76,7 +76,7 @@ export default function AdminLoginPage() {
                   type={showPw ? "text" : "password"}
                   value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" required
-                  className="w-full px-4 py-3 pr-12 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-sm transition-all font-sans"
+                  className="w-full px-4 py-3 pr-12 rounded-2xl border border-slate-200 focus:border-brand-500 outline-none text-sm transition-all font-sans"
                 />
                 <button
                   type="button" onClick={() => setShowPw(!showPw)}

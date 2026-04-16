@@ -34,11 +34,11 @@ export default function ClientEditForm({ client }: { client: Client }) {
     if (res.ok) router.push("/admin/crm");
   }
 
-  const inputCls = "w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none";
-  const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
+  const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 transition-colors";
+  const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-4">
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
       <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-3">Informations client</h2>
 
       {msg && (
@@ -83,7 +83,7 @@ export default function ClientEditForm({ client }: { client: Client }) {
 
       <div className="flex gap-2 pt-1">
         <button onClick={save} disabled={loading}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 disabled:opacity-60 transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-700 text-white text-sm font-bold hover:bg-indigo-800 disabled:opacity-60 transition-colors"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Sauvegarder

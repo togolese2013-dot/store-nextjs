@@ -117,7 +117,7 @@ export default function OfflinePage() {
       ) : (
         <button
           onClick={loadCachedOrders}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors mb-6"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors mb-6"
         >
           <RefreshCw className="w-4 h-4" />
           Actualiser le cache

@@ -51,7 +51,7 @@ export default async function ClientPage({ params }: PageProps) {
           <ChevronLeft className="w-5 h-5" />
         </Link>
         <div className="flex items-center gap-3 flex-1">
-          <div className="w-11 h-11 rounded-full bg-brand-100 flex items-center justify-center text-brand-800 font-bold text-lg shrink-0">
+          <div className="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold text-lg shrink-0">
             {(client.nom || client.telephone).charAt(0).toUpperCase()}
           </div>
           <div>
@@ -73,7 +73,7 @@ export default async function ClientPage({ params }: PageProps) {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: ShoppingCart, label: "Commandes",      value: String(stats.total_orders), color: "bg-brand-50 text-brand-700" },
+          { icon: ShoppingCart, label: "Commandes",      value: String(stats.total_orders), color: "bg-indigo-50 text-indigo-700" },
           { icon: TrendingUp,   label: "CA total",        value: formatPrice(stats.total_spent),  color: "bg-green-50 text-green-700" },
           { icon: FileText,     label: "Panier moyen",    value: formatPrice(stats.avg_basket),   color: "bg-accent-50 text-accent-700" },
           { icon: Calendar,     label: "Dernière commande",
@@ -98,7 +98,7 @@ export default async function ClientPage({ params }: PageProps) {
 
         {/* Orders history */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <h2 className="font-bold text-slate-900">Historique des commandes ({orders.length})</h2>
             </div>

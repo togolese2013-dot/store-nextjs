@@ -65,7 +65,7 @@ export default function EntrepotsManager({ initialEntrepots }: Props) {
     else { const data = await res.json(); flash(data.error ?? "Erreur"); }
   }
 
-  const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none";
+  const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none";
   const labelCls = "block text-xs font-bold text-slate-500 mb-1";
 
   function EntrepotForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {

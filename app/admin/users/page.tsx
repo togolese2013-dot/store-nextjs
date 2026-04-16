@@ -1,22 +1,42 @@
-import { listAdminUsers } from "@/lib/admin-db";
-import { getAdminSession } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { listUtilisateurs, listPermissions } from "@/lib/admin-db";
+import type { Utilisateur, Permission } from "@/lib/admin-db";
 import UsersManager from "@/components/admin/UsersManager";
 
-export const metadata = { title: "Utilisateurs admin" };
+export const dynamic  = "force-dynamic";
+export const metadata = { title: "Utilisateurs" };
 
 export default async function UsersPage() {
-  const session = await getAdminSession();
-  if (session?.role !== "super_admin") redirect("/admin");
+  let utilisateurs: Utilisateur[] = [];
+  let permissions:  Permission[]  = [];
+  let errMsg = "";
 
-  const users = await listAdminUsers();
-  return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="font-display font-800 text-2xl text-slate-900">Utilisateurs admin</h1>
-        <p className="text-slate-500 text-sm mt-1">Gérez les comptes ayant accès au panneau d'administration.</p>
+  try {
+    [utilisateurs, permissions] = await Promise.all([
+      listUtilisateurs(),
+      listPermissions(),
+    ]);
+  } catch (err) {
+    errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[UsersPage]", err);
+  }
+
+  if (errMsg) {
+    return (
+      <div className="p-6 lg:p-8">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
+          <p className="font-bold mb-2">Erreur lors du chargement</p>
+          <code className="text-xs font-mono bg-red-100 px-2 py-1 rounded">{errMsg}</code>
+        </div>
       </div>
-      <UsersManager users={users} currentSessionId={session!.id} />
+    );
+  }
+
+  return (
+    <div className="p-6 lg:p-8">
+      <UsersManager
+        initialUtilisateurs={utilisateurs}
+        allPermissions={permissions}
+      />
     </div>
   );
 }

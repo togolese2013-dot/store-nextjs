@@ -87,7 +87,7 @@ export default function StockParEntrepot({ produitId }: Props) {
           <span className="flex-1 text-sm font-semibold text-slate-700">{r.nom_entrepot}</span>
           <input
             type="number" min={0}
-            className="w-24 px-3 py-1.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none text-center"
+            className="w-24 px-3 py-1.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 text-center"
             value={r.stock}
             onChange={e => updateStock(r.entrepot_id, Number(e.target.value))}
           />

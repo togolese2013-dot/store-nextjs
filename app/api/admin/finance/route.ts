@@ -30,11 +30,11 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   try {
     const body = await req.json();
-    const { type, categorie, description, montant, date_entree } = body;
+    const { type, mode_paiement, categorie, description, montant, date_entree } = body;
     if (!type || !montant || !date_entree) {
       return NextResponse.json({ error: "type, montant et date_entree sont requis." }, { status: 400 });
     }
-    const id = await createFinanceEntry({ type, categorie, description, montant: Number(montant), date_entree });
+    const id = await createFinanceEntry({ type, mode_paiement, categorie, description, montant: Number(montant), date_entree });
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });

@@ -11,6 +11,7 @@ import {
   Boxes, AlertTriangle, XCircle, TrendingDown, TrendingUp, DollarSign,
   Activity,
 } from "lucide-react";
+import PageHeader from "@/components/admin/PageHeader";
 
 export const metadata = { title: "Tous les produits" };
 
@@ -99,34 +100,33 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-6">
 
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display font-800 text-2xl text-slate-900">Tous les produits</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Niveaux de stock actuels</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {view === "stock" && (
+      <PageHeader
+        title="Tous les produits"
+        subtitle="Niveaux de stock actuels"
+        accent="brand"
+        extra={
+          view === "stock" ? (
             <Link href="/admin/products/new"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
             >
-              <PackagePlus className="w-3.5 h-3.5" /> Ajouter un produit
+              <PackagePlus className="w-4 h-4" /> Ajouter un produit
             </Link>
-          )}
-          {view === "mouvements" && <MouvementModal />}
-        </div>
-      </div>
+          ) : (
+            <MouvementModal />
+          )
+        }
+      />
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Produits en stock</p>
             <Boxes className="w-5 h-5 text-slate-300" />
           </div>
           <p className="font-display font-800 text-3xl text-slate-900">{stats.en_stock}</p>
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Valeur totale du stock</p>
             <DollarSign className="w-5 h-5 text-slate-300" />
@@ -134,7 +134,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           <p className="font-display font-800 text-3xl text-slate-900">{formatPrice(stats.valeur_totale)}</p>
           <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wide">FCFA</span>
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Articles stock faible</p>
             <AlertTriangle className="w-5 h-5 text-amber-400" />
@@ -144,7 +144,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">Action requise</span>
           )}
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Articles en rupture</p>
             <XCircle className="w-5 h-5 text-red-400" />
@@ -154,14 +154,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">Épuisé</span>
           )}
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Entrées aujourd&apos;hui</p>
             <TrendingDown className="w-5 h-5 text-emerald-400" />
           </div>
           <p className="font-display font-800 text-3xl text-slate-900">{stats.entrees_jour}</p>
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sorties aujourd&apos;hui</p>
             <TrendingUp className="w-5 h-5 text-red-400" />
@@ -179,12 +179,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           <input
             type="text" name="q" defaultValue={q}
             placeholder="Rechercher un produit…"
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans"
+            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans"
           />
         </div>
         {isStockView && (
           <select name="category" defaultValue={catId ?? ""}
-            className="px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans"
+            className="px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans"
           >
             <option value="">Toutes les catégories</option>
             {categories.map(c => (
@@ -199,7 +199,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         </button>
         {(q || catId) && (
           <Link href={buildUrl({ view: view !== "stock" ? view : undefined, statut: statut !== "all" ? statut : undefined }, {})}
-            className="px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
+            className="px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
           >
             Réinitialiser
           </Link>
@@ -266,7 +266,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
 
         {/* ── Stock view ── */}
         {isStockView && (
@@ -422,14 +422,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
             <div className="flex gap-2">
               {page > 1 && (
                 <Link href={pageUrl(page - 1)}
-                  className="px-4 py-2 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors"
                 >
                   ← Précédent
                 </Link>
               )}
               {page < totalPages && (
                 <Link href={pageUrl(page + 1)}
-                  className="px-4 py-2 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors"
                 >
                   Suivant →
                 </Link>

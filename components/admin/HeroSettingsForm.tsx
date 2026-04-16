@@ -73,7 +73,7 @@ export default function HeroSettingsForm({ settings }: Props) {
     setMsg(res.ok ? "Hero sauvegardé ✓" : "Erreur lors de la sauvegarde");
   }
 
-  const inputCls = "w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none";
+  const inputCls = "w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-emerald-500 outline-none";
   const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
 
   const GRADIENT_PRESETS = [
@@ -93,7 +93,7 @@ export default function HeroSettingsForm({ settings }: Props) {
       )}
 
       {slides.map((slide, i) => (
-        <div key={i} className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+        <div key={i} className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
           <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">
             Slide {i + 1}
           </h2>
@@ -200,7 +200,7 @@ export default function HeroSettingsForm({ settings }: Props) {
       ))}
 
       <button onClick={save} disabled={loading}
-        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60"
+        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-emerald-700 text-white font-bold text-sm hover:bg-emerald-800 transition-colors disabled:opacity-60"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {loading ? "Enregistrement…" : "Sauvegarder le hero"}

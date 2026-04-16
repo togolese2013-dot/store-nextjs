@@ -63,7 +63,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
             href={`/api/admin/orders/${id}/invoice`}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold transition-colors"
           >
             <Download className="w-4 h-4" />
             Télécharger la facture
@@ -76,7 +76,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         <div className="lg:col-span-2 space-y-5">
 
           {/* Articles */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5">
             <h2 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
               <Package className="w-4 h-4" /> Articles commandés
             </h2>
@@ -118,13 +118,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
               </div>
               <div className="flex justify-between font-display font-800 text-lg text-slate-900 pt-2 border-t border-slate-100">
                 <span>Total</span>
-                <span className="text-brand-600">{formatPrice(order.total)}</span>
+                <span className="text-emerald-700">{formatPrice(order.total)}</span>
               </div>
             </div>
           </div>
 
           {/* Timeline */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5">
             <h2 className="font-bold text-slate-700 mb-5">Suivi de la livraison</h2>
             <OrderTimeline events={events} currentStatus={order.status} />
           </div>
@@ -134,7 +134,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
         <div className="space-y-5">
 
           {/* Client */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
             <h2 className="font-bold text-slate-700">Client</h2>
             <div>
               <p className="font-semibold text-slate-900 text-base">{order.nom || "Client"}</p>
@@ -161,7 +161,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           </div>
 
           {/* Changer le statut */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-3">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
             <h2 className="font-bold text-slate-700">Changer le statut</h2>
             <OrderStatusSelect orderId={order.id} currentStatus={order.status} />
             <p className="text-xs text-slate-400">Le changement de statut est automatiquement enregistré dans l&apos;historique.</p>

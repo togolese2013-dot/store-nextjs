@@ -57,21 +57,21 @@ export default function ClientsTable() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none"
+            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:outline-none focus:outline-none focus:border-indigo-500"
             placeholder="Rechercher par téléphone ou nom…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
         <button type="submit"
-          className="px-5 py-2.5 rounded-2xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors"
+          className="px-5 py-2.5 rounded-2xl bg-indigo-700 text-white text-sm font-bold hover:bg-indigo-800 transition-colors"
         >
           Chercher
         </button>
       </form>
 
       {/* Table */}
-      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400">
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -105,7 +105,7 @@ export default function ClientsTable() {
                   <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-800 font-bold text-sm shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold text-sm shrink-0">
                           {(c.nom || c.telephone).charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -129,7 +129,7 @@ export default function ClientsTable() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <Link href={`/admin/crm/${c.id}`}
-                        className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-brand-800 transition-colors"
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-indigo-800 transition-colors"
                       >
                         Voir fiche
                       </Link>

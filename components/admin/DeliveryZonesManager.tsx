@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { DeliveryZone } from "@/lib/admin-db";
 import { Plus, Trash2, Save, GripVertical, Loader2 } from "lucide-react";
 
-const inputCls = "px-3 py-2 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+const inputCls = "px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans";
 
 export default function DeliveryZonesManager({ initialZones }: { initialZones: DeliveryZone[] }) {
   const router  = useRouter();
@@ -50,7 +50,7 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
           <div className="grid grid-cols-[1fr_120px_80px_auto] gap-3 text-xs font-bold uppercase tracking-widest text-slate-400">
             <span>Nom de la zone</span>

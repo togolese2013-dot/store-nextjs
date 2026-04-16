@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Send, Plus, Trash2, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none transition-all font-sans";
 
 export default function BroadcastClient() {
   const [numbers, setNumbers] = useState<string[]>([""]);
@@ -57,7 +57,7 @@ export default function BroadcastClient() {
       )}
 
       {/* Message */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">Message</h2>
         <div>
           <label className="block text-xs font-bold text-slate-600 mb-1.5">
@@ -74,7 +74,7 @@ export default function BroadcastClient() {
       </div>
 
       {/* Numbers */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <h2 className="font-display font-700 text-slate-900">Destinataires</h2>
           <span className="text-xs text-slate-400">{validNumbers.length} numéro{validNumbers.length > 1 ? "s" : ""} valide{validNumbers.length > 1 ? "s" : ""}</span>
@@ -103,7 +103,7 @@ export default function BroadcastClient() {
               />
               {numbers.length > 1 && (
                 <button onClick={() => removeNumber(i)}
-                  className="p-2.5 rounded-2xl border-2 border-red-100 text-red-500 hover:bg-red-50 transition-colors"
+                  className="p-2.5 rounded-2xl border border-red-100 text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -113,7 +113,7 @@ export default function BroadcastClient() {
         </div>
 
         <button onClick={addNumber}
-          className="flex items-center gap-2 px-4 py-2 rounded-2xl border-2 border-dashed border-slate-300 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-2xl border border-dashed border-slate-300 text-sm text-slate-500 hover:border-indigo-400 hover:text-indigo-700 transition-colors"
         >
           <Plus className="w-4 h-4" /> Ajouter un numéro
         </button>

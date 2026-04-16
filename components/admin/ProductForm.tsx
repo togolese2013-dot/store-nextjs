@@ -29,7 +29,7 @@ interface Props {
   initial?:   Partial<ProductData>;
 }
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
 const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
 
 export default function ProductForm({ categories, initial }: Props) {
@@ -172,7 +172,7 @@ export default function ProductForm({ categories, initial }: Props) {
         </div>
       )}
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
         <h2 className="font-display font-700 text-slate-900 text-base border-b border-slate-100 pb-3">Informations générales</h2>
 
         <div className="grid sm:grid-cols-2 gap-4">
@@ -206,7 +206,7 @@ export default function ProductForm({ categories, initial }: Props) {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
         <h2 className="font-display font-700 text-slate-900 text-base border-b border-slate-100 pb-3">Prix & stock</h2>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -240,7 +240,7 @@ export default function ProductForm({ categories, initial }: Props) {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
         <h2 className="font-display font-700 text-slate-900 text-base border-b border-slate-100 pb-3">Images & options</h2>
 
         {/* Galerie d'images */}
@@ -315,7 +315,7 @@ export default function ProductForm({ categories, initial }: Props) {
 
       {/* Section variantes (uniquement en mode édition) */}
       {isEdit && initial?.id && (
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
           <h2 className="font-display font-700 text-slate-900 text-base border-b border-slate-100 pb-3">
             Variantes (taille, couleur, modèle…)
           </h2>
@@ -325,7 +325,7 @@ export default function ProductForm({ categories, initial }: Props) {
 
       {/* Section produits liés (uniquement en mode édition) */}
       {isEdit && initial?.id && (
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
           <h2 className="font-display font-700 text-slate-900 text-base border-b border-slate-100 pb-3">
             Produits recommandés "Vous aimerez aussi"
           </h2>
@@ -341,7 +341,7 @@ export default function ProductForm({ categories, initial }: Props) {
           {loading ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le produit"}
         </button>
         <button type="button" onClick={() => router.back()}
-          className="px-6 py-3 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
+          className="px-6 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
         >
           Annuler
         </button>

@@ -46,7 +46,7 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
 
   if (messages.length === 0) {
     return (
-      <div className="bg-white rounded-3xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
+      <div className="bg-white rounded-2xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
         <MessageCircle className="w-14 h-14 mb-4 opacity-20" />
         <p className="font-semibold">Aucun message reçu</p>
         <p className="text-sm mt-1">Les messages arriveront ici une fois le webhook configuré.</p>
@@ -58,7 +58,7 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
   const selectedThread = selectedNumber ? (threads[selectedNumber] ?? []) : [];
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden flex" style={{ height: "70vh" }}>
+    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden flex" style={{ height: "70vh" }}>
       {/* Contact list */}
       <div className="w-72 shrink-0 border-r border-slate-100 flex flex-col">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -76,11 +76,11 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
               <button key={number} onClick={() => setSelected(last)}
                 className={clsx(
                   "w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors",
-                  selectedNumber === number && "bg-brand-50 border-l-4 border-l-brand-900"
+                  selectedNumber === number && "bg-indigo-50 border-l-4 border-l-indigo-700"
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-800 font-bold text-sm shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold text-sm shrink-0">
                     {name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -106,7 +106,7 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
           <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-800 font-bold text-sm">
+            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold text-sm">
               {(selected.contact_name || selectedNumber || "?").charAt(0).toUpperCase()}
             </div>
             <div>
@@ -124,7 +124,7 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
                 <div className={clsx(
                   "px-4 py-2.5 rounded-2xl text-sm",
                   msg.direction === "out"
-                    ? "bg-brand-900 text-white rounded-br-md"
+                    ? "bg-indigo-700 text-white rounded-br-md"
                     : "bg-slate-100 text-slate-900 rounded-bl-md"
                 )}>
                   {msg.content}
@@ -143,7 +143,7 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
               onChange={e => setReply(e.target.value)}
               onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendReply()}
               placeholder="Écrire un message…"
-              className="flex-1 px-4 py-2.5 text-sm bg-slate-50 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans"
+              className="flex-1 px-4 py-2.5 text-sm bg-slate-50 rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none transition-all font-sans"
             />
             <button onClick={sendReply} disabled={sending || !reply.trim()}
               className="w-11 h-11 flex items-center justify-center rounded-2xl bg-[#25D366] text-white hover:bg-[#1da851] transition-colors disabled:opacity-50"

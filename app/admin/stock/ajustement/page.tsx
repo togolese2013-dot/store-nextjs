@@ -107,7 +107,7 @@ export default function AjustementStockPage() {
         ou <strong>négative</strong> (−10) pour le réduire.
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-8">
+      <div className="bg-white rounded-2xl border border-slate-100 p-8">
         {success ? (
           <div className="flex flex-col items-center py-12 text-center gap-3">
             <CheckCircle2 className="w-14 h-14 text-emerald-500" />
@@ -159,7 +159,7 @@ export default function AjustementStockPage() {
                     onChange={e => { setSearch(e.target.value); setShowList(true); }}
                     onFocus={() => setShowList(true)}
                     placeholder="Rechercher un produit par nom ou référence…"
-                    className="w-full pl-9 pr-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-blue-400 outline-none text-sm transition-all"
+                    className="w-full pl-9 pr-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-400 outline-none text-sm transition-all"
                   />
                   {showList && filtered.length > 0 && (
                     <ul className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-56 overflow-y-auto">
@@ -212,13 +212,13 @@ export default function AjustementStockPage() {
                 onChange={e => setForm(f => ({ ...f, motif: e.target.value }))}
                 placeholder="Ex: Inventaire physique, perte, erreur de saisie…"
                 rows={3}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-blue-400 outline-none text-sm transition-all resize-none"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-400 outline-none text-sm transition-all resize-none"
               />
             </div>
 
             <div className="flex gap-3 pt-2">
               <Link href="/admin/products"
-                className="flex-1 text-center px-5 py-3 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
+                className="flex-1 text-center px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
               >
                 Annuler
               </Link>

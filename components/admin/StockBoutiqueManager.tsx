@@ -4,11 +4,13 @@ import { useState, useCallback } from "react";
 import Image from "next/image";
 import {
   Filter, Package, TrendingDown, AlertTriangle, XCircle,
-  ArrowDownLeft, ArrowUpRight, RefreshCw, X, Check, Loader2,
+  ArrowDownLeft, ArrowUpRight, X, Check, Loader2,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import type { BoutiqueStockItem, BoutiqueStats, BoutiqueMouvement } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import PageHeader from "@/components/admin/PageHeader";
+import TabBar     from "@/components/admin/TabBar";
 
 /* ─── Props ─── */
 interface Props {
@@ -185,30 +187,20 @@ export default function StockBoutiqueManager({
         </div>
       )}
 
-      {/* ══════════════════════════════════════
-          HEADER
-      ══════════════════════════════════════ */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display font-800 text-2xl text-slate-900">Stock Boutique</h1>
-          <p className="text-slate-400 text-sm mt-1">Suivi des quantités disponibles à la vente</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => fetchData({ q: search, filter: filterTab, off: offset })}
-            className="p-2.5 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-all"
-            title="Actualiser"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={() => openModal("retrait")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 active:scale-95 transition-all"
-          >
-            <ArrowDownLeft className="w-4 h-4" /> Retrait
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Stock Boutique"
+        subtitle="Suivi des quantités disponibles à la vente"
+        accent="amber"
+        searchValue={search}
+        onSearchChange={v => applySearch(v)}
+        onSearch={e => { e.preventDefault(); applySearch(search); }}
+        searchPlaceholder="Rechercher un produit…"
+        onRefresh={() => fetchData({ q: search, filter: filterTab, off: offset })}
+        refreshLoading={loading}
+        ctaLabel="Retrait"
+        ctaIcon={ArrowDownLeft}
+        onCtaClick={() => openModal("retrait")}
+      />
 
       {/* ══════════════════════════════════════
           KPI CARDS
@@ -258,43 +250,21 @@ export default function StockBoutiqueManager({
       {/* ══════════════════════════════════════
           FILTRES
       ══════════════════════════════════════ */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Tabs */}
-        <div className="flex bg-white border border-slate-200 rounded-2xl p-1 gap-1">
-          {(["all", "faible", "epuise"] as FilterTab[]).map(tab => (
-            <button
-              key={tab}
-              onClick={() => applyFilter(tab)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                filterTab === tab
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-              }`}
-            >
-              {tab === "all"    ? "Tous"        : ""}
-              {tab === "faible" ? "Stock faible" : ""}
-              {tab === "epuise" ? "Épuisés"      : ""}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px]">
-          <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Rechercher un produit…"
-            value={search}
-            onChange={e => applySearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none transition-all"
-          />
-        </div>
-      </div>
+      <TabBar
+        tabs={[
+          { key: "all",    label: "Tous" },
+          { key: "faible", label: "Stock faible", count: stats.stock_faible },
+          { key: "epuise", label: "Épuisés",      count: stats.epuises },
+        ]}
+        active={filterTab}
+        onChange={k => applyFilter(k as FilterTab)}
+        accent="amber"
+      />
 
       {/* ══════════════════════════════════════
           TABLE PRODUITS
       ══════════════════════════════════════ */}
-      <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -432,7 +402,7 @@ export default function StockBoutiqueManager({
           JOURNAL DES MOUVEMENTS RÉCENTS
       ══════════════════════════════════════ */}
       {movements.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <h2 className="font-bold text-slate-800 text-sm">Mouvements récents</h2>
           </div>
@@ -486,7 +456,7 @@ export default function StockBoutiqueManager({
           />
 
           {/* Panel */}
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-5">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
             {/* Header modal */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -539,7 +509,7 @@ export default function StockBoutiqueManager({
                 </div>
               ) : (
                 <select
-                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all"
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none transition-all"
                   value=""
                   onChange={e => {
                     const found = items.find(i => i.produit_id === Number(e.target.value));
@@ -566,7 +536,7 @@ export default function StockBoutiqueManager({
                 min="1"
                 value={modalQty}
                 onChange={e => setModalQty(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-display font-700 text-lg"
+                className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none transition-all font-display font-700 text-lg"
                 placeholder="0"
               />
             </div>
@@ -578,7 +548,7 @@ export default function StockBoutiqueManager({
                 <select
                   value={modalMotif}
                   onChange={e => setModalMotif(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all"
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none transition-all"
                 >
                   {MOTIFS.map(m => (
                     <option key={m} value={m}>{m}</option>
@@ -598,7 +568,7 @@ export default function StockBoutiqueManager({
                 value={modalRef}
                 onChange={e => setModalRef(e.target.value)}
                 placeholder="CMD-20250101-XXXX"
-                className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-mono"
+                className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none transition-all font-mono"
               />
             </div>
 

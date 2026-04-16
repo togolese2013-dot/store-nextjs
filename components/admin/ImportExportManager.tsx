@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Upload, Download, FileText, CheckCircle, AlertCircle, Loader2, X } from "lucide-react";
 import { clsx } from "clsx";
+import PageHeader from "@/components/admin/PageHeader";
 
 interface ImportResult {
   success: boolean;
@@ -89,8 +90,14 @@ export default function ImportExportManager() {
   return (
     <div className="space-y-8">
 
+      <PageHeader
+        title="Import / Export"
+        subtitle="Importez ou exportez votre catalogue produits au format CSV"
+        accent="brand"
+      />
+
       {/* ── Export ── */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6">
         <div className="flex items-start gap-4 mb-5">
           <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
             <Download className="w-5 h-5 text-green-600" />
@@ -115,7 +122,7 @@ export default function ImportExportManager() {
       </div>
 
       {/* ── Import ── */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6">
         <div className="flex items-start gap-4 mb-5">
           <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
             <Upload className="w-5 h-5 text-brand-700" />
@@ -180,7 +187,7 @@ export default function ImportExportManager() {
       {/* ── Résultat import ── */}
       {importResult && (
         <div className={clsx(
-          "rounded-3xl border p-5",
+          "rounded-2xl border p-5",
           importResult.success
             ? "bg-green-50 border-green-200"
             : "bg-red-50 border-red-200"

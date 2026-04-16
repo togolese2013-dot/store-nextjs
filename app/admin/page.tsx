@@ -17,7 +17,7 @@ const MODULES = [
   {
     key:         "boutique",
     label:       "BOUTIQUE",
-    description: "Ventes, stock boutique, finance, coupons",
+    description: "Ventes, stock boutique, finance, clients",
     href:        "/admin/ventes",
     icon:        ShoppingBag,
     bg:          "bg-amber-500",
@@ -26,7 +26,7 @@ const MODULES = [
   {
     key:         "store",
     label:       "STORE",
-    description: "Commandes, réglages, thème, paiements, domaine",
+    description: "Commandes, coupons, réglages, thème, paiements",
     href:        "/admin/settings",
     icon:        Settings,
     bg:          "bg-emerald-700",
@@ -100,7 +100,7 @@ export default async function AdminHomePage() {
               <Link
                 key={key}
                 href={href}
-                className={`group relative flex flex-col justify-between ${bg} ring-1 ${ring} rounded-3xl p-6 sm:p-8 min-h-[170px] sm:min-h-[200px] overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300`}
+                className={`group relative flex flex-col justify-between ${bg} ring-1 ${ring} rounded-2xl p-6 sm:p-8 min-h-[170px] sm:min-h-[200px] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300`}
               >
                 {/* Decorative circle */}
                 <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-white/5 pointer-events-none" />

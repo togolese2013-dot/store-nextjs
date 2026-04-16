@@ -52,7 +52,7 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
         </div>
       )}
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">Couleurs</h2>
 
         {/* Presets */}
@@ -62,7 +62,7 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
             {PRESETS.map(p => (
               <button key={p.label} type="button"
                 onClick={() => { handlePrimary(p.primary); handleAccent(p.accent); }}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-slate-200 hover:border-brand-400 text-xs font-semibold text-slate-700 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 hover:border-brand-400 text-xs font-semibold text-slate-700 transition-colors"
               >
                 <span className="flex gap-1">
                   <span className="w-4 h-4 rounded-full border border-white/50 shadow-sm" style={{ background: p.primary }} />
@@ -79,10 +79,10 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
             <label className="block text-xs font-bold text-slate-600 mb-1.5">Couleur principale (navy)</label>
             <div className="flex gap-2 items-center">
               <input type="color" value={primary} onChange={e => handlePrimary(e.target.value)}
-                className="w-12 h-12 rounded-2xl border-2 border-slate-200 cursor-pointer p-1"
+                className="w-12 h-12 rounded-2xl border border-slate-200 cursor-pointer p-1"
               />
               <input type="text" value={primary} onChange={e => handlePrimary(e.target.value)}
-                className="flex-1 px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none font-mono"
+                className="flex-1 px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none font-mono"
               />
             </div>
           </div>
@@ -90,17 +90,17 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
             <label className="block text-xs font-bold text-slate-600 mb-1.5">Couleur accent (terracotta)</label>
             <div className="flex gap-2 items-center">
               <input type="color" value={accent} onChange={e => handleAccent(e.target.value)}
-                className="w-12 h-12 rounded-2xl border-2 border-slate-200 cursor-pointer p-1"
+                className="w-12 h-12 rounded-2xl border border-slate-200 cursor-pointer p-1"
               />
               <input type="text" value={accent} onChange={e => handleAccent(e.target.value)}
-                className="flex-1 px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none font-mono"
+                className="flex-1 px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none font-mono"
               />
             </div>
           </div>
         </div>
 
         {/* Preview */}
-        <div className="p-4 rounded-2xl border-2 border-slate-100 flex items-center gap-3">
+        <div className="p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
             style={{ background: primary }}>TS</div>
           <div>
@@ -112,7 +112,7 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">Police (font)</h2>
         <div>
           <label className="block text-xs font-bold text-slate-600 mb-2">Choisir une police Google Fonts</label>

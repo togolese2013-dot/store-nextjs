@@ -14,14 +14,14 @@ export default async function ReviewsPage() {
       </div>
 
       {reviews.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
+        <div className="bg-white rounded-2xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
           <Star className="w-12 h-12 mb-3 opacity-20" />
           <p className="font-semibold">Aucun avis pour l'instant</p>
         </div>
       ) : (
         <div className="space-y-3">
           {reviews.map(review => (
-            <div key={review.id} className="bg-white rounded-3xl border border-slate-100 p-5 flex gap-4">
+            <div key={review.id} className="bg-white rounded-2xl border border-slate-100 p-5 flex gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div>

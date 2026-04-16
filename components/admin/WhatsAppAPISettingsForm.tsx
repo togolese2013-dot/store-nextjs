@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, Save, ExternalLink, Copy, Check } from "lucide-react";
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans font-mono";
+const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans font-mono";
 const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
 
 export default function WhatsAppAPISettingsForm({ settings }: { settings: Record<string, string> }) {
@@ -43,7 +43,7 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
   return (
     <div className="space-y-5">
       {/* Guide */}
-      <div className="bg-brand-50 rounded-3xl border border-brand-100 p-5">
+      <div className="bg-brand-50 rounded-2xl border border-brand-100 p-5">
         <h3 className="font-bold text-brand-900 text-sm mb-2">Comment configurer WhatsApp Cloud API ?</h3>
         <ol className="text-xs text-brand-800 space-y-1.5 list-decimal list-inside leading-relaxed">
           <li>Créez un compte <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline font-semibold">Meta for Developers</a></li>
@@ -67,7 +67,7 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
       )}
 
       {/* Webhook URL */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">URL du Webhook</h2>
         <div>
           <label className={labelCls}>Copiez cette URL dans Meta Dashboard → Webhook URL</label>
@@ -76,7 +76,7 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
               className={`${inputCls} bg-slate-50 text-slate-600`}
             />
             <button onClick={copyWebhook}
-              className="px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors flex items-center gap-2 shrink-0"
+              className="px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors flex items-center gap-2 shrink-0"
             >
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               {copied ? "Copié !" : "Copier"}
@@ -86,7 +86,7 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
       </div>
 
       {/* Credentials */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">Identifiants API</h2>
         <div>
           <label className={labelCls}>Phone Number ID</label>
@@ -111,7 +111,7 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
       </div>
 
       <button onClick={save} disabled={loading}
-        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60"
+        className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-emerald-700 text-white font-bold text-sm hover:bg-emerald-800 transition-colors disabled:opacity-60"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {loading ? "Enregistrement…" : "Sauvegarder la configuration"}

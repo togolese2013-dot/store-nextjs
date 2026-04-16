@@ -18,7 +18,7 @@ interface Props {
 }
 
 const inputCls =
-  "w-full px-3 py-2 text-sm bg-white rounded-xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+  "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
 
 type DraftVariant = Omit<Variant, "id" | "produit_id">;
 
@@ -397,7 +397,7 @@ export default function VariantsManager({ productId }: Props) {
             <button
               type="button"
               onClick={() => { setShowAdd(false); setNewDraft(emptyDraft()); setRawNewOptions(""); }}
-              className="px-4 py-2 rounded-xl border-2 border-slate-200 text-xs font-semibold text-slate-600 hover:border-slate-300 transition-colors"
+              className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:border-slate-300 transition-colors"
             >
               Annuler
             </button>

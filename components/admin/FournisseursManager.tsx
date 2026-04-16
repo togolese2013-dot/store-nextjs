@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Building2, Plus, Pencil, Trash2, Phone, Mail, MapPin, X, Save, Loader2, AlertCircle } from "lucide-react";
 import type { Fournisseur } from "@/lib/admin-db";
+import PageHeader from "@/components/admin/PageHeader";
 
 interface Props {
   initial: Fournisseur[];
@@ -12,8 +13,8 @@ const empty: Omit<Fournisseur, "id" | "created_at"> = {
   nom: "", contact: "", telephone: "", email: "", adresse: "", note: "",
 };
 
-const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none transition-all";
-const labelCls = "block text-xs font-bold text-slate-600 mb-1.5";
+const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-colors";
+const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 
 export default function FournisseursManager({ initial }: Props) {
   const [list,    setList]    = useState<Fournisseur[]>(initial);
@@ -78,21 +79,18 @@ export default function FournisseursManager({ initial }: Props) {
   return (
     <div className="space-y-6">
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display font-800 text-2xl text-slate-900">Fournisseurs</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{list.length} fournisseur{list.length !== 1 ? "s" : ""} enregistré{list.length !== 1 ? "s" : ""}</p>
-        </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors">
-          <Plus className="w-4 h-4" /> Ajouter un fournisseur
-        </button>
-      </div>
+      <PageHeader
+        title="Fournisseurs"
+        subtitle={`${list.length} fournisseur${list.length !== 1 ? "s" : ""} enregistré${list.length !== 1 ? "s" : ""}`}
+        accent="brand"
+        ctaLabel="Ajouter un fournisseur"
+        ctaIcon={Plus}
+        onCtaClick={openCreate}
+      />
 
       {/* List */}
       {list.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
+        <div className="bg-white rounded-2xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
           <Building2 className="w-12 h-12 mb-3 opacity-30" />
           <p className="font-semibold">Aucun fournisseur</p>
           <p className="text-sm mt-1">Ajoutez votre premier fournisseur pour commencer.</p>
@@ -100,7 +98,7 @@ export default function FournisseursManager({ initial }: Props) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {list.map(f => (
-            <div key={f.id} className="bg-white rounded-3xl border border-slate-100 p-5 space-y-3 hover:border-slate-200 transition-colors">
+            <div key={f.id} className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3 hover:border-slate-200 transition-colors">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
@@ -153,7 +151,7 @@ export default function FournisseursManager({ initial }: Props) {
       {/* Modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-5">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display font-700 text-lg text-slate-900">
                 {modal === "create" ? "Nouveau fournisseur" : "Modifier le fournisseur"}
@@ -207,11 +205,11 @@ export default function FournisseursManager({ initial }: Props) {
 
             <div className="flex gap-3 pt-1">
               <button onClick={closeModal}
-                className="flex-1 px-5 py-3 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors">
+                className="flex-1 px-5 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
                 Annuler
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Enregistrement…" : "Enregistrer"}
               </button>

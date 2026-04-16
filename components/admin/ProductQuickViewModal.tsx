@@ -44,7 +44,7 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -135,7 +135,7 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
           <Link
             href={`/products/${product.reference}`}
             target="_blank"
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
           </Link>
