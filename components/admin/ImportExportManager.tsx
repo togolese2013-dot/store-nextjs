@@ -225,7 +225,7 @@ export default function ImportExportManager() {
             </div>
           )}
 
-          {importResult.details?.errors?.length > 0 && (
+          {(importResult.details?.errors?.length ?? 0) > 0 && (
             <div className="mt-4">
               <p className="text-xs font-bold text-red-700 mb-2">Erreurs ({importResult.details.errors.length})</p>
               <div className="space-y-1 max-h-48 overflow-y-auto">
