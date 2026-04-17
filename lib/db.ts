@@ -11,6 +11,17 @@ declare global {
 }
 
 function createPool() {
+  // Support DATABASE_URL (Railway / single env var) or individual DB_* vars
+  const url = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.MYSQL_PUBLIC_URL;
+  if (url) {
+    return mysql.createPool({
+      uri:                url,
+      waitForConnections: true,
+      connectionLimit:    10,
+      charset:            "utf8mb4",
+      timezone:           "+00:00",
+    });
+  }
   return mysql.createPool({
     host:               process.env.DB_HOST     || "127.0.0.1",
     port:               Number(process.env.DB_PORT) || 3306,
