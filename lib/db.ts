@@ -13,6 +13,8 @@ declare global {
 function createPool() {
   // Support DATABASE_URL (Railway / single env var) or individual DB_* vars
   const url = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.MYSQL_PUBLIC_URL;
+  const isProduction = process.env.NODE_ENV === "production";
+
   if (url) {
     return mysql.createPool({
       uri:                url,
@@ -20,6 +22,8 @@ function createPool() {
       connectionLimit:    10,
       charset:            "utf8mb4",
       timezone:           "+00:00",
+      // Railway MySQL proxy requires SSL in production
+      ssl: isProduction ? { rejectUnauthorized: false } : undefined,
     });
   }
   return mysql.createPool({

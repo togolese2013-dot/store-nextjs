@@ -254,13 +254,23 @@ function Testimonials() {
 
 /* ─── PAGE ─── */
 export default async function HomePage() {
-  // Server-side data fetching
-  const [categories, bestsellers, promos, newItems] = await Promise.all([
-    getCategories(),
-    getProducts({ limit: 8 }),
-    getProducts({ promoOnly: true, limit: 8 }),
-    getProducts({ newOnly: true, limit: 8 }),
-  ]);
+  // Server-side data fetching — wrapped to prevent crash if DB is unreachable
+  let categories: Awaited<ReturnType<typeof getCategories>> = [];
+  let bestsellers: Awaited<ReturnType<typeof getProducts>> = [];
+  let promos: Awaited<ReturnType<typeof getProducts>> = [];
+  let newItems: Awaited<ReturnType<typeof getProducts>> = [];
+
+  try {
+    [categories, bestsellers, promos, newItems] = await Promise.all([
+      getCategories(),
+      getProducts({ limit: 8 }),
+      getProducts({ promoOnly: true, limit: 8 }),
+      getProducts({ newOnly: true, limit: 8 }),
+    ]);
+  } catch (err) {
+    console.error("[HomePage] DB fetch failed:", err);
+    // Page renders with empty data rather than crashing
+  }
 
   return (
     <>
