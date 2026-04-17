@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     // Construire la requête dynamiquement (stock_boutique reste 0 — géré par les opérations boutique)
     const columns = ["reference", "nom", "description", "categorie_id", "prix_unitaire", "stock_boutique"];
-    const values: unknown[] = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire), 0];
+    const values: (string | number | boolean | null | Buffer)[] = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire), 0];
 
     if (hasRemise) {
       columns.push("remise");

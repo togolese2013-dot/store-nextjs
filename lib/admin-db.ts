@@ -389,7 +389,7 @@ export async function updateUtilisateur(id: number, data: {
   poste?: string; actif?: number; motDePasse?: string;
 }) {
   const fields: string[] = [];
-  const values: unknown[] = [];
+  const values: (string | number | boolean | null | Buffer)[] = [];
   if (data.nom       !== undefined) { fields.push("nom = ?");         values.push(data.nom); }
   if (data.email     !== undefined) { fields.push("email = ?");       values.push(data.email); }
   if (data.telephone !== undefined) { fields.push("telephone = ?");   values.push(data.telephone); }
@@ -1918,7 +1918,7 @@ export async function createLivreur(data: { nom: string; telephone?: string }): 
 
 export async function updateLivreur(id: number, data: { nom?: string; telephone?: string; statut?: Livreur["statut"] }) {
   const fields: string[] = [];
-  const values: unknown[] = [];
+  const values: (string | number | boolean | null | Buffer)[] = [];
   if (data.nom      !== undefined) { fields.push("nom = ?");      values.push(data.nom); }
   if (data.telephone !== undefined) { fields.push("telephone = ?"); values.push(data.telephone); }
   if (data.statut   !== undefined) { fields.push("statut = ?");   values.push(data.statut); }
@@ -1983,7 +1983,7 @@ export async function updateLivraisonAdmin(id: number, data: {
   note?: string;
 }) {
   const fields: string[] = [];
-  const values: unknown[] = [];
+  const values: (string | number | boolean | null | Buffer)[] = [];
   if (data.statut     !== undefined) { fields.push("statut = ?");     values.push(data.statut); }
   if (data.livreur_id !== undefined) { fields.push("livreur_id = ?"); values.push(data.livreur_id); }
   if (data.note       !== undefined) { fields.push("note = ?");       values.push(data.note); }
@@ -2143,7 +2143,7 @@ export async function createBoutiqueClient(data: Partial<BoutiqueClient>): Promi
 
 export async function updateBoutiqueClient(id: number, data: Partial<BoutiqueClient>): Promise<void> {
   const fields: string[] = [];
-  const values: unknown[] = [];
+  const values: (string | number | boolean | null | Buffer)[] = [];
 
   if (data.nom          !== undefined) { fields.push("nom = ?");          values.push(data.nom); }
   if (data.telephone    !== undefined) { fields.push("telephone = ?");    values.push(data.telephone); }
