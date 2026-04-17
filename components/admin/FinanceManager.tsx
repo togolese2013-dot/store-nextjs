@@ -427,7 +427,7 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
 
       {/* ── Table dépenses / rentrées ── */}
       {tab !== "categories" && (
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           {loading ? (
             <div className="py-16 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" /> Chargement…
@@ -441,34 +441,34 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Date</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Référence</th>
+                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
+                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Référence</th>
                     {tab === "rentree" && (
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Mode</th>
+                      <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Mode</th>
                     )}
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Catégorie</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Description</th>
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Montant</th>
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Actions</th>
+                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Catégorie</th>
+                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Description</th>
+                    <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Montant</th>
+                    <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filtered.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap text-xs">
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="px-5 py-4 text-slate-500 whitespace-nowrap text-xs">
                         {fmtDate(item.date_entree)}
                       </td>
-                      <td className="px-4 py-3.5 font-mono text-xs text-slate-600 whitespace-nowrap">
+                      <td className="px-5 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">
                         {item.reference}
                       </td>
                       {tab === "rentree" && (
-                        <td className="px-4 py-3.5 whitespace-nowrap">
+                        <td className="px-5 py-4 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
                             {modeLabel(item.mode_paiement)}
                           </span>
                         </td>
                       )}
-                      <td className="px-4 py-3.5">
+                      <td className="px-5 py-4">
                         {item.categorie
                           ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
                               <Tag className="w-3 h-3" /> {item.categorie}
@@ -476,16 +476,16 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
                           : <span className="text-slate-300">—</span>
                         }
                       </td>
-                      <td className="px-4 py-3.5 text-slate-500 max-w-[200px] truncate text-xs">
+                      <td className="px-5 py-4 text-slate-500 max-w-[200px] truncate text-xs">
                         {item.description ?? <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-4 py-3.5 text-right font-bold whitespace-nowrap tabular-nums">
+                      <td className="px-5 py-4 text-right font-bold whitespace-nowrap tabular-nums">
                         <span className={item.type === "depense" ? "text-red-500" : "text-emerald-600"}>
                           {item.type === "depense" ? "−" : "+"} {fmtNum(item.montant)} FCFA
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="px-5 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setModal({ type: item.type === "depense" ? "depense" : "rentree", entry: item })}
                             className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"

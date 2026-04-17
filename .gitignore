@@ -31,3 +31,4 @@ yarn-error.log*
 tsconfig.tsbuildinfo
 next-env.d.ts
 
+.claude/worktrees/

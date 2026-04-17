@@ -236,7 +236,7 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
       )}
 
       {/* ── Table livraisons ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -251,30 +251,30 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/70">
-                    <th className="text-left px-5 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Référence</th>
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Client</th>
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden md:table-cell">Adresse</th>
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden lg:table-cell">Livreur</th>
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Statut</th>
-                    <th className="text-right px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Actions</th>
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Référence</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Client</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden md:table-cell">Adresse</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden lg:table-cell">Livreur</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden sm:table-cell">Date</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Statut</th>
+                    <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {livraisons.map(liv => (
-                    <tr key={liv.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-5 py-3.5">
+                    <tr key={liv.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="px-5 py-4">
                         <span className="font-mono text-sm font-semibold text-slate-800">{liv.reference}</span>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-5 py-4">
                         <p className="font-semibold text-slate-800">{liv.client_nom}</p>
                         {liv.client_tel && (
                           <p className="text-xs text-slate-400 flex items-center gap-1"><Phone className="w-3 h-3" />{liv.client_tel}</p>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 hidden md:table-cell">
+                      <td className="px-5 py-4 hidden md:table-cell">
                         <div className="text-sm text-slate-600 space-y-0.5">
                           {liv.adresse && (
                             <p className="flex items-start gap-1 line-clamp-2">
@@ -290,7 +290,7 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 hidden lg:table-cell">
+                      <td className="px-5 py-4 hidden lg:table-cell">
                         {liv.livreur ? (
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center">
@@ -307,13 +307,13 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
                           </button>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-slate-500 text-sm hidden sm:table-cell">
+                      <td className="px-5 py-4 text-slate-500 text-sm hidden sm:table-cell">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-slate-300" />
                           {formatDate(liv.created_at)}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-5 py-4">
                         <select
                           value={liv.statut}
                           onChange={e => changeStatut(liv.id, e.target.value as LivraisonAdmin["statut"])}
@@ -322,8 +322,8 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
                           {STATUTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center justify-end gap-0.5">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => { setAssignModal({ livraison: liv }); setAssignLivreurId(String(liv.livreur_id ?? "")); }}
                             title="Assigner un livreur"

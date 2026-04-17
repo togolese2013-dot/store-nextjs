@@ -1,6 +1,6 @@
 import { getAdminSession } from "@/lib/auth";
 import Link from "next/link";
-import { Package, ShoppingBag, Settings, Users, ArrowRight, Zap, LogOut } from "lucide-react";
+import { Package, ShoppingBag, Settings, Users, ArrowRight, Zap, LogOut, BarChart2 } from "lucide-react";
 
 export const metadata = { title: "Accueil Admin" };
 
@@ -40,6 +40,15 @@ const MODULES = [
     icon:        Users,
     bg:          "bg-indigo-700",
     ring:        "ring-indigo-600",
+  },
+  {
+    key:         "admin",
+    label:       "ADMIN",
+    description: "Rapports, statistiques, tendances des ventes",
+    href:        "/admin/rapports",
+    icon:        BarChart2,
+    bg:          "bg-violet-700",
+    ring:        "ring-violet-600",
   },
 ];
 
@@ -96,11 +105,11 @@ export default async function AdminHomePage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:gap-5">
-            {MODULES.map(({ key, label, description, href, icon: Icon, bg, ring }) => (
+            {MODULES.map(({ key, label, description, href, icon: Icon, bg, ring }, idx) => (
               <Link
                 key={key}
                 href={href}
-                className={`group relative flex flex-col justify-between ${bg} ring-1 ${ring} rounded-2xl p-6 sm:p-8 min-h-[170px] sm:min-h-[200px] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300`}
+                className={`group relative flex flex-col justify-between ${bg} ring-1 ${ring} rounded-2xl p-6 sm:p-8 min-h-[170px] sm:min-h-[200px] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300${idx === MODULES.length - 1 && MODULES.length % 2 !== 0 ? " col-span-2 max-w-sm mx-auto w-full" : ""}`}
               >
                 {/* Decorative circle */}
                 <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-white/5 pointer-events-none" />

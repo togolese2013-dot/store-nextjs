@@ -3,6 +3,9 @@
 
 @import "tailwindcss";
 
+/* ─── Dark mode — class-based (next-themes sets .dark on <html>) ─── */
+@variant dark (&:where(.dark, .dark *));
+
 /* ─── Design Tokens ─── */
 @theme {
   /* Fonts */

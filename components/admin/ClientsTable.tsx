@@ -71,7 +71,7 @@ export default function ClientsTable() {
       </form>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400">
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -88,22 +88,23 @@ export default function ClientsTable() {
             <p className="font-semibold">Aucun client trouvé</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Client</th>
-                <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">Ville</th>
-                <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Statut</th>
-                <th className="px-5 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Inscrit le</th>
-                <th className="px-5 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider"></th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Client</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider hidden md:table-cell">Ville</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider hidden lg:table-cell">Statut</th>
+                <th className="px-5 py-3.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider hidden lg:table-cell">Inscrit le</th>
+                <th className="px-5 py-3.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {clients.map(c => {
                 const badge = STATUS_BADGE[c.statut] ?? STATUS_BADGE.normal;
                 return (
-                  <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-5 py-3.5">
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold text-sm shrink-0">
                           {(c.nom || c.telephone).charAt(0).toUpperCase()}
@@ -114,20 +115,20 @@ export default function ClientsTable() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">
+                    <td className="px-5 py-4 text-slate-600 hidden md:table-cell">
                       {c.ville || "—"}
                     </td>
-                    <td className="px-5 py-3.5 hidden lg:table-cell">
+                    <td className="px-5 py-4 hidden lg:table-cell">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${badge.cls}`}>
                         {c.statut === "vip" && <Crown className="w-3 h-3" />}
                         {c.statut === "blacklist" && <Ban className="w-3 h-3" />}
                         {badge.label}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-slate-400 text-xs text-right hidden lg:table-cell">
+                    <td className="px-5 py-4 text-slate-400 text-xs text-right hidden lg:table-cell">
                       {new Date(c.created_at).toLocaleDateString("fr-FR")}
                     </td>
-                    <td className="px-5 py-3.5 text-right">
+                    <td className="px-5 py-4 text-right">
                       <Link href={`/admin/crm/${c.id}`}
                         className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-indigo-800 transition-colors"
                       >
@@ -139,6 +140,7 @@ export default function ClientsTable() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

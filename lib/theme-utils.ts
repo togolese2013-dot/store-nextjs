@@ -28,6 +28,20 @@ export function buildRamp(base: string): Record<string, string> {
   );
 }
 
+/** The system font stack — used when font === "Système" */
+export const SYSTEM_FONT_STACK = "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+/** Returns true if the font value is the special system font sentinel */
+export function isSystemFont(font: string) {
+  return font === "Système";
+}
+
+/** Build the CSS font-family value for a given font setting */
+export function fontFamilyValue(font: string): string {
+  if (isSystemFont(font)) return SYSTEM_FONT_STACK;
+  return `"${font}", ui-sans-serif, system-ui, sans-serif`;
+}
+
 /** Map font name to Google Fonts import URL */
 export function fontUrl(font: string): string {
   const slug = font.replace(/ /g, "+");
@@ -48,12 +62,14 @@ export function applyThemeToDOM(primary: string, accent: string, font: string) {
   for (const [shade, val] of Object.entries(accentRamp)) {
     root.style.setProperty(`--color-accent-${shade}`, `rgb(${val})`);
   }
-  root.style.setProperty("--font-display", `"${font}", ui-sans-serif, system-ui, sans-serif`);
-  root.style.setProperty("--font-sans",    `"${font}", ui-sans-serif, system-ui, sans-serif`);
+
+  const fontVal = fontFamilyValue(font);
+  root.style.setProperty("--font-display", fontVal);
+  root.style.setProperty("--font-sans",    fontVal);
 
   // Update or add Google Fonts link
   const existingLink = document.getElementById("ts-gfont") as HTMLLinkElement | null;
-  if (font === "Montserrat") {
+  if (font === "Montserrat" || isSystemFont(font)) {
     existingLink?.remove();
   } else {
     const href = fontUrl(font);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Plus, Pencil, Trash2, Phone, Mail, MapPin, X, Save, Loader2, AlertCircle } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Phone, Mail, MapPin, X, Save, Loader2, AlertCircle, Users } from "lucide-react";
 import type { Fournisseur } from "@/lib/admin-db";
 import PageHeader from "@/components/admin/PageHeader";
 
@@ -13,7 +13,7 @@ const empty: Omit<Fournisseur, "id" | "created_at"> = {
   nom: "", contact: "", telephone: "", email: "", adresse: "", note: "",
 };
 
-const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-colors";
+const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 transition-colors";
 const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 
 export default function FournisseursManager({ initial }: Props) {
@@ -88,6 +88,26 @@ export default function FournisseursManager({ initial }: Props) {
         onCtaClick={openCreate}
       />
 
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Fournisseurs</p>
+            <Building2 className="w-8 h-8 text-slate-400 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{list.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Avec contact</p>
+            <Users className="w-8 h-8 text-slate-400 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {list.filter(f => f.telephone || f.contact).length}
+          </p>
+        </div>
+      </div>
+
       {/* List */}
       {list.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
@@ -101,8 +121,8 @@ export default function FournisseursManager({ initial }: Props) {
             <div key={f.id} className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3 hover:border-slate-200 transition-colors">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-                    <Building2 className="w-5 h-5 text-brand-700" />
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-emerald-700" />
                   </div>
                   <div>
                     <p className="font-bold text-slate-900">{f.nom}</p>
@@ -209,7 +229,7 @@ export default function FournisseursManager({ initial }: Props) {
                 Annuler
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Enregistrement…" : "Enregistrer"}
               </button>

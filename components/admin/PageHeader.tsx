@@ -1,59 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Search, RefreshCw, Plus } from "lucide-react";
 
 // ─── Accent palette per module ────────────────────────────────────────────────
 
 const ACCENT_MAP = {
   amber: {
-    focus:   "focus:border-amber-400",
-    cta:     "bg-amber-500 hover:bg-amber-600",
-    refresh: "hover:text-amber-600",
+    focus:   "focus:border-emerald-600",
+    cta:     "bg-emerald-800 hover:bg-emerald-700",
+    refresh: "hover:text-emerald-700",
   },
   brand: {
-    focus:   "focus:border-brand-500",
-    cta:     "bg-brand-900 hover:bg-brand-800",
-    refresh: "hover:text-brand-700",
+    focus:   "focus:border-emerald-600",
+    cta:     "bg-emerald-800 hover:bg-emerald-700",
+    refresh: "hover:text-emerald-700",
   },
   emerald: {
-    focus:   "focus:border-emerald-500",
-    cta:     "bg-emerald-700 hover:bg-emerald-800",
-    refresh: "hover:text-emerald-600",
+    focus:   "focus:border-emerald-600",
+    cta:     "bg-emerald-800 hover:bg-emerald-700",
+    refresh: "hover:text-emerald-700",
   },
   indigo: {
-    focus:   "focus:border-indigo-500",
-    cta:     "bg-indigo-700 hover:bg-indigo-800",
-    refresh: "hover:text-indigo-600",
+    focus:   "focus:border-emerald-600",
+    cta:     "bg-emerald-800 hover:bg-emerald-700",
+    refresh: "hover:text-emerald-700",
   },
 } as const;
 
 export type AccentColor = keyof typeof ACCENT_MAP;
-
-// ─── Live clock ───────────────────────────────────────────────────────────────
-
-function LiveClock() {
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  if (!now) return null;
-
-  return (
-    <div className="text-right hidden sm:block select-none">
-      <p className="text-sm font-semibold text-slate-700 tabular-nums leading-none">
-        {now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-      </p>
-      <p className="text-[11px] text-slate-400 mt-0.5 capitalize">
-        {now.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
-      </p>
-    </div>
-  );
-}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -64,9 +38,6 @@ interface PageHeaderProps {
   subtitle: string;
   /** Module accent color — controls focus ring, CTA bg, refresh hover */
   accent?: AccentColor;
-  /** Show the live clock (date + time) */
-  showClock?: boolean;
-
   // Search
   searchValue?:    string;
   onSearchChange?: (v: string) => void;
@@ -92,7 +63,6 @@ export default function PageHeader({
   title,
   subtitle,
   accent = "brand",
-  showClock = true,
   searchValue,
   onSearchChange,
   onSearch,
@@ -114,10 +84,8 @@ export default function PageHeader({
         <p className="text-sm text-slate-500 leading-snug">{subtitle}</p>
       </div>
 
-      {/* Right — clock + search + actions */}
+      {/* Right — search + actions */}
       <div className="flex items-center gap-2 flex-wrap">
-        {showClock && <LiveClock />}
-
         {/* Search */}
         {onSearch && onSearchChange !== undefined && (
           <form onSubmit={onSearch} className="relative">

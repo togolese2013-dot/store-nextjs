@@ -179,18 +179,18 @@ export default function CreateOrderForm({ zones }: Props) {
           {items.length > 0 ? (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                    <th className="text-left pb-2">Article</th>
-                    <th className="text-center pb-2">Qté</th>
-                    <th className="text-right pb-2">P.U.</th>
-                    <th className="text-right pb-2">Total</th>
-                    <th className="pb-2"></th>
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="text-left px-3 py-3 font-semibold text-xs uppercase tracking-wider text-slate-600">Article</th>
+                    <th className="text-center px-3 py-3 font-semibold text-xs uppercase tracking-wider text-slate-600">Qté</th>
+                    <th className="text-right px-3 py-3 font-semibold text-xs uppercase tracking-wider text-slate-600">P.U.</th>
+                    <th className="text-right px-3 py-3 font-semibold text-xs uppercase tracking-wider text-slate-600">Total</th>
+                    <th className="py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {items.map((item, idx) => (
-                    <tr key={item.product_id}>
+                    <tr key={item.product_id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5">
                         <p className="font-semibold text-slate-800">{item.nom}</p>
                         <p className="text-xs text-slate-400">{item.reference}</p>

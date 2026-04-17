@@ -1291,6 +1291,7 @@ export interface Facture {
   statut:            "brouillon" | "valide" | "paye" | "annule";
   note:              string | null;
   admin_id:          number | null;
+  vendeur:           string | null;
   created_at:        string;
   updated_at:        string;
 }
@@ -1303,9 +1304,12 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM factures ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+    `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
+     FROM factures f
+     LEFT JOIN utilisateurs u ON u.id = f.admin_id
+     ${where} ORDER BY f.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
-  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures ${where}`, params);
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures f ${where}`, params);
   return { items: rows as Facture[], total: Number(cnt[0]?.cnt ?? 0) };
 }
 

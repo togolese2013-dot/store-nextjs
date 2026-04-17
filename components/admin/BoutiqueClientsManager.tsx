@@ -214,7 +214,7 @@ export default function BoutiqueClientsManager() {
       />
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400">
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -232,20 +232,21 @@ export default function BoutiqueClientsManager() {
             <button onClick={() => setModal({})} className="mt-3 text-sm text-amber-600 hover:underline">Ajouter le premier client</button>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">NOM</th>
-                <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">CONTACT</th>
-                <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">LOCALISATION</th>
-                <th className="px-5 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">SOLDE</th>
-                <th className="px-5 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">ACTIONS</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">NOM</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider hidden md:table-cell">CONTACT</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider hidden lg:table-cell">LOCALISATION</th>
+                <th className="px-5 py-3.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">SOLDE</th>
+                <th className="px-5 py-3.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {clients.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="px-5 py-3.5">
+                <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="px-5 py-4">
                     <div>
                       <p className="font-semibold text-slate-900">{c.nom}</p>
                       <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${TYPE_BADGE[c.type_client]}`}>
@@ -253,14 +254,14 @@ export default function BoutiqueClientsManager() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell">
+                  <td className="px-5 py-4 hidden md:table-cell">
                     {c.telephone && (
                       <div className="flex items-center gap-1.5 text-slate-600 text-xs">
                         <Phone className="w-3 h-3 text-slate-400" /> {c.telephone}
                       </div>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 hidden lg:table-cell">
+                  <td className="px-5 py-4 hidden lg:table-cell">
                     {c.localisation ? (
                       <div className="flex items-center gap-1.5 text-slate-500 text-xs">
                         <MapPin className="w-3 h-3 text-slate-400" /> {c.localisation}
@@ -269,15 +270,15 @@ export default function BoutiqueClientsManager() {
                       <span className="text-slate-300">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-5 py-4 text-right">
                     <span className={`font-bold text-sm ${
                       c.solde > 0 ? "text-emerald-600" : c.solde < 0 ? "text-red-600" : "text-slate-400"
                     }`}>
                       {formatPrice(c.solde)}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => setModal(c)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                         <Eye className="w-4 h-4" />
@@ -296,6 +297,7 @@ export default function BoutiqueClientsManager() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

@@ -264,7 +264,7 @@ export default function StockBoutiqueManager({
       {/* ══════════════════════════════════════
           TABLE PRODUITS
       ══════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -279,15 +279,15 @@ export default function StockBoutiqueManager({
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="text-left px-5 py-3 font-bold text-[11px] uppercase tracking-widest text-slate-400">Produit</th>
-                    <th className="text-left px-4 py-3 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden md:table-cell">Catégorie</th>
-                    <th className="text-right px-4 py-3 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden sm:table-cell">Prix unit.</th>
-                    <th className="text-right px-4 py-3 font-bold text-[11px] uppercase tracking-widest text-slate-400">Stock (u.)</th>
-                    <th className="text-center px-4 py-3 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden lg:table-cell">Statut</th>
-                    <th className="text-right px-4 py-3 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden md:table-cell">Valeur</th>
-                    <th className="px-4 py-3 w-24" />
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Produit</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden md:table-cell">Catégorie</th>
+                    <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden sm:table-cell">Prix unit.</th>
+                    <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Stock (u.)</th>
+                    <th className="text-center px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden lg:table-cell">Statut</th>
+                    <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden md:table-cell">Valeur</th>
+                    <th className="px-5 py-3.5 w-24" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -296,9 +296,9 @@ export default function StockBoutiqueManager({
                       ? item.image_url.startsWith("http") ? item.image_url : `/uploads/${item.image_url}`
                       : null;
                     return (
-                      <tr key={item.produit_id} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={item.produit_id} className="hover:bg-slate-50 transition-colors group">
                         {/* Produit */}
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
                               {imgSrc ? (
@@ -317,17 +317,17 @@ export default function StockBoutiqueManager({
                         </td>
 
                         {/* Catégorie */}
-                        <td className="px-4 py-3 text-slate-500 text-sm hidden md:table-cell">
+                        <td className="px-5 py-4 text-slate-500 text-sm hidden md:table-cell">
                           {item.categorie_nom || <span className="text-slate-300">—</span>}
                         </td>
 
                         {/* Prix */}
-                        <td className="px-4 py-3 text-right font-display font-700 text-slate-700 hidden sm:table-cell">
+                        <td className="px-5 py-4 text-right font-display font-700 text-slate-700 hidden sm:table-cell">
                           {formatPrice(item.prix_unitaire)}
                         </td>
 
                         {/* Stock */}
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-5 py-4 text-right">
                           <span className={`text-lg font-display font-800 ${stockColor(item)}`}>
                             {item.quantite}
                           </span>
@@ -335,18 +335,18 @@ export default function StockBoutiqueManager({
                         </td>
 
                         {/* Statut badge */}
-                        <td className="px-4 py-3 text-center hidden lg:table-cell">
+                        <td className="px-5 py-4 text-center hidden lg:table-cell">
                           {stockBadge(item)}
                         </td>
 
                         {/* Valeur */}
-                        <td className="px-4 py-3 text-right text-slate-600 font-semibold hidden md:table-cell">
+                        <td className="px-5 py-4 text-right text-slate-600 font-semibold hidden md:table-cell">
                           {formatPrice(item.valeur)}
                         </td>
 
                         {/* Actions */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1.5">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => openModal("entree", item)}
                               className="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors"

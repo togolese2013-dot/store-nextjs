@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Loader2, Save } from "lucide-react";
-import { applyThemeToDOM } from "@/lib/theme-utils";
+import { applyThemeToDOM, isSystemFont, SYSTEM_FONT_STACK } from "@/lib/theme-utils";
 
 const FONTS = [
-  "Montserrat", "Inter", "Poppins", "Raleway",
+  "Système", "Montserrat", "Inter", "Poppins", "Raleway",
   "Nunito", "Plus Jakarta Sans", "Outfit", "DM Sans",
 ];
 
@@ -124,9 +124,9 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
                     ? "border-brand-900 bg-brand-50 text-brand-900 font-bold"
                     : "border-slate-200 text-slate-600 hover:border-slate-300"
                 }`}
-                style={{ fontFamily: `'${f}', sans-serif` }}
+                style={{ fontFamily: isSystemFont(f) ? SYSTEM_FONT_STACK : `'${f}', sans-serif` }}
               >
-                {f}
+                {isSystemFont(f) ? "Système (défaut)" : f}
               </button>
             ))}
           </div>

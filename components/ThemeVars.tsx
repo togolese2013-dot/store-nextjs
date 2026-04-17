@@ -5,7 +5,7 @@
  * Usage: place <ThemeVars /> inside <head> in app/layout.tsx
  */
 import { getSetting } from "@/lib/admin-db";
-import { buildRamp, fontUrl } from "@/lib/theme-utils";
+import { buildRamp, fontUrl, fontFamilyValue, isSystemFont } from "@/lib/theme-utils";
 
 export default async function ThemeVars() {
   let primary = "#0A2463";
@@ -28,18 +28,22 @@ export default async function ThemeVars() {
   const brandRamp  = buildRamp(primary);
   const accentRamp = buildRamp(accent);
 
+  const fontVal = fontFamilyValue(font);
+
   const cssVars = [
     ...Object.entries(brandRamp).map(([s, v])  => `  --color-brand-${s}: rgb(${v});`),
     ...Object.entries(accentRamp).map(([s, v]) => `  --color-accent-${s}: rgb(${v});`),
-    `  --font-display: "${font}", ui-sans-serif, system-ui, sans-serif;`,
-    `  --font-sans:    "${font}", ui-sans-serif, system-ui, sans-serif;`,
+    `  --font-display: ${fontVal} !important;`,
+    `  --font-sans:    ${fontVal} !important;`,
   ].join("\n");
 
   const css = `:root {\n${cssVars}\n}`;
 
+  const needsGoogleFont = !isSystemFont(font) && font !== "Montserrat";
+
   return (
     <>
-      {font !== "Montserrat" && (
+      {needsGoogleFont && (
         // eslint-disable-next-line @next/next/no-page-custom-font
         <link rel="stylesheet" href={fontUrl(font)} />
       )}

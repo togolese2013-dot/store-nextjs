@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ThemeVars from "@/components/ThemeVars";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeVars />
       </head>
       <body className="min-h-screen flex flex-col">
+        <ThemeProvider>
         {children}
+        </ThemeProvider>
         {/* Service Worker registration */}
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {

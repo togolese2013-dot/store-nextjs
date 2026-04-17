@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import {
-  TrendingUp, Truck, Plus,
+  TrendingUp, Truck, Plus, Search,
   Eye, Trash2, Printer, Loader2, ChevronLeft, ChevronRight,
   X, Check, AlertTriangle, Pencil,
   CreditCard, Banknote, Smartphone, Building2, Package,
@@ -84,14 +84,26 @@ const LIVRAISON_STATUTS: { value: Livraison["statut"]; label: string; color: str
 function statutBadge(statut: string, list: { value: string; label: string; color: string }[]) {
   const s = list.find(x => x.value === statut);
   return (
-    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${s?.color ?? "bg-slate-100 text-slate-600"}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s?.color ?? "bg-slate-100 text-slate-600"}`}>
       {s?.label ?? statut}
     </span>
   );
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const dt = new Date(d);
+  return (
+    dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " " +
+    dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+  );
+}
+
+function getStatutDisplay(f: Facture): { label: string; color: string } {
+  if (f.statut === "annule")   return { label: "Annulé",   color: "bg-red-100 text-red-700" };
+  if (f.statut === "brouillon") return { label: "Brouillon", color: "bg-slate-100 text-slate-600" };
+  if (f.statut_paiement === "paye_total") return { label: "Payé",   color: "bg-emerald-100 text-emerald-700" };
+  return { label: "Validé", color: "bg-green-50 text-green-700 border border-green-200" };
 }
 
 const LIMIT = 50;
@@ -380,7 +392,7 @@ export default function VentesManager({
       />
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -395,22 +407,22 @@ export default function VentesManager({
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/70">
-                    <th className="text-left px-5 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Référence</th>
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Client</th>
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden sm:table-cell">Date</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Référence</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Client</th>
                     {tab !== "livraisons" && (
-                      <th className="text-right px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden md:table-cell">Montant</th>
+                      <th className="text-right px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden md:table-cell">Montant</th>
                     )}
                     {tab === "livraisons" && (
-                      <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden md:table-cell">Adresse</th>
+                      <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden md:table-cell">Adresse</th>
                     )}
+                    <th className="text-center px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Statut</th>
                     {tab === "ventes" && (
-                      <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400 hidden lg:table-cell">Paiement</th>
+                      <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden lg:table-cell">Vendeur</th>
                     )}
-                    <th className="text-left px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Statut</th>
-                    <th className="text-right px-4 py-3.5 font-bold text-[11px] uppercase tracking-widest text-slate-400">Actions</th>
+                    <th className="px-5 py-3.5 text-center font-semibold text-slate-600 text-xs uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -421,10 +433,16 @@ export default function VentesManager({
                     const l = row as Livraison;
 
                     return (
-                      <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-5 py-3.5">
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors group">
+                        {/* Date + heure */}
+                        <td className="px-5 py-4 text-slate-500 text-xs hidden sm:table-cell">
+                          {formatDate(row.created_at)}
+                        </td>
+
+                        {/* Référence */}
+                        <td className="px-5 py-4">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-sm font-semibold text-slate-800">{row.reference}</span>
+                            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">{row.reference}</span>
                             {isVente && f.avec_livraison === 1 && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full border border-indigo-100">
                                 <Truck className="w-3 h-3" /> Livraison
@@ -433,69 +451,52 @@ export default function VentesManager({
                           </div>
                         </td>
 
-                        <td className="px-4 py-3.5">
-                          <p className="font-semibold text-slate-800">{row.client_nom}</p>
-                          {isVente && f.client_tel && (
-                            <p className="text-xs text-slate-400">{f.client_tel}</p>
-                          )}
-                          {isLivraison && l.client_tel && (
-                            <p className="text-xs text-slate-400">{l.client_tel}</p>
-                          )}
+                        {/* Client */}
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-900">{row.client_nom}</div>
                         </td>
 
-                        <td className="px-4 py-3.5 text-slate-500 text-sm hidden sm:table-cell">
-                          {formatDate(row.created_at)}
-                        </td>
-
+                        {/* Montant */}
                         {isVente && (
-                          <td className="px-4 py-3.5 text-right font-display font-700 text-amber-700 hidden md:table-cell">
+                          <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">
                             {formatPrice(f.total)}
                           </td>
                         )}
                         {isLivraison && (
-                          <td className="px-4 py-3.5 text-slate-500 text-sm hidden md:table-cell">
+                          <td className="px-5 py-4 text-slate-600 hidden md:table-cell">
                             <span className="line-clamp-1">{l.adresse ?? "—"}</span>
                           </td>
                         )}
 
-                        {isVente && (
-                          <td className="px-4 py-3.5 hidden lg:table-cell">
-                            <div className="flex flex-col gap-1">
-                              {f.mode_paiement && (
-                                <span className="text-xs text-slate-500">
-                                  {MODES_PAIEMENT.find(m => m.value === f.mode_paiement)?.label ?? f.mode_paiement}
-                                </span>
-                              )}
-                              {f.statut_paiement && (() => {
-                                const sp = STATUTS_PAIEMENT.find(s => s.value === f.statut_paiement);
-                                return sp ? (
-                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${sp.color}`}>
-                                    {sp.label}
-                                  </span>
-                                ) : null;
-                              })()}
-                              {f.statut_paiement === "acompte" && f.montant_acompte != null && (
-                                <span className="text-[10px] text-slate-400">
-                                  Acompte : {formatPrice(f.montant_acompte)}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        )}
-
-                        <td className="px-4 py-3.5">
-                          {isVente     && statutBadge(f.statut, FACTURE_STATUTS)}
+                        {/* Statut */}
+                        <td className="px-5 py-4 text-center">
+                          {isVente && (() => {
+                            const s = getStatutDisplay(f);
+                            return (
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>
+                                {s.label}
+                              </span>
+                            );
+                          })()}
                           {isLivraison && statutBadge(l.statut, LIVRAISON_STATUTS)}
                         </td>
 
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center justify-end gap-0.5">
-                            <button title="Voir"      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"><Eye    className="w-4 h-4" /></button>
-                            <button title="Modifier"  className="p-1.5 rounded-lg hover:bg-blue-50   text-slate-400 hover:text-blue-600  transition-colors"><Pencil className="w-4 h-4" /></button>
+                        {/* Vendeur */}
+                        {isVente && (
+                          <td className="px-5 py-4 text-slate-600 text-xs hidden lg:table-cell">
+                            {f.vendeur ?? "—"}
+                          </td>
+                        )}
+                        {isLivraison && <td className="hidden lg:table-cell" />}
+
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                            <button title="Voir"      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye    className="w-4 h-4" /></button>
+                            <button title="Modifier"  className="p-1.5 rounded-lg hover:bg-amber-50  text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>
                             {!isLivraison && (
-                              <button onClick={() => handlePrint(row.reference)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
+                              <button onClick={() => handlePrint(row.reference)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
                             )}
-                            <button onClick={() => handleDelete(tab, row.id)} title="Supprimer" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                            <button onClick={() => handleDelete(tab, row.id)} title="Supprimer" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>

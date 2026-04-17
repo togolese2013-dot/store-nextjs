@@ -107,7 +107,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         extra={
           view === "stock" ? (
             <Link href="/admin/products/new"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
             >
               <PackagePlus className="w-4 h-4" /> Ajouter un produit
             </Link>
@@ -179,12 +179,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           <input
             type="text" name="q" defaultValue={q}
             placeholder="Rechercher un produit…"
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans"
+            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans"
           />
         </div>
         {isStockView && (
           <select name="category" defaultValue={catId ?? ""}
-            className="px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans"
+            className="px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans"
           >
             <option value="">Toutes les catégories</option>
             {categories.map(c => (
@@ -193,7 +193,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           </select>
         )}
         <button type="submit"
-          className="px-5 py-2.5 rounded-2xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-700 transition-colors"
+          className="px-5 py-2.5 rounded-2xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
         >
           Filtrer
         </button>
@@ -218,7 +218,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                 href={buildUrl({ ...base, view: tab.key !== "stock" ? tab.key : undefined, page: undefined }, {})}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                   isActive
-                    ? "bg-blue-600 text-white shadow-sm"
+                    ? "bg-emerald-800 text-white shadow-sm"
                     : "text-slate-500 hover:text-slate-800 hover:bg-white/60"
                 }`}
               >
@@ -422,14 +422,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
             <div className="flex gap-2">
               {page > 1 && (
                 <Link href={pageUrl(page - 1)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-emerald-400 transition-colors"
                 >
                   ← Précédent
                 </Link>
               )}
               {page < totalPages && (
                 <Link href={pageUrl(page + 1)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-emerald-400 transition-colors"
                 >
                   Suivant →
                 </Link>

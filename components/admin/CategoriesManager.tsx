@@ -12,7 +12,7 @@ interface Props {
 }
 
 const empty = { nom: "", description: "" };
-const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-colors";
+const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 transition-colors";
 const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 
 export default function CategoriesManager({ initialCategories }: Props) {
@@ -104,19 +104,19 @@ export default function CategoriesManager({ initialCategories }: Props) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Catégories</p>
-            <FolderOpen className="w-5 h-5 text-slate-300" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Catégories</p>
+            <FolderOpen className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{list.length}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{list.length}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Produits catalogués</p>
-            <Package className="w-5 h-5 text-slate-300" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Produits catalogués</p>
+            <Package className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{totalProduits}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{totalProduits}</p>
         </div>
       </div>
 
@@ -134,8 +134,8 @@ export default function CategoriesManager({ initialCategories }: Props) {
               className="bg-white rounded-2xl border border-slate-100 p-5 flex flex-col gap-3 hover:border-slate-200 transition-colors">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-                    <FolderOpen className="w-5 h-5 text-brand-700" />
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                    <FolderOpen className="w-5 h-5 text-emerald-700" />
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-slate-900 truncate">{cat.nom}</p>
@@ -174,7 +174,7 @@ export default function CategoriesManager({ initialCategories }: Props) {
 
               {cat.nb_produits > 0 && (
                 <a href={`/admin/products?category=${cat.id}`}
-                  className="self-start text-xs font-semibold text-brand-700 hover:text-brand-900 transition-colors">
+                  className="self-start text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors">
                   Voir les produits →
                 </a>
               )}
@@ -234,7 +234,7 @@ export default function CategoriesManager({ initialCategories }: Props) {
                 Annuler
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Enregistrement…" : "Enregistrer"}
               </button>

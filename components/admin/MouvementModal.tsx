@@ -216,7 +216,7 @@ export default function MouvementModal() {
       {/* ── Trigger button ── */}
       <button
         onClick={openModal}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
       >
         <Plus className="w-3.5 h-3.5" /> Ajouter un mouvement
       </button>
@@ -270,7 +270,7 @@ export default function MouvementModal() {
                         <select
                           value={type}
                           onChange={e => setType(e.target.value as MouvType)}
-                          className="w-full appearance-none px-4 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-all pr-10 font-semibold text-slate-700"
+                          className="w-full appearance-none px-4 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 transition-all pr-10 font-semibold text-slate-700"
                         >
                           {TYPES.map(t => (
                             <option key={t.value} value={t.value}>{t.labelBtn}</option>
@@ -319,8 +319,8 @@ export default function MouvementModal() {
                           {/* Product selector */}
                           <div className="flex-1 min-w-0">
                             {item.produit ? (
-                              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-brand-400 bg-white">
-                                <Package className="w-4 h-4 text-brand-600 shrink-0" />
+                              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-emerald-400 bg-white">
+                                <Package className="w-4 h-4 text-emerald-700 shrink-0" />
                                 <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-sm text-slate-800 truncate">{item.produit.nom}</p>
                                   <p className="text-[10px] text-slate-400 font-mono">stock: {item.produit.stock}</p>
@@ -328,7 +328,7 @@ export default function MouvementModal() {
                                 <button
                                   type="button"
                                   onClick={() => updateItem(index, { produit: null, search: "" })}
-                                  className="p-1 rounded-lg hover:bg-brand-100 text-slate-400 shrink-0"
+                                  className="p-1 rounded-lg hover:bg-emerald-50 text-slate-400 shrink-0"
                                 >
                                   <X className="w-3.5 h-3.5" />
                                 </button>
@@ -346,7 +346,7 @@ export default function MouvementModal() {
                                   disabled={loadingProds}
                                   onChange={e => updateItem(index, { search: e.target.value, showDropdown: true })}
                                   onFocus={() => updateItem(index, { showDropdown: true })}
-                                  className="w-full pl-9 pr-4 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-all disabled:opacity-50"
+                                  className="w-full pl-9 pr-4 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 transition-all disabled:opacity-50"
                                 />
                                 {loadingProds && (
                                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
@@ -392,7 +392,7 @@ export default function MouvementModal() {
                             value={item.qty}
                             onChange={e => updateItem(index, { qty: e.target.value })}
                             placeholder="Qté"
-                            className="w-20 shrink-0 px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-all font-display font-700 text-center"
+                            className="w-20 shrink-0 px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 transition-all font-display font-700 text-center"
                           />
 
                           {/* Remove button (not on first item if only one) */}
@@ -413,7 +413,7 @@ export default function MouvementModal() {
                     <button
                       type="button"
                       onClick={addItem}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-brand-400 hover:text-brand-600 text-sm font-semibold transition-colors"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-700 text-sm font-semibold transition-colors"
                     >
                       <Plus className="w-4 h-4" /> Ajouter un produit
                     </button>

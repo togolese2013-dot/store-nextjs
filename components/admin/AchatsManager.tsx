@@ -26,7 +26,7 @@ interface LineItem {
   prix_unitaire: number | "";
 }
 
-const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 transition-colors";
+const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 transition-colors";
 const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 
 const STATUT_LABELS: Record<string, string> = {
@@ -142,39 +142,41 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Total achats</p>
-            <ShoppingCart className="w-5 h-5 text-slate-300" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Total achats</p>
+            <ShoppingCart className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.total}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.total}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">En attente</p>
-            <Clock className="w-5 h-5 text-amber-400" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">En attente</p>
+            <Clock className="w-8 h-8 text-amber-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.en_attente}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.en_attente}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Reçus</p>
-            <CheckCircle2 className="w-5 h-5 text-green-400" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Reçus</p>
+            <CheckCircle2 className="w-8 h-8 text-green-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.recu}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.recu}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Montant total</p>
-            <DollarSign className="w-5 h-5 text-slate-300" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Montant total</p>
+            <DollarSign className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-2xl text-slate-900">{formatPrice(stats.montant_total)}</p>
-          <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase">FCFA</span>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {formatPrice(stats.montant_total)}{" "}
+            <span className="text-base font-semibold text-emerald-500">FCFA</span>
+          </p>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {achats.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-slate-400">
             <Truck className="w-12 h-12 mb-3 opacity-30" />
@@ -183,33 +185,33 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Référence</th>
-                  <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden md:table-cell">Fournisseur</th>
-                  <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
-                  <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Montant</th>
-                  <th className="text-center px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Statut</th>
-                  <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Actions</th>
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Référence</th>
+                  <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden md:table-cell">Fournisseur</th>
+                  <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden sm:table-cell">Date</th>
+                  <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Montant</th>
+                  <th className="text-center px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Statut</th>
+                  <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {achats.map(a => (
-                  <tr key={a.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-3">
+                  <tr key={a.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-5 py-4">
                       <p className="font-semibold text-slate-800 font-mono text-xs">{a.reference}</p>
                       {a.notes && <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{a.notes}</p>}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 hidden md:table-cell">
+                    <td className="px-5 py-4 text-slate-600 hidden md:table-cell">
                       {a.fournisseur_nom ?? <span className="text-slate-300">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 hidden sm:table-cell text-xs">
+                    <td className="px-5 py-4 text-slate-500 hidden sm:table-cell text-xs">
                       {new Date(a.date_achat).toLocaleDateString("fr-FR")}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-5 py-4 text-right">
                       <span className="font-display font-700 text-slate-900">{formatPrice(a.montant_total)}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-5 py-4 text-center">
                       <div className="relative inline-block">
                         <select
                           value={a.statut}
@@ -223,11 +225,13 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                         <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" />
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleDelete(a.id)} disabled={deleting === a.id}
-                        className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-40">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleDelete(a.id)} disabled={deleting === a.id}
+                          className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-40">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -243,13 +247,13 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
             <div className="flex gap-2">
               {page > 1 && (
                 <a href={`?page=${page - 1}`}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors">
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-emerald-400 transition-colors">
                   ← Précédent
                 </a>
               )}
               {page < totalPages && (
                 <a href={`?page=${page + 1}`}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 transition-colors">
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-emerald-400 transition-colors">
                   Suivant →
                 </a>
               )}
@@ -316,7 +320,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
               <div className="flex items-center justify-between mb-3">
                 <label className={labelCls + " mb-0"}>Articles *</label>
                 <button type="button" onClick={addLine}
-                  className="flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 transition-colors">
+                  className="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors">
                   <Plus className="w-3.5 h-3.5" /> Ajouter une ligne
                 </button>
               </div>
@@ -326,15 +330,15 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                     <input type="text" value={ln.designation}
                       onChange={e => setLine(i, "designation", e.target.value)}
                       placeholder="Désignation article"
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500" />
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500" />
                     <input type="number" min="1" value={ln.quantite}
                       onChange={e => setLine(i, "quantite", e.target.value)}
                       placeholder="Qté"
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 text-center" />
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-center" />
                     <input type="number" min="0" value={ln.prix_unitaire}
                       onChange={e => setLine(i, "prix_unitaire", e.target.value)}
                       placeholder="Prix u."
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500" />
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500" />
                     <button type="button" onClick={() => removeLine(i)} disabled={lines.length === 1}
                       className="p-1.5 rounded-xl hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-30">
                       <X className="w-4 h-4" />
@@ -356,7 +360,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                 Annuler
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Enregistrement…" : "Enregistrer"}
               </button>
