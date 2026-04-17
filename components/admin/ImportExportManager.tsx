@@ -227,9 +227,9 @@ export default function ImportExportManager() {
 
           {(importResult.details?.errors?.length ?? 0) > 0 && (
             <div className="mt-4">
-              <p className="text-xs font-bold text-red-700 mb-2">Erreurs ({importResult.details.errors.length})</p>
+              <p className="text-xs font-bold text-red-700 mb-2">Erreurs ({importResult.details?.errors?.length ?? 0})</p>
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {importResult.details.errors.map((err, i) => (
+                {(importResult.details?.errors ?? []).map((err, i) => (
                   <div key={i} className="text-xs bg-white rounded-xl px-3 py-2 border border-red-100">
                     <span className="font-semibold text-slate-700">Ligne {err.row}</span>
                     {err.reference && <span className="text-slate-500"> · {err.reference}</span>}
