@@ -1298,7 +1298,7 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
      FROM factures f
-     LEFT JOIN utilisateurs u ON u.id = f.admin_id
+     LEFT JOIN admin_users u ON u.id = f.admin_id
      ${where} ORDER BY f.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
   const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures f ${where}`, params);
