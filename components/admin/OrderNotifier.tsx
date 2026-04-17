@@ -49,7 +49,7 @@ function showNativeNotification(order: NewOrder) {
       badge: "/icons/icon-192.png",
       tag: `order-${order.id}`,   // replace previous notif for the same order
       renotify: true,
-    });
+    } as NotificationOptions);
     n.onclick = () => {
       window.focus();
       n.close();
