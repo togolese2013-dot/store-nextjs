@@ -39,7 +39,7 @@ export default function EntrepotsManager({ initialEntrepots }: Props) {
 
   function startEdit(e: Entrepot) {
     setEditId(e.id);
-    setForm({ nom: e.nom, adresse: e.adresse, telephone: e.telephone, responsable: e.responsable, actif: e.actif, sort_order: e.sort_order });
+    setForm({ nom: e.nom, adresse: e.adresse ?? "", telephone: e.telephone ?? "", responsable: e.responsable ?? "", actif: e.actif, sort_order: e.sort_order });
   }
 
   async function handleEdit() {
