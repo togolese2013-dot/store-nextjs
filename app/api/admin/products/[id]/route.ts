@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Construire la requête dynamiquement (ne pas toucher stock_boutique — géré par boutique)
     const sets = ["reference=?", "nom=?", "description=?", "categorie_id=?", "prix_unitaire=?"];
-    const values: unknown[] = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire)];
+    const values: (string | number | boolean | null | Buffer)[] = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire)];
 
     if (hasRemise) {
       sets.push("remise=?");
