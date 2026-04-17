@@ -176,7 +176,7 @@ export default function TendancesManager() {
                   tickLine={false}
                 />
                 <Tooltip
-                  formatter={(value: number | undefined, name: string) => [fmtPrice(value ?? 0), name]}
+                  formatter={(value, name) => [fmtPrice(Number(value) || 0), String(name)]}
                   labelStyle={{ color: "#1e293b", fontWeight: 600 }}
                   contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
                 />
@@ -301,7 +301,7 @@ export default function TendancesManager() {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value: number | undefined) => [fmtPrice(value ?? 0), "Montant"]}
+                          formatter={(value) => [fmtPrice(Number(value) || 0), "Montant"]}
                           contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
                         />
                       </PieChart>
