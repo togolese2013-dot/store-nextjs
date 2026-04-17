@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, action: "updated", email: lowerEmail });
     } else {
       await db.execute(
-        "INSERT INTO admin_users (nom, email, password_hash, role, actif) VALUES (?, ?, ?, 'super_admin', 1)",
+        "INSERT INTO admin_users (nom, email, password_hash, role, actif) VALUES (?, ?, ?, 'admin', 1)",
         ["Admin", lowerEmail, hash]
       );
       return NextResponse.json({ ok: true, action: "created", email: lowerEmail });
