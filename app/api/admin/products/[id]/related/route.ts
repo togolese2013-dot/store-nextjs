@@ -100,10 +100,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-/* DELETE /api/admin/products/[id]/related/[relatedId] — supprimer une association */
+/* DELETE /api/admin/products/[id]/related?relatedId=X — supprimer une association */
 export async function DELETE(
-  req: NextRequest, 
-  { params }: { params: Promise<{ id: string; relatedId: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
@@ -111,8 +111,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
 
-  const { id, relatedId } = await params;
-  
+  const { id } = await params;
+  const relatedId = req.nextUrl.searchParams.get("relatedId");
+
+  if (!relatedId) {
+    return NextResponse.json({ error: "Paramètre relatedId manquant." }, { status: 400 });
+  }
+
   try {
     await db.execute(
       "DELETE FROM produits_liés WHERE produit_id = ? AND id = ?",
