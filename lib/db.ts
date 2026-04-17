@@ -163,6 +163,7 @@ export async function getProductBySlug(reference: string): Promise<Product | nul
     categorie_nom:  (r.categorie_nom ?? null) as string | null,
     prix_unitaire:  Number(r.prix_unitaire),
     stock_boutique: Number(r.stock_boutique),
+    stock_magasin:  Number(r.stock_magasin ?? 0),
     remise:         Number(r.remise),
     neuf:           Boolean(r.neuf),
     image_url:      (r.image_url ?? null) as string | null,

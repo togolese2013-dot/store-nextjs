@@ -94,6 +94,7 @@ export function relatedToProduct(related: RelatedProduct): Product {
     categorie_nom: related.categorie_nom,
     prix_unitaire: related.prix_unitaire,
     stock_boutique: 0, // Non disponible dans la requête
+    stock_magasin:  0, // Non disponible dans la requête
     remise: related.remise,
     neuf: false, // Non disponible dans la requête
     image_url: related.image_url,

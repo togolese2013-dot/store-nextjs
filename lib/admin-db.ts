@@ -4,14 +4,6 @@ import type mysql from "mysql2/promise";
 
 // ─── Stock Operations ─────────────────────────────────────────────────────────
 
-export interface Entrepot {
-  id:          number;
-  nom:         string;
-  adresse:     string | null;
-  responsable: string | null;
-  actif:       boolean;
-}
-
 export async function getEntrepots(): Promise<Entrepot[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT id, nom, adresse, responsable, actif FROM entrepots WHERE actif = 1 ORDER BY sort_order, nom"
@@ -247,7 +239,7 @@ export async function getStockMovements(opts: {
 } = {}): Promise<{ items: StockMouvement[]; total: number }> {
   const { limit = 50, offset = 0, type, search } = opts;
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
 
   if (type && type !== "tous") {
     if (type === "sortie") {
@@ -997,9 +989,9 @@ export async function getCRMStats() {
 export interface Entrepot {
   id:          number;
   nom:         string;
-  adresse:     string;
-  telephone:   string;
-  responsable: string;
+  adresse:     string | null;
+  telephone:   string | null;
+  responsable: string | null;
   actif:       boolean;
   sort_order:  number;
   created_at:  string;
@@ -1173,7 +1165,7 @@ export async function getStockBoutiqueList(opts: {
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
 
   const conditions: string[] = ["bs.from_magasin = 1"];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
 
   if (search) {
     conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
@@ -1299,7 +1291,7 @@ export interface Facture {
 export async function listFactures(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Facture[]; total: number }> {
   const { limit = 50, offset = 0, search, statut } = opts;
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -1472,7 +1464,7 @@ export interface Devis {
 export async function listDevis(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Devis[]; total: number }> {
   const { limit = 50, offset = 0, search, statut } = opts;
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -1526,7 +1518,7 @@ export interface Livraison {
 export async function listLivraisons(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Livraison[]; total: number }> {
   const { limit = 50, offset = 0, search, statut } = opts;
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -1578,7 +1570,7 @@ export async function listFinanceEntries(opts: {
 } = {}): Promise<{ items: FinanceEntry[]; total: number }> {
   const { limit = 50, offset = 0, type, search } = opts;
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
   if (type)   { conditions.push("type = ?");                                         params.push(type); }
   if (search) { conditions.push("(categorie LIKE ? OR reference LIKE ?)");           params.push(`%${search}%`, `%${search}%`); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -1685,7 +1677,7 @@ export async function updateFinanceEntry(id: number, data: {
 }) {
   const cols   = await financeEntrieCols();
   const fields: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
   if (cols.mode_paiement && data.mode_paiement !== undefined) { fields.push("mode_paiement = ?"); params.push(data.mode_paiement); }
   if (data.categorie     !== undefined) { fields.push("categorie = ?");     params.push(data.categorie); }
   if (data.description   !== undefined) { fields.push("description = ?");   params.push(data.description); }
@@ -1742,7 +1734,7 @@ export async function createFournisseur(data: Omit<Fournisseur, "id" | "created_
 export async function updateFournisseur(id: number, data: Partial<Omit<Fournisseur, "id" | "created_at">>) {
   await db.execute(
     `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=?`,
-    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id]
+    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id]
   );
 }
 
@@ -1955,7 +1947,7 @@ export async function listLivraisonsAdmin(opts: {
 } = {}): Promise<{ items: LivraisonAdmin[]; total: number }> {
   const { limit = 50, offset = 0, search, statut } = opts;
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
   if (search) { conditions.push("(lv.client_nom LIKE ? OR lv.reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("lv.statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -2072,7 +2064,7 @@ export async function listBoutiqueClients(
   filtre: "tous" | "debiteurs" | "dettes"
 ): Promise<BoutiqueClient[]> {
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
 
   if (search) {
     conditions.push("(nom LIKE ? OR telephone LIKE ?)");
@@ -2097,7 +2089,7 @@ export async function countBoutiqueClients(
   filtre: "tous" | "debiteurs" | "dettes"
 ): Promise<number> {
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | boolean | null | Buffer)[] = [];
 
   if (search) {
     conditions.push("(nom LIKE ? OR telephone LIKE ?)");
