@@ -51,10 +51,10 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   const isStockView = view === "stock";
 
   const [categories, stats, movCounts, statusCounts] = await Promise.all([
-    getCategories(),
-    getStockStats(),
-    getStockMovementCounts(),
-    getProductStatusCounts(),
+    getCategories().catch(() => []),
+    getStockStats().catch(() => ({ en_stock: 0, en_rupture: 0, stock_faible: 0, valeur_totale: 0, entrees_jour: 0, sorties_jour: 0 })),
+    getStockMovementCounts().catch(() => ({ total: 0, entrees: 0, sorties: 0, ajustements: 0 })),
+    getProductStatusCounts().catch(() => ({ total: 0, disponible: 0, faible: 0, epuise: 0 })),
   ]);
 
   // Load data based on view
@@ -66,11 +66,11 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   if (isStockView) {
     const statutFilter = statut !== "all" ? statut as "disponible" | "faible" | "epuise" : undefined;
     [products, total] = await Promise.all([
-      getProducts({ search: q, categoryId: catId, limit, offset, statut: statutFilter }),
-      getProductCount({ search: q, categoryId: catId, statut: statutFilter }),
+      getProducts({ search: q, categoryId: catId, limit, offset, statut: statutFilter }).catch(() => []),
+      getProductCount({ search: q, categoryId: catId, statut: statutFilter }).catch(() => 0),
     ]);
   } else {
-    const res = await getStockMovements({ type: "tous", search: q, limit, offset });
+    const res = await getStockMovements({ type: "tous", search: q, limit, offset }).catch(() => ({ items: [], total: 0 }));
     movements = res.items;
     movTotal  = res.total;
     total     = movTotal;
@@ -82,7 +82,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
     return buildUrl(base, { page: p > 1 ? String(p) : "" });
   }
 
-  const prodTotal = isStockView ? total : await getProductCount();
+  const prodTotal = isStockView ? total : await getProductCount().catch(() => 0);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewTabs: { key: View; label: string; icon: any; count: number }[] = [
