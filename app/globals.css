@@ -12,54 +12,50 @@
   --font-display: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-sans:    "Montserrat", ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand colors */
-  --color-brand-50:   #eef1ff;
-  --color-brand-100:  #dce3ff;
-  --color-brand-200:  #c0cbff;
-  --color-brand-300:  #9aaaff;
-  --color-brand-400:  #717eff;
-  --color-brand-500:  #4d56f8;
-  --color-brand-600:  #3b38ee;
-  --color-brand-700:  #2f27d4;
-  --color-brand-800:  #1E2B8A;
-  --color-brand-900:  #0A2463;
-  --color-brand-950:  #070f38;
+  /* Brand colors — forest green */
+  --color-brand-50:   #f0fdf4;
+  --color-brand-100:  #dcfce7;
+  --color-brand-200:  #bbf7d0;
+  --color-brand-300:  #86efac;
+  --color-brand-400:  #4ade80;
+  --color-brand-500:  #22c55e;
+  --color-brand-600:  #16a34a;
+  --color-brand-700:  #15803d;
+  --color-brand-800:  #166534;
+  --color-brand-900:  #14532d;
+  --color-brand-950:  #052e16;
 
-  /* Accent (terracotta / orange) */
-  --color-accent-50:  #fff4ee;
-  --color-accent-100: #ffe4d0;
-  --color-accent-200: #ffc4a0;
-  --color-accent-300: #ff9c6b;
-  --color-accent-400: #ff7040;
-  --color-accent-500: #F4623A;
-  --color-accent-600: #e04820;
-  --color-accent-700: #bc3518;
-  --color-accent-800: #962c1a;
-  --color-accent-900: #7a2718;
-
-  /* WhatsApp */
-  --color-wa: #25D366;
-  --color-wa-dark: #1da851;
+  /* Accent — amber (promo badges, highlights) */
+  --color-accent-50:  #fffbeb;
+  --color-accent-100: #fef3c7;
+  --color-accent-200: #fde68a;
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+  --color-accent-700: #b45309;
+  --color-accent-800: #92400e;
+  --color-accent-900: #78350f;
 
   /* Neutrals */
-  --color-canvas:   #FAFAF8;
+  --color-canvas:   #FFFFFF;
   --color-surface:  #FFFFFF;
-  --color-border:   rgba(10, 36, 99, 0.08);
-  --color-border-strong: rgba(10, 36, 99, 0.18);
+  --color-border:   rgba(20, 83, 45, 0.08);
+  --color-border-strong: rgba(20, 83, 45, 0.18);
 
   /* Text */
   --color-text:       #0F1629;
   --color-text-muted: #64748B;
   --color-text-light: #94A3B8;
 
-  /* Shadows (warm tinted) */
-  --shadow-xs: 0 1px 2px rgba(10,36,99,.06);
-  --shadow-sm: 0 2px 8px rgba(10,36,99,.08);
-  --shadow-md: 0 4px 16px rgba(10,36,99,.10);
-  --shadow-lg: 0 8px 32px rgba(10,36,99,.12);
-  --shadow-xl: 0 16px 48px rgba(10,36,99,.14);
-  --shadow-accent: 0 8px 24px rgba(244,98,58,.30);
-  --shadow-brand:  0 8px 24px rgba(10,36,99,.25);
+  /* Shadows (green-tinted) */
+  --shadow-xs: 0 1px 2px rgba(20,83,45,.06);
+  --shadow-sm: 0 2px 8px rgba(20,83,45,.08);
+  --shadow-md: 0 4px 16px rgba(20,83,45,.10);
+  --shadow-lg: 0 8px 32px rgba(20,83,45,.12);
+  --shadow-xl: 0 16px 48px rgba(20,83,45,.14);
+  --shadow-accent: 0 8px 24px rgba(245,158,11,.30);
+  --shadow-brand:  0 8px 24px rgba(20,83,45,.25);
 }
 
 /* ─── Base ─── */
@@ -118,7 +114,7 @@ a   { color: inherit; }
 
 /* ─── Gradient text utility ─── */
 .text-gradient {
-  background: linear-gradient(135deg, var(--color-brand-900) 0%, var(--color-accent-500) 100%);
+  background: linear-gradient(135deg, var(--color-brand-900) 0%, var(--color-brand-500) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -129,6 +125,6 @@ a   { color: inherit; }
   display: inline-block;
   width: 48px; height: 4px;
   border-radius: 9999px;
-  background: var(--color-accent-500);
+  background: var(--color-brand-600);
   margin-bottom: 1rem;
 }

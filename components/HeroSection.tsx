@@ -4,8 +4,6 @@
 import { getSettings } from "@/lib/admin-db";
 import HeroSectionClient from "@/components/HeroSectionClient";
 
-const WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
-
 const DEFAULTS = [
   {
     id: 1,
@@ -13,9 +11,9 @@ const DEFAULTS = [
     title:    "Capturez chaque\nmoment parfait",
     sub:      "Caméras, drones et accessoires de qualité professionnelle. Livraison rapide à Lomé.",
     cta1:     { label: "Découvrir le catalogue", href: "/products" },
-    cta2:     { label: "Commander via WhatsApp", href: `https://wa.me/${WA}` },
-    gradient: "from-[#0A2463] via-[#1E3A8A] to-[#1e40af]",
-    accent:   "#F4623A",
+    cta2:     null,
+    gradient: "from-[#052e16] via-[#14532d] to-[#166534]",
+    accent:   "#22c55e",
     image:    "/hero_1.png",
   },
   {
@@ -25,8 +23,8 @@ const DEFAULTS = [
     sub:      "Jusqu'à -50% sur des centaines de produits. Profitez de nos promotions exceptionnelles.",
     cta1:     { label: "Voir les promotions", href: "/products?promo=true" },
     cta2:     null,
-    gradient: "from-[#1a0533] via-[#3b0764] to-[#4c0d99]",
-    accent:   "#a78bfa",
+    gradient: "from-[#052e16] via-[#0f3d1e] to-[#14532d]",
+    accent:   "#4ade80",
     image:    "/hero_2.png",
   },
   {
@@ -36,8 +34,8 @@ const DEFAULTS = [
     sub:      "Les meilleurs casques, enceintes et accessoires gaming. Qualité garantie.",
     cta1:     { label: "Explorer l'audio", href: "/products?category=audio" },
     cta2:     null,
-    gradient: "from-[#0c1445] via-[#1a2570] to-[#0A2463]",
-    accent:   "#F59E0B",
+    gradient: "from-[#052e16] via-[#14532d] to-[#15803d]",
+    accent:   "#f59e0b",
     image:    "/hero_3.png",
   },
 ];

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, ShoppingBag, User, Menu, X,
-  Phone, Package, Tag, Home, Zap,
+  Package, Tag, Home, Zap,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useCart } from "@/context/CartContext";
@@ -198,19 +198,12 @@ export default function Header() {
                 )}
               </Link>
             ))}
-            <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="mt-2">
               <Link href="/account"
                 className="flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-semibold text-sm hover:border-brand-300 transition-colors"
               >
                 <User className="w-4 h-4" /> Mon compte
               </Link>
-              <a
-                href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}`}
-                target="_blank" rel="noreferrer"
-                className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#25D366] text-white font-bold text-sm"
-              >
-                <Phone className="w-4 h-4" /> WhatsApp
-              </a>
             </div>
           </div>
         )}

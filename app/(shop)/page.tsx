@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getProducts, getCategories, finalPrice, formatPrice } from "@/lib/db";
+import { getProducts, finalPrice, formatPrice } from "@/lib/db";
 import ProductCard from "@/components/ProductCard";
 import HeroSection from "@/components/HeroSection";
 import Newsletter from "@/components/Newsletter";
@@ -109,64 +109,12 @@ function ProductGrid({ products }: { products: Awaited<ReturnType<typeof getProd
   );
 }
 
-/* ─── Categories strip ─── */
-const CAT_ICONS: Record<string, string> = {
-  default: "📦",
-  "électronique": "⚡", "electronique": "⚡",
-  "audio": "🎧", "casque": "🎧",
-  "photo": "📷", "caméra": "📷", "camera": "📷",
-  "drone": "🚁",
-  "gaming": "🎮", "jeux": "🎮",
-  "accessoires": "🔌",
-  "téléphone": "📱", "telephone": "📱", "mobile": "📱",
-  "informatique": "💻", "ordinateur": "💻",
-};
-
-function CategoriesStrip({ categories }: { categories: Awaited<ReturnType<typeof getCategories>> }) {
-  if (!categories.length) return null;
-
-  const getIcon = (nom: string) => {
-    const key = nom.toLowerCase();
-    return Object.keys(CAT_ICONS).find(k => key.includes(k)) ? CAT_ICONS[Object.keys(CAT_ICONS).find(k => key.includes(k))!] : CAT_ICONS.default;
-  };
-
-  return (
-    <section className="py-10 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3 mb-6">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            Parcourir par catégorie
-          </span>
-        </div>
-        <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none snap-x snap-mandatory">
-          <Link href="/products"
-            className="snap-start shrink-0 flex flex-col items-center gap-2 p-4 rounded-2xl bg-brand-900 text-white min-w-[88px] hover:bg-brand-800 transition-colors"
-          >
-            <span className="text-2xl">🛍️</span>
-            <span className="text-xs font-semibold text-center leading-tight">Tout voir</span>
-          </Link>
-          {categories.map(cat => (
-            <Link key={cat.id} href={`/products?category=${cat.id}`}
-              className="snap-start shrink-0 flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-md min-w-[88px] transition-all group"
-            >
-              <span className="text-2xl">{getIcon(cat.nom)}</span>
-              <span className="text-xs font-semibold text-slate-700 group-hover:text-brand-800 text-center leading-tight">
-                {cat.nom}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ─── Promo banner ─── */
 function PromoBanner() {
   return (
     <section className="py-6 lg:py-8 bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-900 via-brand-800 to-accent-700 p-8 sm:p-12">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 p-8 sm:p-12">
           {/* Decorative circles */}
           <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-white/5" />
           <div className="absolute right-20 -bottom-20 w-80 h-80 rounded-full bg-accent-500/10" />
@@ -255,14 +203,12 @@ function Testimonials() {
 /* ─── PAGE ─── */
 export default async function HomePage() {
   // Server-side data fetching — wrapped to prevent crash if DB is unreachable
-  let categories: Awaited<ReturnType<typeof getCategories>> = [];
   let bestsellers: Awaited<ReturnType<typeof getProducts>> = [];
   let promos: Awaited<ReturnType<typeof getProducts>> = [];
   let newItems: Awaited<ReturnType<typeof getProducts>> = [];
 
   try {
-    [categories, bestsellers, promos, newItems] = await Promise.all([
-      getCategories(),
+    [bestsellers, promos, newItems] = await Promise.all([
       getProducts({ limit: 8 }),
       getProducts({ promoOnly: true, limit: 8 }),
       getProducts({ newOnly: true, limit: 8 }),
@@ -276,7 +222,6 @@ export default async function HomePage() {
     <>
       <HeroSection />
       <TrustBar />
-      <CategoriesStrip categories={categories} />
 
       <Section
         title="Meilleures ventes"
