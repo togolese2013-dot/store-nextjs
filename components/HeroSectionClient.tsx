@@ -18,8 +18,9 @@ interface Slide {
 }
 
 export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
-  const [cur,    setCur]    = useState(0);
-  const [paused, setPause]  = useState(false);
+  const [cur,      setCur]     = useState(0);
+  const [paused,   setPause]   = useState(false);
+  const [imgError, setImgErr]  = useState<Record<number, boolean>>({});
   const total = slides.length;
 
   const next = useCallback(() => setCur(c => (c + 1) % total), [total]);
@@ -56,11 +57,16 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
       <div className="absolute right-[30%] bottom-0 w-64 h-64 rounded-full"
         style={{ background: `${slide.accent}08` }} />
 
-      {/* Hero image — reduced ~30% vs original */}
-      {slide.image && (
+      {/* Hero image — reduced ~30% vs original, hidden on broken load */}
+      {slide.image && !imgError[slide.id] && (
         <div className="absolute right-0 bottom-0 h-[75%] w-[32%] pointer-events-none hidden md:block">
-          <img src={slide.image} alt="" loading={cur === 0 ? "eager" : "lazy"}
-            className="absolute right-0 bottom-0 h-full w-full object-contain object-right-bottom opacity-85" aria-hidden />
+          <img
+            src={slide.image} alt=""
+            loading={cur === 0 ? "eager" : "lazy"}
+            onError={() => setImgErr(prev => ({ ...prev, [slide.id]: true }))}
+            className="absolute right-0 bottom-0 h-full w-full object-contain object-right-bottom opacity-85"
+            aria-hidden
+          />
         </div>
       )}
 
