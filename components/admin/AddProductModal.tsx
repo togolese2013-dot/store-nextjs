@@ -21,10 +21,6 @@ interface Props {
 const inp = "w-full px-3.5 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all";
 const lbl = "block text-xs font-semibold text-slate-500 mb-1.5";
 
-function pct(achat: number, vente: number) {
-  if (!achat || !vente || vente <= 0) return null;
-  return Math.round(((vente - achat) / vente) * 100);
-}
 
 export default function AddProductModal({ categories }: Props) {
   const router = useRouter();
@@ -40,6 +36,7 @@ export default function AddProductModal({ categories }: Props) {
   const [stockMag,     setStockMag]    = useState("");
   const [seuilMin,     setSeuilMin]    = useState("5");
   const [actif,        setActif]       = useState(true);
+  const [neuf,         setNeuf]        = useState(false);
 
   // Images — ordered array, index 0 = principale
   const [images,        setImages]        = useState<string[]>([]);
@@ -56,7 +53,6 @@ export default function AddProductModal({ categories }: Props) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
 
-  const marge = pct(Number(prixAchat), Number(prixVente));
 
   // ── Upload images ──────────────────────────────────────────────────────────
   async function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -119,7 +115,7 @@ export default function AddProductModal({ categories }: Props) {
   const reset = useCallback(() => {
     setNom(""); setCategorie(""); setDescription("");
     setPrixAchat(""); setPrixVente(""); setRemise("");
-    setStockMag(""); setSeuilMin("5"); setActif(true);
+    setStockMag(""); setSeuilMin("5"); setActif(true); setNeuf(false);
     setImages([]); setVariants([]); setError("");
   }, []);
 
@@ -141,6 +137,7 @@ export default function AddProductModal({ categories }: Props) {
         stock_magasin: stockMag  ? Number(stockMag)  : 0,
         stock_minimum: seuilMin  ? Number(seuilMin)  : 5,
         actif,
+        neuf,
         image_url:     images[0] ?? null,
         images:        images.length > 0 ? images : undefined,
       };
@@ -193,7 +190,7 @@ export default function AddProductModal({ categories }: Props) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl" style={{ maxHeight: "95vh", display: "flex", flexDirection: "column" }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl" style={{ maxHeight: "96vh", display: "flex", flexDirection: "column" }}>
 
             {/* Header */}
             <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 shrink-0">
@@ -329,40 +326,24 @@ export default function AddProductModal({ categories }: Props) {
                   <section className="space-y-4">
                     <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Tarifs</h3>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={lbl}>Prix d&apos;achat</label>
-                        <div className="relative">
-                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                          <input type="number" min="0" value={prixAchat} onChange={e => setPrixAchat(e.target.value)}
-                            placeholder="0" className={`${inp} pl-7`} />
-                        </div>
+                        <label className={lbl}>Prix d&apos;achat (FCFA)</label>
+                        <input type="number" min="0" value={prixAchat} onChange={e => setPrixAchat(e.target.value)}
+                          placeholder="0" className={inp} />
                       </div>
                       <div>
-                        <label className={lbl}>Prix de vente *</label>
-                        <div className="relative">
-                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                          <input type="number" min="0" value={prixVente} onChange={e => setPrixVente(e.target.value)}
-                            placeholder="0" required className={`${inp} pl-7`} />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={lbl}>Marge</label>
-                        <div className="h-[42px] px-3.5 rounded-xl border border-slate-200 bg-green-50 flex flex-col justify-center">
-                          <span className="text-sm font-bold text-green-700">{marge !== null ? `${marge}%` : "—"}</span>
-                          <span className="text-[10px] text-green-500">Calcul auto</span>
-                        </div>
+                        <label className={lbl}>Prix de vente (FCFA) *</label>
+                        <input type="number" min="0" value={prixVente} onChange={e => setPrixVente(e.target.value)}
+                          placeholder="0" required className={inp} />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className={lbl}>Remise (FCFA)</label>
-                        <div className="relative">
-                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                          <input type="number" min="0" value={remise} onChange={e => setRemise(e.target.value)}
-                            placeholder="0" className={`${inp} pl-7`} />
-                        </div>
+                        <input type="number" min="0" value={remise} onChange={e => setRemise(e.target.value)}
+                          placeholder="0" className={inp} />
                         {remise && Number(prixVente) > 0 && (
                           <p className="text-xs text-slate-400 mt-1">
                             Prix final : {(Number(prixVente) - Number(remise)).toLocaleString("fr-FR")} FCFA
@@ -451,14 +432,25 @@ export default function AddProductModal({ categories }: Props) {
                       </div>
                     </div>
 
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <div className="relative">
-                        <input type="checkbox" className="sr-only peer" checked={actif} onChange={e => setActif(e.target.checked)} />
-                        <div className="w-10 h-6 rounded-full bg-slate-200 peer-checked:bg-green-500 transition-colors" />
-                        <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-                      </div>
-                      <span className="text-sm font-medium text-slate-700">Produit actif (visible sur le site)</span>
-                    </label>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex items-center gap-3 cursor-pointer select-none">
+                        <div className="relative">
+                          <input type="checkbox" className="sr-only peer" checked={actif} onChange={e => setActif(e.target.checked)} />
+                          <div className="w-10 h-6 rounded-full bg-slate-200 peer-checked:bg-green-500 transition-colors" />
+                          <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">Produit actif (visible sur le site)</span>
+                      </label>
+
+                      <label className="flex items-center gap-3 cursor-pointer select-none">
+                        <div className="relative">
+                          <input type="checkbox" className="sr-only peer" checked={neuf} onChange={e => setNeuf(e.target.checked)} />
+                          <div className="w-10 h-6 rounded-full bg-slate-200 peer-checked:bg-blue-500 transition-colors" />
+                          <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">Marquer nouveau</span>
+                      </label>
+                    </div>
                   </section>
 
                 </div>

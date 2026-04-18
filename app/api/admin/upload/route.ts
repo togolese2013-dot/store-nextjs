@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
+import { writeFile, mkdir } from "fs/promises";
+import { join } from "path";
+import { randomUUID } from "crypto";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
+// Save to /tmp/uploads — always writable on any container (Railway, Vercel, etc.)
 async function saveFile(file: File): Promise<string> {
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error(`Type non autorisé: ${file.type}`);
@@ -12,19 +16,16 @@ async function saveFile(file: File): Promise<string> {
     throw new Error("Fichier trop volumineux (max 5 Mo)");
   }
 
-  const { writeFile, mkdir } = await import("fs/promises");
-  const { join }             = await import("path");
-  const { randomUUID }       = await import("crypto");
-
   const ext      = file.type.split("/")[1].replace("jpeg", "jpg");
   const filename = `${randomUUID()}.${ext}`;
-  const dir      = join(process.cwd(), "public", "uploads");
+  const dir      = join("/tmp", "uploads");
 
   await mkdir(dir, { recursive: true });
   const bytes = await file.arrayBuffer();
   await writeFile(join(dir, filename), Buffer.from(bytes));
 
-  return `/uploads/${filename}`;
+  // Served via /api/uploads/[filename] route
+  return `/api/uploads/${filename}`;
 }
 
 /* POST /api/admin/upload — single or multiple files */
@@ -44,11 +45,9 @@ export async function POST(req: Request) {
   const results: { url: string; error?: string }[] = [];
   for (const f of filesToProcess) {
     try {
-      const url = await saveFile(f);
-      results.push({ url });
+      results.push({ url: await saveFile(f) });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur upload";
-      results.push({ url: "", error: msg });
+      results.push({ url: "", error: err instanceof Error ? err.message : "Erreur upload" });
     }
   }
 
@@ -60,5 +59,5 @@ export async function POST(req: Request) {
     success: false,
     urls:   results.map(r => r.url),
     errors: results.filter(r => r.error).map(r => r.error),
-  }, { status: 400 });
+  }, { status: 207 });
 }

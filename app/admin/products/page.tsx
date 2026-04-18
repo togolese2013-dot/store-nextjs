@@ -289,8 +289,11 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                     {products.map(p => {
                       const price   = finalPrice(p);
                       const isPromo = p.remise > 0;
-                      const imgSrc  = p.image_url
-                        ? (p.image_url.startsWith("http") || p.image_url.startsWith("/")) ? p.image_url : `/uploads/${p.image_url}`
+                      // Normalize image URL: handle legacy filenames (no prefix) and full paths
+                      const imgSrc = p.image_url
+                        ? (p.image_url.startsWith("http") || p.image_url.startsWith("/"))
+                          ? p.image_url
+                          : `/api/uploads/${p.image_url}`
                         : null;
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
@@ -298,7 +301,8 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
                                 {imgSrc ? (
-                                  <Image src={imgSrc} alt={p.nom} fill className="object-contain p-1" sizes="40px" />
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={imgSrc} alt={p.nom} className="absolute inset-0 w-full h-full object-contain p-1" />
                                 ) : (
                                   <div className="absolute inset-0 flex items-center justify-center text-slate-300">
                                     <Package className="w-5 h-5" strokeWidth={1} />
