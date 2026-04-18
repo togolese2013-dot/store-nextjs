@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, ShoppingBag, User, Menu, X,
-  Package, Tag, Home, Zap,
+  Package, Tag, Home,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useCart } from "@/context/CartContext";
@@ -56,18 +56,12 @@ export default function Header() {
           <div className="flex items-center h-16 gap-3">
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2.5 shrink-0 mr-2">
-              <div className="w-9 h-9 rounded-xl bg-brand-900 flex items-center justify-center shadow-brand">
-                <Zap className="w-5 h-5 text-accent-400" fill="currentColor" />
-              </div>
-              <div className="hidden sm:block">
-                <span className="font-display font-800 text-lg leading-none text-brand-900">
-                  Togolese
-                </span>
-                <span className="font-display font-800 text-lg leading-none text-accent-500">
-                  Shop
-                </span>
-              </div>
+            <Link href="/" className="flex items-center shrink-0 mr-2">
+              <img
+                src="/logo-togolese-shop.svg"
+                alt="Togolese Shop"
+                className="h-6 sm:h-7 w-auto"
+              />
             </Link>
 
             {/* Search bar — desktop */}
