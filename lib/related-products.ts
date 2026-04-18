@@ -35,16 +35,36 @@ async function getProduitColumns() {
   };
 }
 
+/** Cache — évite de vérifier l'existence de la table à chaque requête */
+let _relatedTableExists: boolean | null = null;
+
+async function relatedTableExists(): Promise<boolean> {
+  if (_relatedTableExists !== null) return _relatedTableExists;
+  try {
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produits_liés'
+       LIMIT 1`
+    );
+    _relatedTableExists = (rows as mysql.RowDataPacket[]).length > 0;
+  } catch {
+    _relatedTableExists = false;
+  }
+  return _relatedTableExists;
+}
+
 /**
  * Récupère les produits liés à un produit donné
  */
 export async function getRelatedProducts(productId: number): Promise<RelatedProduct[]> {
+  if (!(await relatedTableExists())) return [];
+
   try {
     const cols = await getProduitColumns();
     const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
-    
+
     const [rows] = await db.execute(
-      `SELECT 
+      `SELECT
          pl.id, pl.produit_lié_id, pl.type, pl.ordre,
          p.reference, p.nom, p.prix_unitaire,
          ${cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0"} AS remise,
@@ -71,7 +91,7 @@ export async function getRelatedProducts(productId: number): Promise<RelatedProd
       categorie_nom: (row.categorie_nom ?? null) as string | null,
     }));
   } catch (error) {
-    console.error("Erreur lors de la récupération des produits liés:", error);
+    console.error("Erreur produits liés:", error);
     return [];
   }
 }
