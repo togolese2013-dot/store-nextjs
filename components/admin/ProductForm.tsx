@@ -88,14 +88,39 @@ export default function ProductForm({ categories, initial }: Props) {
     setForm(f => ({ ...f, [field]: value }));
   }
 
+  // ── Image compression ─────────────────────────────────────────────────────
+  async function compressImage(file: File, maxDim = 1200, quality = 0.85): Promise<File> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          resolve(new File([blob!], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        }, "image/jpeg", quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
   // ── Gallery upload ─────────────────────────────────────────────────────────
   async function handleUploadImages(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files?.length) return;
     setUploading(true);
-    const fd = new FormData();
-    Array.from(files).forEach(f => fd.append("files", f));
     try {
+      const compressed = await Promise.all(Array.from(files).map(f => compressImage(f)));
+      const fd = new FormData();
+      compressed.forEach(f => fd.append("files", f));
       const res  = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (res.ok && data.urls) {
@@ -177,7 +202,7 @@ export default function ProductForm({ categories, initial }: Props) {
       }
 
       setSuccess(true);
-      if (!isEdit) router.push("/admin/products");
+      if (!isEdit) router.push(`/admin/products/${data.id}`);
       else         router.refresh();
     } catch { setError("Erreur réseau."); }
     finally   { setLoading(false); }
@@ -305,7 +330,7 @@ export default function ProductForm({ categories, initial }: Props) {
                     set("images", next);
                     if (form.image_url === url) set("image_url", next[0] ?? "");
                   }}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center shadow-sm hover:bg-red-600 transition-colors"
                 >×</button>
               </div>
             ))}
@@ -406,15 +431,21 @@ export default function ProductForm({ categories, initial }: Props) {
         {isEdit && initial?.id && <VariantsManager productId={initial.id} />}
       </div>
 
-      {/* ── Produits liés (edit only) ── */}
-      {isEdit && initial?.id && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 text-sm border-b border-slate-100 pb-3">
-            Produits recommandés "Vous aimerez aussi"
-          </h2>
+      {/* ── Produits recommandés ── */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+        <h2 className="font-semibold text-slate-900 text-sm border-b border-slate-100 pb-3">
+          Produits recommandés <span className="text-slate-400 font-normal">"Vous aimerez aussi"</span>
+        </h2>
+        {isEdit && initial?.id ? (
           <RelatedProductsManager productId={initial.id} />
-        </div>
-      )}
+        ) : (
+          <div className="py-6 text-center text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+            <Package className="w-7 h-7 mx-auto mb-2 opacity-25" />
+            Créez d'abord le produit pour ajouter des recommandations.<br />
+            <span className="text-xs">Vous serez redirigé vers la page d'édition après la création.</span>
+          </div>
+        )}
+      </div>
 
       {/* ── Actions ── */}
       <div className="flex gap-3 pb-8">

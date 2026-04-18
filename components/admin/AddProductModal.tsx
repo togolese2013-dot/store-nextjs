@@ -203,7 +203,7 @@ export default function AddProductModal({ categories }: Props) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl" style={{ maxHeight: "96vh", display: "flex", flexDirection: "column" }}>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between px-4 sm:px-7 py-4 border-b border-slate-100 shrink-0">
               <h2 className="text-lg font-bold text-slate-900">Ajouter un produit</h2>
               <button onClick={closeModal} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                 <X className="w-5 h-5" />
@@ -212,10 +212,10 @@ export default function AddProductModal({ categories }: Props) {
 
             {/* Body */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-              <div className="flex flex-1 min-h-0 overflow-hidden">
+              <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
 
                 {/* ── Left — Images ── */}
-                <div className="w-80 shrink-0 border-r border-slate-100 overflow-y-auto p-6 space-y-4 bg-slate-50/60">
+                <div className="w-full lg:w-72 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-slate-100 overflow-y-auto p-4 space-y-3 bg-slate-50/60 max-h-56 lg:max-h-none">
                   <div>
                     <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Images produit</p>
                     <p className="text-xs text-slate-400 mb-3">La 1ère image = image principale. Glisse pour réordonner.</p>
@@ -267,18 +267,18 @@ export default function AddProductModal({ categories }: Props) {
                             </span>
                           )}
 
-                          {/* Drag handle */}
-                          <div className="absolute bottom-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Drag handle — desktop only */}
+                          <div className="absolute bottom-1.5 left-1.5 hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity">
                             <GripVertical className="w-4 h-4 text-white drop-shadow" />
                           </div>
 
-                          {/* Move buttons */}
-                          <div className="absolute bottom-1.5 right-1.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Move buttons — always visible */}
+                          <div className="absolute bottom-1.5 right-1.5 flex gap-0.5">
                             {idx > 0 && (
                               <button
                                 type="button"
                                 onClick={() => moveImage(idx, idx - 1)}
-                                className="w-5 h-5 rounded bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black/80"
+                                className="w-5 h-5 rounded bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black/80"
                                 title="Déplacer à gauche"
                               >‹</button>
                             )}
@@ -286,7 +286,7 @@ export default function AddProductModal({ categories }: Props) {
                               <button
                                 type="button"
                                 onClick={() => moveImage(idx, idx + 1)}
-                                className="w-5 h-5 rounded bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black/80"
+                                className="w-5 h-5 rounded bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black/80"
                                 title="Déplacer à droite"
                               >›</button>
                             )}
@@ -296,7 +296,7 @@ export default function AddProductModal({ categories }: Props) {
                           <button
                             type="button"
                             onClick={() => setImages(prev => prev.filter((_, i) => i !== idx))}
-                            className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                            className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600 shadow-sm transition-colors"
                           >×</button>
                         </div>
                       ))}
@@ -311,7 +311,7 @@ export default function AddProductModal({ categories }: Props) {
                 </div>
 
                 {/* ── Right — Form ── */}
-                <div className="flex-1 overflow-y-auto p-7 space-y-7">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
 
                   {error && (
                     <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">{error}</div>
@@ -402,42 +402,48 @@ export default function AddProductModal({ categories }: Props) {
                       ) : (
                         <div className="space-y-2">
                           {variants.map(v => (
-                            <div key={v._key} className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50">
-                              <label className="shrink-0 cursor-pointer">
-                                <div className="w-10 h-10 rounded-lg border border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center hover:border-blue-400 transition-colors">
-                                  {v.imageUrl ? (
-                                    <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
-                                  ) : v.uploading ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                                  ) : (
-                                    <ImagePlus className="w-3.5 h-3.5 text-slate-300" />
-                                  )}
-                                </div>
-                                <input type="file" accept="image/*" className="sr-only"
-                                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadVariantImage(v._key, f); e.target.value = ""; }} />
-                              </label>
-                              <input
-                                value={v.nom}
-                                onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, nom: e.target.value } : x))}
-                                placeholder="Ex: Rouge XL"
-                                className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white"
-                              />
-                              <input
-                                type="number" min="0" value={v.prix}
-                                onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, prix: e.target.value } : x))}
-                                placeholder="Prix"
-                                className="w-24 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white text-right"
-                              />
-                              <input
-                                type="number" min="0" value={v.stock}
-                                onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, stock: e.target.value } : x))}
-                                placeholder="Qté"
-                                className="w-16 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white text-right"
-                              />
-                              <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
-                                className="p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                            <div key={v._key} className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                              {/* Row 1: image + nom + delete */}
+                              <div className="flex items-center gap-2">
+                                <label className="shrink-0 cursor-pointer">
+                                  <div className="w-10 h-10 rounded-lg border border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center hover:border-blue-400 transition-colors">
+                                    {v.imageUrl ? (
+                                      <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
+                                    ) : v.uploading ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                                    ) : (
+                                      <ImagePlus className="w-3.5 h-3.5 text-slate-300" />
+                                    )}
+                                  </div>
+                                  <input type="file" accept="image/*" className="sr-only"
+                                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadVariantImage(v._key, f); e.target.value = ""; }} />
+                                </label>
+                                <input
+                                  value={v.nom}
+                                  onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, nom: e.target.value } : x))}
+                                  placeholder="Ex: Rouge XL"
+                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white"
+                                />
+                                <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
+                                  className="shrink-0 p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                              {/* Row 2: prix + stock */}
+                              <div className="flex gap-2 pl-12">
+                                <input
+                                  type="number" min="0" value={v.prix}
+                                  onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, prix: e.target.value } : x))}
+                                  placeholder="Prix FCFA"
+                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white"
+                                />
+                                <input
+                                  type="number" min="0" value={v.stock}
+                                  onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, stock: e.target.value } : x))}
+                                  placeholder="Qté"
+                                  className="w-24 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white"
+                                />
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -487,7 +493,7 @@ export default function AddProductModal({ categories }: Props) {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-end gap-3 px-7 py-4 border-t border-slate-100 shrink-0 bg-white rounded-b-2xl">
+              <div className="flex items-center justify-end gap-3 px-4 sm:px-7 py-3 sm:py-4 border-t border-slate-100 shrink-0 bg-white rounded-b-2xl">
                 <button type="button" onClick={closeModal}
                   className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
                   <X className="w-4 h-4" /> Fermer
