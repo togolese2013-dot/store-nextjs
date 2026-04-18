@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
   const offset   = (page - 1) * limit;
 
   const [products, total, categories] = await Promise.all([
-    getProducts({ search: q, categoryId: catId, limit, offset }),
-    getProductCount({ search: q, categoryId: catId }),
+    getProducts({ search: q, categoryId: catId, limit, offset, includeInactive: true }),
+    getProductCount({ search: q, categoryId: catId, includeInactive: true }),
     getCategories(),
   ]);
 

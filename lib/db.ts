@@ -75,15 +75,16 @@ export async function getProducts(opts?: {
   limit?: number;
   offset?: number;
   statut?: "disponible" | "faible" | "epuise";
+  includeInactive?: boolean;
 }): Promise<Product[]> {
   const {
     categoryId, search, promoOnly, newOnly,
-    limit = 60, offset = 0, statut,
+    limit = 60, offset = 0, statut, includeInactive = false,
   } = opts ?? {};
 
   const cols = await produitCols();
 
-  const conditions: string[] = ["p.actif = 1"];
+  const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
   const params: (string | number)[] = [];
 
   if (categoryId) { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
@@ -94,7 +95,7 @@ export async function getProducts(opts?: {
   if (statut === "faible")       { conditions.push("COALESCE(ps.stock_magasin, 0) > 0 AND COALESCE(ps.stock_magasin, 0) <= 5"); }
   if (statut === "epuise")       { conditions.push("COALESCE(ps.stock_magasin, 0) = 0"); }
 
-  const where    = conditions.join(" AND ");
+  const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
 
@@ -194,11 +195,12 @@ export async function getProductCount(opts?: {
   promoOnly?: boolean;
   newOnly?: boolean;
   statut?: "disponible" | "faible" | "epuise";
+  includeInactive?: boolean;
 }): Promise<number> {
-  const { categoryId, search, promoOnly, newOnly, statut } = opts ?? {};
+  const { categoryId, search, promoOnly, newOnly, statut, includeInactive = false } = opts ?? {};
   const cols = await produitCols();
 
-  const conditions: string[] = ["p.actif = 1"];
+  const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
   const params: (string | number)[] = [];
 
   if (categoryId) { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
@@ -210,7 +212,7 @@ export async function getProductCount(opts?: {
   if (statut === "epuise")      { conditions.push("(SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) = 0"); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.join(" AND ")}`,
+    `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,
     params
   );
   return Number(rows[0]?.cnt ?? 0);
