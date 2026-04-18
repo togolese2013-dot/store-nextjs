@@ -76,7 +76,18 @@ export async function stockColName(): Promise<string> {
        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produit_stocks'`
     );
     const names = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
-    _stockCol = names.has("stock") ? "stock" : names.has("quantite") ? "quantite" : "stock";
+    const hasStock   = names.has("stock");
+    const hasQuantite = names.has("quantite");
+
+    if (hasStock && hasQuantite) {
+      // Both columns exist: pick the one that actually holds data
+      const [sums] = await db.execute<mysql.RowDataPacket[]>(
+        `SELECT COALESCE(SUM(stock), 0) AS s, COALESCE(SUM(quantite), 0) AS q FROM produit_stocks`
+      );
+      _stockCol = Number(sums[0]?.q ?? 0) > Number(sums[0]?.s ?? 0) ? "quantite" : "stock";
+    } else {
+      _stockCol = hasStock ? "stock" : hasQuantite ? "quantite" : "stock";
+    }
   } catch {
     _stockCol = "stock";
   }
