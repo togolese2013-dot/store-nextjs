@@ -357,9 +357,17 @@ export default function AddProductModal({ categories }: Props) {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={lbl}>Remise (%)</label>
-                        <input type="number" min="0" max="99" value={remise} onChange={e => setRemise(e.target.value)}
-                          placeholder="0" className={inp} />
+                        <label className={lbl}>Remise (FCFA)</label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                          <input type="number" min="0" value={remise} onChange={e => setRemise(e.target.value)}
+                            placeholder="0" className={`${inp} pl-7`} />
+                        </div>
+                        {remise && Number(prixVente) > 0 && (
+                          <p className="text-xs text-slate-400 mt-1">
+                            Prix final : {(Number(prixVente) - Number(remise)).toLocaleString("fr-FR")} FCFA
+                          </p>
+                        )}
                       </div>
                     </div>
 

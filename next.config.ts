@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "http",  hostname: "localhost" },
     ],
-    unoptimized: process.env.NODE_ENV === "development",
+    unoptimized: true,
   },
   experimental: {
     optimizePackageImports: ["lucide-react"],

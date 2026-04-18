@@ -27,7 +27,7 @@ export interface Category {
 export type RelatedProductType = "similaire" | "complementaire" | "upsell";
 
 export const finalPrice = (p: Product): number =>
-  p.remise > 0 ? Math.round(p.prix_unitaire * (1 - p.remise / 100)) : p.prix_unitaire;
+  p.remise > 0 ? Math.max(0, p.prix_unitaire - p.remise) : p.prix_unitaire;
 
 export const formatPrice = (n: number): string =>
   new Intl.NumberFormat("fr-TG", {

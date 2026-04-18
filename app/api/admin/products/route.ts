@@ -113,19 +113,33 @@ export async function POST(req: NextRequest) {
     );
     const newId = result.insertId;
 
-    // Insert stock magasin initial in produit_stocks (entrepot_id=1)
+    // Insert initial stock in produit_stocks — detect column name dynamically (legacy table)
     if (stockMagasin > 0) {
-      await db.execute(
-        `INSERT INTO produit_stocks (produit_id, entrepot_id, stock)
-         VALUES (?, 1, ?)
-         ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock)`,
-        [newId, stockMagasin]
-      );
-      await db.execute(
-        `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note)
-         VALUES (?, 'entree', ?, ?, 'Stock initial à la création du produit')`,
-        [newId, stockMagasin, stockMagasin]
-      );
+      try {
+        const [psColRows] = await db.execute<mysql.RowDataPacket[]>(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produit_stocks'`
+        );
+        const psCols = new Set(psColRows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
+        const stockCol = psCols.has("stock") ? "stock" : psCols.has("quantite") ? "quantite" : null;
+
+        if (stockCol) {
+          await db.execute(
+            `INSERT INTO produit_stocks (produit_id, entrepot_id, ${stockCol})
+             VALUES (?, 1, ?)
+             ON DUPLICATE KEY UPDATE ${stockCol} = ${stockCol} + VALUES(${stockCol})`,
+            [newId, stockMagasin]
+          );
+        }
+      } catch { /* stock table issue — product is still created */ }
+
+      try {
+        await db.execute(
+          `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note)
+           VALUES (?, 'entree', ?, ?, 'Stock initial à la création du produit')`,
+          [newId, stockMagasin, stockMagasin]
+        );
+      } catch { /* stock_mouvements issue — product is still created */ }
     }
 
     return NextResponse.json({ ok: true, id: newId });
