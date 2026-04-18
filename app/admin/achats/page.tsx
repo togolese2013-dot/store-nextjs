@@ -14,10 +14,10 @@ export default async function AchatsPage({ searchParams }: PageProps) {
   const offset = (page - 1) * limit;
 
   const [achats, total, stats, fournisseurs] = await Promise.all([
-    listAchats(limit, offset),
-    countAchats(),
-    getAchatStats(),
-    listFournisseurs(),
+    listAchats(limit, offset).catch(() => []),
+    countAchats().catch(() => 0),
+    getAchatStats().catch(() => ({ total: 0, en_attente: 0, recu: 0, montant_total: 0 })),
+    listFournisseurs().catch(() => []),
   ]);
 
   return (
