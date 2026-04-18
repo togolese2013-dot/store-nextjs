@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, Package, Tag, Boxes, ExternalLink, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { finalPrice, formatPrice } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 
 interface Product {
   id:             number;
@@ -30,8 +30,8 @@ function normalizeUrl(url: string): string {
 }
 
 export default function ProductQuickViewModal({ product, onClose }: Props) {
-  const price     = finalPrice(product);
-  const hasPromo  = product.remise > 0;
+  const price    = product.remise > 0 ? Math.max(0, product.prix_unitaire - product.remise) : product.prix_unitaire;
+  const hasPromo = product.remise > 0;
 
   // Build ordered image list: images array first, fallback to image_url
   const allImages: string[] = product.images && product.images.length > 0
