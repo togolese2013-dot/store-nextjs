@@ -128,11 +128,21 @@ export async function POST(req: NextRequest) {
     if (stockMagasin > 0) {
       try {
         const sc = await stockColName();
-        // Use the first available entrepot (avoid hardcoded id=1 which may not exist)
+
+        // Ensure at least one entrepot exists (FK: produit_stocks.entrepot_id → entrepots.id)
         const [entrepotRows] = await db.execute<mysql.RowDataPacket[]>(
           `SELECT id FROM entrepots ORDER BY sort_order, id LIMIT 1`
         );
-        const entrepotId: number = entrepotRows.length > 0 ? Number(entrepotRows[0].id) : 1;
+        let entrepotId: number;
+        if (entrepotRows.length > 0) {
+          entrepotId = Number(entrepotRows[0].id);
+        } else {
+          // Auto-create a default warehouse so the FK constraint is satisfied
+          const [inserted] = await db.execute<mysql.ResultSetHeader>(
+            `INSERT INTO entrepots (nom, actif, sort_order) VALUES ('Magasin principal', 1, 0)`
+          );
+          entrepotId = inserted.insertId;
+        }
 
         await db.execute(
           `INSERT INTO produit_stocks (produit_id, entrepot_id, \`${sc}\`)
