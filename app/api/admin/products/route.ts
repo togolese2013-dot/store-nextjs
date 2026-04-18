@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { nom, reference, description, categorie_id, prix_unitaire,
-            stock_magasin, stock_minimum, remise, neuf, actif, image_url, images } = body;
+            stock_magasin, stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
     if (!nom || !reference || !prix_unitaire) {
       return NextResponse.json({ error: "Champs obligatoires manquants." }, { status: 400 });
@@ -66,10 +66,10 @@ export async function POST(req: NextRequest) {
       reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire),
     ];
 
-    // Stock boutique column (set to 0 — managed by boutique operations)
+    // Stock boutique column
     if (hasStockBoutique) {
       columns.push("stock_boutique");
-      values.push(0);
+      values.push(Number(stock_boutique ?? 0));
     }
 
     if (hasRemise) {
