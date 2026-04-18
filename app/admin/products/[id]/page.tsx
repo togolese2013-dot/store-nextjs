@@ -10,8 +10,7 @@ export const metadata = { title: "Modifier un produit" };
 
 async function getProductById(id: number) {
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT p.*, c.nom AS categorie_nom,
-     COALESCE(p.image, '') AS image_url_raw
+    `SELECT p.*, c.nom AS categorie_nom
      FROM produits p LEFT JOIN categories c ON p.categorie_id = c.id
      WHERE p.id = ? LIMIT 1`,
     [id]
@@ -40,7 +39,7 @@ export default async function EditProductPage({ params }: PageProps) {
     remise:         Number(product.remise ?? 0),
     neuf:           Boolean(product.neuf),
     actif:          Boolean(product.actif),
-    image_url:      (product.image_url_raw || product.image_url) ?? "",
+    image_url:      (product.image_url || product.image) ?? "",
   };
 
   return (
