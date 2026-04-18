@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       values.push(Number(stock_minimum ?? 5));
     }
 
-    columns.push("actif", "image");
+    columns.push("actif", "image_url");
     values.push(actif !== false ? 1 : 0, image_url ?? null);
 
     if (hasImagesJson) {
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, id: newId });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erreur serveur.";
     return NextResponse.json({ error: msg }, { status: 500 });
