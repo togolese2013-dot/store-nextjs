@@ -94,6 +94,16 @@ export default function AddProductModal({ categories }: Props) {
 
   function onDragEnd() { dragIdx.current = null; }
 
+  function moveImage(from: number, to: number) {
+    if (to < 0 || to >= images.length) return;
+    setImages(prev => {
+      const arr = [...prev];
+      const [item] = arr.splice(from, 1);
+      arr.splice(to, 0, item);
+      return arr;
+    });
+  }
+
   // ── Variant image upload ───────────────────────────────────────────────────
   async function uploadVariantImage(key: string, file: File) {
     setVariants(vs => vs.map(v => v._key === key ? { ...v, uploading: true } : v));
@@ -260,6 +270,26 @@ export default function AddProductModal({ categories }: Props) {
                           {/* Drag handle */}
                           <div className="absolute bottom-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <GripVertical className="w-4 h-4 text-white drop-shadow" />
+                          </div>
+
+                          {/* Move buttons */}
+                          <div className="absolute bottom-1.5 right-1.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {idx > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => moveImage(idx, idx - 1)}
+                                className="w-5 h-5 rounded bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black/80"
+                                title="Déplacer à gauche"
+                              >‹</button>
+                            )}
+                            {idx < images.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() => moveImage(idx, idx + 1)}
+                                className="w-5 h-5 rounded bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black/80"
+                                title="Déplacer à droite"
+                              >›</button>
+                            )}
                           </div>
 
                           {/* Delete */}

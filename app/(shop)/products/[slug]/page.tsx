@@ -49,8 +49,9 @@ export default async function ProductPage({ params }: PageProps) {
 
   const price    = finalPrice(product);
   const isPromo  = product.remise > 0;
-  const outOf    = product.stock_boutique === 0;
-  const isLow    = product.stock_boutique > 0 && product.stock_boutique <= 5;
+  const stockDisp = product.stock_magasin > 0 ? product.stock_magasin : product.stock_boutique;
+  const outOf    = stockDisp === 0;
+  const isLow    = stockDisp > 0 && stockDisp <= 5;
 
   /* Image src */
   const rawUrl = product.image_url || product.images?.[0] || null;
@@ -122,7 +123,7 @@ export default async function ProductPage({ params }: PageProps) {
               <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
                 {isPromo && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent-500 text-white text-sm font-bold shadow-accent">
-                    <Zap className="w-3.5 h-3.5" /> -{product.remise}%
+                    <Zap className="w-3.5 h-3.5" /> -{formatPrice(product.remise)}
                   </span>
                 )}
                 {product.neuf && !isPromo && (
@@ -206,7 +207,7 @@ export default async function ProductPage({ params }: PageProps) {
                     ) : isLow ? (
                       <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-50 text-amber-700 text-sm font-semibold border border-amber-200">
                         <span className="w-2 h-2 rounded-full bg-amber-500" />
-                        Plus que {product.stock_boutique} en stock !
+                        Plus que {stockDisp} en stock !
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-green-50 text-green-700 text-sm font-semibold border border-green-200">
