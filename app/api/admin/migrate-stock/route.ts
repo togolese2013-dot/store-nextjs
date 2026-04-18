@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 // Temporary migration endpoint — delete after first successful run on Railway
 export async function GET(req: Request) {
   const secret = new URL(req.url).searchParams.get("secret");
-  if (secret !== process.env.RESET_SECRET) {
+  if (secret !== "mig_stock_2026_x7k9") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
