@@ -4,10 +4,10 @@ import { finalPrice, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import AdminProductActions from "@/components/admin/AdminProductActions";
 import MouvementModal from "@/components/admin/MouvementModal";
+import AddProductModal from "@/components/admin/AddProductModal";
 import Image from "next/image";
 import {
   Search, Package,
-  PackagePlus,
   Boxes, AlertTriangle, XCircle, TrendingDown, TrendingUp, DollarSign,
   Activity,
 } from "lucide-react";
@@ -106,11 +106,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         accent="brand"
         extra={
           view === "stock" ? (
-            <Link href="/admin/products/new"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
-            >
-              <PackagePlus className="w-4 h-4" /> Ajouter un produit
-            </Link>
+            <AddProductModal categories={categories} />
           ) : (
             <MouvementModal />
           )
@@ -294,7 +290,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                       const price   = finalPrice(p);
                       const isPromo = p.remise > 0;
                       const imgSrc  = p.image_url
-                        ? p.image_url.startsWith("http") ? p.image_url : `/uploads/${p.image_url}`
+                        ? (p.image_url.startsWith("http") || p.image_url.startsWith("/")) ? p.image_url : `/uploads/${p.image_url}`
                         : null;
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
