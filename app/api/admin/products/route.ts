@@ -45,21 +45,32 @@ export async function POST(req: NextRequest) {
     const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
     const stockMagasin = Number(stock_magasin ?? 0);
 
-    // Vérifier dynamiquement les colonnes
+    // Detect available columns dynamically (Railway table is legacy PHP schema)
     const [colRows] = await db.execute<mysql.RowDataPacket[]>(
       `SELECT COLUMN_NAME
        FROM INFORMATION_SCHEMA.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produits'`
     );
     const colNames = new Set(colRows.map((r) => (r.COLUMN_NAME as string).toLowerCase()));
-    const hasRemise = colNames.has("remise");
-    const hasNeuf = colNames.has("neuf");
-    const hasImagesJson = colNames.has("images_json");
-    const hasStockMinimum = colNames.has("stock_minimum");
+    const hasRemise        = colNames.has("remise");
+    const hasNeuf          = colNames.has("neuf");
+    const hasImagesJson    = colNames.has("images_json");
+    const hasStockMinimum  = colNames.has("stock_minimum");
+    const hasStockBoutique = colNames.has("stock_boutique");
+    const hasImageUrl      = colNames.has("image_url");
+    const hasImage         = colNames.has("image");
 
-    // Construire la requête dynamiquement (stock_boutique reste 0 — géré par les opérations boutique)
-    const columns = ["reference", "nom", "description", "categorie_id", "prix_unitaire", "stock_boutique"];
-    const values: (string | number | boolean | null | Buffer)[] = [reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire), 0];
+    // Build INSERT dynamically
+    const columns: string[] = ["reference", "nom", "description", "categorie_id", "prix_unitaire"];
+    const values: (string | number | boolean | null | Buffer)[] = [
+      reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire),
+    ];
+
+    // Stock boutique column (set to 0 — managed by boutique operations)
+    if (hasStockBoutique) {
+      columns.push("stock_boutique");
+      values.push(0);
+    }
 
     if (hasRemise) {
       columns.push("remise");
@@ -74,8 +85,17 @@ export async function POST(req: NextRequest) {
       values.push(Number(stock_minimum ?? 5));
     }
 
-    columns.push("actif", "image_url");
-    values.push(actif !== false ? 1 : 0, image_url ?? null);
+    columns.push("actif");
+    values.push(actif !== false ? 1 : 0);
+
+    // Image column: prefer image_url, fall back to image
+    if (hasImageUrl) {
+      columns.push("image_url");
+      values.push(image_url ?? null);
+    } else if (hasImage) {
+      columns.push("image");
+      values.push(image_url ?? null);
+    }
 
     if (hasImagesJson) {
       columns.push("images_json");
