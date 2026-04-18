@@ -37,7 +37,7 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
   return (
     <section
       className="relative overflow-hidden"
-      style={{ minHeight: "clamp(300px, 40vw, 440px)" }}
+      style={{ height: "clamp(300px, 40vw, 440px)" }}
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
     >
@@ -71,9 +71,8 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
       )}
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center"
-        style={{ minHeight: "inherit" }}
       >
-        <div className="py-12 max-w-xl animate-fade-up" key={slide.id}>
+        <div className="py-8 max-w-xl animate-fade-up" key={slide.id}>
 
           {/* Eyebrow */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5"
