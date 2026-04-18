@@ -35,10 +35,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { nom, reference, description, categorie_id, prix_unitaire,
+    const { nom, description, categorie_id, prix_unitaire,
             stock_magasin, stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
-    if (!nom || !reference || !prix_unitaire) {
+    // Auto-generate reference if not provided
+    const reference = body.reference?.trim() ||
+      `PROD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+    if (!nom || !prix_unitaire) {
       return NextResponse.json({ error: "Champs obligatoires manquants." }, { status: 400 });
     }
 
