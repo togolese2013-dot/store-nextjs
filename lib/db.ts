@@ -44,6 +44,7 @@ export const db: mysql.Pool =
 
 /* ─── Schema introspection (cached) ─── */
 let _cols: Record<string, boolean> | null = null;
+let _stockCol: string | null = null;   // "stock" or "quantite" in produit_stocks
 
 async function produitCols() {
   if (_cols) return _cols;
@@ -56,6 +57,7 @@ async function produitCols() {
   _cols = {
     remise:          names.has("remise"),
     neuf:            names.has("neuf"),
+    stock_boutique:  names.has("stock_boutique"),
     variations_json: names.has("variations_json"),
     images_json:     names.has("images_json"),
     image:           names.has("image"),
@@ -64,6 +66,21 @@ async function produitCols() {
     created_at:      names.has("created_at"),
   };
   return _cols;
+}
+
+export async function stockColName(): Promise<string> {
+  if (_stockCol) return _stockCol;
+  try {
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produit_stocks'`
+    );
+    const names = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
+    _stockCol = names.has("stock") ? "stock" : names.has("quantite") ? "quantite" : "stock";
+  } catch {
+    _stockCol = "stock";
+  }
+  return _stockCol;
 }
 
 /* ─── Queries ─── */
@@ -82,7 +99,7 @@ export async function getProducts(opts?: {
     limit = 60, offset = 0, statut, includeInactive = false,
   } = opts ?? {};
 
-  const cols = await produitCols();
+  const [cols, sc] = await Promise.all([produitCols(), stockColName()]);
 
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
   const params: (string | number)[] = [];
@@ -98,6 +115,7 @@ export async function getProducts(opts?: {
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
+  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
 
   const safeLimit  = Math.max(1, Math.min(200, Number(limit)));
   const safeOffset = Math.max(0, Number(offset));
@@ -107,7 +125,7 @@ export async function getProducts(opts?: {
     `SELECT
        p.id, p.reference, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                          AS prix_unitaire,
-       CAST(p.stock_boutique AS SIGNED)                                         AS stock_boutique,
+       ${stockBoutiqueCol}                                                       AS stock_boutique,
        COALESCE(ps.stock_magasin, 0)                                            AS stock_magasin,
        ${cols.remise         ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)"  : "0"    } AS remise,
        ${cols.neuf           ? "COALESCE(p.neuf, 1)"                           : "1"    } AS neuf,
@@ -118,7 +136,7 @@ export async function getProducts(opts?: {
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
-     LEFT JOIN (SELECT produit_id, COALESCE(SUM(stock), 0) AS stock_magasin FROM produit_stocks GROUP BY produit_id) ps ON ps.produit_id = p.id
+     LEFT JOIN (SELECT produit_id, COALESCE(SUM(\`${sc}\`), 0) AS stock_magasin FROM produit_stocks GROUP BY produit_id) ps ON ps.produit_id = p.id
      WHERE ${where}
      ORDER BY ${orderCol} DESC
      LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -145,15 +163,17 @@ export async function getProducts(opts?: {
 }
 
 export async function getProductBySlug(reference: string): Promise<Product | null> {
-  const cols = await produitCols();
+  const [cols, sc] = await Promise.all([produitCols(), stockColName()]);
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
+  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT
        p.id, p.reference, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                        AS prix_unitaire,
-       CAST(p.stock_boutique AS SIGNED)                                       AS stock_boutique,
+       ${stockBoutiqueCol}                                                     AS stock_boutique,
+       COALESCE((SELECT SUM(\`${sc}\`) FROM produit_stocks WHERE produit_id = p.id), 0) AS stock_magasin,
        ${cols.remise         ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)),0)" : "0"   } AS remise,
        ${cols.neuf           ? "COALESCE(p.neuf,1)"                         : "1"   } AS neuf,
        ${imageCol}                                                                      AS image_url,
@@ -221,13 +241,14 @@ export async function getProductCount(opts?: {
 export async function getProductStatusCounts(): Promise<{
   total: number; disponible: number; faible: number; epuise: number;
 }> {
+  const sc = await stockColName();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total,
-       SUM((SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) > 5)               AS disponible,
-       SUM((SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) BETWEEN 1 AND 5)   AS faible,
-       SUM((SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) = 0)               AS epuise
-     FROM produits p WHERE p.actif = 1`
+       SUM((SELECT COALESCE(SUM(\`${sc}\`),0) FROM produit_stocks WHERE produit_id=p.id) > 5)               AS disponible,
+       SUM((SELECT COALESCE(SUM(\`${sc}\`),0) FROM produit_stocks WHERE produit_id=p.id) BETWEEN 1 AND 5)   AS faible,
+       SUM((SELECT COALESCE(SUM(\`${sc}\`),0) FROM produit_stocks WHERE produit_id=p.id) = 0)               AS epuise
+     FROM produits p`
   );
   const r = (rows as mysql.RowDataPacket[])[0];
   return {
