@@ -15,7 +15,9 @@ interface Product {
   prix_unitaire:  number;
   remise:         number;
   stock_boutique: number;
+  stock_magasin:  number;
   image_url:      string | null;
+  images:         string[];
 }
 
 export default function AdminProductActions({ product }: { product: Product }) {
@@ -24,11 +26,21 @@ export default function AdminProductActions({ product }: { product: Product }) {
   const router = useRouter();
 
   async function handleDelete() {
-    if (!confirm("Supprimer ce produit ? (Il sera masqué du site)")) return;
+    if (!confirm(`Supprimer définitivement "${product.nom}" ? Cette action est irréversible.`)) return;
     setDeleting(true);
-    await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
-    setDeleting(false);
-    router.refresh();
+    try {
+      const res = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Erreur lors de la suppression.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert("Erreur réseau. Veuillez réessayer.");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, stockColName } from "@/lib/db";
 import { getProducts, getProductCount, getCategories } from "@/lib/db";
 import mysql from "mysql2/promise";
 
@@ -38,9 +38,20 @@ export async function POST(req: NextRequest) {
     const { nom, description, categorie_id, prix_unitaire,
             stock_magasin, stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
-    // Auto-generate reference if not provided
-    const reference = body.reference?.trim() ||
-      `PROD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    // Auto-generate sequential reference PROD-001, PROD-002, ...
+    let reference = body.reference?.trim() || "";
+    if (!reference) {
+      const [refRows] = await db.execute<mysql.RowDataPacket[]>(
+        `SELECT reference FROM produits
+         WHERE reference REGEXP '^PROD-[0-9]+$'
+         ORDER BY CAST(SUBSTRING(reference, 6) AS UNSIGNED) DESC
+         LIMIT 1`
+      );
+      const lastNum = refRows.length > 0
+        ? parseInt((refRows[0].reference as string).replace("PROD-", ""), 10)
+        : 0;
+      reference = `PROD-${String(isNaN(lastNum) ? 1 : lastNum + 1).padStart(3, "0")}`;
+    }
 
     if (!nom || !prix_unitaire) {
       return NextResponse.json({ error: "Champs obligatoires manquants." }, { status: 400 });
@@ -113,25 +124,25 @@ export async function POST(req: NextRequest) {
     );
     const newId = result.insertId;
 
-    // Insert initial stock in produit_stocks — detect column name dynamically (legacy table)
+    // Insert initial stock in produit_stocks — use shared stockColName() for consistency
     if (stockMagasin > 0) {
       try {
-        const [psColRows] = await db.execute<mysql.RowDataPacket[]>(
-          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produit_stocks'`
+        const sc = await stockColName();
+        // Use the first available entrepot (avoid hardcoded id=1 which may not exist)
+        const [entrepotRows] = await db.execute<mysql.RowDataPacket[]>(
+          `SELECT id FROM entrepots ORDER BY sort_order, id LIMIT 1`
         );
-        const psCols = new Set(psColRows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
-        const stockCol = psCols.has("stock") ? "stock" : psCols.has("quantite") ? "quantite" : null;
+        const entrepotId: number = entrepotRows.length > 0 ? Number(entrepotRows[0].id) : 1;
 
-        if (stockCol) {
-          await db.execute(
-            `INSERT INTO produit_stocks (produit_id, entrepot_id, ${stockCol})
-             VALUES (?, 1, ?)
-             ON DUPLICATE KEY UPDATE ${stockCol} = ${stockCol} + VALUES(${stockCol})`,
-            [newId, stockMagasin]
-          );
-        }
-      } catch { /* stock table issue — product is still created */ }
+        await db.execute(
+          `INSERT INTO produit_stocks (produit_id, entrepot_id, \`${sc}\`)
+           VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE \`${sc}\` = GREATEST(0, \`${sc}\` + ?)`,
+          [newId, entrepotId, stockMagasin, stockMagasin]
+        );
+      } catch (e) {
+        console.error("[stock insert] failed:", e);
+      }
 
       try {
         await db.execute(

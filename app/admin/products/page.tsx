@@ -315,16 +315,15 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-slate-500 hidden md:table-cell">
-                            {p.categorie_nom ?? <span className="text-slate-300">—</span>}
+                          <td className="px-4 py-3 hidden md:table-cell">
+                            {p.categorie_nom
+                              ? <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{p.categorie_nom.toUpperCase()}</span>
+                              : <span className="text-slate-300">—</span>}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <span className={`font-display font-700 ${isPromo ? "text-accent-500" : "text-slate-900"}`}>
+                            <span className={`font-bold text-sm ${isPromo ? "text-emerald-700" : "text-slate-900"}`}>
                               {formatPrice(price)}
                             </span>
-                            {isPromo && (
-                              <p className="text-xs text-slate-400 line-through">{formatPrice(p.prix_unitaire)}</p>
-                            )}
                           </td>
                           <td className="px-4 py-3 text-right hidden sm:table-cell">
                             <span className={`font-semibold ${p.stock_magasin === 0 ? "text-red-500" : p.stock_magasin <= 5 ? "text-amber-500" : "text-green-600"}`}>

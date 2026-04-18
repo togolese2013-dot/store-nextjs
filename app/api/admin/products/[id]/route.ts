@@ -98,6 +98,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { id } = await params;
-  await db.execute("UPDATE produits SET actif = 0 WHERE id = ?", [Number(id)]);
+  const numId = Number(id);
+  // Hard delete: remove stock entries then the product
+  await db.execute("DELETE FROM produit_stocks WHERE produit_id = ?", [numId]);
+  await db.execute("DELETE FROM produits WHERE id = ?", [numId]);
   return NextResponse.json({ ok: true });
 }
