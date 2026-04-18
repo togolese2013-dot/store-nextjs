@@ -1,31 +1,37 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { randomUUID } from "crypto";
+import { v2 as cloudinary } from "cloudinary";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_SIZE = 10 * 1024 * 1024; // 10 MB (compression is done client-side)
 
-// Save to /tmp/uploads — always writable on any container (Railway, Vercel, etc.)
-async function saveFile(file: File): Promise<string> {
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+async function uploadToCloudinary(file: File): Promise<string> {
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error(`Type non autorisé: ${file.type}`);
   }
   if (file.size > MAX_SIZE) {
-    throw new Error("Fichier trop volumineux (max 5 Mo)");
+    throw new Error("Fichier trop volumineux (max 10 Mo)");
   }
 
-  const ext      = file.type.split("/")[1].replace("jpeg", "jpg");
-  const filename = `${randomUUID()}.${ext}`;
-  const dir      = join("/tmp", "uploads");
+  const bytes  = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
 
-  await mkdir(dir, { recursive: true });
-  const bytes = await file.arrayBuffer();
-  await writeFile(join(dir, filename), Buffer.from(bytes));
-
-  // Served via /api/uploads/[filename] route
-  return `/api/uploads/${filename}`;
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "togolese-shop", resource_type: "image" },
+      (error, result) => {
+        if (error || !result) reject(error ?? new Error("Upload échoué"));
+        else resolve(result.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
 }
 
 /* POST /api/admin/upload — single or multiple files */
@@ -45,7 +51,7 @@ export async function POST(req: Request) {
   const results: { url: string; error?: string }[] = [];
   for (const f of filesToProcess) {
     try {
-      results.push({ url: await saveFile(f) });
+      results.push({ url: await uploadToCloudinary(f) });
     } catch (err) {
       results.push({ url: "", error: err instanceof Error ? err.message : "Erreur upload" });
     }
