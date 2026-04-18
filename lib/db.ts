@@ -44,7 +44,6 @@ export const db: mysql.Pool =
 
 /* ─── Schema introspection (cached) ─── */
 let _cols: Record<string, boolean> | null = null;
-let _stockCol: string | null = null;   // "stock" or "quantite" in produit_stocks
 
 async function produitCols() {
   if (_cols) return _cols;
@@ -54,10 +53,38 @@ async function produitCols() {
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produits'`
   );
   const names = new Set(rows.map((r) => (r.COLUMN_NAME as string).toLowerCase()));
+
+  // Auto-migrate: add stock_magasin column directly on produits if missing
+  if (!names.has("stock_magasin")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN stock_magasin INT NOT NULL DEFAULT 0`);
+      names.add("stock_magasin");
+      // Migrate existing data from produit_stocks
+      try {
+        const [psRows] = await db.execute<mysql.RowDataPacket[]>(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produit_stocks'`
+        );
+        const psCols = new Set(psRows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
+        const sc = psCols.has("stock") ? "stock" : psCols.has("quantite") ? "quantite" : null;
+        if (sc) {
+          await db.execute(
+            `UPDATE produits p
+             JOIN (SELECT produit_id, COALESCE(SUM(\`${sc}\`), 0) AS total
+                   FROM produit_stocks GROUP BY produit_id) ps
+               ON ps.produit_id = p.id
+             SET p.stock_magasin = ps.total`
+          );
+        }
+      } catch { /* migration of existing data optional */ }
+    } catch { /* ALTER may fail if column already added by concurrent request */ }
+  }
+
   _cols = {
     remise:          names.has("remise"),
     neuf:            names.has("neuf"),
     stock_boutique:  names.has("stock_boutique"),
+    stock_magasin:   names.has("stock_magasin"),
     variations_json: names.has("variations_json"),
     images_json:     names.has("images_json"),
     image:           names.has("image"),
@@ -66,32 +93,6 @@ async function produitCols() {
     created_at:      names.has("created_at"),
   };
   return _cols;
-}
-
-export async function stockColName(): Promise<string> {
-  if (_stockCol) return _stockCol;
-  try {
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produit_stocks'`
-    );
-    const names = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
-    const hasStock   = names.has("stock");
-    const hasQuantite = names.has("quantite");
-
-    if (hasStock && hasQuantite) {
-      // Both columns exist: pick the one that actually holds data
-      const [sums] = await db.execute<mysql.RowDataPacket[]>(
-        `SELECT COALESCE(SUM(stock), 0) AS s, COALESCE(SUM(quantite), 0) AS q FROM produit_stocks`
-      );
-      _stockCol = Number(sums[0]?.q ?? 0) > Number(sums[0]?.s ?? 0) ? "quantite" : "stock";
-    } else {
-      _stockCol = hasStock ? "stock" : hasQuantite ? "quantite" : "stock";
-    }
-  } catch {
-    _stockCol = "stock";
-  }
-  return _stockCol;
 }
 
 /* ─── Queries ─── */
@@ -110,7 +111,7 @@ export async function getProducts(opts?: {
     limit = 60, offset = 0, statut, includeInactive = false,
   } = opts ?? {};
 
-  const [cols, sc] = await Promise.all([produitCols(), stockColName()]);
+  const cols = await produitCols();
 
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
   const params: (string | number)[] = [];
@@ -119,14 +120,15 @@ export async function getProducts(opts?: {
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise)  { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)    { conditions.push("p.neuf = 1"); }
-  if (statut === "disponible")   { conditions.push("COALESCE(ps.stock_magasin, 0) > 5"); }
-  if (statut === "faible")       { conditions.push("COALESCE(ps.stock_magasin, 0) > 0 AND COALESCE(ps.stock_magasin, 0) <= 5"); }
-  if (statut === "epuise")       { conditions.push("COALESCE(ps.stock_magasin, 0) = 0"); }
+  if (statut === "disponible")   { conditions.push("COALESCE(p.stock_magasin, 0) > 5"); }
+  if (statut === "faible")       { conditions.push("COALESCE(p.stock_magasin, 0) > 0 AND COALESCE(p.stock_magasin, 0) <= 5"); }
+  if (statut === "epuise")       { conditions.push("COALESCE(p.stock_magasin, 0) = 0"); }
 
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
   const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockMagasinCol  = cols.stock_magasin  ? "COALESCE(p.stock_magasin, 0)"    : "0";
 
   const safeLimit  = Math.max(1, Math.min(200, Number(limit)));
   const safeOffset = Math.max(0, Number(offset));
@@ -137,7 +139,7 @@ export async function getProducts(opts?: {
        p.id, p.reference, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                          AS prix_unitaire,
        ${stockBoutiqueCol}                                                       AS stock_boutique,
-       COALESCE(ps.stock_magasin, 0)                                            AS stock_magasin,
+       ${stockMagasinCol}                                                        AS stock_magasin,
        ${cols.remise         ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)"  : "0"    } AS remise,
        ${cols.neuf           ? "COALESCE(p.neuf, 1)"                           : "1"    } AS neuf,
        ${imageCol}                                                                          AS image_url,
@@ -147,7 +149,6 @@ export async function getProducts(opts?: {
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
-     LEFT JOIN (SELECT produit_id, COALESCE(SUM(\`${sc}\`), 0) AS stock_magasin FROM produit_stocks GROUP BY produit_id) ps ON ps.produit_id = p.id
      WHERE ${where}
      ORDER BY ${orderCol} DESC
      LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -174,17 +175,18 @@ export async function getProducts(opts?: {
 }
 
 export async function getProductBySlug(reference: string): Promise<Product | null> {
-  const [cols, sc] = await Promise.all([produitCols(), stockColName()]);
+  const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
   const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockMagasinCol  = cols.stock_magasin  ? "COALESCE(p.stock_magasin, 0)"    : "0";
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT
        p.id, p.reference, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                        AS prix_unitaire,
        ${stockBoutiqueCol}                                                     AS stock_boutique,
-       COALESCE((SELECT SUM(\`${sc}\`) FROM produit_stocks WHERE produit_id = p.id), 0) AS stock_magasin,
+       ${stockMagasinCol}                                                      AS stock_magasin,
        ${cols.remise         ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)),0)" : "0"   } AS remise,
        ${cols.neuf           ? "COALESCE(p.neuf,1)"                         : "1"   } AS neuf,
        ${imageCol}                                                                      AS image_url,
@@ -238,9 +240,9 @@ export async function getProductCount(opts?: {
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise) { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)   { conditions.push("p.neuf = 1"); }
-  if (statut === "disponible")  { conditions.push("(SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) > 5"); }
-  if (statut === "faible")      { conditions.push("(SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) > 0 AND (SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) <= 5"); }
-  if (statut === "epuise")      { conditions.push("(SELECT COALESCE(SUM(stock),0) FROM produit_stocks WHERE produit_id=p.id) = 0"); }
+  if (statut === "disponible")  { conditions.push("COALESCE(p.stock_magasin, 0) > 5"); }
+  if (statut === "faible")      { conditions.push("COALESCE(p.stock_magasin, 0) > 0 AND COALESCE(p.stock_magasin, 0) <= 5"); }
+  if (statut === "epuise")      { conditions.push("COALESCE(p.stock_magasin, 0) = 0"); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,
@@ -252,14 +254,13 @@ export async function getProductCount(opts?: {
 export async function getProductStatusCounts(): Promise<{
   total: number; disponible: number; faible: number; epuise: number;
 }> {
-  const sc = await stockColName();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total,
-       SUM((SELECT COALESCE(SUM(\`${sc}\`),0) FROM produit_stocks WHERE produit_id=p.id) > 5)               AS disponible,
-       SUM((SELECT COALESCE(SUM(\`${sc}\`),0) FROM produit_stocks WHERE produit_id=p.id) BETWEEN 1 AND 5)   AS faible,
-       SUM((SELECT COALESCE(SUM(\`${sc}\`),0) FROM produit_stocks WHERE produit_id=p.id) = 0)               AS epuise
-     FROM produits p`
+       SUM(COALESCE(stock_magasin, 0) > 5)             AS disponible,
+       SUM(COALESCE(stock_magasin, 0) BETWEEN 1 AND 5) AS faible,
+       SUM(COALESCE(stock_magasin, 0) = 0)             AS epuise
+     FROM produits`
   );
   const r = (rows as mysql.RowDataPacket[])[0];
   return {

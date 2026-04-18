@@ -90,7 +90,6 @@ const MODULES: Record<string, {
 const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/products",      "magasin"],
   ["/admin/categories",    "magasin"],
-  ["/admin/entrepots",     "magasin"],
   ["/admin/fournisseurs",  "magasin"],
   ["/admin/achats",        "magasin"],
   ["/admin/import-export", "magasin"],

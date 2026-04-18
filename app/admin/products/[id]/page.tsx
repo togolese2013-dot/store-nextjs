@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getCategories } from "@/lib/db";
 import { db } from "@/lib/db";
-import type mysql from "mysql2/promise";
+import type { RowDataPacket } from "mysql2";
 import ProductForm from "@/components/admin/ProductForm";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -9,7 +9,7 @@ import { ChevronLeft } from "lucide-react";
 export const metadata = { title: "Modifier un produit" };
 
 async function getProductById(id: number) {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+  const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT p.*, c.nom AS categorie_nom,
      COALESCE(p.image, '') AS image_url_raw
      FROM produits p LEFT JOIN categories c ON p.categorie_id = c.id
@@ -21,20 +21,11 @@ async function getProductById(id: number) {
 
 interface PageProps { params: Promise<{ id: string }> }
 
-async function getStockMagasin(produitId: number): Promise<number> {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT COALESCE(SUM(stock), 0) AS stock_magasin FROM produit_stocks WHERE produit_id = ?`,
-    [produitId]
-  );
-  return Number(rows[0]?.stock_magasin ?? 0);
-}
-
 export default async function EditProductPage({ params }: PageProps) {
   const { id } = await params;
-  const [product, categories, stockMagasin] = await Promise.all([
+  const [product, categories] = await Promise.all([
     getProductById(Number(id)),
     getCategories(),
-    getStockMagasin(Number(id)),
   ]);
   if (!product) notFound();
 
@@ -45,7 +36,7 @@ export default async function EditProductPage({ params }: PageProps) {
     description:    product.description ?? "",
     categorie_id:   product.categorie_id ? Number(product.categorie_id) : ("" as const),
     prix_unitaire:  Number(product.prix_unitaire),
-    stock_magasin:  stockMagasin,
+    stock_magasin:  Number(product.stock_magasin ?? 0),
     remise:         Number(product.remise ?? 0),
     neuf:           Boolean(product.neuf),
     actif:          Boolean(product.actif),

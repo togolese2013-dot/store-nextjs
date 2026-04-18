@@ -1,15 +1,8 @@
 import "server-only";
-import { db, stockColName } from "./db";
+import { db } from "./db";
 import type mysql from "mysql2/promise";
 
 // ─── Stock Operations ─────────────────────────────────────────────────────────
-
-export async function getEntrepots(): Promise<Entrepot[]> {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, adresse, responsable, actif FROM entrepots WHERE actif = 1 ORDER BY sort_order, nom"
-  );
-  return rows as Entrepot[];
-}
 
 export interface ProduitStock {
   produit_id: number;
@@ -19,14 +12,12 @@ export interface ProduitStock {
 }
 
 export async function getProduitsWithStock(): Promise<ProduitStock[]> {
-  const sc = await stockColName();
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT p.id AS produit_id, p.nom, p.reference,
-            COALESCE(SUM(ps.\`${sc}\`), 0) AS stock
-     FROM produits p
-     LEFT JOIN produit_stocks ps ON ps.produit_id = p.id
-     GROUP BY p.id, p.nom, p.reference
-     ORDER BY p.nom`
+    `SELECT id AS produit_id, nom, reference,
+            COALESCE(stock_magasin, 0) AS stock
+     FROM produits
+     WHERE actif = 1
+     ORDER BY nom`
   );
   return rows as ProduitStock[];
 }
@@ -39,28 +30,21 @@ export async function createStockEntree(data: {
   note?:      string;
   user_id?:   number;
 }) {
-  const ENTREPOT_ID = 1;
-  const sc   = await stockColName();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
-    // Upsert produit_stocks
     await conn.execute(
-      `INSERT INTO produit_stocks (produit_id, entrepot_id, \`${sc}\`)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE \`${sc}\` = \`${sc}\` + VALUES(\`${sc}\`)`,
-      [data.produit_id, ENTREPOT_ID, data.quantite]
+      `UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?`,
+      [data.quantite, data.produit_id]
     );
 
-    // Get stock after (sum across all)
     const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(\`${sc}\`), 0) AS stock FROM produit_stocks WHERE produit_id = ?`,
+      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
       [data.produit_id]
     );
     const stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
 
-    // Log mouvement
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
        VALUES (?, 'entree', ?, ?, ?, ?, ?)`,
@@ -84,15 +68,12 @@ export async function createStockSortie(data: {
   note?:      string;
   user_id?:   number;
 }) {
-  const ENTREPOT_ID = 1;
-  const sc   = await stockColName();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
-    // Check available stock (sum across all entrepots)
     const [[row]] = await conn.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(\`${sc}\`), 0) AS stock FROM produit_stocks WHERE produit_id = ?`,
+      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
       [data.produit_id]
     );
     const available = Number((row as mysql.RowDataPacket)?.stock ?? 0);
@@ -100,38 +81,17 @@ export async function createStockSortie(data: {
       throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demandé(s)`);
     }
 
-    // Decrement magasin stock
+    // Decrement magasin, increment boutique
     await conn.execute(
-      `UPDATE produit_stocks SET \`${sc}\` = GREATEST(0, \`${sc}\` - ?) WHERE produit_id = ? AND entrepot_id = ?`,
-      [data.quantite, data.produit_id, ENTREPOT_ID]
-    );
-
-    // Increment boutique stock on produits (ignore if column missing)
-    try {
-      await conn.execute(
-        `UPDATE produits SET stock_boutique = stock_boutique + ? WHERE id = ?`,
-        [data.quantite, data.produit_id]
-      );
-    } catch { /* stock_boutique column may not exist */ }
-
-    // UPSERT into boutique_stock (flagged from_magasin=1 so it appears in Stock Boutique page)
-    await conn.execute(
-      `INSERT INTO boutique_stock (produit_id, quantite, seuil_alerte, from_magasin)
-       VALUES (?, ?, 5, 1)
-       ON DUPLICATE KEY UPDATE quantite = quantite + ?, from_magasin = 1, updated_at = NOW()`,
-      [data.produit_id, data.quantite, data.quantite]
-    );
-
-    // Log boutique mouvement
-    await conn.execute(
-      `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif)
-       VALUES (?, 'entree', ?, 'Transfert depuis magasin')`,
-      [data.produit_id, data.quantite]
+      `UPDATE produits
+       SET stock_magasin  = GREATEST(0, COALESCE(stock_magasin, 0) - ?),
+           stock_boutique = COALESCE(stock_boutique, 0) + ?
+       WHERE id = ?`,
+      [data.quantite, data.quantite, data.produit_id]
     );
 
     const stockApres = available - data.quantite;
 
-    // Log mouvement magasin
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
        VALUES (?, 'retrait', ?, ?, ?, ?, ?)`,
@@ -154,7 +114,6 @@ export async function createStockAjustement(data: {
   motif:      string;
   user_id?:   number;
 }) {
-  const ENTREPOT_ID = 1;
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -162,31 +121,19 @@ export async function createStockAjustement(data: {
     const abs  = Math.abs(data.quantite);
     const type = data.quantite >= 0 ? "entree" : "retrait";
 
-    const sc = await stockColName();
+    await conn.execute(
+      `UPDATE produits
+       SET stock_magasin = GREATEST(0, COALESCE(stock_magasin, 0) + ?)
+       WHERE id = ?`,
+      [data.quantite, data.produit_id]
+    );
 
-    // Upsert/update produit_stocks
-    if (data.quantite >= 0) {
-      await conn.execute(
-        `INSERT INTO produit_stocks (produit_id, entrepot_id, \`${sc}\`)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE \`${sc}\` = \`${sc}\` + VALUES(\`${sc}\`)`,
-        [data.produit_id, ENTREPOT_ID, abs]
-      );
-    } else {
-      await conn.execute(
-        `UPDATE produit_stocks SET \`${sc}\` = GREATEST(0, \`${sc}\` - ?) WHERE produit_id = ? AND entrepot_id = ?`,
-        [abs, data.produit_id, ENTREPOT_ID]
-      );
-    }
-
-    // Get stock after (sum across all)
     const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(\`${sc}\`), 0) AS stock FROM produit_stocks WHERE produit_id = ?`,
+      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
       [data.produit_id]
     );
     const stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
 
-    // Log mouvement
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note, user_id)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -991,96 +938,38 @@ export async function getCRMStats() {
   };
 }
 
-/* ─── Entrepôts (multi-boutique) ─── */
+/* ─── Entrepôts — supprimés, stubs pour compatibilité des imports ─── */
 export interface Entrepot {
-  id:          number;
-  nom:         string;
-  adresse:     string | null;
-  telephone:   string | null;
-  responsable: string | null;
-  actif:       boolean;
-  sort_order:  number;
-  created_at:  string;
+  id: number; nom: string; adresse: string | null;
+  telephone: string | null; responsable: string | null;
+  actif: boolean; sort_order: number; created_at: string;
 }
-
-export async function listEntrepots(activeOnly = false): Promise<Entrepot[]> {
-  const where = activeOnly ? "WHERE actif = 1" : "";
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT * FROM entrepots ${where} ORDER BY sort_order ASC, id ASC`
-  );
-  return rows.map(r => ({ ...r, actif: Boolean(r.actif) })) as Entrepot[];
-}
-
-export async function upsertEntrepot(e: Omit<Entrepot, "id" | "created_at"> & { id?: number }) {
-  if (e.id) {
-    await db.execute(
-      "UPDATE entrepots SET nom=?,adresse=?,telephone=?,responsable=?,actif=?,sort_order=? WHERE id=?",
-      [e.nom, e.adresse, e.telephone, e.responsable, e.actif ? 1 : 0, e.sort_order, e.id]
-    );
-  } else {
-    await db.execute(
-      "INSERT INTO entrepots (nom,adresse,telephone,responsable,actif,sort_order) VALUES (?,?,?,?,?,?)",
-      [e.nom, e.adresse, e.telephone, e.responsable, e.actif ? 1 : 0, e.sort_order]
-    );
-  }
-}
-
-export async function deleteEntrepot(id: number) {
-  await db.execute("DELETE FROM entrepots WHERE id = ?", [id]);
-}
+export async function listEntrepots(): Promise<Entrepot[]> { return []; }
+export async function getEntrepots():  Promise<Entrepot[]> { return []; }
+export async function upsertEntrepot(_e: unknown): Promise<void> {}
+export async function deleteEntrepot(_id: number): Promise<void> {}
 
 export interface ProduitStock {
-  produit_id:  number;
-  entrepot_id: number;
-  stock:       number;
-  nom_entrepot?: string;
-  nom_produit?:  string;
+  produit_id: number; stock: number;
+  nom_produit?: string;
 }
 
-export async function getStocksForProduct(produit_id: number): Promise<ProduitStock[]> {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT ps.*, e.nom as nom_entrepot FROM produit_stocks ps
-     JOIN entrepots e ON e.id = ps.entrepot_id
-     WHERE ps.produit_id = ?`,
-    [produit_id]
-  );
-  return rows as ProduitStock[];
-}
-
-export async function getStocksForEntrepot(entrepot_id: number): Promise<ProduitStock[]> {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT ps.*, p.nom as nom_produit FROM produit_stocks ps
-     JOIN produits p ON p.id = ps.produit_id
-     WHERE ps.entrepot_id = ?
-     ORDER BY p.nom ASC`,
-    [entrepot_id]
-  );
-  return rows as ProduitStock[];
-}
-
-export async function updateProductStock(produit_id: number, entrepot_id: number, stock: number) {
-  const sc = await stockColName();
+export async function updateProductStock(produit_id: number, _entrepot_id: number, stock: number) {
   await db.execute(
-    `INSERT INTO produit_stocks (produit_id, entrepot_id, \`${sc}\`) VALUES (?,?,?)
-     ON DUPLICATE KEY UPDATE \`${sc}\` = VALUES(\`${sc}\`)`,
-    [produit_id, entrepot_id, stock]
+    `UPDATE produits SET stock_magasin = ? WHERE id = ?`,
+    [stock, produit_id]
   );
 }
 
 /* ─── Stock dashboard stats ─── */
 export async function getStockStats() {
-  const sc = await stockColName();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT
-      SUM(CASE WHEN sm.stock_magasin > 0 THEN 1 ELSE 0 END)                           AS en_stock,
-      SUM(CASE WHEN sm.stock_magasin = 0 THEN 1 ELSE 0 END)                           AS en_rupture,
-      SUM(CASE WHEN sm.stock_magasin > 0 AND sm.stock_magasin <= 5 THEN 1 ELSE 0 END) AS stock_faible,
-      COALESCE(SUM(p.prix_unitaire * sm.stock_magasin), 0)                             AS valeur_totale
-    FROM produits p
-    LEFT JOIN (
-      SELECT produit_id, COALESCE(SUM(\`${sc}\`), 0) AS stock_magasin
-      FROM produit_stocks GROUP BY produit_id
-    ) sm ON sm.produit_id = p.id
+      SUM(CASE WHEN COALESCE(stock_magasin, 0) > 0 THEN 1 ELSE 0 END)                           AS en_stock,
+      SUM(CASE WHEN COALESCE(stock_magasin, 0) = 0 THEN 1 ELSE 0 END)                           AS en_rupture,
+      SUM(CASE WHEN COALESCE(stock_magasin, 0) > 0 AND COALESCE(stock_magasin, 0) <= 5 THEN 1 ELSE 0 END) AS stock_faible,
+      COALESCE(SUM(prix_unitaire * COALESCE(stock_magasin, 0)), 0)                               AS valeur_totale
+    FROM produits
   `);
   const r = rows[0];
   return {

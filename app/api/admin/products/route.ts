@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { db, stockColName } from "@/lib/db";
+import { db } from "@/lib/db";
 import { getProducts, getProductCount, getCategories } from "@/lib/db";
 import mysql from "mysql2/promise";
 
@@ -81,7 +81,12 @@ export async function POST(req: NextRequest) {
       reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire),
     ];
 
-    // Stock boutique column
+    // Stock magasin — direct column on produits
+    if (colNames.has("stock_magasin")) {
+      columns.push("stock_magasin");
+      values.push(stockMagasin);
+    }
+
     if (hasStockBoutique) {
       columns.push("stock_boutique");
       values.push(Number(stock_boutique ?? 0));
@@ -124,36 +129,8 @@ export async function POST(req: NextRequest) {
     );
     const newId = result.insertId;
 
-    // Insert initial stock in produit_stocks — use shared stockColName() for consistency
+    // Log initial stock movement
     if (stockMagasin > 0) {
-      try {
-        const sc = await stockColName();
-
-        // Ensure at least one entrepot exists (FK: produit_stocks.entrepot_id → entrepots.id)
-        const [entrepotRows] = await db.execute<mysql.RowDataPacket[]>(
-          `SELECT id FROM entrepots ORDER BY sort_order, id LIMIT 1`
-        );
-        let entrepotId: number;
-        if (entrepotRows.length > 0) {
-          entrepotId = Number(entrepotRows[0].id);
-        } else {
-          // Auto-create a default warehouse so the FK constraint is satisfied
-          const [inserted] = await db.execute<mysql.ResultSetHeader>(
-            `INSERT INTO entrepots (nom, actif, sort_order) VALUES ('Magasin principal', 1, 0)`
-          );
-          entrepotId = inserted.insertId;
-        }
-
-        await db.execute(
-          `INSERT INTO produit_stocks (produit_id, entrepot_id, \`${sc}\`)
-           VALUES (?, ?, ?)
-           ON DUPLICATE KEY UPDATE \`${sc}\` = GREATEST(0, \`${sc}\` + ?)`,
-          [newId, entrepotId, stockMagasin, stockMagasin]
-        );
-      } catch (e) {
-        console.error("[stock insert] failed:", e);
-      }
-
       try {
         await db.execute(
           `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note)
