@@ -108,13 +108,8 @@ export default function ProductCard({ product, className }: Props) {
             </span>
           )}
           {product.neuf && !isPromo && (
-            <span className="px-2.5 py-1 rounded-md bg-indigo-600 text-white text-xs font-bold">
+            <span className="px-2.5 py-1 rounded-md bg-amber-500 text-white text-xs font-bold">
               Nouveau
-            </span>
-          )}
-          {isLow && (
-            <span className="px-2.5 py-1 rounded-md bg-amber-500 text-white text-xs font-semibold">
-              {product.stock_boutique} restants
             </span>
           )}
           {outOf && (
@@ -168,7 +163,7 @@ export default function ProductCard({ product, className }: Props) {
 
         {/* Price row */}
         <div className="flex items-end gap-2 mb-3">
-          <span className="font-display font-600 text-base text-slate-900">
+          <span className="font-display font-medium text-base text-slate-900">
             {formatPrice(price)}
           </span>
           {isPromo && (

@@ -31,10 +31,13 @@ interface GoogleUser {
 }
 
 export async function GET(req: NextRequest) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  // Strip trailing slash to avoid double-slash in redirect_uri
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
   const code    = req.nextUrl.searchParams.get("code");
+  const error   = req.nextUrl.searchParams.get("error");
 
-  if (!code) {
+  if (error || !code) {
+    console.error("[google-callback] OAuth error from Google:", error ?? "no code");
     return NextResponse.redirect(`${siteUrl}/?auth=error`);
   }
 
@@ -42,20 +45,23 @@ export async function GET(req: NextRequest) {
     await ensureColumns();
 
     // Exchange code for access token
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    const redirectUri = `${siteUrl}/api/account/google/callback`;
+    const tokenRes    = await fetch("https://oauth2.googleapis.com/token", {
       method:  "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body:    new URLSearchParams({
         code,
         client_id:     process.env.GOOGLE_CLIENT_ID!,
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri:  `${siteUrl}/api/account/google/callback`,
+        redirect_uri:  redirectUri,
         grant_type:    "authorization_code",
       }),
     });
 
-    const tokenData = await tokenRes.json() as { access_token?: string };
+    const tokenData = await tokenRes.json() as { access_token?: string; error?: string; error_description?: string };
     if (!tokenData.access_token) {
+      console.error("[google-callback] Token exchange failed:", tokenData.error, tokenData.error_description);
+      console.error("[google-callback] redirect_uri used:", redirectUri);
       return NextResponse.redirect(`${siteUrl}/?auth=error`);
     }
 
@@ -66,6 +72,7 @@ export async function GET(req: NextRequest) {
     const googleUser = await userRes.json() as GoogleUser;
 
     if (!googleUser.email) {
+      console.error("[google-callback] No email in Google user info:", googleUser);
       return NextResponse.redirect(`${siteUrl}/?auth=error`);
     }
 
@@ -132,7 +139,7 @@ export async function GET(req: NextRequest) {
     });
     return res;
   } catch (err) {
-    console.error("[google-callback]", err);
+    console.error("[google-callback] Unexpected error:", err);
     return NextResponse.redirect(`${siteUrl}/?auth=error`);
   }
 }

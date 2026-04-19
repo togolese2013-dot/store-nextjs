@@ -269,11 +269,11 @@ export default function AccountDropdown({ open, onClose, onUserChange }: Props) 
               className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans"
             />
           ) : (
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 w-full overflow-hidden">
               <select
                 value={countryCode}
                 onChange={e => setCountryCode(e.target.value)}
-                className="w-24 px-2 py-2.5 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-xs transition-all font-sans shrink-0"
+                className="shrink-0 w-[78px] px-1.5 py-2.5 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-xs transition-all font-sans"
               >
                 {COUNTRY_CODES.map(c => (
                   <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
@@ -286,7 +286,7 @@ export default function AccountDropdown({ open, onClose, onUserChange }: Props) 
                 placeholder="90 00 00 00"
                 required
                 autoComplete="tel"
-                className="flex-1 px-3.5 py-2.5 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans"
+                className="min-w-0 flex-1 px-3 py-2.5 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans"
               />
             </div>
           )}
