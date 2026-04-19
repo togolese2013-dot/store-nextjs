@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { db } from "@/lib/db";
 import { signClientToken, CLIENT_COOKIE } from "@/lib/client-auth";
+
+type ClientRow = RowDataPacket & {
+  id:        number;
+  nom:       string;
+  email:     string | null;
+  telephone: string | null;
+  photo_url: string | null;
+  google_id: string | null;
+};
 
 async function ensureColumns() {
   for (const sql of [
@@ -50,7 +60,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get Google user info
-    const userRes  = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    const userRes    = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const googleUser = await userRes.json() as GoogleUser;
@@ -60,30 +70,30 @@ export async function GET(req: NextRequest) {
     }
 
     // 1. Find by google_id
-    let [rows] = await db.execute(
+    let [rows] = await db.execute<ClientRow[]>(
       "SELECT * FROM clients WHERE google_id = ? LIMIT 1",
       [googleUser.sub]
     );
-    let client = (rows as Record<string, unknown>[])[0];
+    let client = rows[0] ?? null;
 
     if (!client) {
       // 2. Find by email — link Google account
-      [rows] = await db.execute(
+      [rows] = await db.execute<ClientRow[]>(
         "SELECT * FROM clients WHERE email = ? LIMIT 1",
         [googleUser.email.toLowerCase()]
       );
-      client = (rows as Record<string, unknown>[])[0];
+      client = rows[0] ?? null;
 
       if (client) {
         await db.execute(
           "UPDATE clients SET google_id = ?, photo_url = COALESCE(photo_url, ?) WHERE id = ?",
-          [googleUser.sub, googleUser.picture ?? null, client.id as number]
+          [googleUser.sub, googleUser.picture ?? null, client.id]
         );
         client.google_id = googleUser.sub;
         client.photo_url = client.photo_url ?? googleUser.picture ?? null;
       } else {
         // 3. Create new client
-        const [result] = await db.execute(
+        const [result] = await db.execute<ResultSetHeader>(
           "INSERT INTO clients (nom, email, google_id, photo_url, statut) VALUES (?, ?, ?, ?, 'actif')",
           [
             googleUser.name || googleUser.email,
@@ -92,24 +102,23 @@ export async function GET(req: NextRequest) {
             googleUser.picture ?? null,
           ]
         );
-        const id = (result as { insertId: number }).insertId;
         client = {
-          id,
+          id:        result.insertId,
           nom:       googleUser.name || googleUser.email,
           email:     googleUser.email.toLowerCase(),
           telephone: null,
           google_id: googleUser.sub,
           photo_url: googleUser.picture ?? null,
-        };
+        } as ClientRow;
       }
     }
 
     const session = {
-      id:        client.id as number,
-      nom:       (client.nom as string) ?? "",
-      email:     (client.email as string | null) ?? null,
-      telephone: (client.telephone as string | null) ?? null,
-      photo_url: (client.photo_url as string | null) ?? null,
+      id:        client.id,
+      nom:       client.nom ?? "",
+      email:     client.email ?? null,
+      telephone: client.telephone ?? null,
+      photo_url: client.photo_url ?? null,
     };
 
     const token = await signClientToken(session);

@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import type { RowDataPacket } from "mysql2";
 import { db } from "@/lib/db";
 import { signClientToken, CLIENT_COOKIE } from "@/lib/client-auth";
+
+type ClientRow = RowDataPacket & {
+  id:        number;
+  nom:       string;
+  email:     string | null;
+  telephone: string | null;
+  password:  string | null;
+  photo_url: string | null;
+};
 
 // Auto-add columns if they don't exist yet
 async function ensureColumns() {
@@ -25,24 +35,24 @@ export async function POST(req: NextRequest) {
     }
 
     const isEmail = (identifier as string).includes("@");
-    let rows: unknown[];
+    let rows: ClientRow[];
 
     if (isEmail) {
-      [rows] = await db.execute(
+      [rows] = await db.execute<ClientRow[]>(
         "SELECT * FROM clients WHERE email = ? LIMIT 1",
         [identifier.trim().toLowerCase()]
       );
     } else {
       // Normalize: last 8 digits for flexible matching
       const digits = (identifier as string).replace(/\D/g, "");
-      const last8 = digits.slice(-8);
-      [rows] = await db.execute(
+      const last8  = digits.slice(-8);
+      [rows] = await db.execute<ClientRow[]>(
         "SELECT * FROM clients WHERE RIGHT(REGEXP_REPLACE(telephone, '[^0-9]', ''), 8) = ? LIMIT 1",
         [last8]
       );
     }
 
-    const client = (rows as Record<string, unknown>[])[0];
+    const client = rows[0];
     if (!client) {
       return NextResponse.json({ error: "Compte introuvable" }, { status: 401 });
     }
@@ -53,17 +63,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const valid = await bcrypt.compare(password, client.password as string);
+    const valid = await bcrypt.compare(password as string, client.password);
     if (!valid) {
       return NextResponse.json({ error: "Mot de passe incorrect" }, { status: 401 });
     }
 
     const session = {
-      id:        client.id as number,
-      nom:       (client.nom as string) ?? "",
-      email:     (client.email as string | null) ?? null,
-      telephone: (client.telephone as string | null) ?? null,
-      photo_url: (client.photo_url as string | null) ?? null,
+      id:        client.id,
+      nom:       client.nom ?? "",
+      email:     client.email ?? null,
+      telephone: client.telephone ?? null,
+      photo_url: client.photo_url ?? null,
     };
 
     const token = await signClientToken(session);

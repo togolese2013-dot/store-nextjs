@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { db } from "@/lib/db";
 import { signClientToken, CLIENT_COOKIE } from "@/lib/client-auth";
+
+type ClientRow = RowDataPacket & { id: number };
 
 async function ensureColumns() {
   for (const sql of [
@@ -29,29 +32,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isEmail    = (identifier as string).includes("@");
-    const email      = isEmail ? (identifier as string).trim().toLowerCase() : null;
-    const telephone  = isEmail ? null : (identifier as string).trim();
+    const isEmail   = (identifier as string).includes("@");
+    const email     = isEmail ? (identifier as string).trim().toLowerCase() : null;
+    const telephone = isEmail ? null : (identifier as string).trim();
 
     // Check duplicate
     const field = isEmail ? "email" : "telephone";
-    const [existing] = await db.execute(
+    const [existing] = await db.execute<ClientRow[]>(
       `SELECT id FROM clients WHERE ${field} = ? LIMIT 1`,
       [isEmail ? email : telephone]
     );
-    if ((existing as unknown[]).length > 0) {
+    if (existing.length > 0) {
       return NextResponse.json(
         { error: "Un compte existe déjà avec cet identifiant" },
         { status: 409 }
       );
     }
 
-    const hash   = await bcrypt.hash(password as string, 12);
-    const [result] = await db.execute(
+    const hash     = await bcrypt.hash(password as string, 12);
+    const [result] = await db.execute<ResultSetHeader>(
       "INSERT INTO clients (nom, email, telephone, password, statut) VALUES (?, ?, ?, ?, 'actif')",
       [(nom as string).trim(), email, telephone, hash]
     );
-    const id = (result as { insertId: number }).insertId;
+    const id = result.insertId;
 
     const session = {
       id,
