@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, ShoppingBag, User, Menu, X,
-  Package, Tag, Home, Heart,
+  Package, Tag, Home, Heart, Loader2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useCart } from "@/context/CartContext";
+import { type Product, finalPrice, formatPrice } from "@/lib/utils";
 
 function useWishlistCount() {
   const [count, setCount] = useState(0);
@@ -32,13 +34,46 @@ const NAV = [
 export default function Header() {
   const { count: cartCount } = useCart();
   const wishlistCount = useWishlistCount();
-  const [open, setOpen]         = useState(false);
-  const [search, setSearch]     = useState("");
-  const [searchFocus, setFocus] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const router   = useRouter();
-  const pathname = usePathname();
+  const [open, setOpen]             = useState(false);
+  const [search, setSearch]         = useState("");
+  const [searchFocus, setFocus]     = useState(false);
+  const [scrolled, setScrolled]     = useState(false);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [sugLoading, setSugLoading] = useState(false);
+  const [showSug, setShowSug]       = useState(false);
+  const inputRef    = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const router      = useRouter();
+  const pathname    = usePathname();
+
+  /* Instant search — debounced 300ms */
+  const fetchSuggestions = useCallback(async (q: string) => {
+    if (q.trim().length < 2) { setSuggestions([]); setShowSug(false); return; }
+    setSugLoading(true);
+    try {
+      const res  = await fetch(`/api/products?q=${encodeURIComponent(q.trim())}&limit=6`);
+      const json = await res.json();
+      setSuggestions(json.data ?? []);
+      setShowSug(true);
+    } catch { setSuggestions([]); }
+    finally { setSugLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => fetchSuggestions(search), 300);
+    return () => clearTimeout(t);
+  }, [search, fetchSuggestions]);
+
+  /* Close dropdown on outside click */
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowSug(false);
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 8);
@@ -79,32 +114,80 @@ export default function Header() {
             </Link>
 
             {/* Search bar — desktop */}
-            <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-lg relative">
-              <div className={clsx(
-                "flex items-center w-full rounded-2xl border-2 transition-all duration-200 bg-slate-50",
-                searchFocus
-                  ? "border-brand-600 bg-white shadow-md"
-                  : "border-slate-200 hover:border-slate-300"
-              )}>
-                <Search className="w-4 h-4 text-slate-400 ml-4 shrink-0" />
-                <input
-                  ref={inputRef}
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  onFocus={() => setFocus(true)}
-                  onBlur={() => setFocus(false)}
-                  placeholder="Rechercher un produit…"
-                  className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none text-slate-800 placeholder:text-slate-400 font-sans"
-                />
-                {search && (
-                  <button type="submit"
-                    className="mr-2 px-3 py-1.5 rounded-xl bg-brand-900 text-white text-xs font-semibold hover:bg-brand-800 transition-colors"
+            <div ref={dropdownRef} className="hidden md:flex flex-1 max-w-lg relative">
+              <form onSubmit={handleSearch} className="w-full">
+                <div className={clsx(
+                  "flex items-center w-full rounded-2xl border-2 transition-all duration-200 bg-slate-50",
+                  searchFocus
+                    ? "border-brand-600 bg-white shadow-md"
+                    : "border-slate-200 hover:border-slate-300"
+                )}>
+                  <Search className="w-4 h-4 text-slate-400 ml-4 shrink-0" />
+                  <input
+                    ref={inputRef}
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    onFocus={() => { setFocus(true); if (suggestions.length) setShowSug(true); }}
+                    onBlur={() => setFocus(false)}
+                    placeholder="Rechercher un produit…"
+                    className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none text-slate-800 placeholder:text-slate-400 font-sans"
+                  />
+                  {sugLoading && <Loader2 className="w-4 h-4 text-slate-400 mr-3 animate-spin" />}
+                  {search && !sugLoading && (
+                    <button type="submit"
+                      className="mr-2 px-3 py-1.5 rounded-xl bg-brand-900 text-white text-xs font-semibold hover:bg-brand-800 transition-colors"
+                    >
+                      OK
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              {/* Instant search dropdown */}
+              {showSug && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden">
+                  {suggestions.map(p => {
+                    const price  = finalPrice(p);
+                    const isPromo = p.remise > 0;
+                    const imgSrc = p.image_url
+                      ? p.image_url.startsWith("http") ? p.image_url : `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${p.image_url}`
+                      : null;
+                    return (
+                      <Link
+                        key={p.id}
+                        href={`/products/${p.reference}`}
+                        onClick={() => { setShowSug(false); setSearch(""); }}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden shrink-0">
+                          {imgSrc
+                            ? <Image src={imgSrc} alt={p.nom} width={40} height={40} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">📷</div>
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-800 line-clamp-1">{p.nom}</p>
+                          {p.categorie_nom && <p className="text-xs text-slate-400">{p.categorie_nom}</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={clsx("text-sm font-800", isPromo ? "text-accent-600" : "text-slate-900")}>
+                            {formatPrice(price)}
+                          </p>
+                          {isPromo && <p className="text-xs text-slate-400 line-through">{formatPrice(p.prix_unitaire)}</p>}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                  <Link
+                    href={`/products?q=${encodeURIComponent(search)}`}
+                    onClick={() => { setShowSug(false); setSearch(""); }}
+                    className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 transition-colors"
                   >
-                    OK
-                  </button>
-                )}
-              </div>
-            </form>
+                    Voir tous les résultats pour « {search} » →
+                  </Link>
+                </div>
+              )}
+            </div>
 
             {/* Desktop nav */}
             <nav className="hidden lg:flex items-center gap-1 mx-2">

@@ -62,18 +62,20 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Support */}
+          {/* Support & Fidélité */}
           <div>
             <h4 className="font-display font-700 text-sm uppercase tracking-widest text-slate-400 mb-5">
               Support
             </h4>
             <ul className="flex flex-col gap-3">
               {[
-                ["Mon compte",       "/account"],
-                ["Mes commandes",    "/account/orders"],
+                ["Mon compte",          "/account"],
+                ["Mes commandes",       "/account/orders"],
                 ["Politique de retour", "/returns"],
-                ["Livraisons",       "/shipping"],
-                ["Contact",          "/contact"],
+                ["Livraisons",          "/shipping"],
+                ["Contact",             "/contact"],
+                ["Programme Fidélité ⭐", "/fidelite"],
+                ["Parrainage 🎁",       "/parrainage"],
               ].map(([label, href]) => (
                 <li key={label}>
                   <Link href={href}

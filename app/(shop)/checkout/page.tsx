@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { calcPrice } from "@/context/CartContext";
 import { formatPrice } from "@/lib/utils";
@@ -45,7 +45,15 @@ export default function CheckoutPage() {
   });
   const [submitted, setSubmitted]       = useState(false);
   const [errors,    setErrors]          = useState<Partial<Form>>({});
-  const [orderedItems, setOrderedItems] = useState<typeof items>([]);
+  const [orderedItems,  setOrderedItems]  = useState<typeof items>([]);
+  const [orderedTotal,  setOrderedTotal]  = useState(0);
+  const [refCode,   setRefCode]         = useState<string | null>(null);
+
+  // Read referral code from cookie on mount
+  useEffect(() => {
+    const match = document.cookie?.match?.(/ts_ref=([^;]+)/);
+    if (match) setRefCode(decodeURIComponent(match[1]));
+  }, []);
 
   const selectedZone = ZONES.find(z => z.label === form.zone);
   const deliveryFee  = selectedZone?.fee ?? 0;
@@ -82,7 +90,8 @@ export default function CheckoutPage() {
       `💰 Sous-total : ${formatPrice(total)}\n` +
       `🚚 Livraison : ${deliveryFee === 0 ? "À confirmer" : formatPrice(deliveryFee)}\n` +
       `━━━━━━━━━━━━━━━\n` +
-      `*TOTAL : ${formatPrice(grandTotal)}*`
+      `*TOTAL : ${formatPrice(grandTotal)}*` +
+      (refCode ? `\n\n🎁 *Code parrain :* ${refCode}` : "")
     );
   }
 
@@ -94,6 +103,7 @@ export default function CheckoutPage() {
     const url = `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${buildWhatsAppText()}`;
     window.open(url, "_blank", "noreferrer");
     setOrderedItems([...items]);
+    setOrderedTotal(grandTotal);
     setSubmitted(true);
     clearCart();
   }
@@ -129,9 +139,16 @@ export default function CheckoutPage() {
         <p className="text-slate-600 text-sm max-w-sm mx-auto mb-2">
           Votre commande a été transmise sur WhatsApp. Notre équipe vous confirmera la livraison très bientôt.
         </p>
-        <p className="text-slate-400 text-xs mb-8">
+        <p className="text-slate-400 text-xs mb-6">
           Si la fenêtre WhatsApp ne s'est pas ouverte, appuyez sur le bouton ci-dessous.
         </p>
+
+        {/* Points estimés */}
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-50 border border-brand-100 text-brand-800 text-sm font-semibold mb-8">
+          <Star className="w-4 h-4 text-brand-600" fill="currentColor" />
+          ~{Math.floor(orderedTotal / 100)} points fidélité à recevoir après livraison
+          <Link href="/fidelite" className="text-xs text-brand-600 hover:underline ml-1">En savoir plus →</Link>
+        </div>
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
           <Link href="/"
             className="px-6 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-brand-300 transition-colors"
