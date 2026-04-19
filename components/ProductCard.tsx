@@ -161,7 +161,7 @@ export default function ProductCard({ product, className }: Props) {
 
         {/* Name */}
         <Link href={`/products/${product.reference}`}>
-          <h3 className="font-display font-700 text-sm text-slate-900 leading-snug mb-2.5 line-clamp-2 hover:text-brand-800 transition-colors">
+          <h3 className="font-sans text-sm text-slate-700 leading-snug mb-2.5 line-clamp-2 hover:text-brand-800 transition-colors">
             {product.nom}
           </h3>
         </Link>

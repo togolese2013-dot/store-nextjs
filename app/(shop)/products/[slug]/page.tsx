@@ -236,6 +236,16 @@ export default async function ProductPage({ params }: PageProps) {
           </div>
         </div>
 
+        {/* ── Description complète ── */}
+        {product.description && (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8 lg:p-10 mb-10">
+            <h2 className="font-display text-xl font-800 text-slate-900 mb-4">Description du produit</h2>
+            <div className="prose prose-sm prose-slate max-w-none text-slate-600 leading-relaxed whitespace-pre-line">
+              {product.description}
+            </div>
+          </div>
+        )}
+
         {/* ── Reviews ── */}
         <div id="avis" className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8 lg:p-10 mb-10">
           <ProductReviews productId={product.id} />

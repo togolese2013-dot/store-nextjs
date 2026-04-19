@@ -8,7 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
-  User, MessageSquare, ChevronDown, Truck,
+  User, MessageSquare, ChevronDown, Truck, Star,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -43,8 +43,9 @@ export default function CheckoutPage() {
   const [form, setForm] = useState<Form>({
     nom: "", telephone: "", adresse: "", zone: "", note: "",
   });
-  const [submitted, setSubmitted] = useState(false);
-  const [errors,    setErrors]    = useState<Partial<Form>>({});
+  const [submitted, setSubmitted]       = useState(false);
+  const [errors,    setErrors]          = useState<Partial<Form>>({});
+  const [orderedItems, setOrderedItems] = useState<typeof items>([]);
 
   const selectedZone = ZONES.find(z => z.label === form.zone);
   const deliveryFee  = selectedZone?.fee ?? 0;
@@ -92,6 +93,7 @@ export default function CheckoutPage() {
 
     const url = `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${buildWhatsAppText()}`;
     window.open(url, "_blank", "noreferrer");
+    setOrderedItems([...items]);
     setSubmitted(true);
     clearCart();
   }
@@ -117,18 +119,20 @@ export default function CheckoutPage() {
   /* Success screen */
   if (submitted) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-5">
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+
+        {/* Confirmation */}
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
           <Check className="w-10 h-10 text-green-600" />
         </div>
         <h1 className="font-display text-2xl font-800 text-slate-900 mb-3">Commande envoyée !</h1>
-        <p className="text-slate-600 text-sm max-w-sm mb-2">
+        <p className="text-slate-600 text-sm max-w-sm mx-auto mb-2">
           Votre commande a été transmise sur WhatsApp. Notre équipe vous confirmera la livraison très bientôt.
         </p>
         <p className="text-slate-400 text-xs mb-8">
           Si la fenêtre WhatsApp ne s'est pas ouverte, appuyez sur le bouton ci-dessous.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
           <Link href="/"
             className="px-6 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-brand-300 transition-colors"
           >
@@ -140,6 +144,37 @@ export default function CheckoutPage() {
             Continuer les achats
           </Link>
         </div>
+
+        {/* ── Review invitation ── */}
+        {orderedItems.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-left">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 text-amber-400" fill="currentColor" />
+                ))}
+              </div>
+              <h2 className="font-display font-800 text-slate-900 text-base">Votre avis compte !</h2>
+            </div>
+            <p className="text-slate-600 text-sm mb-4">
+              Dès réception de votre commande, partagez votre expérience — cela aide d'autres clients togolais à mieux choisir.
+            </p>
+            <div className="flex flex-col gap-2">
+              {orderedItems.map(item => (
+                <Link
+                  key={item.id}
+                  href={`/products/${item.reference}#avis`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all group"
+                >
+                  <span className="text-sm text-slate-800 font-medium line-clamp-1">{item.nom}</span>
+                  <span className="shrink-0 text-xs font-bold text-amber-600 group-hover:underline">
+                    Laisser un avis →
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
