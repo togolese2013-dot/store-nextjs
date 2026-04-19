@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProducts } from "@/lib/db";
+import { getProducts, getProductsByIds } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
 
   try {
+    /* Wishlist / ids filter */
+    const idsParam = searchParams.get("ids");
+    if (idsParam) {
+      const ids = idsParam.split(",").map(Number).filter(n => !isNaN(n) && n > 0).slice(0, 50);
+      if (ids.length === 0) return NextResponse.json({ success: true, data: [] });
+      const products = await getProductsByIds(ids);
+      return NextResponse.json({ success: true, data: products });
+    }
+
     const products = await getProducts({
       categoryId: searchParams.get("category") ? Number(searchParams.get("category")) : undefined,
       search:     searchParams.get("q")        ?? undefined,

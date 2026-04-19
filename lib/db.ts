@@ -174,6 +174,53 @@ export async function getProducts(opts?: {
   })) as Product[];
 }
 
+export async function getProductsByIds(ids: number[]): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  const cols = await produitCols();
+  const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
+  const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
+  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockMagasinCol  = cols.stock_magasin  ? "COALESCE(p.stock_magasin, 0)"    : "0";
+
+  const placeholders = ids.map(() => "?").join(",");
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT
+       p.id, p.reference, p.nom, p.description, p.categorie_id,
+       CAST(p.prix_unitaire AS SIGNED)                                          AS prix_unitaire,
+       ${stockBoutiqueCol}                                                       AS stock_boutique,
+       ${stockMagasinCol}                                                        AS stock_magasin,
+       ${cols.remise         ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)"  : "0"    } AS remise,
+       ${cols.neuf           ? "COALESCE(p.neuf, 1)"                           : "1"    } AS neuf,
+       ${imageCol}                                                                          AS image_url,
+       ${cols.variations_json ? "p.variations_json"                            : "NULL" } AS variations_json,
+       ${cols.images_json     ? "p.images_json"                                : "NULL" } AS images_json,
+       ${orderCol}                                                                          AS sort_col,
+       c.nom AS categorie_nom
+     FROM produits p
+     LEFT JOIN categories c ON p.categorie_id = c.id
+     WHERE p.id IN (${placeholders}) AND p.actif = 1`,
+    ids
+  );
+
+  return rows.map((r) => ({
+    id:             Number(r.id),
+    reference:      r.reference as string,
+    nom:            r.nom as string,
+    description:    (r.description ?? null) as string | null,
+    categorie_id:   r.categorie_id ? Number(r.categorie_id) : null,
+    categorie_nom:  (r.categorie_nom ?? null) as string | null,
+    prix_unitaire:  Number(r.prix_unitaire),
+    stock_boutique: Number(r.stock_boutique),
+    stock_magasin:  Number(r.stock_magasin ?? 0),
+    remise:         Number(r.remise),
+    neuf:           Boolean(r.neuf),
+    image_url:      (r.image_url ?? null) as string | null,
+    images:         r.images_json ? tryParse(r.images_json as string) : [],
+    variations:     r.variations_json ? tryParse(r.variations_json as string) : null,
+    date_creation:  (r.sort_col ?? "") as string,
+  })) as Product[];
+}
+
 export async function getProductBySlug(reference: string): Promise<Product | null> {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";

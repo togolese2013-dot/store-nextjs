@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag, Heart, Zap } from "lucide-react";
 import { clsx } from "clsx";
 import { type Product, finalPrice, formatPrice } from "@/lib/utils";
+
+const WL_KEY = "ts_wishlist";
+
+function getWishlist(): number[] {
+  try { return JSON.parse(localStorage.getItem(WL_KEY) || "[]"); } catch { return []; }
+}
+function saveWishlist(ids: number[]) {
+  try { localStorage.setItem(WL_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+}
 
 interface Props {
   product: Product;
@@ -15,6 +24,11 @@ interface Props {
 export default function ProductCard({ product, className }: Props) {
   const [liked, setLiked]   = useState(false);
   const [added, setAdded]   = useState(false);
+
+  /* Sync wishlist state from localStorage after mount */
+  useEffect(() => {
+    setLiked(getWishlist().includes(product.id));
+  }, [product.id]);
   const [imgErr, setImgErr] = useState(false);
   const [imgOk, setImgOk]   = useState(false);
 
@@ -89,22 +103,22 @@ export default function ProductCard({ product, className }: Props) {
         {/* Badges top-left */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
           {isPromo && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent-500 text-white text-xs font-bold shadow-sm">
-              <Zap className="w-3 h-3" /> -{product.remise}%
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-accent-500 text-white text-xs font-bold shadow-sm">
+              <Zap className="w-3 h-3" /> -{Math.round((product.remise / product.prix_unitaire) * 100)}%
             </span>
           )}
           {product.neuf && !isPromo && (
-            <span className="px-2.5 py-1 rounded-full bg-brand-900 text-white text-xs font-bold">
+            <span className="px-2.5 py-1 rounded-md bg-indigo-600 text-white text-xs font-bold">
               Nouveau
             </span>
           )}
           {isLow && (
-            <span className="px-2.5 py-1 rounded-full bg-amber-500 text-white text-xs font-semibold">
+            <span className="px-2.5 py-1 rounded-md bg-amber-500 text-white text-xs font-semibold">
               {product.stock_boutique} restants
             </span>
           )}
           {outOf && (
-            <span className="px-2.5 py-1 rounded-full bg-slate-400 text-white text-xs font-semibold">
+            <span className="px-2.5 py-1 rounded-md bg-slate-400 text-white text-xs font-semibold">
               Rupture
             </span>
           )}
@@ -112,7 +126,17 @@ export default function ProductCard({ product, className }: Props) {
 
         {/* Wishlist top-right */}
         <button
-          onClick={e => { e.preventDefault(); setLiked(!liked); }}
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            const wl  = getWishlist();
+            const next = liked
+              ? wl.filter(id => id !== product.id)
+              : [...wl, product.id];
+            saveWishlist(next);
+            setLiked(!liked);
+            window.dispatchEvent(new Event("wishlist-updated"));
+          }}
           aria-label={liked ? "Retirer des favoris" : "Ajouter aux favoris"}
           className={clsx(
             "absolute top-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center",
@@ -145,7 +169,7 @@ export default function ProductCard({ product, className }: Props) {
         {/* Price row */}
         <div className="flex items-end gap-2 mb-3">
           <span className={clsx(
-            "font-display font-800 text-lg",
+            "font-display font-800 text-base",
             isPromo ? "text-accent-600" : "text-brand-900"
           )}>
             {formatPrice(price)}

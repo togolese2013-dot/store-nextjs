@@ -2,8 +2,12 @@ import { CartProvider } from "@/context/CartContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AnnouncementBar from "@/components/AnnouncementBar";
+import WhatsAppButton from "@/components/WhatsAppButton";
+import { getSetting } from "@/lib/admin-db";
 
-export default function ShopLayout({ children }: { children: React.ReactNode }) {
+export default async function ShopLayout({ children }: { children: React.ReactNode }) {
+  const waNumber = await getSetting("whatsapp_number").catch(() => "");
+
   return (
     <CartProvider>
       <AnnouncementBar />
@@ -12,8 +16,7 @@ export default function ShopLayout({ children }: { children: React.ReactNode }) 
         {children}
       </main>
       <Footer />
-
-
+      {waNumber && <WhatsAppButton number={waNumber} />}
     </CartProvider>
   );
 }

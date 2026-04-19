@@ -70,47 +70,15 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
         </div>
       )}
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center"
-      >
-        <div className="py-8 max-w-xl animate-fade-up" key={slide.id}>
-
-          {/* Eyebrow */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5"
-            style={{ background: `${slide.accent}22`, border: `1px solid ${slide.accent}40` }}
-          >
-            <span className="w-2 h-2 rounded-full" style={{ background: slide.accent }} />
-            <span className="text-white/90 text-xs font-bold tracking-widest uppercase">{slide.eyebrow}</span>
-          </div>
-
-          {/* Title */}
-          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-800 text-white leading-none mb-4 whitespace-pre-line"
-            style={{ textShadow: "0 2px 20px rgba(0,0,0,.25)" }}
-          >
-            {slide.title}
-          </h1>
-
-          <p className="text-white/70 text-base sm:text-lg leading-relaxed mb-8 max-w-md">{slide.sub}</p>
-
-          {/* CTA */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
+        <div className="py-8 animate-fade-up" key={slide.id}>
+          {/* CTA only */}
           <Link href={slide.cta1.href}
-            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-base transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
-            style={{ background: slide.accent, color: "#fff", boxShadow: `0 8px 24px ${slide.accent}45` }}
+            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-base text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl bg-brand-600 hover:bg-brand-500"
+            style={{ boxShadow: "0 8px 24px rgba(22,163,74,0.45)" }}
           >
             {slide.cta1.label} <ArrowRight className="w-5 h-5" />
           </Link>
-
-          {/* Social proof */}
-          <div className="flex items-center gap-4 mt-8">
-            <div className="flex -space-x-2">
-              {["KA", "AM", "EK", "DS"].map((av, i) => (
-                <div key={i}
-                  className="w-8 h-8 rounded-full border-2 border-white/30 flex items-center justify-center text-[10px] font-bold text-white"
-                  style={{ background: ["#14532d", "#f59e0b", "#166534", "#15803d"][i] }}
-                >{av}</div>
-              ))}
-            </div>
-            <p className="text-white/70 text-sm"><span className="text-white font-bold">+500</span> clients satisfaits</p>
-          </div>
         </div>
       </div>
 

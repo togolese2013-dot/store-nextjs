@@ -5,10 +5,23 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, ShoppingBag, User, Menu, X,
-  Package, Tag, Home,
+  Package, Tag, Home, Heart,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useCart } from "@/context/CartContext";
+
+function useWishlistCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const read = () => {
+      try { setCount(JSON.parse(localStorage.getItem("ts_wishlist") || "[]").length); } catch { setCount(0); }
+    };
+    read();
+    window.addEventListener("wishlist-updated", read);
+    return () => window.removeEventListener("wishlist-updated", read);
+  }, []);
+  return count;
+}
 
 const NAV = [
   { label: "Accueil",    href: "/",                   icon: Home },
@@ -18,6 +31,7 @@ const NAV = [
 
 export default function Header() {
   const { count: cartCount } = useCart();
+  const wishlistCount = useWishlistCount();
   const [open, setOpen]         = useState(false);
   const [search, setSearch]     = useState("");
   const [searchFocus, setFocus] = useState(false);
@@ -125,6 +139,19 @@ export default function Header() {
               >
                 <Search className="w-5 h-5" />
               </button>
+
+              {/* Wishlist */}
+              <Link href="/wishlist"
+                className="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                aria-label={`Favoris (${wishlistCount})`}
+              >
+                <Heart className="w-5 h-5" />
+                {wishlistCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                    {wishlistCount > 9 ? "9+" : wishlistCount}
+                  </span>
+                )}
+              </Link>
 
               {/* Cart */}
               <Link href="/cart"
