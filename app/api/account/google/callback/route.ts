@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       if (client) {
         await db.execute(
           "UPDATE clients SET google_id = ?, photo_url = COALESCE(photo_url, ?) WHERE id = ?",
-          [googleUser.sub, googleUser.picture ?? null, client.id]
+          [googleUser.sub, googleUser.picture ?? null, client.id as number]
         );
         client.google_id = googleUser.sub;
         client.photo_url = client.photo_url ?? googleUser.picture ?? null;
