@@ -78,24 +78,24 @@ export default function AccountDropdown({ open, onClose, onUserChange }: Props) 
   const [submitting,  setSubmitting]  = useState(false);
   const [error,       setError]       = useState("");
 
-  // Check session every time the dropdown opens
+  // Check session once on mount (catches Google OAuth redirect cookie)
   useEffect(() => {
-    if (!open) return;
-    setStatus("loading");
-    fetch("/api/account/me")
+    fetch("/api/account/me", { cache: "no-store", credentials: "include" })
       .then(r => r.json())
       .then(data => {
         if (data.user) {
           setUser(data.user as ClientUser);
           setStatus("logged");
           syncLocalStorage(data.user as ClientUser);
+          onUserChange(data.user as ClientUser);
         } else {
           setUser(null);
           setStatus("guest");
         }
       })
       .catch(() => { setUser(null); setStatus("guest"); });
-  }, [open]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function syncLocalStorage(u: ClientUser) {
     try {
