@@ -64,7 +64,7 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="bg-white border-b border-slate-100">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-brand-900 flex items-center justify-center text-white font-800 text-xl">
               {profil?.nom ? profil.nom.charAt(0).toUpperCase() : <User className="w-6 h-6" />}
@@ -79,7 +79,7 @@ export default function AccountPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
         {/* Main menu */}
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           {MENU.map((item, i) => (

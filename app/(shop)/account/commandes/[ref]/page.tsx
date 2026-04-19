@@ -94,7 +94,7 @@ export default function CommandeDetailPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-slate-100">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center gap-4">
           <Link href="/account/commandes" className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500">
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -109,7 +109,7 @@ export default function CommandeDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
 
         {/* Delivery timeline */}
         {!isCancelled ? (
