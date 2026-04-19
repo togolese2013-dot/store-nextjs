@@ -173,7 +173,7 @@ export default async function ProductPage({ params }: PageProps) {
                 <>
                   {/* Price */}
                   <div className="flex items-end gap-3 mb-6">
-                    <span className={`font-display text-4xl font-800 ${isPromo ? "text-accent-500" : "text-brand-900"}`}>
+                    <span className="font-display text-4xl font-800 text-slate-900">
                       {formatPrice(price)}
                     </span>
                     {isPromo && (
