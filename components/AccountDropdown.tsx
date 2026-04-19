@@ -373,8 +373,12 @@ export default function AccountDropdown({ open, onClose, onUserChange }: Props) 
   return (
     <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden">
 
-      {/* User header */}
-      <div className="px-4 py-4 border-b border-slate-50 flex items-center gap-3">
+      {/* User header — cliquable → /account */}
+      <Link
+        href="/account"
+        onClick={onClose}
+        className="px-4 py-4 border-b border-slate-50 flex items-center gap-3 hover:bg-slate-50 transition-colors"
+      >
         {user?.photo_url ? (
           <Image
             src={user.photo_url}
@@ -392,7 +396,8 @@ export default function AccountDropdown({ open, onClose, onUserChange }: Props) 
           <p className="font-800 text-sm text-slate-900 truncate">{user?.nom ?? "—"}</p>
           <p className="text-xs text-slate-400 truncate">{user?.email ?? user?.telephone ?? ""}</p>
         </div>
-      </div>
+        <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+      </Link>
 
       {/* Main menu */}
       {MENU_LINKS.map(item => {
