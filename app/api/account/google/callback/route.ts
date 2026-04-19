@@ -18,8 +18,12 @@ async function ensureColumns() {
     "ALTER TABLE clients ADD COLUMN photo_url VARCHAR(512)",
     "ALTER TABLE clients ADD COLUMN google_id VARCHAR(255)",
   ]) {
-    try { await db.execute(sql); } catch { /* column already exists */ }
+    try { await db.execute(sql); } catch { /* already exists */ }
   }
+  // telephone was originally NOT NULL — allow NULL for Google-only accounts
+  try {
+    await db.execute("ALTER TABLE clients MODIFY COLUMN telephone VARCHAR(20) NULL");
+  } catch { /* already nullable */ }
 }
 
 interface GoogleUser {
@@ -101,7 +105,7 @@ export async function GET(req: NextRequest) {
       } else {
         // 3. Create new client
         const [result] = await db.execute<ResultSetHeader>(
-          "INSERT INTO clients (nom, email, google_id, photo_url, statut) VALUES (?, ?, ?, ?, 'actif')",
+          "INSERT INTO clients (nom, email, google_id, photo_url, statut) VALUES (?, ?, ?, ?, 'normal')",
           [
             googleUser.name || googleUser.email,
             googleUser.email.toLowerCase(),
