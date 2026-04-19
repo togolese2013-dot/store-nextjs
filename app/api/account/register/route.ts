@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     const hash     = await bcrypt.hash(password as string, 12);
     const [result] = await db.execute<ResultSetHeader>(
-      "INSERT INTO clients (nom, email, telephone, password, statut) VALUES (?, ?, ?, ?, 'actif')",
+      "INSERT INTO clients (nom, email, telephone, password, statut) VALUES (?, ?, ?, ?, 'normal')",
       [(nom as string).trim(), email, telephone, hash]
     );
     const id = result.insertId;
