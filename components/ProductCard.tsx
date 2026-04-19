@@ -168,7 +168,7 @@ export default function ProductCard({ product, className }: Props) {
 
         {/* Price row */}
         <div className="flex items-end gap-2 mb-3">
-          <span className="font-display font-800 text-base text-slate-900">
+          <span className="font-display font-600 text-base text-slate-900">
             {formatPrice(price)}
           </span>
           {isPromo && (
