@@ -2114,3 +2114,102 @@ export async function getBoutiqueClientsStats(): Promise<BoutiqueClientStats> {
     derniers:       derniers as BoutiqueClient[],
   };
 }
+
+// ─── VITRINE — Fidélité, Parrainage, Newsletter, Comptes clients ──────────────
+
+export async function listLoyaltyClients() {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(`
+    SELECT
+      lp.telephone,
+      MAX(c.nom) AS nom,
+      SUM(lp.points) AS total_points,
+      MAX(lp.created_at) AS last_date,
+      COUNT(*) AS nb_transactions
+    FROM loyalty_points lp
+    LEFT JOIN clients c
+      ON RIGHT(REGEXP_REPLACE(c.telephone, '[^0-9]', ''), 8)
+       = RIGHT(REGEXP_REPLACE(lp.telephone, '[^0-9]', ''), 8)
+    GROUP BY lp.telephone
+    ORDER BY total_points DESC
+  `);
+  return rows as {
+    telephone: string; nom: string | null;
+    total_points: number; last_date: string; nb_transactions: number;
+  }[];
+}
+
+export async function getLoyaltyHistory(telephone: string) {
+  const digits = telephone.replace(/\D/g, "").slice(-8);
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT * FROM loyalty_points
+     WHERE RIGHT(REGEXP_REPLACE(telephone, '[^0-9]', ''), 8) = ?
+     ORDER BY created_at DESC LIMIT 50`,
+    [digits]
+  );
+  return rows as { id: number; telephone: string; points: number; reason: string; created_at: string }[];
+}
+
+export async function addLoyaltyPointsManual(telephone: string, points: number, reason: string) {
+  await db.execute(
+    `INSERT INTO loyalty_points (telephone, points, reason, created_at) VALUES (?, ?, ?, NOW())`,
+    [telephone, points, reason]
+  );
+}
+
+export async function listReferrals() {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT * FROM referrals ORDER BY uses_count DESC, created_at DESC`
+  );
+  return rows as {
+    id: number; nom: string; telephone: string; code: string;
+    uses_count: number; created_at: string;
+  }[];
+}
+
+export async function listNewsletterSubscribers() {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT * FROM newsletter_subscribers ORDER BY subscribed_at DESC`
+  );
+  return rows as { id: number; email: string; subscribed_at: string }[];
+}
+
+export async function deleteNewsletterSubscriber(id: number) {
+  await db.execute(`DELETE FROM newsletter_subscribers WHERE id = ?`, [id]);
+}
+
+export async function listSiteClients() {
+  try {
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(`
+      SELECT id, nom, email, telephone,
+             google_id IS NOT NULL AS via_google,
+             password IS NOT NULL  AS via_password,
+             statut, created_at
+      FROM clients
+      WHERE password IS NOT NULL OR google_id IS NOT NULL
+      ORDER BY created_at DESC
+    `);
+    return rows as {
+      id: number; nom: string; email: string | null; telephone: string | null;
+      via_google: number; via_password: number; statut: string; created_at: string;
+    }[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getLoyaltyStats() {
+  try {
+    const [[r]] = await db.execute<mysql.RowDataPacket[]>(`
+      SELECT
+        COUNT(DISTINCT telephone) AS nb_clients,
+        SUM(CASE WHEN points > 0 THEN points ELSE 0 END) AS total_distribues,
+        ABS(SUM(CASE WHEN points < 0 THEN points ELSE 0 END)) AS total_echanges
+      FROM loyalty_points
+    `);
+    return {
+      nb_clients:       Number(r?.nb_clients ?? 0),
+      total_distribues: Number(r?.total_distribues ?? 0),
+      total_echanges:   Number(r?.total_echanges ?? 0),
+    };
+  } catch { return { nb_clients: 0, total_distribues: 0, total_echanges: 0 }; }
+}

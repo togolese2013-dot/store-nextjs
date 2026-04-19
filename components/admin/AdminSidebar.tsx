@@ -9,6 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart, Zap,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, Globe, FileText, BarChart2,
+  Gift, Mail, UserCheck,
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; icon: React.ElementType };
@@ -69,10 +70,14 @@ const MODULES: Record<string, {
     color:     "bg-indigo-700",
     textColor: "text-indigo-700",
     items: [
-      { label: "Clients",         href: "/admin/crm",      icon: Users },
-      { label: "Avis clients",    href: "/admin/reviews",  icon: Star },
-      { label: "Messages reçus",  href: "/admin/messages", icon: MessageCircle },
-      { label: "Diffusion",       href: "/admin/whatsapp", icon: Send },
+      { label: "Clients",          href: "/admin/crm",              icon: Users },
+      { label: "Avis clients",     href: "/admin/reviews",          icon: Star },
+      { label: "Messages reçus",   href: "/admin/messages",         icon: MessageCircle },
+      { label: "Diffusion",        href: "/admin/whatsapp",         icon: Send },
+      { label: "Fidélité",         href: "/admin/fidelite",         icon: Gift },
+      { label: "Parrainage",       href: "/admin/parrainage",       icon: Link2 },
+      { label: "Newsletter",       href: "/admin/newsletter",       icon: Mail },
+      { label: "Comptes clients",  href: "/admin/comptes-clients",  icon: UserCheck },
     ],
   },
   admin: {
@@ -106,10 +111,14 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/coupons",       "store"],
   ["/admin/settings",      "store"],
   ["/admin/users",         "store"],
-  ["/admin/reviews",       "crm"],
-  ["/admin/crm",           "crm"],
-  ["/admin/messages",      "crm"],
-  ["/admin/whatsapp",      "crm"],
+  ["/admin/reviews",          "crm"],
+  ["/admin/crm",              "crm"],
+  ["/admin/messages",         "crm"],
+  ["/admin/whatsapp",         "crm"],
+  ["/admin/fidelite",         "crm"],
+  ["/admin/parrainage",       "crm"],
+  ["/admin/newsletter",       "crm"],
+  ["/admin/comptes-clients",  "crm"],
   ["/admin/rapports",      "admin"],
   ["/admin/tendances",     "admin"],
 ];

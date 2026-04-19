@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Search, Users, Crown, Ban, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Search, Users, Crown, Ban, ChevronLeft, ChevronRight, Loader2, UserCheck } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import type { Client } from "@/lib/admin-db";
 
 interface ClientRow extends Client {
   total_orders?: number;
   total_spent?:  number;
+  password?:     string | null;
+  google_id?:    string | null;
 }
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
@@ -110,7 +112,14 @@ export default function ClientsTable() {
                           {(c.nom || c.telephone).charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-900">{c.nom || <span className="text-slate-400 italic">Sans nom</span>}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-semibold text-slate-900">{c.nom || <span className="text-slate-400 italic">Sans nom</span>}</p>
+                            {(c.password || c.google_id) && (
+                              <span title="Compte store actif" className="inline-flex items-center p-0.5 rounded-full bg-emerald-100 text-emerald-600">
+                                <UserCheck className="w-3 h-3" />
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-400">{c.telephone}</p>
                         </div>
                       </div>
