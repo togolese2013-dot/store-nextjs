@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Search, ShoppingBag, User, Menu, X,
   Package, Tag, Home, Heart, Loader2,
+  Star, Users, MapPin, CreditCard, Bell, Settings, ChevronRight,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useCart } from "@/context/CartContext";
@@ -41,10 +42,13 @@ export default function Header() {
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [sugLoading, setSugLoading] = useState(false);
   const [showSug, setShowSug]       = useState(false);
-  const inputRef    = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const router      = useRouter();
-  const pathname    = usePathname();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [profilNom, setProfilNom]   = useState<string | null>(null);
+  const inputRef      = useRef<HTMLInputElement>(null);
+  const dropdownRef   = useRef<HTMLDivElement>(null);
+  const accountRef    = useRef<HTMLDivElement>(null);
+  const router        = useRouter();
+  const pathname      = usePathname();
 
   /* Instant search — debounced 300ms */
   const fetchSuggestions = useCallback(async (q: string) => {
@@ -64,11 +68,22 @@ export default function Header() {
     return () => clearTimeout(t);
   }, [search, fetchSuggestions]);
 
-  /* Close dropdown on outside click */
+  /* Load profil name from localStorage */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ts_profil");
+      if (raw) setProfilNom(JSON.parse(raw).nom ?? null);
+    } catch { /* ignore */ }
+  }, []);
+
+  /* Close search dropdown on outside click */
   useEffect(() => {
     function handle(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowSug(false);
+      }
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
       }
     }
     document.addEventListener("mousedown", handle);
@@ -249,13 +264,100 @@ export default function Header() {
                 )}
               </Link>
 
-              {/* Account */}
-              <Link href="/account"
-                className="hidden sm:flex p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
-                aria-label="Mon compte"
-              >
-                <User className="w-5 h-5" />
-              </Link>
+              {/* Account dropdown */}
+              <div ref={accountRef} className="hidden sm:block relative">
+                <button
+                  onClick={() => setAccountOpen(v => !v)}
+                  className={clsx(
+                    "flex items-center gap-1.5 p-2 rounded-xl transition-colors",
+                    accountOpen ? "bg-brand-50 text-brand-800" : "hover:bg-slate-100 text-slate-700"
+                  )}
+                  aria-label="Mon compte"
+                  aria-expanded={accountOpen}
+                >
+                  <div className={clsx(
+                    "w-7 h-7 rounded-full flex items-center justify-center text-xs font-800",
+                    profilNom ? "bg-brand-900 text-white" : "bg-slate-200 text-slate-500"
+                  )}>
+                    {profilNom ? profilNom.charAt(0).toUpperCase() : <User className="w-3.5 h-3.5" />}
+                  </div>
+                </button>
+
+                {/* Dropdown panel */}
+                {accountOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden">
+                    {/* User header */}
+                    <div className="px-4 py-3.5 border-b border-slate-50 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-brand-900 flex items-center justify-center text-white text-sm font-800 shrink-0">
+                        {profilNom ? profilNom.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-800 text-sm text-slate-900 truncate">{profilNom ?? "Mon compte"}</p>
+                        <p className="text-xs text-slate-400">Gérer mon espace</p>
+                      </div>
+                    </div>
+
+                    {/* Main links */}
+                    {[
+                      { label: "Mon profil",        href: "/account/profil",    icon: User,    color: "text-brand-700"  },
+                      { label: "Mes commandes",     href: "/account/commandes", icon: Package, color: "text-blue-600"   },
+                      { label: "Mes favoris",       href: "/wishlist",           icon: Heart,   color: "text-red-500"    },
+                      { label: "Programme Fidélité",href: "/fidelite",           icon: Star,    color: "text-amber-500"  },
+                      { label: "Parrainage",        href: "/parrainage",         icon: Users,   color: "text-purple-600" },
+                    ].map(item => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setAccountOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors"
+                        >
+                          <Icon className={`w-4 h-4 shrink-0 ${item.color}`} />
+                          <span className="text-sm text-slate-700 font-medium flex-1">{item.label}</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                        </Link>
+                      );
+                    })}
+
+                    {/* Settings section */}
+                    <div className="border-t border-slate-50 mt-1">
+                      <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-300 flex items-center gap-1.5">
+                        <Settings className="w-3 h-3" /> Paramètres
+                      </p>
+                      {[
+                        { label: "Mes adresses",  href: "/account/adresses",     icon: MapPin },
+                        { label: "Paiement",      href: "/account/paiement",     icon: CreditCard },
+                        { label: "Notifications", href: "/account/notifications", icon: Bell },
+                      ].map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setAccountOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors"
+                          >
+                            <Icon className="w-4 h-4 shrink-0 text-slate-400" />
+                            <span className="text-sm text-slate-600 flex-1">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+
+                    {/* Full account hub */}
+                    <div className="border-t border-slate-50 p-2">
+                      <Link
+                        href="/account"
+                        onClick={() => setAccountOpen(false)}
+                        className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-brand-700 hover:bg-brand-50 transition-colors"
+                      >
+                        Voir tout mon compte
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Hamburger */}
               <button
@@ -302,12 +404,24 @@ export default function Header() {
                 )}
               </Link>
             ))}
-            <div className="mt-2">
+            <div className="mt-2 space-y-2">
               <Link href="/account"
                 className="flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-semibold text-sm hover:border-brand-300 transition-colors"
               >
                 <User className="w-4 h-4" /> Mon compte
               </Link>
+              <div className="grid grid-cols-2 gap-2">
+                <Link href="/account/commandes"
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-slate-50 text-slate-600 text-sm font-semibold hover:bg-brand-50 hover:text-brand-800 transition-colors"
+                >
+                  <Package className="w-4 h-4" /> Commandes
+                </Link>
+                <Link href="/wishlist"
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-slate-50 text-slate-600 text-sm font-semibold hover:bg-red-50 hover:text-red-700 transition-colors"
+                >
+                  <Heart className="w-4 h-4" /> Favoris
+                </Link>
+              </div>
             </div>
           </div>
         )}

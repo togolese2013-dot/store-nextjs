@@ -49,6 +49,28 @@ export default async function ProductPage({ params }: PageProps) {
 
   /* Image src */
   const rawUrl = product.image_url || product.images?.[0] || null;
+
+  /* JSON-LD — Schema.org Product */
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-nextjs-production.up.railway.app";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type":    "Product",
+    name:        product.nom,
+    description: product.description ?? product.nom,
+    sku:         product.reference,
+    brand:       { "@type": "Brand", name: "Togolese Shop" },
+    image:       rawUrl ? (rawUrl.startsWith("http") ? rawUrl : `${siteUrl}${rawUrl}`) : undefined,
+    offers: {
+      "@type":          "Offer",
+      url:              `${siteUrl}/products/${product.reference}`,
+      priceCurrency:    "XOF",
+      price:            price,
+      availability:     outOf
+        ? "https://schema.org/OutOfStock"
+        : "https://schema.org/InStock",
+      seller:           { "@type": "Organization", name: "Togolese Shop" },
+    },
+  };
   const imgSrc = rawUrl
     ? rawUrl.startsWith("http")
       ? rawUrl
@@ -71,6 +93,12 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Schema.org JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Breadcrumb */}
       <div className="bg-white border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
