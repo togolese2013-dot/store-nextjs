@@ -7,13 +7,18 @@ import { signClientToken, CLIENT_COOKIE } from "@/lib/client-auth";
 type ClientRow = RowDataPacket & { id: number };
 
 async function ensureColumns() {
+  // Add new columns (silently skip if already exist)
   for (const sql of [
     "ALTER TABLE clients ADD COLUMN password VARCHAR(255)",
     "ALTER TABLE clients ADD COLUMN photo_url VARCHAR(512)",
     "ALTER TABLE clients ADD COLUMN google_id VARCHAR(255)",
   ]) {
-    try { await db.execute(sql); } catch { /* column already exists */ }
+    try { await db.execute(sql); } catch { /* already exists */ }
   }
+  // telephone was originally NOT NULL — allow NULL so email-only accounts work
+  try {
+    await db.execute("ALTER TABLE clients MODIFY COLUMN telephone VARCHAR(20) NULL");
+  } catch { /* already nullable */ }
 }
 
 export async function POST(req: NextRequest) {

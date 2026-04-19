@@ -108,7 +108,7 @@ export default function ProductCard({ product, className }: Props) {
             </span>
           )}
           {product.neuf && !isPromo && (
-            <span className="px-2.5 py-1 rounded-md bg-amber-500 text-white text-xs font-bold">
+            <span className="px-2.5 py-1 rounded-md bg-brand-900 text-white text-xs font-bold">
               Nouveau
             </span>
           )}
