@@ -12,7 +12,6 @@ import {
   Tag, Zap, ShieldCheck, Truck, ChevronRight,
   Sparkles,
 } from "lucide-react";
-import ProductReviews from "@/components/ProductReviews";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -172,22 +171,14 @@ export default async function ProductPage({ params }: PageProps) {
                 {product.nom}
               </h1>
 
-              {/* Rating anchor — le composant ProductReviews affiche les vraies notes */}
-              <a href="#avis" className="flex items-center gap-2 mb-5 group w-fit">
-                <div className="flex items-center gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <span className="text-sm text-slate-500 font-medium group-hover:text-brand-700 transition-colors">Voir les avis</span>
-              </a>
-
-              {/* Description */}
+              {/* Mini description */}
               {product.description && (
                 <div className="mb-6 pb-6 border-b border-slate-100">
-                  <p className="text-slate-600 text-sm leading-relaxed">{product.description}</p>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    {product.description.length > 160
+                      ? product.description.slice(0, 160).trimEnd() + "…"
+                      : product.description}
+                  </p>
                 </div>
               )}
 
@@ -201,7 +192,7 @@ export default async function ProductPage({ params }: PageProps) {
                 <>
                   {/* Price */}
                   <div className="flex items-end gap-3 mb-6">
-                    <span className="font-display text-4xl font-600 text-slate-900">
+                    <span className="font-display text-4xl font-800 text-slate-900">
                       {formatPrice(price)}
                     </span>
                     {isPromo && (
@@ -273,11 +264,6 @@ export default async function ProductPage({ params }: PageProps) {
             </div>
           </div>
         )}
-
-        {/* ── Reviews ── */}
-        <div id="avis" className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8 lg:p-10 mb-10">
-          <ProductReviews productId={product.id} />
-        </div>
 
         {/* ── Related products ── */}
         {related.length > 0 && (
