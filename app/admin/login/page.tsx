@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, Package, ShoppingBag, Settings, Users, BarChart2 } from "lucide-react";
-
-const MODULES = [
-  { label: "MAGASIN",  desc: "Produits & stocks",   color: "bg-brand-800",   icon: Package },
-  { label: "BOUTIQUE", desc: "Ventes & finance",     color: "bg-amber-500",   icon: ShoppingBag },
-  { label: "STORE",    desc: "Commandes & réglages", color: "bg-emerald-700", icon: Settings },
-  { label: "CRM",      desc: "Clients & fidélité",   color: "bg-indigo-700",  icon: Users },
-  { label: "ADMIN",    desc: "Rapports & tendances", color: "bg-violet-700",  icon: BarChart2 },
-];
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -68,21 +60,6 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Module badges */}
-        <div className="relative z-10 space-y-2.5">
-          {MODULES.map(({ label, desc, color, icon: Icon }) => (
-            <div key={label} className="flex items-center gap-4 p-3.5 rounded-2xl bg-white/8 border border-white/10">
-              <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center shrink-0`}>
-                <Icon className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm leading-none">{label}</p>
-                <p className="text-white/50 text-xs mt-0.5">{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* Bottom spacer */}
         <div className="relative z-10 h-2" />
       </div>
@@ -93,7 +70,6 @@ export default function AdminLoginPage() {
 
           {/* Header design */}
           <div className="mb-10">
-            <div className="w-1 h-10 rounded-full bg-accent-500 mb-6" />
             <h1 className="font-display font-800 text-4xl text-slate-900 leading-tight mb-2">
               Bienvenue
             </h1>

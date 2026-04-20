@@ -18,7 +18,7 @@ interface Props {
   categories: Category[];
 }
 
-const inp = "w-full px-3.5 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all";
+const inp = "w-full px-3.5 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
 const lbl = "block text-xs font-semibold text-slate-500 mb-1.5";
 
 
@@ -134,8 +134,10 @@ export default function AddProductModal({ categories }: Props) {
   // ── Submit ─────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nom.trim())  { setError("Le nom est obligatoire."); return; }
-    if (!prixVente)   { setError("Le prix de vente est obligatoire."); return; }
+    if (!nom.trim())           { setError("Le nom est obligatoire."); return; }
+    if (!categorie_id)         { setError("La catégorie est obligatoire."); return; }
+    if (!description.trim())   { setError("La mini description est obligatoire."); return; }
+    if (!prixVente)            { setError("Le prix de vente est obligatoire."); return; }
     setError(""); setLoading(true);
     try {
       const payload: Record<string, unknown> = {
@@ -193,9 +195,9 @@ export default function AddProductModal({ categories }: Props) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
       >
-        <Plus className="w-4 h-4" /> Ajouter un produit
+        Ajouter un produit
       </button>
 
       {open && (
@@ -226,7 +228,7 @@ export default function AddProductModal({ categories }: Props) {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingImgs}
-                    className="w-full flex flex-col items-center gap-2 py-8 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/40 transition-all disabled:opacity-50"
+                    className="w-full flex flex-col items-center gap-2 py-8 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50/40 transition-all disabled:opacity-50"
                   >
                     {uploadingImgs
                       ? <Loader2 className="w-7 h-7 animate-spin" />
@@ -333,20 +335,27 @@ export default function AddProductModal({ categories }: Props) {
                     </div>
 
                     <div>
-                      <label className={lbl}>Catégorie</label>
-                      <select value={categorie_id} onChange={e => setCategorie(e.target.value ? Number(e.target.value) : "")} className={inp}>
-                        <option value="">Sélectionner…</option>
+                      <label className={lbl}>Catégorie *</label>
+                      <select value={categorie_id} onChange={e => setCategorie(e.target.value ? Number(e.target.value) : "")} className={inp} required>
+                        <option value="">Sélectionner une catégorie…</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
                       </select>
                     </div>
 
                     <div>
-                      <label className={lbl}>Description</label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className={lbl + " mb-0"}>Mini description (site vitrine) *</label>
+                        <span className={`text-xs font-semibold ${description.length > 160 ? "text-red-500" : "text-slate-400"}`}>
+                          {description.length}/160
+                        </span>
+                      </div>
                       <textarea
                         value={description}
-                        onChange={e => setDescription(e.target.value)}
-                        placeholder="Description du produit…"
+                        onChange={e => setDescription(e.target.value.slice(0, 160))}
+                        placeholder="Description courte affichée sur le site (160 caractères max)…"
                         rows={3}
+                        maxLength={160}
+                        required
                         className={`${inp} resize-none`}
                       />
                     </div>
@@ -389,7 +398,7 @@ export default function AddProductModal({ categories }: Props) {
                         <button
                           type="button"
                           onClick={() => setVariants(vs => [...vs, { _key: Math.random().toString(36).slice(2), nom: "", prix: "", stock: "", imageUrl: "", uploading: false }])}
-                          className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs font-semibold hover:border-blue-400 hover:text-blue-600 transition-colors"
+                          className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs font-semibold hover:border-brand-400 hover:text-brand-600 transition-colors"
                         >
                           <Plus className="w-3 h-3" /> Ajouter
                         </button>
@@ -422,7 +431,7 @@ export default function AddProductModal({ categories }: Props) {
                                   value={v.nom}
                                   onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, nom: e.target.value } : x))}
                                   placeholder="Ex: Rouge XL"
-                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white"
+                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white"
                                 />
                                 <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
                                   className="shrink-0 p-1 text-slate-400 hover:text-red-500 transition-colors">
@@ -435,13 +444,13 @@ export default function AddProductModal({ categories }: Props) {
                                   type="number" min="0" value={v.prix}
                                   onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, prix: e.target.value } : x))}
                                   placeholder="Prix FCFA"
-                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white"
+                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white"
                                 />
                                 <input
                                   type="number" min="0" value={v.stock}
                                   onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, stock: e.target.value } : x))}
                                   placeholder="Qté"
-                                  className="w-24 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-blue-400 outline-none bg-white"
+                                  className="w-24 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white"
                                 />
                               </div>
                             </div>
@@ -499,7 +508,7 @@ export default function AddProductModal({ categories }: Props) {
                   <X className="w-4 h-4" /> Fermer
                 </button>
                 <button type="submit" disabled={loading}
-                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-60">
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors disabled:opacity-60">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   {loading ? "Création…" : "Créer le produit"}
                 </button>

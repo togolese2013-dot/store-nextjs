@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Package, Tag, Boxes, ExternalLink, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Package, Tag, Boxes, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 
@@ -202,7 +202,11 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
             {product.description && (
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Description</p>
-                <p className="text-sm text-slate-600 leading-relaxed">{product.description}</p>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  {product.description.length > 160
+                    ? product.description.slice(0, 160) + "…"
+                    : product.description}
+                </p>
               </div>
             )}
           </div>
@@ -210,13 +214,6 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
 
         {/* ── Footer ── */}
         <div className="px-7 py-5 border-t border-slate-100 shrink-0 flex gap-3 bg-slate-50/60">
-          <Link
-            href={`/admin/products/${product.id}`}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 transition-colors"
-          >
-            <Pencil className="w-4 h-4" />
-            Modifier le produit
-          </Link>
           <Link
             href={`/products/${product.reference}`}
             target="_blank"

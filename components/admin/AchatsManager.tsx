@@ -169,8 +169,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
             <DollarSign className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums">
-            {formatPrice(stats.montant_total)}{" "}
-            <span className="text-base font-semibold text-emerald-500">FCFA</span>
+            {formatPrice(stats.montant_total)}
           </p>
         </div>
       </div>

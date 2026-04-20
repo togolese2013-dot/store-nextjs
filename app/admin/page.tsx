@@ -9,7 +9,7 @@ const MODULES = [
     key:    "magasin",
     label:  "Magasin",
     sub:    "GESTION DES STOCKS",
-    desc:   "Produits, catégories, fournisseurs, achats, import/export",
+    desc:   "Produits, catégories, marques, fournisseurs, achats",
     href:   "/admin/products",
     icon:   Package,
     grad:   "from-brand-900 to-brand-800",

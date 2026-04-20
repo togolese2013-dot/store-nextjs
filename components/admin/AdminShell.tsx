@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
 
@@ -13,7 +13,13 @@ interface Props {
 
 export default function AdminShell({ nom, role, children }: Props) {
   const pathname    = usePathname();
+  const router      = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => router.refresh(), 30_000);
+    return () => clearInterval(timer);
+  }, [router]);
 
   // Landing page — no sidebar
   if (pathname === "/admin") {

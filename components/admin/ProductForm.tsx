@@ -209,257 +209,243 @@ export default function ProductForm({ categories, initial }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
-        <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">{error}</div>
-      )}
-      {success && (
-        <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
-          Produit {isEdit ? "mis à jour" : "créé"} avec succès !
-        </div>
-      )}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
 
-      {/* ── Informations générales ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-        <h2 className="font-semibold text-slate-900 text-sm border-b border-slate-100 pb-3">Informations générales</h2>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>Nom du produit *</label>
-            <input type="text" value={form.nom} onChange={e => set("nom", e.target.value)}
-              placeholder="Ex: Casque Audio Premium" required className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Référence (slug) *</label>
-            <input type="text" value={form.reference}
-              onChange={e => set("reference", e.target.value.replace(/\s+/g, "-").toLowerCase())}
-              placeholder="casque-audio-premium" required className={inputCls} />
-          </div>
-        </div>
-
-        <div>
-          <label className={labelCls}>Catégorie</label>
-          <select value={form.categorie_id} onChange={e => set("categorie_id", e.target.value ? Number(e.target.value) : "")}
-            className={inputCls}>
-            <option value="">— Sans catégorie —</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Description</label>
-          <textarea value={form.description} onChange={e => set("description", e.target.value)}
-            placeholder="Description du produit…" rows={3}
-            className={clsx(inputCls, "resize-none")} />
-        </div>
-      </div>
-
-      {/* ── Prix & stock ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-        <h2 className="font-semibold text-slate-900 text-sm border-b border-slate-100 pb-3">Prix & stock</h2>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <label className={labelCls}>Prix (FCFA) *</label>
-            <input type="number" min="0" value={form.prix_unitaire}
-              onChange={e => set("prix_unitaire", e.target.value ? Number(e.target.value) : "")}
-              placeholder="25000" required className={inputCls} />
-          </div>
-          {schema.hasRemise && (
-            <div>
-              <label className={labelCls}>Remise (%)</label>
-              <input type="number" min="0" max="99" value={form.remise}
-                onChange={e => set("remise", e.target.value ? Number(e.target.value) : "")}
-                placeholder="0" className={inputCls} />
-            </div>
-          )}
-          <div>
-            <label className={labelCls}>Stock magasin</label>
-            <input type="number" min="0" value={form.stock_magasin}
-              onChange={e => set("stock_magasin", e.target.value ? Number(e.target.value) : "")}
-              placeholder="10" className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Stock mini. (alerte)</label>
-            <input type="number" min="0" value={form.stock_minimum}
-              onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
-              placeholder="5" className={inputCls} />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-5 pt-1">
-          {schema.hasNeuf && (
-            <Toggle checked={form.neuf} onChange={v => set("neuf", v)} label='Marquer comme "Nouveau"' color="brand" />
-          )}
-          <Toggle checked={form.actif} onChange={v => set("actif", v)} label="Produit actif (visible)" color="green" />
-        </div>
-      </div>
-
-      {/* ── Images ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-        <h2 className="font-semibold text-slate-900 text-sm border-b border-slate-100 pb-3">Images produit</h2>
-
-        {/* Upload */}
-        <label className={clsx(
-          "flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-slate-300 text-sm text-slate-500 cursor-pointer w-fit",
-          "hover:border-brand-400 hover:text-brand-700 transition-colors",
-          uploading && "opacity-60 pointer-events-none"
-        )}>
-          <ImagePlus className="w-4 h-4" />
-          {uploading ? "Upload en cours…" : "Ajouter des photos"}
-          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={handleUploadImages} disabled={uploading} className="sr-only" />
-        </label>
-
-        {form.images.length > 0 && (
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-            {form.images.map((url, idx) => (
-              <div key={idx} className="relative group">
-                <div className={clsx(
-                  "aspect-square rounded-xl overflow-hidden bg-slate-100 border-2 transition-all",
-                  idx === 0 ? "border-brand-400" : "border-transparent"
-                )}>
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                </div>
-                {idx === 0 && (
-                  <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-lg bg-brand-900 text-white text-[9px] font-bold">Principale</span>
-                )}
-                <button type="button"
-                  onClick={() => {
-                    const next = form.images.filter((_, i) => i !== idx);
-                    set("images", next);
-                    if (form.image_url === url) set("image_url", next[0] ?? "");
-                  }}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center shadow-sm hover:bg-red-600 transition-colors"
-                >×</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {form.images.length === 0 && (
-          <p className="text-xs text-slate-400">Aucune image — la première image ajoutée sera l'image principale.</p>
-        )}
-      </div>
-
-      {/* ── Variantes ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="font-semibold text-slate-900 text-sm">Variantes</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Taille, couleur, modèle… — chacune avec son prix et stock</p>
-          </div>
-          {!isEdit && (
-            <button type="button" onClick={() => setVariants(vs => [...vs, newVariant()])}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 transition-colors">
-              <Plus className="w-3.5 h-3.5" /> Ajouter
-            </button>
-          )}
-        </div>
-
-        {/* Creation mode — inline variant list */}
-        {!isEdit && (
-          <div className="space-y-3">
-            {variants.length === 0 && (
-              <div className="py-8 text-center text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-                <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                Pas de variantes — le produit se vend tel quel.
-              </div>
-            )}
-            {variants.map(v => (
-              <div key={v._key} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  {/* Photo variante */}
-                  <label className="shrink-0 cursor-pointer group">
-                    <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center group-hover:border-brand-400 transition-colors">
-                      {v.imageUrl ? (
-                        <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
-                      ) : v.uploading ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                      ) : (
-                        <ImagePlus className="w-5 h-5 text-slate-300 group-hover:text-brand-400 transition-colors" />
-                      )}
-                    </div>
-                    <input type="file" accept="image/*" className="sr-only"
-                      ref={el => { variantRefs.current[v._key] = el; }}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadVariantImage(v._key, f); e.target.value = ""; }}
-                    />
-                  </label>
-
-                  {/* Champs */}
-                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="col-span-2 sm:col-span-2">
-                      <label className={labelCls}>Nom / options</label>
-                      <input type="text" value={v.nom}
-                        onChange={e => updateVariant(v._key, { nom: e.target.value })}
-                        placeholder="Ex: Rouge XL  ou  Taille=XL, Couleur=Rouge"
-                        className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Prix (FCFA) *</label>
-                      <input type="number" min="0" value={v.prix}
-                        onChange={e => updateVariant(v._key, { prix: e.target.value ? Number(e.target.value) : "" })}
-                        placeholder="25000" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Quantité</label>
-                      <input type="number" min="0" value={v.stock}
-                        onChange={e => updateVariant(v._key, { stock: e.target.value ? Number(e.target.value) : "" })}
-                        placeholder="10" className={inputCls} />
-                    </div>
-                  </div>
-
-                  {/* Supprimer */}
-                  <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
-                    className="shrink-0 mt-6 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {variants.length > 0 && (
-              <button type="button" onClick={() => setVariants(vs => [...vs, newVariant()])}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-slate-300 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-700 transition-colors w-full justify-center">
-                <Plus className="w-4 h-4" /> Ajouter une variante
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Edit mode — live VariantsManager */}
-        {isEdit && initial?.id && <VariantsManager productId={initial.id} />}
-      </div>
-
-      {/* ── Produits recommandés ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-        <h2 className="font-semibold text-slate-900 text-sm border-b border-slate-100 pb-3">
-          Produits recommandés <span className="text-slate-400 font-normal">"Vous aimerez aussi"</span>
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <h2 className="text-lg font-bold text-slate-900">
+          {isEdit ? "Modifier le produit" : "Nouveau produit"}
         </h2>
-        {isEdit && initial?.id ? (
-          <RelatedProductsManager productId={initial.id} />
-        ) : (
-          <div className="py-6 text-center text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-            <Package className="w-7 h-7 mx-auto mb-2 opacity-25" />
-            Créez d'abord le produit pour ajouter des recommandations.<br />
-            <span className="text-xs">Vous serez redirigé vers la page d'édition après la création.</span>
-          </div>
-        )}
       </div>
 
-      {/* ── Actions ── */}
-      <div className="flex gap-3 pb-8">
-        <button type="submit" disabled={loading}
-          className="flex items-center gap-2 px-7 py-3 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {loading ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le produit"}
-        </button>
-        <button type="button" onClick={() => router.back()}
-          className="px-6 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors">
-          Annuler
-        </button>
-      </div>
-    </form>
+      <form onSubmit={handleSubmit}>
+        <div className="flex flex-col lg:flex-row min-h-0">
+
+          {/* ── Left — Images ── */}
+          <div className="w-full lg:w-72 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-slate-100 p-5 space-y-3 bg-slate-50/60">
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Images produit</p>
+            <p className="text-xs text-slate-400 mb-3">La 1ère image = image principale.</p>
+
+            <label className={clsx(
+              "flex flex-col items-center gap-2 py-7 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-400 cursor-pointer",
+              "hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50/40 transition-all",
+              uploading && "opacity-60 pointer-events-none"
+            )}>
+              {uploading ? <Loader2 className="w-7 h-7 animate-spin" /> : <ImagePlus className="w-7 h-7" />}
+              <span className="text-sm font-semibold">{uploading ? "Upload…" : "Ajouter des images"}</span>
+              <span className="text-xs">JPG, PNG, WebP</span>
+              <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleUploadImages} disabled={uploading} className="sr-only" />
+            </label>
+
+            {form.images.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {form.images.map((url, idx) => (
+                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden bg-slate-100 border-2 border-transparent hover:border-brand-300 transition-all">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-brand-900 text-white text-[9px] font-bold leading-none">Principal</span>
+                    )}
+                    <button type="button"
+                      onClick={() => {
+                        const next = form.images.filter((_, i) => i !== idx);
+                        set("images", next);
+                        if (form.image_url === url) set("image_url", next[0] ?? "");
+                      }}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center shadow-sm hover:bg-red-600 transition-colors"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {form.images.length === 0 && (
+              <p className="text-xs text-slate-400 text-center">Aucune image</p>
+            )}
+          </div>
+
+          {/* ── Right — Form fields ── */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+
+            {error && (
+              <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">{error}</div>
+            )}
+            {success && (
+              <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
+                Produit {isEdit ? "mis à jour" : "créé"} avec succès !
+              </div>
+            )}
+
+            {/* Informations générales */}
+            <section className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Informations générales</h3>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Nom du produit *</label>
+                  <input type="text" value={form.nom} onChange={e => set("nom", e.target.value)}
+                    placeholder="Ex: Casque Audio Premium" required className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Référence (slug) *</label>
+                  <input type="text" value={form.reference}
+                    onChange={e => set("reference", e.target.value.replace(/\s+/g, "-").toLowerCase())}
+                    placeholder="casque-audio-premium" required className={inputCls} />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>Catégorie *</label>
+                <select value={form.categorie_id} onChange={e => set("categorie_id", e.target.value ? Number(e.target.value) : "")}
+                  className={inputCls} required>
+                  <option value="">Sélectionner une catégorie…</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={labelCls + " mb-0"}>Mini description (site vitrine) *</label>
+                  <span className={`text-xs font-semibold ${form.description.length > 160 ? "text-red-500" : "text-slate-400"}`}>
+                    {form.description.length}/160
+                  </span>
+                </div>
+                <textarea value={form.description}
+                  onChange={e => set("description", e.target.value.slice(0, 160))}
+                  placeholder="Description courte affichée sur le site (160 caractères max)…"
+                  rows={3} maxLength={160} required
+                  className={clsx(inputCls, "resize-none")} />
+              </div>
+            </section>
+
+            {/* Tarifs */}
+            <section className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Tarifs</h3>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className={labelCls}>Prix (FCFA) *</label>
+                  <input type="number" min="0" value={form.prix_unitaire}
+                    onChange={e => set("prix_unitaire", e.target.value ? Number(e.target.value) : "")}
+                    placeholder="25000" required className={inputCls} />
+                </div>
+                {schema.hasRemise && (
+                  <div>
+                    <label className={labelCls}>Remise (FCFA)</label>
+                    <input type="number" min="0" value={form.remise}
+                      onChange={e => set("remise", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="0" className={inputCls} />
+                  </div>
+                )}
+                <div>
+                  <label className={labelCls}>Stock magasin</label>
+                  <input type="number" min="0" value={form.stock_magasin}
+                    onChange={e => set("stock_magasin", e.target.value ? Number(e.target.value) : "")}
+                    placeholder="10" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Seuil minimum</label>
+                  <input type="number" min="0" value={form.stock_minimum}
+                    onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
+                    placeholder="5" className={inputCls} />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-5 pt-1">
+                {schema.hasNeuf && (
+                  <Toggle checked={form.neuf} onChange={v => set("neuf", v)} label='Marquer comme "Nouveau"' color="brand" />
+                )}
+                <Toggle checked={form.actif} onChange={v => set("actif", v)} label="Produit actif (visible)" color="green" />
+              </div>
+            </section>
+
+            {/* Variantes */}
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Variantes</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Taille, couleur, modèle…</p>
+                </div>
+                {!isEdit && (
+                  <button type="button" onClick={() => setVariants(vs => [...vs, newVariant()])}
+                    className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs font-semibold hover:border-brand-400 hover:text-brand-600 transition-colors">
+                    <Plus className="w-3 h-3" /> Ajouter
+                  </button>
+                )}
+              </div>
+
+              {!isEdit && (
+                <div className="space-y-2">
+                  {variants.length === 0 && (
+                    <div className="px-4 py-3 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                      Aucune variante configurée
+                    </div>
+                  )}
+                  {variants.map(v => (
+                    <div key={v._key} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="shrink-0 cursor-pointer">
+                          <div className="w-10 h-10 rounded-lg border border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center hover:border-brand-400 transition-colors">
+                            {v.imageUrl ? <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
+                              : v.uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                              : <ImagePlus className="w-3.5 h-3.5 text-slate-300" />}
+                          </div>
+                          <input type="file" accept="image/*" className="sr-only"
+                            ref={el => { variantRefs.current[v._key] = el; }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadVariantImage(v._key, f); e.target.value = ""; }} />
+                        </label>
+                        <input value={v.nom}
+                          onChange={e => updateVariant(v._key, { nom: e.target.value })}
+                          placeholder="Ex: Rouge XL"
+                          className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white" />
+                        <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
+                          className="shrink-0 p-1 text-slate-400 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2 pl-12">
+                        <input type="number" min="0" value={v.prix}
+                          onChange={e => updateVariant(v._key, { prix: e.target.value ? Number(e.target.value) : "" })}
+                          placeholder="Prix FCFA"
+                          className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white" />
+                        <input type="number" min="0" value={v.stock}
+                          onChange={e => updateVariant(v._key, { stock: e.target.value ? Number(e.target.value) : "" })}
+                          placeholder="Qté"
+                          className="w-24 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isEdit && initial?.id && <VariantsManager productId={initial.id} />}
+            </section>
+
+          </div>
+        </div>
+
+        {/* ── Footer actions ── */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-white">
+          <button type="button" onClick={() => router.back()}
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
+            Annuler
+          </button>
+          <button type="submit" disabled={loading}
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors disabled:opacity-60">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {loading ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le produit"}
+          </button>
+        </div>
+      </form>
+
+      {/* ── Produits recommandés (sous le formulaire) ── */}
+      {isEdit && initial?.id && (
+        <div className="border-t border-slate-100 p-6 space-y-4">
+          <h3 className="font-semibold text-slate-900 text-sm">
+            Produits recommandés <span className="text-slate-400 font-normal">"Vous aimerez aussi"</span>
+          </h3>
+          <RelatedProductsManager productId={initial.id} />
+        </div>
+      )}
+    </div>
   );
 }
 

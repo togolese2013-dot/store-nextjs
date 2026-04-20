@@ -2213,3 +2213,64 @@ export async function getLoyaltyStats() {
     };
   } catch { return { nb_clients: 0, total_distribues: 0, total_echanges: 0 }; }
 }
+
+// ─── Marques ─────────────────────────────────────────────────────────────────
+
+export interface AdminMarque {
+  id:          number;
+  nom:         string;
+  description: string;
+  nb_produits: number;
+}
+
+async function ensureMarquesTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS marques (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      nom         VARCHAR(255) NOT NULL,
+      description TEXT,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.execute(`
+    ALTER TABLE produits ADD COLUMN IF NOT EXISTS marque_id INT NULL
+  `).catch(() => {});
+}
+
+export async function listAdminMarques(): Promise<AdminMarque[]> {
+  await ensureMarquesTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(`
+    SELECT m.id, m.nom, COALESCE(m.description, '') AS description,
+           COUNT(p.id) AS nb_produits
+    FROM marques m
+    LEFT JOIN produits p ON p.marque_id = m.id
+    GROUP BY m.id
+    ORDER BY m.nom
+  `);
+  return (rows as mysql.RowDataPacket[]).map(r => ({
+    id:          Number(r.id),
+    nom:         String(r.nom),
+    description: String(r.description ?? ""),
+    nb_produits: Number(r.nb_produits ?? 0),
+  }));
+}
+
+export async function createMarque(data: { nom: string; description: string }) {
+  await ensureMarquesTable();
+  const [res] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO marques (nom, description) VALUES (?, ?)`,
+    [data.nom, data.description || null]
+  );
+  return res.insertId;
+}
+
+export async function updateMarque(id: number, data: { nom: string; description: string }) {
+  await db.execute(
+    `UPDATE marques SET nom = ?, description = ? WHERE id = ?`,
+    [data.nom, data.description || null, id]
+  );
+}
+
+export async function deleteMarque(id: number) {
+  await db.execute(`DELETE FROM marques WHERE id = ?`, [id]);
+}

@@ -1,5 +1,5 @@
 import { getProducts, getProductCount, getCategories, getProductStatusCounts } from "@/lib/db";
-import { getStockStats, getStockMovements, getStockMovementCounts } from "@/lib/admin-db";
+import { getStockStats, getStockMovements, getStockMovementCounts, listAdminMarques } from "@/lib/admin-db";
 import { finalPrice, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import AdminProductActions from "@/components/admin/AdminProductActions";
@@ -12,6 +12,7 @@ import {
   Activity,
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
+import ProductsViewTabs from "@/components/admin/ProductsViewTabs";
 
 export const metadata = { title: "Tous les produits" };
 
@@ -19,7 +20,7 @@ type View   = "stock" | "mouvements";
 type Statut = "all" | "disponible" | "faible" | "epuise";
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; category?: string; page?: string; view?: string; statut?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; brand?: string; filter?: string; page?: string; view?: string; statut?: string }>;
 }
 
 // ─── Filter buttons ────────────────────────────────────────────────────────────
@@ -32,26 +33,34 @@ function buildUrl(base: Record<string, string | undefined>, override: Record<str
 }
 
 export default async function AdminProductsPage({ searchParams }: PageProps) {
-  const sp     = await searchParams;
-  const q      = sp.q?.trim() || undefined;
-  const catId  = sp.category ? Number(sp.category) : undefined;
-  const page   = Math.max(1, Number(sp.page) || 1);
+  const sp      = await searchParams;
+  const q       = sp.q?.trim() || undefined;
+  // filter param: "cat:N" or "brand:N" from the unified select
+  const filterVal = sp.filter || "";
+  const catId   = filterVal.startsWith("cat:")   ? Number(filterVal.slice(4))   :
+                  sp.category                     ? Number(sp.category)          : undefined;
+  const brandId = filterVal.startsWith("brand:") ? Number(filterVal.slice(6))   :
+                  sp.brand                        ? Number(sp.brand)             : undefined;
+  const page    = Math.max(1, Number(sp.page) || 1);
   const view   = (sp.view as View)     || "stock";
   const statut = (sp.statut as Statut) || "all";
   const limit  = 20;
   const offset = (page - 1) * limit;
 
+  const activeFilter = catId   ? `cat:${catId}`     :
+                       brandId ? `brand:${brandId}` : undefined;
   const base = {
-    q: q || undefined,
-    category: catId ? String(catId) : undefined,
-    view: view !== "stock" ? view : undefined,
+    q:      q || undefined,
+    filter: activeFilter,
+    view:   view !== "stock" ? view : undefined,
     statut: statut !== "all" ? statut : undefined,
   };
 
   const isStockView = view === "stock";
 
-  const [categories, stats, movCounts, statusCounts] = await Promise.all([
+  const [categories, marques, stats, movCounts, statusCounts] = await Promise.all([
     getCategories().catch(() => []),
+    listAdminMarques().catch(() => []),
     getStockStats().catch(() => ({ en_stock: 0, en_rupture: 0, stock_faible: 0, valeur_totale: 0, entrees_jour: 0, sorties_jour: 0 })),
     getStockMovementCounts().catch(() => ({ total: 0, entrees: 0, sorties: 0, ajustements: 0 })),
     getProductStatusCounts().catch(() => ({ total: 0, disponible: 0, faible: 0, epuise: 0 })),
@@ -66,8 +75,8 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   if (isStockView) {
     const statutFilter = statut !== "all" ? statut as "disponible" | "faible" | "epuise" : undefined;
     [products, total] = await Promise.all([
-      getProducts({ search: q, categoryId: catId, limit, offset, statut: statutFilter, includeInactive: true }).catch(() => []),
-      getProductCount({ search: q, categoryId: catId, statut: statutFilter, includeInactive: true }).catch(() => 0),
+      getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true }).catch(() => []),
+      getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true }).catch(() => 0),
     ]);
   } else {
     const res = await getStockMovements({ type: "tous", search: q, limit, offset }).catch(() => ({ items: [], total: 0 }));
@@ -115,54 +124,53 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Produits en stock</p>
-            <Boxes className="w-5 h-5 text-slate-300" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Produits en stock</p>
+            <Boxes className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.en_stock}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.en_stock}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Valeur totale du stock</p>
-            <DollarSign className="w-5 h-5 text-slate-300" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Valeur totale</p>
+            <DollarSign className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{formatPrice(stats.valeur_totale)}</p>
-          <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wide">FCFA</span>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{formatPrice(stats.valeur_totale)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Articles stock faible</p>
-            <AlertTriangle className="w-5 h-5 text-amber-400" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Articles stock faible</p>
+            <AlertTriangle className="w-8 h-8 text-amber-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.stock_faible}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.stock_faible}</p>
           {stats.stock_faible > 0 && (
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">Action requise</span>
           )}
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Articles en rupture</p>
-            <XCircle className="w-5 h-5 text-red-400" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Articles en rupture</p>
+            <XCircle className="w-8 h-8 text-red-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.en_rupture}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.en_rupture}</p>
           {stats.en_rupture > 0 && (
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">Épuisé</span>
           )}
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Entrées aujourd&apos;hui</p>
-            <TrendingDown className="w-5 h-5 text-emerald-400" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Entrées aujourd&apos;hui</p>
+            <TrendingDown className="w-8 h-8 text-emerald-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.entrees_jour}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.entrees_jour}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sorties aujourd&apos;hui</p>
-            <TrendingUp className="w-5 h-5 text-red-400" />
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Sorties aujourd&apos;hui</p>
+            <TrendingUp className="w-8 h-8 text-red-400 opacity-20" />
           </div>
-          <p className="font-display font-800 text-3xl text-slate-900">{stats.sorties_jour}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.sorties_jour}</p>
         </div>
       </div>
 
@@ -179,13 +187,22 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           />
         </div>
         {isStockView && (
-          <select name="category" defaultValue={catId ?? ""}
+          <select
+            name="filter"
+            defaultValue={activeFilter ?? ""}
             className="px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans"
           >
-            <option value="">Toutes les catégories</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.nom}</option>
-            ))}
+            <option value="">Toutes les catégories & marques</option>
+            {categories.length > 0 && (
+              <optgroup label="Catégories">
+                {categories.map(c => <option key={`cat-${c.id}`} value={`cat:${c.id}`}>{c.nom}</option>)}
+              </optgroup>
+            )}
+            {marques.length > 0 && (
+              <optgroup label="Marques">
+                {marques.map(m => <option key={`brand-${m.id}`} value={`brand:${m.id}`}>{m.nom}</option>)}
+              </optgroup>
+            )}
           </select>
         )}
         <button type="submit"
@@ -193,7 +210,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         >
           Filtrer
         </button>
-        {(q || catId) && (
+        {(q || activeFilter) && (
           <Link href={buildUrl({ view: view !== "stock" ? view : undefined, statut: statut !== "all" ? statut : undefined }, {})}
             className="px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
           >
@@ -205,30 +222,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       {/* ── Filter tabs ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: tab bar */}
-        <div className="flex items-center bg-slate-100 rounded-2xl p-1 gap-1 flex-wrap">
-          {viewTabs.map(tab => {
-            const isActive = view === tab.key;
-            return (
-              <Link
-                key={tab.key}
-                href={buildUrl({ ...base, view: tab.key !== "stock" ? tab.key : undefined, page: undefined }, {})}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                  isActive
-                    ? "bg-emerald-800 text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-800 hover:bg-white/60"
-                }`}
-              >
-                <tab.icon className="w-4 h-4 shrink-0" />
-                <span>{tab.label}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${
-                  isActive ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"
-                }`}>
-                  {tab.count}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
+        <ProductsViewTabs tabs={viewTabs} active={view} />
 
         {/* Right: statut tabs (only for stock view) */}
         {isStockView && (

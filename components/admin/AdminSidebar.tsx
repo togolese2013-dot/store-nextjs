@@ -6,7 +6,7 @@ import { clsx } from "clsx";
 import {
   Package, ShoppingBag, Settings, Users, MessageCircle, Send, Star, Tag,
   X, ChevronRight, Palette, MapPin, CreditCard, Link2,
-  FolderOpen, Image, ShoppingCart, Zap,
+  FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
   Gift, Mail, UserCheck, Home, LogOut, Globe,
@@ -27,11 +27,11 @@ const MODULES: Record<string, {
     ring:   "border-brand-600",
     dot:    "bg-brand-400",
     items: [
-      { label: "Tous les produits", href: "/admin/products",      icon: Package },
-      { label: "Catégories",        href: "/admin/categories",    icon: FolderOpen },
-      { label: "Fournisseurs",      href: "/admin/fournisseurs",  icon: Building2 },
-      { label: "Achats",            href: "/admin/achats",        icon: Truck },
-      { label: "Import / Export",   href: "/admin/import-export", icon: Zap },
+      { label: "Tous les produits", href: "/admin/products",     icon: Package },
+      { label: "Catégories",       href: "/admin/categories",   icon: FolderOpen },
+      { label: "Marques",          href: "/admin/categories",   icon: Tag },
+      { label: "Fournisseurs",     href: "/admin/fournisseurs", icon: Building2 },
+      { label: "Achats",           href: "/admin/achats",       icon: Truck },
     ],
   },
   boutique: {
@@ -100,7 +100,6 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/categories",            "magasin"],
   ["/admin/fournisseurs",          "magasin"],
   ["/admin/achats",                "magasin"],
-  ["/admin/import-export",         "magasin"],
   ["/admin/stock",                 "magasin"],
   ["/admin/boutique-clients",      "boutique"],
   ["/admin/boutique-segmentation", "boutique"],
@@ -202,7 +201,7 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
                 className={clsx(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all",
                   isActive(item.href)
-                    ? `${activeModule.accent} shadow-sm`
+                    ? "bg-emerald-600 shadow-sm"
                     : "hover:bg-white/10"
                 )}
               >
