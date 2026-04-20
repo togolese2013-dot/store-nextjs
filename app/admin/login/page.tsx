@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Zap, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Package, ShoppingBag, Settings, Users, BarChart2 } from "lucide-react";
+
+const MODULES = [
+  { label: "MAGASIN",  desc: "Produits & stocks",    color: "bg-brand-800",   icon: Package },
+  { label: "BOUTIQUE", desc: "Ventes & finance",      color: "bg-amber-500",   icon: ShoppingBag },
+  { label: "STORE",    desc: "Commandes & réglages",  color: "bg-emerald-700", icon: Settings },
+  { label: "CRM",      desc: "Clients & fidélité",    color: "bg-indigo-700",  icon: Users },
+  { label: "ADMIN",    desc: "Rapports & tendances",  color: "bg-violet-700",  icon: BarChart2 },
+];
 
 export default function AdminLoginPage() {
   const router  = useRouter();
@@ -19,13 +27,13 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const res = await fetch("/api/admin/auth/login", {
+      const res  = await fetch("/api/admin/auth/login", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Erreur"); return; }
+      if (!res.ok) { setError(data.error || "Identifiants incorrects"); return; }
       router.push(redirect);
       router.refresh();
     } catch {
@@ -36,51 +44,59 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex">
 
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-              <Zap className="w-7 h-7 text-accent-400" fill="currentColor" />
+      {/* ── Left — Form ── */}
+      <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-12 bg-white">
+        <div className="w-full max-w-md mx-auto">
+
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 rounded-xl bg-brand-900 flex items-center justify-center shrink-0">
+              <img src="/logo-togolese-shop-white.svg" alt="" className="h-5 w-auto" />
+            </div>
+            <div>
+              <p className="font-display font-800 text-slate-900 text-sm leading-none">Togolese Shop</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Administration</p>
             </div>
           </div>
-          <h1 className="font-display font-800 text-2xl text-white">Togolese Shop</h1>
-          <p className="text-brand-300 text-sm mt-1">Panneau d'administration</p>
-        </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl p-8 shadow-xl">
-          <h2 className="font-display font-800 text-slate-900 text-xl mb-6">Connexion</h2>
+          <h1 className="font-display font-800 text-3xl text-slate-900 mb-1">Connexion</h1>
+          <p className="text-slate-500 text-sm mb-8">Accédez à votre panneau de gestion</p>
 
           {error && (
-            <div className="mb-4 px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-6 flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
+              <span className="w-5 h-5 rounded-full border-2 border-red-400 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">!</span>
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1.5">Adresse email</label>
+              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
+                Adresse email
+              </label>
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="admin@togolese.net" required autoFocus
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-brand-500 outline-none text-sm transition-all font-sans"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans placeholder:text-slate-400"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1.5">Mot de passe</label>
+              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
+                Mot de passe
+              </label>
               <div className="relative">
                 <input
                   type={showPw ? "text" : "password"}
                   value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" required
-                  className="w-full px-4 py-3 pr-12 rounded-2xl border border-slate-200 focus:border-brand-500 outline-none text-sm transition-all font-sans"
+                  className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans"
                 />
                 <button
                   type="button" onClick={() => setShowPw(!showPw)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -89,17 +105,69 @@ export default function AdminLoginPage() {
 
             <button
               type="submit" disabled={loading}
-              className="w-full py-3.5 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? "Connexion…" : "Se connecter"}
+              {loading ? "Connexion en cours…" : "Se connecter"}
             </button>
           </form>
 
-          <p className="text-center text-xs text-slate-400 mt-5">
-            Première connexion ? Entrez votre email et un mot de passe.<br />
-            Un compte super_admin sera créé automatiquement.
+          <p className="text-center text-xs text-slate-400 mt-8 leading-relaxed">
+            Première connexion ? Un compte super_admin<br />
+            sera créé automatiquement avec ces identifiants.
           </p>
+        </div>
+      </div>
+
+      {/* ── Right — Brand panel ── */}
+      <div className="hidden lg:flex w-[45%] xl:w-[42%] bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 flex-col justify-between p-12 relative overflow-hidden">
+
+        {/* Decorative circles */}
+        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-accent-500/10 -translate-x-1/2 translate-y-1/2 pointer-events-none" />
+
+        {/* Top */}
+        <div className="relative z-10">
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/80 text-xs font-semibold mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse" />
+            Panneau d'administration
+          </span>
+          <h2 className="font-display font-800 text-3xl xl:text-4xl text-white leading-tight mb-4">
+            Gérez votre boutique<br />
+            <span className="text-accent-300">en toute simplicité</span>
+          </h2>
+          <p className="text-white/60 text-sm leading-relaxed max-w-xs">
+            Produits, commandes, clients, finances — tout au même endroit, conçu pour le Togo.
+          </p>
+        </div>
+
+        {/* Module badges */}
+        <div className="relative z-10 space-y-2.5 my-6">
+          {MODULES.map(({ label, desc, color, icon: Icon }) => (
+            <div key={label} className="flex items-center gap-4 p-3.5 rounded-2xl bg-white/8 border border-white/10">
+              <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center shrink-0`}>
+                <Icon className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm leading-none">{label}</p>
+                <p className="text-white/50 text-xs mt-0.5">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Stats */}
+        <div className="relative z-10 grid grid-cols-3 gap-4 pt-6 border-t border-white/10">
+          {[
+            { value: "5",    label: "Modules" },
+            { value: "48+",  label: "Pages" },
+            { value: "100%", label: "Sécurisé" },
+          ].map(({ value, label }) => (
+            <div key={label} className="text-center">
+              <p className="font-display font-800 text-2xl text-white">{value}</p>
+              <p className="text-white/50 text-xs mt-0.5">{label}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

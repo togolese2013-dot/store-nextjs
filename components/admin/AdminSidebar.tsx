@@ -8,24 +8,24 @@ import {
   X, ChevronRight, Palette, MapPin, CreditCard, Link2,
   FolderOpen, Image, ShoppingCart, Zap,
   TrendingUp, Archive, FilePlus, DollarSign,
-  Truck, Building2, PieChart, Globe, FileText, BarChart2,
-  Gift, Mail, UserCheck,
+  Truck, Building2, PieChart, FileText, BarChart2,
+  Gift, Mail, UserCheck, Home,
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; icon: React.ElementType };
 
-// ─── Module definitions ────────────────────────────────────────────────────────
-
 const MODULES: Record<string, {
-  label:     string;
-  color:     string;
-  textColor: string;
-  items:     NavItem[];
+  label:    string;
+  accent:   string;
+  ring:     string;
+  dot:      string;
+  items:    NavItem[];
 }> = {
   magasin: {
-    label:     "MAGASIN",
-    color:     "bg-brand-900",
-    textColor: "text-brand-900",
+    label:  "MAGASIN",
+    accent: "bg-brand-700",
+    ring:   "border-brand-700",
+    dot:    "bg-brand-400",
     items: [
       { label: "Tous les produits", href: "/admin/products",      icon: Package },
       { label: "Catégories",        href: "/admin/categories",    icon: FolderOpen },
@@ -35,23 +35,25 @@ const MODULES: Record<string, {
     ],
   },
   boutique: {
-    label:     "BOUTIQUE",
-    color:     "bg-amber-500",
-    textColor: "text-amber-600",
+    label:  "BOUTIQUE",
+    accent: "bg-amber-500",
+    ring:   "border-amber-500",
+    dot:    "bg-amber-400",
     items: [
       { label: "Ventes",         href: "/admin/ventes",                icon: TrendingUp },
       { label: "Livraisons",     href: "/admin/livraisons",            icon: Truck },
       { label: "Stock boutique", href: "/admin/stock-boutique",        icon: Archive },
-      { label: "Proformat",      href: "/admin/proforma",              icon: FilePlus },
+      { label: "Proforma",       href: "/admin/proforma",              icon: FilePlus },
       { label: "Finance",        href: "/admin/finance",               icon: DollarSign },
       { label: "Clients",        href: "/admin/boutique-clients",      icon: Users },
       { label: "Segmentation",   href: "/admin/boutique-segmentation", icon: PieChart },
     ],
   },
   store: {
-    label:     "STORE",
-    color:     "bg-emerald-700",
-    textColor: "text-emerald-700",
+    label:  "STORE",
+    accent: "bg-emerald-600",
+    ring:   "border-emerald-600",
+    dot:    "bg-emerald-400",
     items: [
       { label: "Commandes",          href: "/admin/orders",            icon: ShoppingCart },
       { label: "Coupons",            href: "/admin/coupons",           icon: Tag },
@@ -59,68 +61,69 @@ const MODULES: Record<string, {
       { label: "Hero & Bannières",   href: "/admin/settings/hero",     icon: Image },
       { label: "Zones de livraison", href: "/admin/settings/delivery", icon: MapPin },
       { label: "Apparence",          href: "/admin/settings/theme",    icon: Palette },
-      { label: "WhatsApp API",       href: "/admin/settings/whatsapp", icon: Globe },
+      { label: "WhatsApp API",       href: "/admin/settings/whatsapp", icon: ShoppingBag },
       { label: "Paiements",          href: "/admin/settings/payment",  icon: CreditCard },
       { label: "Domaine & URL",      href: "/admin/settings/domain",   icon: Link2 },
       { label: "Utilisateurs",       href: "/admin/users",             icon: Users },
     ],
   },
   crm: {
-    label:     "CRM",
-    color:     "bg-indigo-700",
-    textColor: "text-indigo-700",
+    label:  "CRM",
+    accent: "bg-indigo-600",
+    ring:   "border-indigo-600",
+    dot:    "bg-indigo-400",
     items: [
-      { label: "Clients",          href: "/admin/crm",              icon: Users },
-      { label: "Avis clients",     href: "/admin/reviews",          icon: Star },
-      { label: "Messages reçus",   href: "/admin/messages",         icon: MessageCircle },
-      { label: "Diffusion",        href: "/admin/whatsapp",         icon: Send },
-      { label: "Fidélité",         href: "/admin/fidelite",         icon: Gift },
-      { label: "Parrainage",       href: "/admin/parrainage",       icon: Link2 },
-      { label: "Newsletter",       href: "/admin/newsletter",       icon: Mail },
-      { label: "Comptes clients",  href: "/admin/comptes-clients",  icon: UserCheck },
+      { label: "Clients",         href: "/admin/crm",             icon: Users },
+      { label: "Avis clients",    href: "/admin/reviews",         icon: Star },
+      { label: "Messages reçus",  href: "/admin/messages",        icon: MessageCircle },
+      { label: "Diffusion",       href: "/admin/whatsapp",        icon: Send },
+      { label: "Fidélité",        href: "/admin/fidelite",        icon: Gift },
+      { label: "Parrainage",      href: "/admin/parrainage",      icon: Link2 },
+      { label: "Newsletter",      href: "/admin/newsletter",      icon: Mail },
+      { label: "Comptes clients", href: "/admin/comptes-clients", icon: UserCheck },
     ],
   },
   admin: {
-    label:     "ADMIN",
-    color:     "bg-violet-700",
-    textColor: "text-violet-700",
+    label:  "ADMIN",
+    accent: "bg-violet-600",
+    ring:   "border-violet-600",
+    dot:    "bg-violet-400",
     items: [
-      { label: "Rapports",              href: "/admin/rapports",  icon: FileText },
-      { label: "Tendances des ventes",  href: "/admin/tendances", icon: BarChart2 },
+      { label: "Rapports",             href: "/admin/rapports",  icon: FileText },
+      { label: "Tendances des ventes", href: "/admin/tendances", icon: BarChart2 },
     ],
   },
 };
 
-// Maps URL prefixes → module key (more specific first)
 const ROUTE_TO_MODULE: [string, string][] = [
-  ["/admin/products",      "magasin"],
-  ["/admin/categories",    "magasin"],
-  ["/admin/fournisseurs",  "magasin"],
-  ["/admin/achats",        "magasin"],
-  ["/admin/import-export", "magasin"],
-  ["/admin/boutique-clients",      "boutique"],
-  ["/admin/boutique-segmentation", "boutique"],
-  ["/admin/livraisons",            "boutique"],
-  ["/admin/stock-boutique",        "boutique"],
-  ["/admin/stock",         "magasin"],
-  ["/admin/orders",        "store"],
-  ["/admin/ventes",        "boutique"],
-  ["/admin/factures",      "boutique"],
-  ["/admin/proforma",      "boutique"],
-  ["/admin/finance",       "boutique"],
-  ["/admin/coupons",       "store"],
-  ["/admin/settings",      "store"],
-  ["/admin/users",         "store"],
-  ["/admin/reviews",          "crm"],
-  ["/admin/crm",              "crm"],
-  ["/admin/messages",         "crm"],
-  ["/admin/whatsapp",         "crm"],
-  ["/admin/fidelite",         "crm"],
-  ["/admin/parrainage",       "crm"],
-  ["/admin/newsletter",       "crm"],
-  ["/admin/comptes-clients",  "crm"],
-  ["/admin/rapports",      "admin"],
-  ["/admin/tendances",     "admin"],
+  ["/admin/products",             "magasin"],
+  ["/admin/categories",           "magasin"],
+  ["/admin/fournisseurs",         "magasin"],
+  ["/admin/achats",               "magasin"],
+  ["/admin/import-export",        "magasin"],
+  ["/admin/stock",                "magasin"],
+  ["/admin/boutique-clients",     "boutique"],
+  ["/admin/boutique-segmentation","boutique"],
+  ["/admin/livraisons",           "boutique"],
+  ["/admin/stock-boutique",       "boutique"],
+  ["/admin/ventes",               "boutique"],
+  ["/admin/factures",             "boutique"],
+  ["/admin/proforma",             "boutique"],
+  ["/admin/finance",              "boutique"],
+  ["/admin/orders",               "store"],
+  ["/admin/coupons",              "store"],
+  ["/admin/settings",             "store"],
+  ["/admin/users",                "store"],
+  ["/admin/reviews",              "crm"],
+  ["/admin/crm",                  "crm"],
+  ["/admin/messages",             "crm"],
+  ["/admin/whatsapp",             "crm"],
+  ["/admin/fidelite",             "crm"],
+  ["/admin/parrainage",           "crm"],
+  ["/admin/newsletter",           "crm"],
+  ["/admin/comptes-clients",      "crm"],
+  ["/admin/rapports",             "admin"],
+  ["/admin/tendances",            "admin"],
 ];
 
 function getActiveModule(pathname: string): string | null {
@@ -130,8 +133,6 @@ function getActiveModule(pathname: string): string | null {
   return null;
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────────
-
 interface Props {
   nom:           string;
   role:          string;
@@ -139,9 +140,8 @@ interface Props {
   setMobileOpen: (v: boolean) => void;
 }
 
-export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: Props) {
+export default function AdminSidebar({ nom: _nom, role: _role, mobileOpen, setMobileOpen }: Props) {
   const pathname = usePathname();
-
   const moduleKey    = getActiveModule(pathname);
   const activeModule = moduleKey ? MODULES[moduleKey] : null;
 
@@ -151,10 +151,24 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
   }
 
   const SidebarContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-brand-950">
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      {/* Module badge */}
+      {activeModule ? (
+        <div className={`mx-3 mt-4 mb-2 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${activeModule.ring} bg-white/5`}>
+          <span className={`w-2 h-2 rounded-full ${activeModule.dot} shrink-0`} />
+          <span className="text-white font-display font-800 text-xs tracking-widest">
+            {activeModule.label}
+          </span>
+        </div>
+      ) : (
+        <div className="mx-3 mt-4 mb-2 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+          <span className="text-white/40 text-xs font-semibold tracking-widest">MODULE</span>
+        </div>
+      )}
+
+      {/* Nav items */}
+      <nav className="flex-1 overflow-y-auto px-3 py-2">
         {activeModule ? (
           <div className="space-y-0.5">
             {activeModule.items.map(item => (
@@ -163,48 +177,68 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={clsx(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                   isActive(item.href)
-                    ? "bg-emerald-800 text-white shadow-sm"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    ? `${activeModule.accent} text-white shadow-sm`
+                    : "text-white/60 hover:text-white hover:bg-white/10"
                 )}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
-                <span className="flex-1">{item.label}</span>
-                {isActive(item.href) && <ChevronRight className="w-3 h-3 opacity-60" />}
+                <span className="flex-1 leading-none">{item.label}</span>
+                {isActive(item.href) && <ChevronRight className="w-3 h-3 opacity-60 shrink-0" />}
               </Link>
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-32 gap-2 text-center px-4">
-            <ShoppingBag className="w-8 h-8 text-slate-200" />
-            <p className="text-xs text-slate-400">
-              Retournez à l&apos;accueil pour sélectionner un module.
+          <div className="flex flex-col items-center justify-center h-40 gap-3 text-center px-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <Home className="w-5 h-5 text-white/20" />
+            </div>
+            <p className="text-xs text-white/30 leading-relaxed">
+              Sélectionnez un module depuis l&apos;accueil
             </p>
+            <Link
+              href="/admin"
+              className="px-4 py-2 rounded-xl bg-white/10 text-white/70 text-xs font-semibold hover:bg-white/15 transition-colors"
+            >
+              Retour à l'accueil
+            </Link>
           </div>
         )}
       </nav>
 
+      {/* Back to home — bottom */}
+      {activeModule && (
+        <div className="px-3 pb-4 pt-2 border-t border-white/10">
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/50 text-sm font-medium hover:text-white hover:bg-white/10 transition-all"
+          >
+            <Home className="w-4 h-4 shrink-0" />
+            Accueil admin
+          </Link>
+        </div>
+      )}
     </div>
   );
 
   return (
     <>
-      {/* Desktop sidebar — starts below top bar (top-14) */}
-      <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col bg-white border-r border-slate-100 fixed left-0 top-14 h-[calc(100vh-3.5rem)] z-40">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col fixed left-0 top-14 h-[calc(100vh-3.5rem)] z-40 shadow-lg">
         {SidebarContent}
       </aside>
 
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="relative w-72 bg-white h-full shadow-xl flex flex-col">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="relative w-72 h-full shadow-xl flex flex-col">
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100 text-slate-500"
+              className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
             {SidebarContent}
           </div>
