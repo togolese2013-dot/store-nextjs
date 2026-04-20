@@ -40,6 +40,7 @@ export default async function EditProductPage({ params }: PageProps) {
     neuf:           Boolean(product.neuf),
     actif:          Boolean(product.actif),
     image_url:      (product.image_url || product.image) ?? "",
+    images:         (() => { try { return JSON.parse(product.images_json || "[]"); } catch { return []; } })(),
   };
 
   return (
