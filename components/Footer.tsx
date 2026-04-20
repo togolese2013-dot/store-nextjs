@@ -38,54 +38,55 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Navigation */}
-          <div>
-            <h4 className="font-display font-700 text-sm uppercase tracking-widest text-slate-400 mb-5">
-              Navigation
-            </h4>
-            <ul className="flex flex-col gap-3">
-              {[
-                ["Accueil",         "/"],
-                ["Tous les produits", "/products"],
-                ["Promotions",      "/products?promo=true"],
-                ["Nouveautés",      "/products?new=true"],
-                ["Mon panier",      "/cart"],
-              ].map(([label, href]) => (
-                <li key={label}>
-                  <Link href={href}
-                    className="text-slate-400 hover:text-white text-sm transition-colors hover:translate-x-1 inline-flex items-center gap-1"
-                  >
-                    <span className="text-accent-500">›</span> {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Navigation + Support — côte à côte sur mobile */}
+          <div className="sm:col-span-2 lg:col-span-1 grid grid-cols-2 gap-6 lg:contents">
+            <div className="lg:col-auto">
+              <h4 className="font-display font-700 text-sm uppercase tracking-widest text-slate-400 mb-5">
+                Navigation
+              </h4>
+              <ul className="flex flex-col gap-3">
+                {[
+                  ["Accueil",           "/"],
+                  ["Tous les produits", "/products"],
+                  ["Promotions",        "/products?promo=true"],
+                  ["Nouveautés",        "/products?new=true"],
+                  ["Mon panier",        "/cart"],
+                ].map(([label, href]) => (
+                  <li key={label}>
+                    <Link href={href}
+                      className="text-slate-400 hover:text-white text-sm transition-colors hover:translate-x-1 inline-flex items-center gap-1"
+                    >
+                      <span className="text-accent-500">›</span> {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-          {/* Support & Fidélité */}
-          <div>
-            <h4 className="font-display font-700 text-sm uppercase tracking-widest text-slate-400 mb-5">
-              Support
-            </h4>
-            <ul className="flex flex-col gap-3">
-              {[
-                ["Mon compte",          "/account"],
-                ["Mes commandes",       "/account/orders"],
-                ["Politique de retour", "/returns"],
-                ["Livraisons",          "/shipping"],
-                ["Contact",             "/contact"],
-                ["Programme Fidélité ⭐", "/fidelite"],
-                ["Parrainage 🎁",       "/parrainage"],
-              ].map(([label, href]) => (
-                <li key={label}>
-                  <Link href={href}
-                    className="text-slate-400 hover:text-white text-sm transition-colors inline-flex items-center gap-1"
-                  >
-                    <span className="text-accent-500">›</span> {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div className="lg:col-auto">
+              <h4 className="font-display font-700 text-sm uppercase tracking-widest text-slate-400 mb-5">
+                Support
+              </h4>
+              <ul className="flex flex-col gap-3">
+                {[
+                  ["Mon compte",           "/account"],
+                  ["Mes commandes",        "/account/orders"],
+                  ["Politique de retour",  "/returns"],
+                  ["Livraisons",           "/shipping"],
+                  ["Contact",              "/contact"],
+                  ["Programme Fidélité ⭐", "/fidelite"],
+                  ["Parrainage 🎁",        "/parrainage"],
+                ].map(([label, href]) => (
+                  <li key={label}>
+                    <Link href={href}
+                      className="text-slate-400 hover:text-white text-sm transition-colors inline-flex items-center gap-1"
+                    >
+                      <span className="text-accent-500">›</span> {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Contact */}

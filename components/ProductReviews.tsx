@@ -45,15 +45,14 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
   );
 }
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return "Aujourd'hui";
-  if (days === 1) return "Hier";
-  if (days < 30) return `Il y a ${days} jours`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `Il y a ${months} mois`;
-  return `Il y a ${Math.floor(months / 12)} an${Math.floor(months / 12) > 1 ? "s" : ""}`;
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} à ${hh}:${min}`;
 }
 
 export default function ProductReviews({ productId }: Props) {
@@ -120,23 +119,23 @@ export default function ProductReviews({ productId }: Props) {
         )}
       </div>
 
-      {/* ── Reviews list ── */}
+      {/* ── Reviews slider ── */}
       {loading ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm py-4">
           <Loader2 className="w-4 h-4 animate-spin" /> Chargement des avis…
         </div>
       ) : reviews.length > 0 ? (
-        <div className="space-y-4 mb-8">
+        <div className="flex gap-4 overflow-x-auto pb-3 mb-5 snap-x snap-mandatory scrollbar-hide -mx-1 px-1">
           {reviews.map(r => (
-            <div key={r.id} className="bg-white rounded-2xl border border-slate-100 p-5">
+            <div key={r.id} className="bg-white rounded-2xl border border-slate-100 p-5 snap-start shrink-0 w-[85vw] sm:w-80">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm">
+                  <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm shrink-0">
                     {r.nom.charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{r.nom}</p>
-                    <p className="text-xs text-slate-400">{timeAgo(r.created_at)}</p>
+                    <p className="text-xs text-slate-400">{formatDate(r.created_at)}</p>
                   </div>
                 </div>
                 <StarRating value={r.rating} />

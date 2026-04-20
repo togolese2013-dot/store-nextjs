@@ -19,17 +19,17 @@ function TrustBar() {
     { icon: ShieldCheck, label: "100% authentique",     sub: "Produits vérifiés" },
   ];
   return (
-    <div className="bg-white border-b border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
+    <div className="bg-white border-b border-slate-100 overflow-x-auto">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
+        <div className="flex items-stretch divide-x divide-slate-100 min-w-max lg:min-w-0 lg:grid lg:grid-cols-4">
           {items.map(({ icon: Icon, label, sub }) => (
-            <div key={label} className="flex items-center gap-3 px-4 py-4 lg:py-5">
-              <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-                <Icon className="w-5 h-5 text-brand-700" />
+            <div key={label} className="flex items-center gap-2 px-3 py-3 lg:py-5 shrink-0">
+              <div className="w-7 h-7 lg:w-10 lg:h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                <Icon className="w-3.5 h-3.5 lg:w-5 lg:h-5 text-brand-700" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900 leading-tight">{label}</p>
-                <p className="text-xs text-slate-500 leading-tight">{sub}</p>
+                <p className="text-xs lg:text-sm font-bold text-slate-900 leading-tight whitespace-nowrap">{label}</p>
+                <p className="text-[10px] lg:text-xs text-slate-500 leading-tight whitespace-nowrap hidden sm:block">{sub}</p>
               </div>
             </div>
           ))}
@@ -172,10 +172,11 @@ function Testimonials() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Slider horizontal — scroll-snap */}
+        <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
           {reviews.map((r, i) => (
             <div key={i}
-              className="bg-white rounded-3xl p-6 border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+              className="bg-white rounded-3xl p-6 border border-slate-100 hover:shadow-lg transition-all duration-300 snap-start shrink-0 w-[80vw] sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)]"
             >
               <div className="flex gap-0.5 mb-4">
                 {[...Array(r.rating)].map((_, j) => (

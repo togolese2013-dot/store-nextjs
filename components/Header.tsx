@@ -144,14 +144,14 @@ export default function Header() {
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16 gap-3">
+          <div className="flex items-center h-9 sm:h-14 gap-1.5 sm:gap-3">
 
             {/* Logo */}
-            <Link href="/" className="flex items-center shrink-0 mr-2">
+            <Link href="/" className="flex items-center shrink-0 mr-1 sm:mr-2">
               <img
                 src="/logo-togolese-shop.svg"
                 alt="Togolese Shop"
-                className="h-6 sm:h-7 w-auto"
+                className="h-4 sm:h-7 w-auto"
               />
             </Link>
 
@@ -259,21 +259,21 @@ export default function Header() {
             <div className="flex items-center gap-1 ml-auto">
 
               {/* Mobile search icon */}
-              <button className="md:hidden p-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+              <button className="md:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
                 onClick={() => inputRef.current?.focus()}
                 aria-label="Rechercher"
               >
-                <Search className="w-5 h-5" />
+                <Search className="w-4 h-4" />
               </button>
 
               {/* Wishlist */}
               <Link href="/wishlist"
-                className="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                className="relative p-1.5 sm:p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
                 aria-label={`Favoris (${wishlistCount})`}
               >
-                <Heart className="w-5 h-5" />
+                <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
                 {wishlistCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                  <span className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
                     {wishlistCount > 9 ? "9+" : wishlistCount}
                   </span>
                 )}
@@ -281,12 +281,12 @@ export default function Header() {
 
               {/* Cart */}
               <Link href="/cart"
-                className="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                className="relative p-1.5 sm:p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
                 aria-label={`Panier (${cartCount})`}
               >
-                <ShoppingBag className="w-5 h-5" />
+                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
                 {cartCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                  <span className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-accent-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
                     {cartCount > 9 ? "9+" : cartCount}
                   </span>
                 )}
@@ -341,24 +341,24 @@ export default function Header() {
               {/* Hamburger */}
               <button
                 onClick={() => setOpen(!open)}
-                className="lg:hidden p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                className="lg:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
                 aria-label="Menu"
                 aria-expanded={open}
               >
-                {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {open ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
           {/* Mobile search bar */}
-          <div className="md:hidden pb-3">
+          <div className="md:hidden pb-2">
             <form onSubmit={handleSearch} className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Rechercher…"
-                className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-100 rounded-2xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
+                className="w-full pl-8 pr-4 py-1.5 text-sm bg-slate-100 rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
               />
             </form>
           </div>
@@ -366,7 +366,7 @@ export default function Header() {
 
         {/* ── Mobile menu ── */}
         {open && (
-          <div className="lg:hidden border-t border-slate-100 bg-white px-4 py-4 flex flex-col gap-2 shadow-lg">
+          <div className="lg:hidden border-t border-slate-100 bg-white px-4 py-3 flex flex-col gap-2 shadow-lg max-h-[70vh] overflow-y-auto">
             {NAV.map(({ label, href, icon: Icon, hot }) => (
               <Link
                 key={label} href={href}
