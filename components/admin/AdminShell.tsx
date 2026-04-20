@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import AdminTopBar from "./AdminTopBar";
 import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
 
@@ -13,34 +12,36 @@ interface Props {
 }
 
 export default function AdminShell({ nom, role, children }: Props) {
-  const pathname     = usePathname();
+  const pathname    = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Landing page — top bar only, no sidebar
+  // Landing page — no sidebar
   if (pathname === "/admin") {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-        <AdminTopBar nom={nom} role={role} />
-        <div className="pt-14">{children}</div>
-      </div>
-    );
+    return <>{children}</>;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <AdminTopBar
-        nom={nom}
-        role={role}
-        onMobileMenuToggle={() => setMobileOpen(o => !o)}
-      />
+    <div className="min-h-screen bg-slate-50">
       <AdminSidebar
         nom={nom}
         role={role}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
-      <div className="lg:pl-60 xl:pl-64 pt-14">
+      <div className="lg:pl-60 xl:pl-64">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+          {/* Mobile hamburger — top of content */}
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="lg:hidden mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-900 text-white text-sm font-semibold"
+          >
+            <span className="flex flex-col gap-1">
+              <span className="w-4 h-0.5 bg-white rounded" />
+              <span className="w-4 h-0.5 bg-white rounded" />
+              <span className="w-4 h-0.5 bg-white rounded" />
+            </span>
+            Menu
+          </button>
           {children}
         </main>
       </div>
