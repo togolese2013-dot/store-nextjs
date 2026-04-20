@@ -81,15 +81,18 @@ export default async function AdminHomePage() {
           </div>
 
           {/* Module grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-5">
-            {MODULES.map(({ key, label, sub, desc, href, icon: Icon, grad, dot }) => (
+          <div className="grid grid-cols-2 gap-4 sm:gap-5">
+            {MODULES.map(({ key, label, sub, desc, href, icon: Icon, grad, dot }, idx) => (
               <Link
                 key={key}
                 href={href}
                 className={clsx(
                   `group relative flex flex-col justify-between bg-gradient-to-br ${grad}`,
                   "rounded-2xl p-6 sm:p-8 min-h-[180px] sm:min-h-[210px] overflow-hidden",
-                  "hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+                  "hover:shadow-2xl hover:-translate-y-1 transition-all duration-300",
+                  idx === MODULES.length - 1 && MODULES.length % 2 !== 0
+                    ? "col-span-2 max-w-sm mx-auto w-full"
+                    : ""
                 )}
               >
                 {/* Decorative */}
