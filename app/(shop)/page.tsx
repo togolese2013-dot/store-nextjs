@@ -172,7 +172,35 @@ function Testimonials() {
             <span className="ml-2 text-sm font-semibold text-slate-600">4.9 / 5 · 120+ avis</span>
           </div>
         </div>
-        <TestimonialsSlider reviews={reviews} colors={colors} />
+        {/* Mobile: auto-sliding single card */}
+        <div className="md:hidden">
+          <TestimonialsSlider reviews={reviews} colors={colors} />
+        </div>
+
+        {/* Desktop: static grid */}
+        <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-6">
+          {reviews.map((r, i) => (
+            <div key={r.name} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex gap-0.5 mb-4">
+                {[...Array(r.rating)].map((_, j) => (
+                  <Star key={j} className="w-4 h-4 text-amber-400" fill="currentColor" />
+                ))}
+              </div>
+              <p className="text-slate-700 text-sm leading-relaxed mb-6 italic flex-1">
+                &ldquo;{r.text}&rdquo;
+              </p>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full ${colors[i % colors.length]} text-white text-sm font-bold flex items-center justify-center shrink-0`}>
+                  {r.avatar}
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-slate-900">{r.name}</p>
+                  <p className="text-xs text-slate-400">{r.loc}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -199,7 +227,7 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection />
-      <TrustBar />
+      <div className="hidden md:block"><TrustBar /></div>
 
       <Section
         title="Meilleures ventes"

@@ -47,9 +47,10 @@ export default function Header() {
   const [avatarNom,   setAvatarNom]   = useState<string | null>(null);
   const [avatarPhoto, setAvatarPhoto] = useState<string | null>(null);
 
-  const inputRef    = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const accountRef  = useRef<HTMLDivElement>(null);
+  const inputRef          = useRef<HTMLInputElement>(null);
+  const dropdownRef       = useRef<HTMLDivElement>(null);
+  const mobileDropdownRef = useRef<HTMLDivElement>(null);
+  const accountRef        = useRef<HTMLDivElement>(null);
   const router      = useRouter();
   const pathname    = usePathname();
 
@@ -95,7 +96,10 @@ export default function Header() {
   /* Close dropdowns on outside click */
   useEffect(() => {
     function handle(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        mobileDropdownRef.current && !mobileDropdownRef.current.contains(e.target as Node)
+      ) {
         setShowSug(false);
       }
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
@@ -146,12 +150,22 @@ export default function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-9 sm:h-14 gap-1.5 sm:gap-3">
 
+            {/* Hamburger — mobile/tablet only, LEFT of logo */}
+            <button
+              onClick={() => setOpen(!open)}
+              className="lg:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+              aria-label="Menu"
+              aria-expanded={open}
+            >
+              {open ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
+
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0 mr-1 sm:mr-2">
               <img
                 src="/logo-togolese-shop.svg"
                 alt="Togolese Shop"
-                className="h-4 sm:h-7 w-auto"
+                className="h-5 sm:h-7 w-auto"
               />
             </Link>
 
@@ -258,14 +272,6 @@ export default function Header() {
             {/* Right icons */}
             <div className="flex items-center gap-1 ml-auto">
 
-              {/* Mobile search icon */}
-              <button className="md:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
-                onClick={() => inputRef.current?.focus()}
-                aria-label="Rechercher"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-
               {/* Wishlist */}
               <Link href="/wishlist"
                 className="relative p-1.5 sm:p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
@@ -338,29 +344,59 @@ export default function Header() {
                 />
               </div>
 
-              {/* Hamburger */}
-              <button
-                onClick={() => setOpen(!open)}
-                className="lg:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
-                aria-label="Menu"
-                aria-expanded={open}
-              >
-                {open ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              </button>
             </div>
           </div>
 
-          {/* Mobile search bar */}
-          <div className="md:hidden pb-2">
+          {/* Mobile search bar + dropdown */}
+          <div ref={mobileDropdownRef} className="md:hidden pb-2 relative">
             <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                onFocus={() => { if (suggestions.length) setShowSug(true); }}
                 placeholder="Rechercher…"
                 className="w-full pl-8 pr-4 py-1.5 text-sm bg-slate-100 rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
               />
             </form>
+
+            {showSug && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden">
+                {suggestions.map(p => {
+                  const price   = finalPrice(p);
+                  const isPromo = p.remise > 0;
+                  const imgSrc  = p.image_url
+                    ? p.image_url.startsWith("http") ? p.image_url : `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${p.image_url}`
+                    : null;
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/products/${p.reference}`}
+                      onClick={() => { setShowSug(false); setSearch(""); }}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden shrink-0">
+                        {imgSrc
+                          ? <Image src={imgSrc} alt={p.nom} width={40} height={40} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">📷</div>
+                        }
+                      </div>
+                      <p className="flex-1 text-sm text-slate-800 line-clamp-1 min-w-0">{p.nom}</p>
+                      <p className={clsx("text-sm font-bold shrink-0", isPromo ? "text-accent-600" : "text-slate-900")}>
+                        {formatPrice(price)}
+                      </p>
+                    </Link>
+                  );
+                })}
+                <Link
+                  href={`/products?q=${encodeURIComponent(search)}`}
+                  onClick={() => { setShowSug(false); setSearch(""); }}
+                  className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 transition-colors"
+                >
+                  Voir tous les résultats →
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
