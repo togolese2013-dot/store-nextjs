@@ -2232,9 +2232,16 @@ async function ensureMarquesTable() {
       created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  await db.execute(`
-    ALTER TABLE produits ADD COLUMN IF NOT EXISTS marque_id INT NULL
-  `).catch(() => {});
+  // Check column existence before ALTER to support MySQL < 8.0.3
+  const [cols] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME   = 'produits'
+       AND COLUMN_NAME  = 'marque_id'`
+  );
+  if (Number((cols as mysql.RowDataPacket[])[0]?.cnt ?? 0) === 0) {
+    await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`).catch(() => {});
+  }
 }
 
 export async function listAdminMarques(): Promise<AdminMarque[]> {

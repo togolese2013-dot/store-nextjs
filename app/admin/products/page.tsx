@@ -11,6 +11,7 @@ import {
   Boxes, AlertTriangle, XCircle, TrendingDown, TrendingUp, DollarSign,
   Activity,
 } from "lucide-react";
+import { Suspense } from "react";
 import PageHeader from "@/components/admin/PageHeader";
 import ProductsViewTabs from "@/components/admin/ProductsViewTabs";
 
@@ -222,7 +223,9 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       {/* ── Filter tabs ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: tab bar */}
-        <ProductsViewTabs tabs={viewTabs} active={view} />
+        <Suspense fallback={<div className="flex gap-0 border-b border-slate-100 h-10" />}>
+          <ProductsViewTabs tabs={viewTabs} active={view} />
+        </Suspense>
 
         {/* Right: statut tabs (only for stock view) */}
         {isStockView && (
