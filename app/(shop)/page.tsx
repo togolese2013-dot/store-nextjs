@@ -3,6 +3,7 @@ import { getProducts, finalPrice, formatPrice } from "@/lib/db";
 import ProductCard from "@/components/ProductCard";
 import HeroSection from "@/components/HeroSection";
 import Newsletter from "@/components/Newsletter";
+import TestimonialsSlider from "@/components/TestimonialsSlider";
 import Link from "next/link";
 import {
   Truck, CreditCard, RefreshCw, ShieldCheck,
@@ -19,17 +20,17 @@ function TrustBar() {
     { icon: ShieldCheck, label: "100% authentique",     sub: "Produits vérifiés" },
   ];
   return (
-    <div className="bg-white border-b border-slate-100 overflow-x-auto">
+    <div className="bg-white border-b border-slate-100">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
-        <div className="flex items-stretch divide-x divide-slate-100 min-w-max lg:min-w-0 lg:grid lg:grid-cols-4">
+        <div className="grid grid-cols-4 divide-x divide-slate-100">
           {items.map(({ icon: Icon, label, sub }) => (
-            <div key={label} className="flex items-center gap-2 px-3 py-3 lg:py-5 shrink-0">
-              <div className="w-7 h-7 lg:w-10 lg:h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-                <Icon className="w-3.5 h-3.5 lg:w-5 lg:h-5 text-brand-700" />
+            <div key={label} className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-2.5 lg:py-5">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-lg sm:rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                <Icon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-brand-700" />
               </div>
-              <div>
-                <p className="text-xs lg:text-sm font-bold text-slate-900 leading-tight whitespace-nowrap">{label}</p>
-                <p className="text-[10px] lg:text-xs text-slate-500 leading-tight whitespace-nowrap hidden sm:block">{sub}</p>
+              <div className="min-w-0">
+                <p className="text-[9px] sm:text-xs lg:text-sm font-bold text-slate-900 leading-tight line-clamp-2">{label}</p>
+                <p className="text-[8px] lg:text-xs text-slate-500 leading-tight hidden lg:block">{sub}</p>
               </div>
             </div>
           ))}
@@ -171,31 +172,7 @@ function Testimonials() {
             <span className="ml-2 text-sm font-semibold text-slate-600">4.9 / 5 · 120+ avis</span>
           </div>
         </div>
-
-        {/* Slider horizontal — scroll-snap */}
-        <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-          {reviews.map((r, i) => (
-            <div key={i}
-              className="bg-white rounded-3xl p-6 border border-slate-100 hover:shadow-lg transition-all duration-300 snap-start shrink-0 w-[80vw] sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)]"
-            >
-              <div className="flex gap-0.5 mb-4">
-                {[...Array(r.rating)].map((_, j) => (
-                  <Star key={j} className="w-4 h-4 text-amber-400" fill="currentColor" />
-                ))}
-              </div>
-              <p className="text-slate-700 text-sm leading-relaxed mb-5 italic">"{r.text}"</p>
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-full ${colors[i]} text-white text-xs font-bold flex items-center justify-center shrink-0`}>
-                  {r.avatar}
-                </div>
-                <div>
-                  <p className="font-bold text-sm text-slate-900">{r.name}</p>
-                  <p className="text-xs text-slate-400">{r.loc}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <TestimonialsSlider reviews={reviews} colors={colors} />
       </div>
     </section>
   );

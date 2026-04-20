@@ -75,9 +75,9 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
           )}
         >
           {added ? (
-            <><Check className="w-4 h-4" /> Ajouté au panier !</>
+            <><Check className="w-4 h-4" /> <span className="hidden sm:inline">Ajouté au panier !</span><span className="sm:hidden">Ajouté !</span></>
           ) : (
-            <><ShoppingBag className="w-4 h-4" /> Ajouter au panier</>
+            <><ShoppingBag className="w-4 h-4" /> <span className="hidden sm:inline">Ajouter au panier</span><span className="sm:hidden">Ajouter</span></>
           )}
         </button>
 

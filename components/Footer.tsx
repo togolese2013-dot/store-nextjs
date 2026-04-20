@@ -109,8 +109,8 @@ export default function Footer() {
               </li>
             </ul>
 
-            {/* Guarantees */}
-            <div className="mt-6 p-4 rounded-2xl bg-white/5 border border-white/10">
+            {/* Guarantees — desktop only */}
+            <div className="hidden lg:block mt-6 p-4 rounded-2xl bg-white/5 border border-white/10">
               <p className="text-xs font-semibold text-slate-300 mb-3">Nos garanties</p>
               <ul className="flex flex-col gap-2 text-xs text-slate-400">
                 <li>✅ Paiement à la livraison</li>

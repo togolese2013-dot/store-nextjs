@@ -37,7 +37,7 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
   return (
     <section
       className="relative overflow-hidden"
-      style={{ height: "clamp(300px, 40vw, 440px)" }}
+      style={{ aspectRatio: "16/9", maxHeight: "440px", minHeight: "180px" }}
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
     >
@@ -57,14 +57,14 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
       <div className="absolute right-[30%] bottom-0 w-64 h-64 rounded-full"
         style={{ background: `${slide.accent}08` }} />
 
-      {/* Hero image — reduced ~30% vs original, hidden on broken load */}
+      {/* Hero image — 16:9, visible mobile + desktop */}
       {slide.image && !imgError[slide.id] && (
-        <div className="absolute right-0 bottom-0 h-[75%] w-[32%] pointer-events-none hidden md:block">
+        <div className="absolute right-0 bottom-0 h-[80%] w-[42%] sm:w-[36%] md:w-[32%] pointer-events-none">
           <img
             src={slide.image} alt=""
             loading={cur === 0 ? "eager" : "lazy"}
             onError={() => setImgErr(prev => ({ ...prev, [slide.id]: true }))}
-            className="absolute right-0 bottom-0 h-full w-full object-contain object-right-bottom opacity-85"
+            className="absolute right-0 bottom-0 h-full w-full object-contain object-right-bottom opacity-75 sm:opacity-85"
             aria-hidden
           />
         </div>
