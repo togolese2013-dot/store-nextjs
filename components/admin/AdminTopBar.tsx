@@ -57,13 +57,13 @@ export default function AdminTopBar({ nom, role, onMobileMenuToggle }: AdminTopB
   const initial = nom.charAt(0).toUpperCase();
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b border-slate-100 flex items-center px-4 gap-3 shadow-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-brand-950 border-b border-white/10 flex items-center px-4 gap-3">
 
       {/* Mobile hamburger */}
       {onMobileMenuToggle && (
         <button
           onClick={onMobileMenuToggle}
-          className="lg:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+          className="lg:hidden p-2 rounded-xl hover:bg-white/10 text-white/70 hover:text-white transition-colors"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -75,8 +75,8 @@ export default function AdminTopBar({ nom, role, onMobileMenuToggle }: AdminTopB
           <img src="/logo-togolese-shop-white.svg" alt="" className="h-4 w-auto" />
         </div>
         <div className="hidden sm:block">
-          <p className="font-display font-800 text-xs text-slate-900 leading-none">Togolese Shop</p>
-          <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Admin</p>
+          <p className="font-display font-800 text-xs text-white leading-none">Togolese Shop</p>
+          <p className="text-[9px] text-white/40 uppercase tracking-widest mt-0.5">Admin</p>
         </div>
       </Link>
 
@@ -89,7 +89,7 @@ export default function AdminTopBar({ nom, role, onMobileMenuToggle }: AdminTopB
         {/* Voir le site */}
         <Link
           href="/" target="_blank"
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-brand-700 hover:bg-brand-50 transition-colors border border-slate-200 hover:border-brand-200"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white/60 hover:text-white hover:bg-white/10 transition-colors border border-white/15"
         >
           <Globe className="w-3.5 h-3.5" />
           Site →
@@ -98,7 +98,7 @@ export default function AdminTopBar({ nom, role, onMobileMenuToggle }: AdminTopB
         {/* Home */}
         <Link
           href="/admin"
-          className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+          className="p-2 rounded-xl text-white/60 hover:bg-white/10 hover:text-white transition-colors"
           title="Accueil admin"
         >
           <Home className="w-4 h-4" />
@@ -108,16 +108,16 @@ export default function AdminTopBar({ nom, role, onMobileMenuToggle }: AdminTopB
         <div className="relative" ref={modalRef}>
           <button
             onClick={() => setModalOpen(o => !o)}
-            className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl hover:bg-slate-100 transition-colors"
+            className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl hover:bg-white/10 transition-colors"
           >
             <div className="w-8 h-8 rounded-full bg-brand-900 flex items-center justify-center text-white font-bold text-sm shrink-0">
               {initial}
             </div>
             <div className="hidden sm:block text-left">
-              <p className="text-xs font-bold text-slate-900 leading-none">{nom}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">{role.replace("_", " ")}</p>
+              <p className="text-xs font-bold text-white leading-none">{nom}</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-0.5">{role.replace("_", " ")}</p>
             </div>
-            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform hidden sm:block ${modalOpen ? "rotate-180" : ""}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform hidden sm:block ${modalOpen ? "rotate-180" : ""}`} />
           </button>
 
           {modalOpen && (

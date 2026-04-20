@@ -180,7 +180,7 @@ export default function AdminSidebar({ nom: _nom, role: _role, mobileOpen, setMo
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                   isActive(item.href)
                     ? `${activeModule.accent} text-white shadow-sm`
-                    : "text-white/60 hover:text-white hover:bg-white/10"
+                    : "text-white/85 hover:text-white hover:bg-white/10"
                 )}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
@@ -212,7 +212,7 @@ export default function AdminSidebar({ nom: _nom, role: _role, mobileOpen, setMo
         <div className="px-3 pb-4 pt-2 border-t border-white/10">
           <Link
             href="/admin"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/50 text-sm font-medium hover:text-white hover:bg-white/10 transition-all"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 text-sm font-medium hover:text-white hover:bg-white/10 transition-all"
           >
             <Home className="w-4 h-4 shrink-0" />
             Accueil admin
