@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingBag, Check, Minus, Plus } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import type { SelectedVariant } from "@/context/CartContext";
 import type { Product } from "@/lib/utils";
@@ -32,9 +32,9 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
   if (outOf) {
     return (
       <button disabled
-        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md bg-slate-100 text-slate-400 font-bold text-xs cursor-not-allowed"
+        className="flex-1 flex items-center justify-center py-2.5 rounded-md bg-slate-100 text-slate-400 font-sans text-xs font-medium cursor-not-allowed"
       >
-        <ShoppingBag className="w-4 h-4" /> Indisponible
+        Indisponible
       </button>
     );
   }
@@ -68,17 +68,13 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
         <button
           onClick={handleAdd}
           className={clsx(
-            "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md font-bold text-xs transition-all duration-200",
+            "flex-1 flex items-center justify-center py-2.5 rounded-md font-sans font-medium text-xs transition-all duration-200",
             added
               ? "bg-green-500 text-white scale-[0.98]"
               : "bg-brand-900 text-white hover:bg-brand-800 hover:shadow-brand active:scale-[0.98]"
           )}
         >
-          {added ? (
-            <><Check className="w-4 h-4" /> <span className="hidden sm:inline">Ajouté au panier !</span><span className="sm:hidden">Ajouté !</span></>
-          ) : (
-            <><ShoppingBag className="w-4 h-4" /> <span className="hidden sm:inline">Ajouter au panier</span><span className="sm:hidden">Ajouter</span></>
-          )}
+          {added ? "Ajouté au panier ✓" : "Ajouter au panier"}
         </button>
 
         {added && (

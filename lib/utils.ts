@@ -30,8 +30,4 @@ export const finalPrice = (p: Product): number =>
   p.remise > 0 ? Math.max(0, p.prix_unitaire - p.remise) : p.prix_unitaire;
 
 export const formatPrice = (n: number): string =>
-  new Intl.NumberFormat("fr-TG", {
-    style: "currency",
-    currency: "XOF",
-    maximumFractionDigits: 0,
-  }).format(n);
+  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n) + " FCFA";

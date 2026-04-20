@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ShoppingBag, Heart, Zap } from "lucide-react";
 import { clsx } from "clsx";
 import { type Product, finalPrice, formatPrice } from "@/lib/utils";
+import { useCart } from "@/context/CartContext";
 
 const WL_KEY = "ts_wishlist";
 
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function ProductCard({ product, className }: Props) {
+  const { addItem } = useCart();
   const [liked, setLiked]   = useState(false);
   const [added, setAdded]   = useState(false);
 
@@ -47,14 +49,7 @@ export default function ProductCard({ product, className }: Props) {
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     if (outOf) return;
-    try {
-      const cart = JSON.parse(localStorage.getItem("ts_cart") || "[]") as Array<Product & { qty: number }>;
-      const idx = cart.findIndex(i => i.id === product.id);
-      if (idx >= 0) cart[idx].qty += 1;
-      else cart.push({ ...product, qty: 1 });
-      localStorage.setItem("ts_cart", JSON.stringify(cart));
-      window.dispatchEvent(new Event("cart-updated"));
-    } catch { /* ignore storage errors */ }
+    addItem(product, 1);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
   };
@@ -179,7 +174,7 @@ export default function ProductCard({ product, className }: Props) {
           disabled={outOf}
           className={clsx(
             "w-full flex items-center justify-center py-2.5 rounded-md transition-all duration-200",
-            "font-sans text-xs font-medium sm:text-sm sm:font-bold sm:gap-2",
+            "font-sans text-xs font-medium",
             outOf
               ? "bg-slate-100 text-slate-400 cursor-not-allowed"
               : added
@@ -187,7 +182,6 @@ export default function ProductCard({ product, className }: Props) {
                 : "bg-brand-900 text-white hover:bg-brand-800 hover:shadow-brand active:scale-95"
           )}
         >
-          <ShoppingBag className="hidden sm:block w-4 h-4" />
           {outOf ? "Indisponible" : added ? "Ajouté ✓" : "Ajouter au panier"}
         </button>
       </div>
