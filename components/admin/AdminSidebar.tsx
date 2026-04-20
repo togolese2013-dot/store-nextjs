@@ -198,11 +198,12 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
+                style={{ color: "white" }}
                 className={clsx(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all",
                   isActive(item.href)
-                    ? `${activeModule.accent} text-white shadow-sm`
-                    : "text-white hover:bg-white/10"
+                    ? `${activeModule.accent} shadow-sm`
+                    : "hover:bg-white/10"
                 )}
               >
                 <item.icon className="w-4 h-4 shrink-0 opacity-80" />
@@ -233,21 +234,24 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
       <div className="px-3 pb-4 pt-2 border-t border-white/10 space-y-0.5">
         <Link
           href="/" target="_blank"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white text-sm font-semibold hover:bg-white/10 transition-colors"
+          style={{ color: "white" }}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors"
         >
           <Globe className="w-4 h-4 shrink-0 opacity-80" />
           Voir le site
         </Link>
         <Link
           href="/admin"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white text-sm font-semibold hover:bg-white/10 transition-colors"
+          style={{ color: "white" }}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors"
         >
           <Home className="w-4 h-4 shrink-0 opacity-80" />
           Accueil admin
         </Link>
         <button
           onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-300 text-sm font-semibold hover:bg-red-500/15 transition-colors"
+          style={{ color: "#fca5a5" }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-500/15 transition-colors"
         >
           <LogOut className="w-4 h-4 shrink-0" />
           Déconnexion — {nom}

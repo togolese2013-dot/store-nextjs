@@ -1,6 +1,6 @@
 import { getAdminSession } from "@/lib/auth";
 import Link from "next/link";
-import { Package, ShoppingBag, Settings, Users, ArrowRight, BarChart2, Globe, LogOut } from "lucide-react";
+import { Package, ShoppingBag, Settings, Users, ArrowRight, BarChart2 } from "lucide-react";
 
 export const metadata = { title: "Accueil Admin" };
 
@@ -68,46 +68,6 @@ export default async function AdminHomePage() {
   return (
     <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto flex flex-col">
 
-      {/* Top bar */}
-      <header className="bg-white border-b border-slate-100 px-6 py-3.5 flex items-center justify-between shrink-0 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-brand-900 flex items-center justify-center">
-            <img src="/logo-togolese-shop-white.svg" alt="" className="h-4 w-auto" />
-          </div>
-          <div>
-            <p className="font-display font-800 text-sm text-slate-900 leading-none">Togolese Shop</p>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Administration</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {session && (
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-brand-900 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                {session.nom.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm text-slate-600">
-                <span className="font-semibold text-slate-900">{session.nom}</span>
-              </span>
-            </div>
-          )}
-          <Link
-            href="/" target="_blank"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-brand-700 hover:bg-brand-50 transition-colors border border-slate-200 hover:border-brand-200"
-          >
-            <Globe className="w-3.5 h-3.5" /> Voir le site
-          </Link>
-          <form action="/api/admin/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors border border-transparent hover:border-red-100"
-            >
-              <LogOut className="w-3.5 h-3.5" /> Déconnexion
-            </button>
-          </form>
-        </div>
-      </header>
-
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-3xl">
@@ -121,18 +81,15 @@ export default async function AdminHomePage() {
           </div>
 
           {/* Module grid */}
-          <div className="grid grid-cols-2 gap-4 sm:gap-5">
-            {MODULES.map(({ key, label, sub, desc, href, icon: Icon, grad, dot }, idx) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-5">
+            {MODULES.map(({ key, label, sub, desc, href, icon: Icon, grad, dot }) => (
               <Link
                 key={key}
                 href={href}
                 className={clsx(
                   `group relative flex flex-col justify-between bg-gradient-to-br ${grad}`,
                   "rounded-2xl p-6 sm:p-8 min-h-[180px] sm:min-h-[210px] overflow-hidden",
-                  "hover:shadow-2xl hover:-translate-y-1 transition-all duration-300",
-                  idx === MODULES.length - 1 && MODULES.length % 2 !== 0
-                    ? "col-span-2 max-w-sm mx-auto w-full"
-                    : ""
+                  "hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
                 )}
               >
                 {/* Decorative */}
