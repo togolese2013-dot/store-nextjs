@@ -69,17 +69,7 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
         </div>
       )}
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
-        <div className="py-8 animate-fade-up" key={slide.id}>
-          {/* CTA only */}
-          <Link href={slide.cta1.href}
-            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-base text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl bg-brand-600 hover:bg-brand-500"
-            style={{ boxShadow: "0 8px 24px rgba(22,163,74,0.45)" }}
-          >
-            {slide.cta1.label} <ArrowRight className="w-5 h-5" />
-          </Link>
-        </div>
-      </div>
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center" />
 
       {/* Slider controls */}
       {total > 1 && (

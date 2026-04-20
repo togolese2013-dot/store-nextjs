@@ -348,7 +348,7 @@ export default function Header() {
           </div>
 
           {/* Mobile search bar + dropdown */}
-          <div ref={mobileDropdownRef} className="md:hidden pb-2 relative">
+          <div ref={mobileDropdownRef} className="md:hidden pt-1 pb-2 relative">
             <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
@@ -356,7 +356,8 @@ export default function Header() {
                 onChange={e => setSearch(e.target.value)}
                 onFocus={() => { if (suggestions.length) setShowSug(true); }}
                 placeholder="Rechercher…"
-                className="w-full pl-8 pr-4 py-1.5 text-sm bg-slate-100 rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
+                className="w-full pl-8 pr-4 py-1.5 text-[16px] bg-slate-100 rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
+                style={{ fontSize: "16px" }}
               />
             </form>
 
@@ -381,7 +382,10 @@ export default function Header() {
                           : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">📷</div>
                         }
                       </div>
-                      <p className="flex-1 text-sm text-slate-800 line-clamp-1 min-w-0">{p.nom}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-800 line-clamp-1">{p.nom}</p>
+                        {p.categorie_nom && <p className="text-xs text-slate-400">{p.categorie_nom}</p>}
+                      </div>
                       <p className={clsx("text-sm font-bold shrink-0", isPromo ? "text-accent-600" : "text-slate-900")}>
                         {formatPrice(price)}
                       </p>

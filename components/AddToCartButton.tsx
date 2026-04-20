@@ -32,7 +32,7 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
   if (outOf) {
     return (
       <button disabled
-        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs cursor-not-allowed"
+        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md bg-slate-100 text-slate-400 font-bold text-xs cursor-not-allowed"
       >
         <ShoppingBag className="w-4 h-4" /> Indisponible
       </button>
@@ -68,7 +68,7 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
         <button
           onClick={handleAdd}
           className={clsx(
-            "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-xs transition-all duration-200",
+            "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md font-bold text-xs transition-all duration-200",
             added
               ? "bg-green-500 text-white scale-[0.98]"
               : "bg-brand-900 text-white hover:bg-brand-800 hover:shadow-brand active:scale-[0.98]"
@@ -83,7 +83,7 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
 
         {added && (
           <Link href="/cart"
-            className="px-3 py-2.5 rounded-xl border-2 border-brand-200 text-brand-700 font-bold text-xs hover:bg-brand-50 transition-colors whitespace-nowrap"
+            className="px-3 py-2.5 rounded-md border-2 border-brand-200 text-brand-700 font-bold text-xs hover:bg-brand-50 transition-colors whitespace-nowrap"
           >
             Voir le panier →
           </Link>
