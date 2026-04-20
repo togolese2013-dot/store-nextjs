@@ -54,6 +54,14 @@ async function produitCols() {
   );
   const names = new Set(rows.map((r) => (r.COLUMN_NAME as string).toLowerCase()));
 
+  // Auto-migrate: add images_json column if missing
+  if (!names.has("images_json")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`);
+      names.add("images_json");
+    } catch { /* already added by concurrent request */ }
+  }
+
   // Auto-migrate: add stock_magasin column directly on produits if missing
   if (!names.has("stock_magasin")) {
     try {
