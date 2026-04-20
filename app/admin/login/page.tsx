@@ -5,16 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, Package, ShoppingBag, Settings, Users, BarChart2 } from "lucide-react";
 
 const MODULES = [
-  { label: "MAGASIN",  desc: "Produits & stocks",    color: "bg-brand-800",   icon: Package },
-  { label: "BOUTIQUE", desc: "Ventes & finance",      color: "bg-amber-500",   icon: ShoppingBag },
-  { label: "STORE",    desc: "Commandes & réglages",  color: "bg-emerald-700", icon: Settings },
-  { label: "CRM",      desc: "Clients & fidélité",    color: "bg-indigo-700",  icon: Users },
-  { label: "ADMIN",    desc: "Rapports & tendances",  color: "bg-violet-700",  icon: BarChart2 },
+  { label: "MAGASIN",  desc: "Produits & stocks",   color: "bg-brand-800",   icon: Package },
+  { label: "BOUTIQUE", desc: "Ventes & finance",     color: "bg-amber-500",   icon: ShoppingBag },
+  { label: "STORE",    desc: "Commandes & réglages", color: "bg-emerald-700", icon: Settings },
+  { label: "CRM",      desc: "Clients & fidélité",   color: "bg-indigo-700",  icon: Users },
+  { label: "ADMIN",    desc: "Rapports & tendances", color: "bg-violet-700",  icon: BarChart2 },
 ];
 
 export default function AdminLoginPage() {
-  const router  = useRouter();
-  const params  = useSearchParams();
+  const router = useRouter();
+  const params = useSearchParams();
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
@@ -46,23 +46,61 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen flex">
 
-      {/* ── Left — Form ── */}
+      {/* ── Left — Brand panel ── */}
+      <div className="hidden lg:flex w-[45%] xl:w-[42%] bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 flex-col justify-between p-12 relative overflow-hidden">
+
+        {/* Decorative circles */}
+        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-accent-500/10 -translate-x-1/2 translate-y-1/2 pointer-events-none" />
+
+        {/* Top */}
+        <div className="relative z-10">
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/80 text-xs font-semibold mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse" />
+            Panneau d'administration
+          </span>
+          <h2 className="font-display font-800 text-3xl xl:text-4xl text-white leading-tight mb-4">
+            Gérez votre boutique<br />
+            <span className="text-accent-300">en toute simplicité</span>
+          </h2>
+          <p className="text-white/60 text-sm leading-relaxed max-w-xs">
+            Produits, commandes, clients, finances — tout au même endroit, conçu pour le Togo.
+          </p>
+        </div>
+
+        {/* Module badges */}
+        <div className="relative z-10 space-y-2.5">
+          {MODULES.map(({ label, desc, color, icon: Icon }) => (
+            <div key={label} className="flex items-center gap-4 p-3.5 rounded-2xl bg-white/8 border border-white/10">
+              <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center shrink-0`}>
+                <Icon className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm leading-none">{label}</p>
+                <p className="text-white/50 text-xs mt-0.5">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom spacer */}
+        <div className="relative z-10 h-2" />
+      </div>
+
+      {/* ── Right — Form ── */}
       <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-12 bg-white">
         <div className="w-full max-w-md mx-auto">
 
-          {/* Logo */}
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 rounded-xl bg-brand-900 flex items-center justify-center shrink-0">
-              <img src="/logo-togolese-shop-white.svg" alt="" className="h-5 w-auto" />
-            </div>
-            <div>
-              <p className="font-display font-800 text-slate-900 text-sm leading-none">Togolese Shop</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Administration</p>
-            </div>
+          {/* Header design */}
+          <div className="mb-10">
+            <div className="w-1 h-10 rounded-full bg-accent-500 mb-6" />
+            <h1 className="font-display font-800 text-4xl text-slate-900 leading-tight mb-2">
+              Bienvenue
+            </h1>
+            <p className="text-slate-400 text-sm">
+              Connectez-vous pour accéder à l'administration
+            </p>
           </div>
-
-          <h1 className="font-display font-800 text-3xl text-slate-900 mb-1">Connexion</h1>
-          <p className="text-slate-500 text-sm mb-8">Accédez à votre panneau de gestion</p>
 
           {error && (
             <div className="mb-6 flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
@@ -116,58 +154,6 @@ export default function AdminLoginPage() {
             Première connexion ? Un compte super_admin<br />
             sera créé automatiquement avec ces identifiants.
           </p>
-        </div>
-      </div>
-
-      {/* ── Right — Brand panel ── */}
-      <div className="hidden lg:flex w-[45%] xl:w-[42%] bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 flex-col justify-between p-12 relative overflow-hidden">
-
-        {/* Decorative circles */}
-        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-accent-500/10 -translate-x-1/2 translate-y-1/2 pointer-events-none" />
-
-        {/* Top */}
-        <div className="relative z-10">
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/80 text-xs font-semibold mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse" />
-            Panneau d'administration
-          </span>
-          <h2 className="font-display font-800 text-3xl xl:text-4xl text-white leading-tight mb-4">
-            Gérez votre boutique<br />
-            <span className="text-accent-300">en toute simplicité</span>
-          </h2>
-          <p className="text-white/60 text-sm leading-relaxed max-w-xs">
-            Produits, commandes, clients, finances — tout au même endroit, conçu pour le Togo.
-          </p>
-        </div>
-
-        {/* Module badges */}
-        <div className="relative z-10 space-y-2.5 my-6">
-          {MODULES.map(({ label, desc, color, icon: Icon }) => (
-            <div key={label} className="flex items-center gap-4 p-3.5 rounded-2xl bg-white/8 border border-white/10">
-              <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center shrink-0`}>
-                <Icon className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm leading-none">{label}</p>
-                <p className="text-white/50 text-xs mt-0.5">{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Stats */}
-        <div className="relative z-10 grid grid-cols-3 gap-4 pt-6 border-t border-white/10">
-          {[
-            { value: "5",    label: "Modules" },
-            { value: "48+",  label: "Pages" },
-            { value: "100%", label: "Sécurisé" },
-          ].map(({ value, label }) => (
-            <div key={label} className="text-center">
-              <p className="font-display font-800 text-2xl text-white">{value}</p>
-              <p className="text-white/50 text-xs mt-0.5">{label}</p>
-            </div>
-          ))}
         </div>
       </div>
     </div>
