@@ -28,10 +28,9 @@ const MODULES: Record<string, {
     dot:    "bg-brand-400",
     items: [
       { label: "Tous les produits", href: "/admin/products",     icon: Package },
-      { label: "Catégories",       href: "/admin/categories",   icon: FolderOpen },
-      { label: "Marques",          href: "/admin/categories",   icon: Tag },
-      { label: "Fournisseurs",     href: "/admin/fournisseurs", icon: Building2 },
-      { label: "Achats",           href: "/admin/achats",       icon: Truck },
+      { label: "Catégories",        href: "/admin/categories",   icon: FolderOpen },
+      { label: "Fournisseurs",      href: "/admin/fournisseurs", icon: Building2 },
+      { label: "Achats",            href: "/admin/achats",       icon: Truck },
     ],
   },
   boutique: {
@@ -100,7 +99,6 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/categories",            "magasin"],
   ["/admin/fournisseurs",          "magasin"],
   ["/admin/achats",                "magasin"],
-  ["/admin/stock",                 "magasin"],
   ["/admin/boutique-clients",      "boutique"],
   ["/admin/boutique-segmentation", "boutique"],
   ["/admin/livraisons",            "boutique"],
