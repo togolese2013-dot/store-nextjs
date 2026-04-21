@@ -6,7 +6,7 @@ import {
   Eye, Trash2, Printer, Loader2, ChevronLeft, ChevronRight,
   X, Check, AlertTriangle, Pencil,
   CreditCard, Banknote, Smartphone, Building2, Package,
-  ShoppingCart, Minus,
+  ShoppingCart, Minus, MapPin, UserCheck,
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import TabBar     from "@/components/admin/TabBar";
@@ -80,6 +80,33 @@ const LIVRAISON_STATUTS: { value: Livraison["statut"]; label: string; color: str
   { value: "echoue",     label: "Échoué",     color: "bg-red-100 text-red-700" },
 ];
 
+/* ─── Map preview ─── */
+function MapPreview({ url }: { url: string }) {
+  if (!url.trim()) return null;
+  const match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    const d   = 0.005;
+    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${lng-d},${lat-d},${lng+d},${lat+d}&layer=mapnik&marker=${lat},${lng}`;
+    return (
+      <div className="mt-2 rounded-xl overflow-hidden border border-indigo-200">
+        <iframe src={src} className="w-full h-44" style={{ border: 0 }} loading="lazy" title="Localisation" />
+      </div>
+    );
+  }
+  if (url.startsWith("http")) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        className="mt-2 flex items-center gap-2 px-3 py-2 bg-white border border-indigo-200 rounded-xl text-indigo-600 text-sm font-semibold hover:bg-indigo-50 transition-colors">
+        <MapPin className="w-4 h-4 shrink-0" />
+        Voir la localisation sur la carte
+      </a>
+    );
+  }
+  return null;
+}
+
 /* ─── Helpers ─── */
 function statutBadge(statut: string, list: { value: string; label: string; color: string }[]) {
   const s = list.find(x => x.value === statut);
@@ -146,6 +173,12 @@ export default function VentesManager({
   /* ── Modal état ── */
   const [modal,      setModal]      = useState<NewVenteModal | null>(null);
 
+  /* ── Client autocomplete ── */
+  const [clientSuggestions, setClientSuggestions] = useState<{id:number;nom:string;telephone:string|null}[]>([]);
+  const [showSuggestions,   setShowSuggestions]   = useState(false);
+  const [isNewClient,       setIsNewClient]       = useState(false);
+  const clientRef = useRef<HTMLDivElement>(null);
+
   /* ── Panier (articles de la vente) ── */
   const [items,          setItems]          = useState<VenteItem[]>([]);
   const [boutiqueStock,  setBoutiqueStock]  = useState<BoutiqueStockItem[]>([]);
@@ -195,6 +228,35 @@ export default function VentesManager({
     setItems([]);
     setBoutiqueStock([]);
     setProdSearch("");
+    setClientSuggestions([]);
+    setShowSuggestions(false);
+    setIsNewClient(false);
+  }
+
+  /* ── Client autocomplete handlers ── */
+  async function handleClientNomChange(val: string) {
+    setModal(m => m ? { ...m, clientNom: val, clientTel: "" } : m);
+    setIsNewClient(false);
+    if (val.trim().length < 2) {
+      setClientSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    try {
+      const res  = await fetch(`/api/admin/boutique-clients?q=${encodeURIComponent(val)}&page=1`);
+      const data = await res.json();
+      const list = (data.data ?? []).slice(0, 6) as {id:number;nom:string;telephone:string|null}[];
+      setClientSuggestions(list);
+      setShowSuggestions(list.length > 0);
+    } catch { setClientSuggestions([]); }
+    setIsNewClient(true);
+  }
+
+  function selectClient(c: {id:number;nom:string;telephone:string|null}) {
+    setModal(m => m ? { ...m, clientNom: c.nom, clientTel: c.telephone ?? "" } : m);
+    setClientSuggestions([]);
+    setShowSuggestions(false);
+    setIsNewClient(false);
   }
 
   /* ── Produits filtrés pour le dropdown ── */
@@ -738,20 +800,65 @@ export default function VentesManager({
                 <div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Client</p>
                   <div className="space-y-3">
-                    <div>
+
+                    {/* Nom avec autocomplétion */}
+                    <div ref={clientRef} className="relative">
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Nom *</label>
-                      <input type="text" value={modal.clientNom}
-                        onChange={e => setModal(m => m ? { ...m, clientNom: e.target.value } : m)}
-                        placeholder="Ex : WADADA" autoFocus
-                        className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all" />
+                      <input
+                        type="text"
+                        value={modal.clientNom}
+                        onChange={e => handleClientNomChange(e.target.value)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                        onFocus={() => clientSuggestions.length > 0 && setShowSuggestions(true)}
+                        placeholder="Ex : WADADA"
+                        autoFocus
+                        autoComplete="off"
+                        className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all"
+                      />
+                      {/* Suggestions dropdown */}
+                      {showSuggestions && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                          {clientSuggestions.map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={() => selectClient(c)}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-amber-50 transition-colors text-left"
+                            >
+                              <UserCheck className="w-4 h-4 text-amber-500 shrink-0" />
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">{c.nom}</p>
+                                {c.telephone && <p className="text-xs text-slate-400">{c.telephone}</p>}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {/* Badge client existant sélectionné */}
+                      {!isNewClient && modal.clientNom && !showSuggestions && (
+                        <p className="mt-1 text-xs text-emerald-600 flex items-center gap-1">
+                          <UserCheck className="w-3 h-3" /> Client enregistré
+                        </p>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Téléphone</label>
-                      <input type="text" value={modal.clientTel}
-                        onChange={e => setModal(m => m ? { ...m, clientTel: e.target.value } : m)}
-                        placeholder="+228 90 00 00 00"
-                        className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all" />
-                    </div>
+
+                    {/* Téléphone — affiché seulement pour un nouveau client */}
+                    {isNewClient && modal.clientNom.trim().length >= 2 && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">
+                          Téléphone <span className="font-normal text-slate-400">(nouveau client)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={modal.clientTel}
+                          onChange={e => setModal(m => m ? { ...m, clientTel: e.target.value } : m)}
+                          placeholder="+228 90 00 00 00"
+                          className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-amber-300 focus:outline-none focus:border-amber-500 transition-all"
+                        />
+                        <p className="mt-1 text-xs text-amber-600">Ce client sera enregistré automatiquement.</p>
+                      </div>
+                    )}
+
                   </div>
                 </div>
 
@@ -792,6 +899,7 @@ export default function VentesManager({
                           onChange={e => setModal(m => m ? { ...m, lienLocalisation: e.target.value } : m)}
                           placeholder="https://maps.app.goo.gl/..."
                           className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
+                        {modal.lienLocalisation && <MapPreview url={modal.lienLocalisation} />}
                       </div>
                     </div>
                   )}
