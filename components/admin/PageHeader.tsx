@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, RefreshCw, Plus } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 
 // ─── Accent palette per module ────────────────────────────────────────────────
 
@@ -102,18 +102,6 @@ export default function PageHeader({
 
         {/* Extra slot (filters, selects, secondary buttons…) */}
         {extra}
-
-        {/* Refresh */}
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            title="Rafraîchir"
-            className={`p-2 rounded-xl border border-slate-200 text-slate-500 ${a.refresh} transition-colors`}
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshLoading ? "animate-spin" : ""}`} />
-          </button>
-        )}
 
         {/* Primary CTA */}
         {ctaLabel && onCtaClick && (

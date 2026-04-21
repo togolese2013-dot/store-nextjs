@@ -17,8 +17,28 @@ export default function AdminShell({ nom, role, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => router.refresh(), 30_000);
-    return () => clearInterval(timer);
+    let es: EventSource;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    function connect() {
+      es = new EventSource("/api/admin/events");
+      es.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data) as { type: string };
+          if (event.type !== "connected") router.refresh();
+        } catch { /* ignore parse errors */ }
+      };
+      es.onerror = () => {
+        es.close();
+        retryTimer = setTimeout(connect, 5_000);
+      };
+    }
+
+    connect();
+    return () => {
+      es?.close();
+      clearTimeout(retryTimer);
+    };
   }, [router]);
 
   // Landing page — no sidebar

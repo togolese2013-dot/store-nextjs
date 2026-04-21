@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { RefreshCw, Users, TrendingUp, TrendingDown, Minus, Loader2, MapPin, Phone } from "lucide-react";
+import { Users, TrendingUp, TrendingDown, Minus, Loader2, MapPin, Phone } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import type { BoutiqueClientStats } from "@/lib/admin-db";
 
@@ -230,10 +230,6 @@ export default function BoutiqueSegmentation() {
           <h1 className="text-xl font-bold text-slate-900">Segmentation des clients</h1>
           <p className="text-sm text-slate-500">Analyse des segments de clientèle et de leur valeur commerciale.</p>
         </div>
-        <button onClick={load}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-          <RefreshCw className="w-3.5 h-3.5" /> Actualiser
-        </button>
       </div>
 
       {/* KPIs */}

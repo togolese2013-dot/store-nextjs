@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProducts, getProductCount, getCategories } from "@/lib/db";
+import { emitAdminEvent } from "@/lib/admin-events";
 import mysql from "mysql2/promise";
 
 /* GET /api/admin/products?page=1&q=...&category=... */
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
       } catch { /* stock_mouvements issue — product is still created */ }
     }
 
+    emitAdminEvent("produit");
     return NextResponse.json({ ok: true, id: newId });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erreur serveur.";

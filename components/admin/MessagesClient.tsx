@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WaMessage } from "@/lib/admin-db";
-import { MessageCircle, Send, RefreshCw, Loader2 } from "lucide-react";
+import { MessageCircle, Send, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
 
 export default function MessagesClient({ messages }: { messages: WaMessage[] }) {
@@ -11,7 +11,6 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
   const [selected, setSelected] = useState<WaMessage | null>(null);
   const [reply,    setReply]    = useState("");
   const [sending,  setSending]  = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   /* Group by sender */
   const threads = messages.reduce<Record<string, WaMessage[]>>((acc, m) => {
@@ -38,12 +37,6 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
     router.refresh();
   }
 
-  async function refresh() {
-    setRefreshing(true);
-    router.refresh();
-    setTimeout(() => setRefreshing(false), 1000);
-  }
-
   if (messages.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-slate-100 py-20 flex flex-col items-center text-slate-400">
@@ -63,9 +56,6 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
       <div className="w-72 shrink-0 border-r border-slate-100 flex flex-col">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <span className="font-bold text-sm text-slate-700">{contacts.length} conversation{contacts.length > 1 ? "s" : ""}</span>
-          <button onClick={refresh} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors">
-            {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          </button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {contacts.map(([number, msgs]) => {

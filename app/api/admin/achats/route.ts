@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { listAchats, countAchats, getAchatStats, createAchat } from "@/lib/admin-db";
+import { emitAdminEvent } from "@/lib/admin-events";
 
 export async function GET(req: NextRequest) {
   const session = await getAdminSession();
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
     if (!items?.length)      return NextResponse.json({ error: "Au moins un article est requis." }, { status: 400 });
 
     const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference, date_achat, statut: statut ?? "en_attente", note: note ?? null, items });
+    emitAdminEvent("achat");
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur.";

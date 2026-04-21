@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { createStockAjustement } from "@/lib/admin-db";
+import { emitAdminEvent } from "@/lib/admin-events";
 
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
@@ -14,6 +15,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Un motif est requis pour un ajustement." }, { status: 400 });
     }
     await createStockAjustement({ produit_id, quantite: Number(quantite), motif });
+    emitAdminEvent("stock");
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });

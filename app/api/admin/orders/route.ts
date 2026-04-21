@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { listOrders, countOrders, createOrder, addOrderEvent } from "@/lib/admin-db";
+import { emitAdminEvent } from "@/lib/admin-events";
 
 export async function GET(req: Request) {
   const session = await getAdminSession();
@@ -33,6 +34,6 @@ export async function POST(req: Request) {
 
   // Add first event
   await addOrderEvent(id, "pending", "Commande créée par l'admin", session.nom);
-
+  emitAdminEvent("commande");
   return NextResponse.json({ success: true, id });
 }
