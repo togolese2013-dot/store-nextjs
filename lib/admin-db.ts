@@ -1028,7 +1028,54 @@ async function getProduitColsAdmin() {
   };
 }
 
+async function ensureBoutiqueStockPopulated(): Promise<void> {
+  // Create table if missing
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS boutique_stock (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      produit_id   INT NOT NULL,
+      quantite     INT NOT NULL DEFAULT 0,
+      seuil_alerte INT NOT NULL DEFAULT 5,
+      updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_produit (produit_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // If empty, seed from produits.stock_boutique (or 0 for all products)
+  const [[cnt]] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT COUNT(*) AS n FROM boutique_stock"
+  );
+  if (Number((cnt as mysql.RowDataPacket).n ?? 0) === 0) {
+    // Try with stock_boutique column first, fall back to 0
+    await db.execute(`
+      INSERT INTO boutique_stock (produit_id, quantite)
+      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
+      FROM produits
+      ON DUPLICATE KEY UPDATE quantite = VALUES(quantite)
+    `).catch(() =>
+      db.execute(`
+        INSERT INTO boutique_stock (produit_id, quantite)
+        SELECT id, 0 FROM produits
+        ON DUPLICATE KEY UPDATE quantite = quantite
+      `)
+    );
+  } else {
+    // Ensure any new products added since last seeding are included
+    await db.execute(`
+      INSERT IGNORE INTO boutique_stock (produit_id, quantite)
+      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
+      FROM produits
+    `).catch(() =>
+      db.execute(`
+        INSERT IGNORE INTO boutique_stock (produit_id, quantite)
+        SELECT id, 0 FROM produits
+      `)
+    );
+  }
+}
+
 export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
+  await ensureBoutiqueStockPopulated();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT
       COUNT(bs.produit_id)                                                                  AS total_produits,
@@ -1055,6 +1102,7 @@ export async function getStockBoutiqueList(opts: {
 }): Promise<{ items: BoutiqueStockItem[]; total: number }> {
   const { search, filter = "all", limit = 50, offset = 0 } = opts;
 
+  await ensureBoutiqueStockPopulated();
   const cols = await getProduitColsAdmin();
   const imageCol  = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
