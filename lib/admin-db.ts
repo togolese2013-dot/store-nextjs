@@ -1037,7 +1037,6 @@ export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
       SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
     FROM boutique_stock bs
     JOIN produits p ON p.id = bs.produit_id
-    WHERE bs.from_magasin = 1
   `);
   const r = rows[0] ?? {};
   return {
@@ -1060,7 +1059,7 @@ export async function getStockBoutiqueList(opts: {
   const imageCol  = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
 
-  const conditions: string[] = ["bs.from_magasin = 1"];
+  const conditions: string[] = [];
   const params: (string | number | boolean | null | Buffer)[] = [];
 
   if (search) {
@@ -1070,7 +1069,7 @@ export async function getStockBoutiqueList(opts: {
   if (filter === "faible") conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
   if (filter === "epuise") conditions.push("bs.quantite = 0");
 
-  const where = `WHERE ${conditions.join(" AND ")}`;
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT bs.produit_id, p.nom, p.reference,
