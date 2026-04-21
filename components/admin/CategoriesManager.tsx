@@ -133,17 +133,17 @@ export default function CategoriesManager({ initialCategories, initialMarques = 
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Produits catalogués</p>
-            <Package className="w-8 h-8 text-slate-400 opacity-20" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{totalProduits}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Marques</p>
             <Tag className="w-8 h-8 text-slate-400 opacity-20" />
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums">{marques.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Produits catalogués</p>
+            <Package className="w-8 h-8 text-slate-400 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{totalProduits}</p>
         </div>
       </div>
 
