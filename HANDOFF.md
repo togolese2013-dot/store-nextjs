@@ -1,5 +1,5 @@
 # HANDOFF — Togolese Shop Admin
-> Dernière mise à jour : 2026-04-17 (session 4)
+> Dernière mise à jour : 2026-04-21 (session 5)
 > Commit actuel : voir `git log --oneline -1`
 
 ---
@@ -16,19 +16,20 @@
 │   │   │   ├── entree/page.tsx       ← Formulaire nouvelle entrée stock (legacy)
 │   │   │   ├── sortie/page.tsx       ← Formulaire nouvelle sortie stock (legacy)
 │   │   │   └── ajustement/page.tsx   ← Formulaire ajustement stock (legacy)
-│   │   ├── categories/               ← CRUD catégories (grille cartes + KPIs)
+│   │   ├── categories/               ← CRUD catégories + marques (tabs)
 │   │   ├── fournisseurs/             ← CRUD fournisseurs (grille cartes + KPIs)
 │   │   ├── achats/                   ← Achats fournisseurs (KPIs + tableau + création)
 │   │   ├── orders/                   ← Commandes
-│   │   ├── ventes/                   ← Gestion des ventes (tab: VENTES + actions)
+│   │   ├── ventes/                   ← Gestion des ventes (KPIs + tabs VENTES/LIVRAISONS)
+│   │   ├── livraisons/               ← Livraisons admin (KPIs + tableau + modal manuel)
 │   │   ├── stock-boutique/           ← Stock boutique (module BOUTIQUE)
-│   │   ├── finance/                  ← Finance (KPIs, tabs Dépenses/Recettes)
+│   │   ├── finance/                  ← Finance (KPIs, tabs Dépenses/Rentrées)
+│   │   ├── boutique-clients/         ← Clients boutique physique
+│   │   ├── boutique-segmentation/    ← Segmentation clients boutique
 │   │   ├── proforma/                 ← Proformat
 │   │   ├── coupons/                  ← Coupons
 │   │   ├── reviews/                  ← Avis clients (module CRM)
-│   │   ├── import-export/            ← Import/Export CSV
-│   │   ├── users/                    ← Utilisateurs
-│   │   ├── crm/                      ← Clients CRM
+│   │   ├── crm/                      ← Clients CRM (vitrine uniquement)
 │   │   ├── messages/                 ← Messages reçus
 │   │   ├── whatsapp/                 ← Diffusion WhatsApp
 │   │   └── settings/                 ← Réglages (général, hero, livraison, thème, etc.)
@@ -36,9 +37,9 @@
 │       ├── auth/                     ← login/logout (JWT cookie)
 │       ├── products/                 ← CRUD produits
 │       ├── stock/
-│       │   ├── entree/route.ts       ← POST entrée stock magasin (sans entrepot_id)
-│       │   ├── sortie/route.ts       ← POST sortie stock magasin → boutique (sans entrepot_id)
-│       │   ├── ajustement/route.ts   ← POST ajustement stock magasin (sans entrepot_id)
+│       │   ├── entree/route.ts       ← POST entrée stock magasin
+│       │   ├── sortie/route.ts       ← POST sortie stock magasin → boutique
+│       │   ├── ajustement/route.ts   ← POST ajustement stock magasin
 │       │   └── produits/route.ts     ← GET produits avec stock magasin (SUM produit_stocks)
 │       ├── stock-boutique/           ← Mouvements stock boutique
 │       ├── finance/                  ← CRUD entrées finance
@@ -46,40 +47,38 @@
 │       ├── fournisseurs/             ← CRUD fournisseurs
 │       ├── achats/                   ← Achats fournisseurs
 │       ├── orders/                   ← Commandes
+│       ├── livraisons/route.ts       ← GET liste + POST livraison manuelle
+│       ├── livraisons/[id]/route.ts  ← PATCH statut/livreur + DELETE
+│       ├── boutique-clients/         ← CRUD clients boutique
 │       └── ventes/factures/          ← Ventes (POST = createVenteWithStock)
 ├── components/admin/
-│   ├── AdminTopBar.tsx               ← Barre haut fixe (logo, date, mode jour/nuit, SuperAdmin)
-│   ├── AdminShell.tsx                ← Wrapper client (gère mobileOpen, rend TopBar + Sidebar)
+│   ├── AdminShell.tsx                ← Wrapper client (SSE EventSource, refresh auto)
 │   ├── AdminSidebar.tsx              ← Sidebar modulaire (MAGASIN/BOUTIQUE/STORE/CRM)
-│   ├── PageHeader.tsx                ← Header réutilisable (titre, sous-titre, search, CTA, refresh)
+│   ├── PageHeader.tsx                ← Header réutilisable (titre, sous-titre, search, CTA, extra)
 │   ├── TabBar.tsx                    ← Barre d'onglets réutilisable
-│   ├── StatCard.tsx                  ← Carte KPI réutilisable (style Finance — shadow-sm, icône opacity-20)
-│   ├── AdminProductActions.tsx       ← Icônes inline Eye/Pencil/Trash par ligne produit
+│   ├── StatCard.tsx                  ← Carte KPI réutilisable
+│   ├── VentesManager.tsx             ← Ventes + autocomplétion client + aperçu carte
+│   ├── LivraisonsManager.tsx         ← Livraisons + KPIs + modal livraison manuelle
+│   ├── FinanceManager.tsx            ← Finance (Dépenses/Rentrées, boutons dans PageHeader)
+│   ├── StockBoutiqueManager.tsx      ← Stock boutique (tous les produits boutique_stock)
+│   ├── BoutiqueClientsManager.tsx    ← Clients boutique (autocomplete, tabs)
+│   ├── CategoriesManager.tsx         ← Catégories + Marques (2 tabs)
 │   ├── MouvementModal.tsx            ← Modal unifié Entrée/Sortie/Ajustement (MAGASIN)
-│   ├── VentesManager.tsx             ← Gestion ventes (onglet VENTES, modal nouvelle vente)
-│   ├── ProductQuickViewModal.tsx     ← Modal aperçu rapide produit
 │   ├── ProductForm.tsx               ← Formulaire création/édition produit
-│   ├── CategoriesManager.tsx         ← Grille cartes catégories + KPIs + modal CRUD
-│   ├── FournisseursManager.tsx       ← Grille cartes fournisseurs + KPIs + modal CRUD
-│   ├── AchatsManager.tsx             ← Tableau achats + KPIs + modal création
-│   ├── FinanceManager.tsx            ← Client component Finance (CRUD)
-│   ├── StockBoutiqueManager.tsx      ← Gestion stock boutique (from_magasin=1)
-│   ├── StockParEntrepot.tsx          ← Stock par entrepôt
-│   ├── VariantsManager.tsx           ← Gestion variantes produit
-│   ├── ImportExportManager.tsx       ← Import/Export CSV
-│   └── CreateOrderForm.tsx           ← Formulaire création commande
-├── components/
-│   ├── ThemeProvider.tsx             ← next-themes wrapper (attribute="class", defaultTheme="light")
-│   └── ThemeVars.tsx                 ← Variables CSS du thème
+│   └── ...
 ├── lib/
-│   ├── db.ts                         ← MySQL pool, requêtes produits (inclut stock_magasin)
+│   ├── db.ts                         ← MySQL pool, requêtes produits
 │   ├── admin-db.ts                   ← Toutes les fonctions DB admin
+│   ├── admin-events.ts               ← SSE EventEmitter singleton (globalThis.__adminEmitter)
 │   ├── auth.ts                       ← getAdminSession() via cookie JWT
 │   └── utils.ts                      ← finalPrice(), formatPrice(), type Product
+├── app/api/admin/events/route.ts     ← SSE endpoint (text/event-stream, heartbeat 25s)
 ├── scripts/
-│   └── ventes-v2-migration.sql       ← Migration factures (avec_livraison, mode_paiement, statut_paiement)
-├── package.json                      ← "dev": "next dev --turbopack --port 3003"
-└── .env.local                        ← Variables d'environnement (DB + secrets)
+│   ├── ventes-v2-migration.sql
+│   ├── stock-boutique-migration.sql
+│   ├── boutique-clients-migration.sql
+│   └── ...
+└── .env.local
 ```
 
 ---
@@ -88,12 +87,12 @@
 
 | Technologie | Usage |
 |---|---|
-| Next.js 14 App Router | Framework principal |
+| Next.js 15 App Router | Framework principal |
 | TypeScript strict | Typage |
-| Tailwind CSS v4 | Styles — config via `@theme` dans `globals.css`, pas de fichier `tailwind.config` |
+| Tailwind CSS v4 | Styles — config via `@theme` dans `globals.css` |
 | MySQL (mysql2/promise) | Base de données — **pas Prisma** |
 | JWT (jose) | Auth admin via cookie httpOnly |
-| next-themes | Mode jour/nuit (`attribute="class"`, `suppressHydrationWarning` sur `<html>`) |
+| Server-Sent Events | Temps réel — remplace le polling 30s |
 | Lucide React | Icônes |
 | Turbopack | HMR rapide (`--turbopack`) |
 
@@ -102,12 +101,9 @@
 ## 🚀 Lancer le projet
 
 ```bash
-# L'utilisateur lance lui-même depuis le répertoire main :
 cd "/Volumes/LOCAL/CLAUDE CODE/store-nextjs"
 npx next dev --turbopack --port 3003
-
-# Accès local :       http://localhost:3003/admin
-# Accès réseau :      http://192.168.0.140:3003/admin
+# http://localhost:3003/admin
 ```
 
 > ⚠️ **Règle absolue** : toujours éditer dans `/Volumes/LOCAL/CLAUDE CODE/store-nextjs` (main). Jamais dans un worktree.
@@ -116,274 +112,210 @@ npx next dev --turbopack --port 3003
 
 ## 🗄️ Base de données (MySQL direct)
 
-### Connexion
-```ts
-// lib/db.ts — pool partagé
-import mysql from "mysql2/promise";
-const pool = mysql.createPool({ host, user, password, database, ... });
-```
-
 ### Tables principales
 | Table | Description |
 |---|---|
 | `produits` | Catalogue produits (nom, reference, prix, stock_boutique, remise…) |
 | `categories` | Catégories produits |
+| `marques` | Marques produits (créée via `ensureMarquesTable()`) |
 | `produit_stocks` | Stock MAGASIN par entrepôt (`produit_id`, `entrepot_id`, `stock`) |
-| `stock_mouvements` | Journal de tous les mouvements de stock magasin |
-| `entrepots` | Entrepôts (entrepot_id=1 utilisé par défaut) |
-| `boutique_stock` | Stock boutique (`produit_id`, `quantite`, `from_magasin` flag) |
+| `stock_mouvements` | Journal mouvements stock magasin |
+| `boutique_stock` | Stock boutique (`produit_id`, `quantite`, `seuil_alerte`) |
 | `boutique_mouvements` | Journal mouvements boutique |
-| `fournisseurs` | Fournisseurs (nom, contact, telephone, email, adresse, note) |
+| `boutique_clients` | Clients boutique physique (auto-peuplé depuis `clients` si vide) |
+| `clients` | Clients vitrine en ligne (CRM uniquement) |
+| `factures` | Ventes boutique physique |
+| `livraisons_ventes` | Livraisons (liées à une vente ou manuelles — `facture_id` nullable) |
+| `livreurs` | Livreurs avec `code_acces` unique |
+| `fournisseurs` | Fournisseurs |
 | `achats` | Commandes fournisseurs |
 | `achat_items` | Lignes d'un achat |
-| `factures` | Ventes (avec_livraison, mode_paiement, statut_paiement, montant_acompte) |
-| `facture_items` | Lignes de vente (produit_id, designation, quantite, prix_unitaire) |
-| `finance_entries` | Entrées finance (type: depense/recette, montant, date…) |
-| `commandes` | Commandes clients |
+| `finance_entries` | Entrées finance (type: depense/rentree, montant, date…) |
+| `commandes` | Commandes clients vitrine |
 
 ### Distinction MAGASIN vs BOUTIQUE
 | | Source | Utilisé pour |
 |---|---|---|
-| **Stock magasin** | `produit_stocks.stock` (SUM par produit_id) | Mouvements magasin (entree/sortie/ajustement) |
-| **Stock boutique** | `produits.stock_boutique` + `boutique_stock.quantite` | Ventes boutique |
+| **Stock magasin** | `SUM(produit_stocks.stock)` par produit_id | Mouvements magasin |
+| **Stock boutique** | `boutique_stock.quantite` | Ventes boutique, affichage Stock Boutique |
 
-- La page **Produits MAGASIN** affiche `stock_magasin` (depuis `produit_stocks`)
-- La page **Stock Boutique** affiche `boutique_stock` filtré par `from_magasin = 1`
-- Une **sortie magasin** décrémente `produit_stocks` ET incrémente `boutique_stock` + `produits.stock_boutique`
-- Une **vente** décrémente `boutique_stock` + `produits.stock_boutique`
+### Distinction clients BOUTIQUE vs CRM
+| | Table | Alimentation |
+|---|---|---|
+| **Boutique > Clients** | `boutique_clients` | Import initial depuis `clients` + auto-sync à chaque vente |
+| **CRM > Clients** | `clients` | Clients de la vitrine en ligne uniquement |
+
+### Auto-initialisation (pas de migration manuelle nécessaire)
+- **`boutique_stock`** : `ensureBoutiqueStockPopulated()` crée la table et insère tous les produits depuis `produits.stock_boutique` si vide
+- **`boutique_clients`** : `ensureBoutiqueClientsTable()` crée la table et importe depuis `clients` si vide
+- **`marques`** : `ensureMarquesTable()` crée la table + colonne `marque_id` sur `produits`
 
 ### Schéma `achats`
 ```sql
 id, fournisseur_id (FK), reference, date_achat,
 nom_fournisseur (legacy), montant_total,
 utilisateur_id, notes (TEXT — pas "note"), mode_transport,
-statut ENUM('en_attente','recu','valide')  -- pas 'annule'
--- Pas de colonne created_at
-```
-
-### Migration requise (si nouvelle DB)
-```bash
-mysql -u USER -p DATABASE < scripts/ventes-v2-migration.sql
-# Ajoute: factures.avec_livraison, mode_paiement, statut_paiement
+statut ENUM('en_attente','recu','valide')  -- pas 'annule', pas de created_at
 ```
 
 ---
 
-## 🔐 Authentification
+## ⚡ Temps réel — SSE (Server-Sent Events)
 
-- Cookie httpOnly `admin_token` (JWT signé avec `ADMIN_JWT_SECRET`)
-- `getAdminSession()` dans `lib/auth.ts` — utilisé dans toutes les API routes
-- Middleware : `middleware.ts` protège `/admin/*` (redirige vers `/admin/login` si non connecté)
+**Plus de polling 30s ni de boutons rafraîchir visibles.**
+
+### Architecture
+- `lib/admin-events.ts` — EventEmitter singleton via `globalThis.__adminEmitter` (partagé entre tous les modules API)
+- `app/api/admin/events/route.ts` — endpoint SSE `text/event-stream`, heartbeat toutes les 25s (Railway ferme à 30s)
+- `AdminShell.tsx` — `EventSource("/api/admin/events")` avec reconnexion auto (retry 5s)
+
+### Déclencher un événement (dans les API routes de mutation)
+```ts
+import { emitAdminEvent } from "@/lib/admin-events";
+emitAdminEvent("stock" | "achat" | "vente" | "commande" | "produit" | "finance" | "livraison");
+```
+Dès qu'un événement est émis, tous les clients admin reçoivent un push → `router.refresh()` côté client.
+
+### Routes qui émettent des événements
+- `POST /api/admin/stock/entree|sortie|ajustement` → `"stock"`
+- `POST /api/admin/achats` → `"achat"`
+- `POST /api/admin/products` → `"produit"`
+- `POST /api/admin/orders` → `"commande"`
+- `POST /api/admin/livraisons` → `"livraison"`
 
 ---
 
 ## 🖥️ Layout admin
 
-### Structure générale
-```
-AdminTopBar (h-14, fixed, z-50)
-  ├── Gauche : Zap logo + "Togolese Shop"
-  ├── Centre : — (vide)
-  └── Droite : date live (60s), toggle jour/nuit, "Voir le site →", dropdown SuperAdmin
+### Sidebar modulaire
+| Clé | Label | Items |
+|---|---|---|
+| `magasin` | MAGASIN | Produits, Catégories, Fournisseurs, Achats |
+| `boutique` | BOUTIQUE | Ventes, Livraisons, Stock boutique, Finance, Clients, Segmentation |
+| `store` | STORE | Commandes, Coupons, Réglages… |
+| `crm` | CRM | Clients (vitrine), Avis, Messages, WhatsApp |
 
-AdminShell (client component)
-  ├── Gère mobileOpen state
-  ├── Rend AdminTopBar + AdminSidebar + children + OrderNotifier
-  └── Landing /admin : TopBar sans sidebar
-```
-
-### Mode jour/nuit
-- `next-themes` avec `attribute="class"` et `defaultTheme="light"`
-- `suppressHydrationWarning` obligatoire sur `<html lang="fr">` dans `app/layout.tsx`
-- `@variant dark (&:where(.dark, .dark *))` dans `globals.css` (Tailwind v4)
-- Toggle dans AdminTopBar avec `mounted` state pour éviter le flash hydration
-
-### Tailwind v4 + Turbopack — piège connu
-Les classes dans les ternaires ne sont pas toujours détectées. Préférer les classes en dehors du ternaire ou utiliser `!important` modifier (`!text-white`).
-
----
-
-## 🧭 Sidebar (AdminSidebar.tsx)
-
-La sidebar est **modulaire** : elle affiche uniquement les items du module actif selon l'URL.
-
-### Modules
-| Clé | Label | Couleur badge | Items |
-|---|---|---|---|
-| `magasin` | MAGASIN | brand-900 (noir) | Tous les produits, Catégories, Fournisseurs, Achats, Import/Export |
-| `boutique` | BOUTIQUE | amber-500 | Ventes, Livraisons, Stock boutique, Proformat, Finance, Clients, Segmentation |
-| `store` | STORE | emerald-700 | Commandes, Coupons, Réglages, Hero, Livraison, Apparence, WhatsApp, Paiements, Domaine, Utilisateurs |
-| `crm` | CRM | indigo-700 | Clients, Avis clients, Messages, Diffusion |
-
-### Style navigation sidebar
-- Item actif : `bg-emerald-800 text-white shadow-sm`
-- Item inactif : `text-slate-700 hover:bg-slate-100 hover:text-slate-900`
-- Background sidebar : `bg-white border-r border-slate-100`
-
-### Règle critique du routing sidebar
-`ROUTE_TO_MODULE` utilise `startsWith()` → **les routes plus spécifiques doivent être placées AVANT les routes générales**.
-`/admin/stock-boutique` précède `/admin/stock` dans le tableau.
+### Règle critique routing sidebar
+`ROUTE_TO_MODULE` utilise `startsWith()` → routes spécifiques AVANT générales.
+`/admin/stock-boutique` précède `/admin/stock`.
 
 ---
 
 ## 🎨 Design System
 
-### Couleur CTA universelle
-**Tous les boutons primaires** (CTA, save, submit) : `bg-emerald-800 hover:bg-emerald-700 text-white`
+### Boutons CTA
+Tous les boutons primaires : `bg-emerald-800 hover:bg-emerald-700 text-white`
 
-### PageHeader (`components/admin/PageHeader.tsx`)
-Composant réutilisable pour tous les en-têtes de pages admin.
+### PageHeader
 ```tsx
 <PageHeader
-  title="Titre page"
-  subtitle="Sous-titre"
-  accent="brand" | "amber" | "emerald" | "indigo"
-  ctaLabel="Ajouter"
-  ctaIcon={Plus}
-  onCtaClick={...}
-  onRefresh={...}
-  searchValue={...}
-  onSearchChange={...}
-  onSearch={...}
-  extra={<ReactNode />}  // boutons secondaires
+  title="..." subtitle="..." accent="brand|amber|emerald|indigo"
+  ctaLabel="..." ctaIcon={Plus} onCtaClick={...}
+  onRefresh={...} searchValue={...} onSearchChange={...} onSearch={...}
+  extra={<ReactNode />}  // boutons secondaires entre refresh et CTA
 />
 ```
 
-### TabBar (`components/admin/TabBar.tsx`)
-Barre d'onglets réutilisable.
-
-### StatCard (`components/admin/StatCard.tsx`)
-Carte KPI réutilisable — **template Finance**, à utiliser sur toutes les pages de dashboard.
+### KPI Cards (inline — pas StatCard)
+Pattern utilisé dans Ventes, Livraisons, Finance :
 ```tsx
-<StatCard
-  title="Total"
-  value={42}
-  icon={Package}
-  iconColor="text-slate-400"  // opacity-20 appliqué automatiquement
-  badge={<span className="...">label</span>}
-/>
+<div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+  <div className="flex items-start justify-between mb-3">
+    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Titre</p>
+    <Icon className="w-8 h-8 text-xxx-500 opacity-20" />
+  </div>
+  <p className="text-2xl font-bold text-slate-900 tabular-nums">{valeur}</p>
+  <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-xxx-50 text-xxx-700 border border-xxx-100">badge</span>
+</div>
 ```
-Style : `bg-white rounded-2xl border border-slate-100 p-5 shadow-sm`, icône `w-8 h-8 opacity-20` en haut à droite, titre `text-xs font-bold uppercase tracking-wide text-slate-400`, valeur `text-2xl font-bold text-slate-900 tabular-nums`.
-
-### Inputs / focus
-Toutes les pages : `focus:border-emerald-500` (plus de `focus:border-brand-500`)
-
-### Thème / Polices (`ThemeSettingsForm.tsx` + `lib/theme-utils.ts`)
-- Polices disponibles : `"Système"` (spécial) + 8 polices Google Fonts (`Montserrat`, `Inter`, `Poppins`, `Raleway`, `Nunito`, `Plus Jakarta Sans`, `Outfit`, `DM Sans`)
-- `"Système"` = stack `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif` — aucun chargement Google Fonts
-- `"Montserrat"` = valeur par défaut — aucun chargement Google Fonts (déjà dans `globals.css`)
-- Toutes les autres polices → chargement dynamique Google Fonts via `<link id="ts-gfont" />`
-- `ThemeVars.tsx` (Server Component) injecte un `<style id="ts-theme">` avec `--font-display` et `--font-sans` en `!important` — obligatoire pour survivre à l'injection HMR Tailwind post-hydratation
-
----
-
-## 📦 Page Produits MAGASIN (`/admin/products`)
-
-### Fonctionnement (Server Component)
-- Paramètres URL : `view`, `statut`, `q`, `category`, `page`
-- `view` : `stock` | `mouvements` (seulement ces 2 — Entrées/Sorties/Ajustements supprimés)
-- `statut` : `all` | `disponible` | `faible` | `epuise` (basé sur **stock magasin**)
-
-### Boutons header (conditionnels par tab)
-| Tab actif | Bouton affiché |
-|---|---|
-| `stock` | "Ajouter un produit" → `/admin/products/new` |
-| `mouvements` | `<MouvementModal />` — modal unifié Entrée/Sortie/Ajustement |
-
-### Colonne Stock
-Affiche `produits.stock_magasin` = `SUM(produit_stocks.stock)` par produit.
-
----
-
-## 🔄 MouvementModal (`components/admin/MouvementModal.tsx`)
-
-Modal client unifié pour les 3 types de mouvements de stock magasin. **Supporte plusieurs produits en une seule soumission.**
-
-### Fonctionnement
-- Bouton trigger : `bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700`
-- Fetch produits depuis `/api/admin/stock/produits` (stock magasin réel)
-- `entrepot_id` supprimé de toute la chaîne — hardcodé à `1` dans `admin-db.ts`
-- State : liste `items: MouvItem[]` (chaque item = produit + qty + champ recherche indépendant)
-- Submit : boucle de `fetch` séquentiels pour chaque item, affiche le compte "N mouvements enregistrés"
-- `router.refresh()` après succès pour recharger la page server component
-- Bouton "+ Ajouter un produit" pour ajouter une ligne supplémentaire
-
-### Types disponibles
-| Type | API | Effet |
-|---|---|---|
-| Entrée | `/api/admin/stock/entree` | Incrémente `produit_stocks.stock` |
-| Sortie (→ boutique) | `/api/admin/stock/sortie` | Décrémente `produit_stocks`, incrémente `boutique_stock` + `stock_boutique` |
-| Ajustement | `/api/admin/stock/ajustement` | Corrige `produit_stocks.stock` (± selon signe quantite) |
-
-### Bug fix important
-`getProduitsWithStock()` utilise `GROUP BY p.id + SUM(ps.stock)` pour éviter les doublons de lignes quand un produit a plusieurs entrepôts.
+Grille : `grid grid-cols-2 lg:grid-cols-4 gap-4`
 
 ---
 
 ## 🛍️ Page Ventes (`/admin/ventes`)
 
-### Architecture
-- `VentesManager.tsx` : client component, 2 tabs : **VENTES** + **LIVRAISONS**
-- Tab Devis supprimé — `listDevis` / `getVentesStats.devis` supprimés de `admin-db.ts`
-- Bouton "Nouvelle vente" visible uniquement sur le tab VENTES
+### Dashboard KPIs
+4 cards : CA Total · Nb Ventes · Payées · Livraisons
 
-### Modal Nouvelle Vente (2 colonnes, max-w-5xl)
-**Colonne gauche — Articles**
-- Recherche produit depuis stock boutique (`boutique_stock` avec `from_magasin=1`)
-- Tableau colonnes fixes : `minmax(0,1fr)` / `108px` / `96px` / `112px` (évite chevauchement P.U./Total)
-- Récap : sous-total → champ remise globale (FCFA) → économie si remise > 0 → total net
-- Champ acompte + reste à payer si statut = "acompte"
+### Modal Nouvelle Vente
+**Colonne gauche** — Articles depuis `boutique_stock`
+**Colonne droite** — Client + Livraison + Paiement
 
-**Colonne droite — Client / Livraison / Paiement**
-- Client : Nom (requis) + Téléphone
-- **Livraison** : case à cocher "Livraison à domicile". Si cochée → 3 champs : adresse, contact, lien de localisation
-- **Mode de paiement** : `<select>` (Espèces / Mix by Yas / Moov Money / Virement bancaire)
-- **Statut du paiement** : `<select>` (Payé en totalité / Acompte / Non payé)
-- Note (optionnel)
+#### Autocomplétion client
+- Frappe 2+ caractères → recherche dans `boutique_clients` → dropdown suggestions
+- Sélection client existant → nom + tél auto-remplis, champ tél masqué, badge "Client enregistré"
+- Nouveau client → champ tél affiché (bordure amber) → auto-enregistré dans `boutique_clients` via `createVenteWithStock`
 
-### Payload API vente
-```ts
-{ client_nom, client_tel, avec_livraison, adresse_livraison?, contact_livraison?,
-  lien_localisation?, mode_paiement, statut_paiement, montant_acompte?,
-  sous_total, remise?, total, note?, items[] }
-```
+#### Aperçu carte (livraison à domicile)
+- URL Google Maps contenant `@lat,lng` → iframe OpenStreetMap intégré (sans API key)
+- URL courte (`maps.app.goo.gl`) → bouton "Voir la localisation sur la carte"
 
 ### Création d'une vente (`createVenteWithStock`)
 Transaction atomique :
-1. Vérifie stock boutique disponible par item
-2. Insère dans `factures` (avec tous les nouveaux champs)
-3. Insère les lignes dans `facture_items`
-4. Décrémente `boutique_stock` par item
-5. Log `boutique_mouvements` par item
-6. Sync `produits.stock_boutique` depuis `boutique_stock`
+1. Vérifie stock boutique par item
+2. Insère dans `factures`
+3. Décrémente `boutique_stock` + log `boutique_mouvements`
+4. Sync `produits.stock_boutique`
+5. Si livraison → insère dans `livraisons_ventes`
+6. **Après commit** : sync client vers `boutique_clients` (INSERT...SELECT WHERE NOT EXISTS)
 
-### Actions par ligne vente
-Eye (voir) / Pencil (modifier) / Printer (imprimer, masqué si livraison) / Trash (supprimer)
+---
+
+## 🚚 Page Livraisons (`/admin/livraisons`)
+
+### Dashboard KPIs
+4 cards : Total · En attente · En cours · Livrées
+
+### Boutons PageHeader
+- **"Ajouter"** → modal livraison manuelle (sans vente liée, `facture_id = NULL`)
+- **"Livreur"** → modal création livreur (dans slot `extra`)
+
+### Livraison manuelle
+Champs : client_nom*, client_tel, adresse, contact_livraison, lien_localisation, note
+API : `POST /api/admin/livraisons` → `createManualLivraison()` → référence `LV-XXXXX` auto-générée
+
+### Livraisons liées à une vente
+Créées automatiquement dans `createVenteWithStock` quand `avec_livraison = true`
 
 ---
 
 ## 🏪 Stock Boutique (`/admin/stock-boutique`)
 
-- Affiche uniquement les produits avec `boutique_stock.from_magasin = 1`
-- Ces produits arrivent via une **Sortie magasin** uniquement
-- KPIs, liste, mouvements boutique
+- Affiche **tous** les produits de `boutique_stock` (plus de filtre `from_magasin`)
+- `ensureBoutiqueStockPopulated()` appelé à chaque chargement : crée la table si absente, insère tous les produits depuis `produits.stock_boutique` si vide, puis `INSERT IGNORE` les nouveaux produits
+- KPIs : total produits, valeur boutique, stock faible, épuisés
 
 ---
 
-## 💰 Page Finance (`/admin/finance`) — Template de référence
+## 💰 Page Finance (`/admin/finance`)
 
-- KPIs : Solde caisse, Total dépenses, Total rentrées
-- Tabs : **Dépenses** / **Rentrées** (anciennement "Recettes")
-- Header : un seul bouton **"Nouvelle entrée"** (supprimé : CAISSE, DÉPENSES, RENTRÉES séparés)
-  - Le type de modal ouvert dépend du tab actif : tab "depense" → modal dépense, sinon → modal rentrée
+- KPIs : Solde caisse, Espèces, Moov Money, TMoney, Virement bancaire
+- Tabs : **Dépenses** / **Rentrées** (onglet Catégories supprimé)
+- Boutons **"Nouvelle dépense"** et **"Nouvelle rentrée"** dans le slot `extra` du PageHeader (toujours visibles)
 - CRUD complet via `FinanceManager.tsx`
-- API : `GET/POST /api/admin/finance`, `PUT/DELETE /api/admin/finance/[id]`
-
-> ⭐ **Finance est le template visuel de référence pour tous les dashboards.** Son `StatCard` inline a été extrait dans `components/admin/StatCard.tsx` pour être réutilisé partout.
 
 ---
 
-## ⚙️ Variables d'environnement (`.env.local`)
+## 👥 Clients Boutique (`/admin/boutique-clients`)
+
+- Table `boutique_clients` : clients de la boutique physique
+- Auto-peuplée depuis `clients` (vitrine) au premier chargement si vide
+- Alimentée automatiquement à chaque vente (`createVenteWithStock`) et chaque facture (`createFacture`) si nom + tél fournis
+- Tabs : Tous / Débiteurs / Dettes
+- CRUD complet via `BoutiqueClientsManager.tsx`
+
+---
+
+## 📂 CRM (`/admin/crm`)
+
+- Affiche **uniquement** les clients de la vitrine en ligne (table `clients`)
+- KPIs : Nouveaux (30j) + Top client
+- Top 10 clients par CA total
+- Pas de liste complète (supprimée — voir Boutique > Clients pour les clients physiques)
+
+---
+
+## ⚙️ Variables d'environnement
 
 ```env
 DB_HOST=
@@ -401,45 +333,49 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3003
 
 1. **Jamais de worktree** — éditer uniquement dans `/Volumes/LOCAL/CLAUDE CODE/store-nextjs`
 2. **Pas de Prisma** — MySQL direct via `mysql2/promise`
-3. **Pas de preview Claude** — l'utilisateur lance `npx next dev` lui-même et valide dans son navigateur
+3. **Pas de preview Claude** — l'utilisateur valide dans son propre navigateur
 4. **Toujours expliquer avant d'appliquer** — attendre la validation explicite
 5. **Transactions MySQL** pour toutes les opérations de stock (atomicité)
-6. **`entrepot_id`** supprimé des APIs et de l'UI — hardcodé à `1` dans `admin-db.ts`
-7. **Stock magasin** = `SUM(produit_stocks.stock) GROUP BY produit_id` — jamais `produits.stock_boutique` pour le magasin
-8. **Table `achats`** : pas de colonne `created_at`, colonne `notes` (pas `note`), statut sans `annule`
-9. **`produit_id`** dans `getProduitsWithStock()` — le SELECT retourne `p.id AS produit_id`, utiliser `selected.produit_id` (pas `.id`)
-10. **Boutons CTA** : toujours `bg-emerald-800 hover:bg-emerald-700` — plus de `bg-brand-*` dans les composants admin
-11. **Inputs** : toujours `focus:border-emerald-500` — plus de `focus:border-brand-500`
+6. **`entrepot_id`** hardcodé à `1` dans `admin-db.ts`
+7. **Stock magasin** = `SUM(produit_stocks.stock) GROUP BY produit_id`
+8. **`produit_id`** dans `getProduitsWithStock()` → retourne `p.id AS produit_id`, utiliser `.produit_id` (pas `.id`)
+9. **Boutons CTA** : `bg-emerald-800 hover:bg-emerald-700`
+10. **SSE** : utiliser `emitAdminEvent()` dans toutes les API routes de mutation
+11. **Auto-init DB** : `ensureBoutiqueStockPopulated()`, `ensureBoutiqueClientsTable()`, `ensureMarquesTable()` — pas besoin d'exécuter des scripts SQL manuellement
+12. **Table `achats`** : pas de `created_at`, colonne `notes` (pas `note`), statut sans `annule`
 
 ---
 
 ## 📝 Historique des sessions
 
+### Session 5 (2026-04-21)
+- **SSE temps réel** : remplacement du polling 30s par Server-Sent Events — `lib/admin-events.ts` (EventEmitter singleton), `app/api/admin/events/route.ts` (heartbeat 25s), `AdminShell.tsx` (EventSource avec reconnexion auto)
+- **Suppression refresh manuel** : `onRefresh`/`RefreshCw` retirés de `PageHeader`, `BoutiqueSegmentation`, `MessagesClient`
+- **CategoriesManager** : refonte avec onglets Catégories/Marques + 3 KPI cards + `ensureMarquesTable()` compatible MySQL 8.0 (INFORMATION_SCHEMA au lieu de IF NOT EXISTS)
+- **Clients boutique vs CRM** : séparation claire — `boutique_clients` (physique, auto-sync ventes) vs `clients` (vitrine)
+- **`createVenteWithStock` + `createFacture`** : sync automatique `boutique_clients` après commit (INSERT...SELECT WHERE NOT EXISTS)
+- **CRM page** : liste complète supprimée — KPIs + Top 10 uniquement
+- **Dashboard Ventes** : 4 KPI cards (CA total, nb ventes, payées, livraisons) — `getVentesStats` enrichi
+- **Dashboard Livraisons** : 4 KPI cards (total, en attente, en cours, livrées) — `getLivraisonsStats` ajouté
+- **LivraisonsManager** : bouton "Ajouter" → modal livraison manuelle ; bouton "Livreur" déplacé dans `extra`
+- **FinanceManager** : onglet "Recettes" → "Rentrées" ; onglet "Catégories" supprimé ; boutons CTA dans `extra` du PageHeader
+- **Modal Nouvelle Vente** : autocomplétion client depuis `boutique_clients`, champ tél masqué/conditionnel, aperçu OpenStreetMap pour liens Google Maps avec coordonnées
+- **`ensureBoutiqueStockPopulated()`** : auto-création + peuplement `boutique_stock` depuis `produits` si vide
+- **Fix `from_magasin`** : filtre supprimé dans `getStockBoutiqueStats` et `getStockBoutiqueList`
+- **Fix products page SSR** : `ProductsViewTabs` supprimé (utilisait `useSearchParams`), remplacé par `<Link>` server-side
+
 ### Session 4 (2026-04-17)
-- **VentesManager — style tableau** : refonte visuelle du tableau Ventes calquée sur le tableau Commandes de `gestion-commandes` — `bg-white rounded-2xl shadow-sm border border-slate-200`, `thead bg-slate-50`, `tbody divide-y divide-slate-50`, `hover:bg-slate-50 group`, badge référence `font-mono bg-indigo-50 text-indigo-700`, actions `opacity-60 group-hover:opacity-100`
-- **Système de thème — police "Système"** : ajout d'une option spéciale dans la page Apparence (`/admin/settings/theme`)
-  - `lib/theme-utils.ts` : 3 nouveaux exports — `SYSTEM_FONT_STACK` (stack complète), `isSystemFont(font)`, `fontFamilyValue(font)` (retourne la stack système si `"Système"`, sinon `"NomPolice", ui-sans-serif, ...`)
-  - `components/ThemeVars.tsx` : utilise `fontFamilyValue()` pour injecter la variable CSS ; ne charge pas Google Fonts si `isSystemFont(font)`
-  - `components/admin/ThemeSettingsForm.tsx` : `"Système"` ajouté en tête de `FONTS[]`, bouton affiché en "Système (défaut)" avec `fontFamily: SYSTEM_FONT_STACK` (pas de Google Font fictive), imports `isSystemFont` + `SYSTEM_FONT_STACK`
-- **ThemeVars — fix régression font** : ajout `!important` sur `--font-display` et `--font-sans` pour empêcher l'injection CSS de Next.js HMR d'écraser la police thème après hydratation
+- **VentesManager — style tableau** : refonte visuelle calquée sur tableau Commandes
+- **Système de thème — police "Système"** : `SYSTEM_FONT_STACK`, `isSystemFont()`, `fontFamilyValue()`
+- **ThemeVars — fix régression font** : `!important` sur variables CSS pour survivre à l'injection HMR
 
 ### Session 3 (2026-04-17)
-- **AdminTopBar** : barre fixe `h-14` — logo Zap + "Togolese Shop", date live (60s), toggle jour/nuit (next-themes), "Voir le site →", dropdown SuperAdmin (profil, paramètres, déconnexion)
-- **AdminShell** : client component wrapper gérant `mobileOpen` partagé entre TopBar et Sidebar
-- **Mode jour/nuit** : `ThemeProvider` (next-themes), `@variant dark` dans `globals.css`, `suppressHydrationWarning` sur `<html>`
-- **Sidebar** : suppression logo/utilisateur — items seuls ; item actif `bg-emerald-800 text-white` ; background `bg-white`
-- **Design system unifié** : tous les boutons CTA → `bg-emerald-800` ; tous les inputs → `focus:border-emerald-500`
-- **PageHeader** + **TabBar** : composants partagés créés et déployés sur toutes les pages MAGASIN + BOUTIQUE
-- **StatCard** : composant KPI partagé extrait de Finance, style Finance standardisé sur toutes les pages
-- **CategoriesManager** : KPI cards style Finance + brand→emerald
-- **FournisseursManager** : ajout 2 KPI cards (Fournisseurs + Avec contact) + brand→emerald
-- **AchatsManager** : KPI cards style Finance + brand→emerald sur tous les éléments
-- **CRM page** : header custom → `<PageHeader>` + KPI cards horizontaux → style Finance vertical
+- **AdminTopBar** : barre fixe h-14, date live, toggle jour/nuit, dropdown SuperAdmin
+- **Mode jour/nuit** : ThemeProvider (next-themes), `@variant dark`
+- **Design system unifié** : CTA `bg-emerald-800`, inputs `focus:border-emerald-500`
+- **PageHeader + TabBar + StatCard** : composants partagés sur toutes les pages
 
 ### Session 2 (2026-04-15)
-- **MAGASIN** : Suppression "Stock par entrepôt" de la fiche produit ; `stock_magasin` écrit dans `produit_stocks` (plus `stock_boutique`) ; `stock_mouvements` sans `entrepot_id`
-- **MouvementModal** : multi-produits (liste `items[]`, recherche indépendante par ligne, submit en boucle)
-- **Stock boutique** : filtré `from_magasin = 1` dans `getStockBoutiqueStats` et `getStockBoutiqueList`
-- **Sidebar** : "Commandes" déplacé BOUTIQUE → STORE
-- **Finance** : 3 boutons header → 1 "Nouvelle entrée" ; tab "Recettes" → "Rentrées"
-- **Ventes** : tab Devis supprimé ; modal redesign 2 colonnes : livraison checkbox+champs, selects mode/statut paiement, remise globale sur total, colonnes articles avec largeurs fixes
+- **MAGASIN** : stock_magasin via produit_stocks, entrepot_id supprimé de l'UI
+- **MouvementModal** : multi-produits
+- **Ventes** : tab Devis supprimé, modal 2 colonnes avec livraison/paiement
