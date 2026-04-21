@@ -16,7 +16,7 @@ import { formatPrice } from "@/lib/utils";
 /* ─── Types ─── */
 type Tab = "ventes" | "livraisons";
 
-interface Stats { factures: number; livraisons: number }
+interface Stats { factures: number; livraisons: number; ca_total: number; factures_payees: number }
 
 interface Props {
   initialFactures:   Facture[];
@@ -380,6 +380,45 @@ export default function VentesManager({
         ctaLabel={tab === "ventes" ? "Nouvelle vente" : undefined}
         onCtaClick={tab === "ventes" ? openModal : undefined}
       />
+
+      {/* KPI Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">CA Total</p>
+            <TrendingUp className="w-8 h-8 text-emerald-500 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {new Intl.NumberFormat("fr-FR").format(stats.ca_total)}{" "}
+            <span className="text-sm font-semibold text-emerald-500">FCFA</span>
+          </p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Hors annulations</span>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ventes</p>
+            <ShoppingCart className="w-8 h-8 text-blue-500 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.factures}</p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">Total factures</span>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payées</p>
+            <Check className="w-8 h-8 text-emerald-500 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.factures_payees}</p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Statut payé</span>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Livraisons</p>
+            <Truck className="w-8 h-8 text-amber-500 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.livraisons}</p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">Total livraisons</span>
+        </div>
+      </div>
 
       <TabBar
         tabs={[

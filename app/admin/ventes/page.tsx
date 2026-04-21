@@ -6,7 +6,7 @@ export const metadata = { title: "Ventes" };
 export default async function VentesPage() {
   let factures:   Awaited<ReturnType<typeof listFactures>>["items"]   = [];
   let livraisons: Awaited<ReturnType<typeof listLivraisons>>["items"] = [];
-  let stats      = { factures: 0, livraisons: 0 };
+  let stats      = { factures: 0, livraisons: 0, ca_total: 0, factures_payees: 0 };
   let totals     = { factures: 0, livraisons: 0 };
   let migrationNeeded = false;
 

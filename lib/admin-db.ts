@@ -1610,14 +1610,41 @@ export async function deleteFinanceEntry(id: number) {
   await db.execute("DELETE FROM finance_entries WHERE id = ?", [id]);
 }
 
-export async function getVentesStats(): Promise<{ factures: number; livraisons: number }> {
-  const [[f], [l]] = await Promise.all([
+export async function getVentesStats(): Promise<{
+  factures: number; livraisons: number;
+  ca_total: number; factures_payees: number;
+}> {
+  const [[f], [l], [ca], [fp]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures"),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
+    db.execute<mysql.RowDataPacket[]>("SELECT COALESCE(SUM(total),0) AS total FROM factures WHERE statut != 'annule'"),
+    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures WHERE statut = 'paye'"),
   ]);
   return {
-    factures:   Number((f as mysql.RowDataPacket[])[0]?.cnt ?? 0),
-    livraisons: Number((l as mysql.RowDataPacket[])[0]?.cnt ?? 0),
+    factures:       Number((f  as mysql.RowDataPacket[])[0]?.cnt   ?? 0),
+    livraisons:     Number((l  as mysql.RowDataPacket[])[0]?.cnt   ?? 0),
+    ca_total:       Number((ca as mysql.RowDataPacket[])[0]?.total ?? 0),
+    factures_payees:Number((fp as mysql.RowDataPacket[])[0]?.cnt   ?? 0),
+  };
+}
+
+export async function getLivraisonsStats(): Promise<{
+  total: number; en_attente: number; en_cours: number; livre: number;
+}> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(statut = 'en_attente') AS en_attente,
+       SUM(statut IN ('acceptee','en_cours')) AS en_cours,
+       SUM(statut = 'livre') AS livre
+     FROM livraisons_ventes`
+  );
+  const r = (rows as mysql.RowDataPacket[])[0] ?? {};
+  return {
+    total:      Number(r.total      ?? 0),
+    en_attente: Number(r.en_attente ?? 0),
+    en_cours:   Number(r.en_cours   ?? 0),
+    livre:      Number(r.livre      ?? 0),
   };
 }
 
@@ -1934,6 +1961,32 @@ export async function accepterLivraison(livraisonId: number, livreurId: number):
   }
 }
 
+export async function createManualLivraison(data: {
+  client_nom:         string;
+  client_tel?:        string;
+  adresse?:           string;
+  contact_livraison?: string;
+  lien_localisation?: string;
+  note?:              string;
+}): Promise<number> {
+  const reference = generateVenteRef("LV");
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO livraisons_ventes
+       (reference, facture_id, client_nom, client_tel, adresse, contact_livraison, lien_localisation, statut, note)
+     VALUES (?, NULL, ?, ?, ?, ?, ?, 'en_attente', ?)`,
+    [
+      reference,
+      data.client_nom,
+      data.client_tel   ?? null,
+      data.adresse      ?? null,
+      data.contact_livraison ?? null,
+      data.lien_localisation ?? null,
+      data.note         ?? null,
+    ]
+  );
+  return result.insertId;
+}
+
 // For driver page: get deliveries available (en_attente) + their own accepted ones
 export async function getLivraisonsForLivreur(livreurId: number): Promise<LivraisonAdmin[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
@@ -1975,12 +2028,45 @@ export interface BoutiqueClientStats {
   derniers:       BoutiqueClient[];
 }
 
+async function ensureBoutiqueClientsTable(): Promise<void> {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS boutique_clients (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      nom          VARCHAR(255) NOT NULL,
+      telephone    VARCHAR(20),
+      email        VARCHAR(150),
+      localisation VARCHAR(255),
+      type_client  ENUM('particulier','professionnel') NOT NULL DEFAULT 'particulier',
+      solde        DECIMAL(15,2) NOT NULL DEFAULT 0,
+      notes        TEXT,
+      created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_nom       (nom),
+      INDEX idx_telephone (telephone)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // Import from clients table if boutique_clients is empty
+  const [[cnt]] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT COUNT(*) AS n FROM boutique_clients"
+  );
+  if (Number((cnt as mysql.RowDataPacket).n ?? 0) === 0) {
+    await db.execute(`
+      INSERT INTO boutique_clients (nom, telephone, email, type_client)
+      SELECT nom, telephone, email, 'particulier'
+      FROM clients
+      WHERE telephone IS NOT NULL AND telephone != ''
+    `).catch(() => {});
+  }
+}
+
 export async function listBoutiqueClients(
   limit: number,
   offset: number,
   search: string,
   filtre: "tous" | "debiteurs" | "dettes"
 ): Promise<BoutiqueClient[]> {
+  await ensureBoutiqueClientsTable();
   const conditions: string[] = [];
   const params: (string | number | boolean | null | Buffer)[] = [];
 

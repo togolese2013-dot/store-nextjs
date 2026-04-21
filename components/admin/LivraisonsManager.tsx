@@ -3,8 +3,9 @@
 import { useState, useCallback } from "react";
 import {
   Truck, Plus, X, Check, Loader2,
-  MapPin, Phone, User, Clock, Package, Pencil, Trash2,
+  MapPin, Phone, User, Clock, Pencil, Trash2,
   ChevronLeft, ChevronRight, Copy, UserPlus,
+  Package, AlertCircle,
 } from "lucide-react";
 import type { LivraisonAdmin, Livreur } from "@/lib/admin-db";
 import PageHeader from "@/components/admin/PageHeader";
@@ -18,10 +19,13 @@ const STATUTS: { value: LivraisonAdmin["statut"]; label: string; color: string }
   { value: "echoue",     label: "Échoué",      color: "bg-red-100 text-red-700 border-red-200" },
 ];
 
+interface LivStats { total: number; en_attente: number; en_cours: number; livre: number }
+
 interface Props {
   initialLivraisons: LivraisonAdmin[];
   initialTotal:      number;
   initialLivreurs:   Livreur[];
+  initialStats:      LivStats;
 }
 
 const LIMIT = 50;
@@ -42,15 +46,22 @@ function formatDate(d: string) {
 /* ══════════════════════════════════════════════════════════════════
    COMPONENT
 ══════════════════════════════════════════════════════════════════ */
-export default function LivraisonsManager({ initialLivraisons, initialTotal, initialLivreurs }: Props) {
+export default function LivraisonsManager({ initialLivraisons, initialTotal, initialLivreurs, initialStats }: Props) {
   const [livraisons,  setLivraisons]  = useState<LivraisonAdmin[]>(initialLivraisons);
   const [total,       setTotal]       = useState(initialTotal);
   const [livreurs,    setLivreurs]    = useState<Livreur[]>(initialLivreurs);
+  const [stats,       setStats]       = useState<LivStats>(initialStats);
   const [loading,     setLoading]     = useState(false);
   const [flash,       setFlash]       = useState("");
   const [search,      setSearch]      = useState("");
   const [filterStatut, setFilterStatut] = useState("");
   const [offset,      setOffset]      = useState(0);
+
+  /* ── Modal livraison manuelle ── */
+  const [showAddModal,  setShowAddModal]  = useState(false);
+  const [addForm, setAddForm] = useState({ client_nom: "", client_tel: "", adresse: "", contact_livraison: "", lien_localisation: "", note: "" });
+  const [savingAdd, setSavingAdd] = useState(false);
+  const [addError,  setAddError]  = useState("");
 
   /* ── Livreur modal ── */
   const [showLivreurModal, setShowLivreurModal] = useState(false);
@@ -122,6 +133,25 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
     }
   }
 
+  /* ── Create manual livraison ── */
+  async function handleCreateManual(e: React.FormEvent) {
+    e.preventDefault();
+    if (!addForm.client_nom.trim()) { setAddError("Nom du client requis."); return; }
+    setSavingAdd(true); setAddError("");
+    const res  = await fetch("/api/admin/livraisons", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(addForm),
+    });
+    const data = await res.json();
+    setSavingAdd(false);
+    if (!res.ok) { setAddError(data.error ?? "Erreur"); return; }
+    setShowAddModal(false);
+    setAddForm({ client_nom: "", client_tel: "", adresse: "", contact_livraison: "", lien_localisation: "", note: "" });
+    fetchLivraisons(search, filterStatut, 0);
+    setOffset(0);
+    showFlash("Livraison créée ✓");
+  }
+
   /* ── Create livreur ── */
   async function handleCreateLivreur() {
     if (!livreurForm.nom.trim()) return;
@@ -182,20 +212,63 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
         searchPlaceholder="Rechercher…"
         onRefresh={() => fetchLivraisons(search, filterStatut, offset)}
         refreshLoading={loading}
-        ctaLabel="Livreur"
-        ctaIcon={UserPlus}
-        onCtaClick={() => setShowLivreurModal(true)}
+        ctaLabel="Ajouter"
+        onCtaClick={() => setShowAddModal(true)}
         extra={
-          <select
-            value={filterStatut}
-            onChange={e => applyFilter(e.target.value)}
-            className="px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 text-slate-600"
-          >
-            <option value="">Tous les statuts</option>
-            {STATUTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+          <>
+            <select
+              value={filterStatut}
+              onChange={e => applyFilter(e.target.value)}
+              className="px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 text-slate-600"
+            >
+              <option value="">Tous les statuts</option>
+              {STATUTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <button
+              onClick={() => setShowLivreurModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" /> Livreur
+            </button>
+          </>
         }
       />
+
+      {/* KPI dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total</p>
+            <Truck className="w-8 h-8 text-amber-500 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.total}</p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Toutes livraisons</span>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">En attente</p>
+            <AlertCircle className="w-8 h-8 text-slate-400 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.en_attente}</p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">À prendre en charge</span>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">En cours</p>
+            <Clock className="w-8 h-8 text-blue-500 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.en_cours}</p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">Acceptée / en cours</span>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Livrées</p>
+            <Check className="w-8 h-8 text-emerald-500 opacity-20" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.livre}</p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Complétées</span>
+        </div>
+      </div>
 
       {/* ── Livreurs cards ── */}
       {livreurs.length > 0 && (
@@ -363,6 +436,71 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
           </>
         )}
       </div>
+
+      {/* ════ MODAL : Livraison manuelle ════ */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 text-lg">Nouvelle livraison</h3>
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateManual} className="space-y-3">
+              {addError && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2">{addError}</p>}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Nom du client *</label>
+                <input type="text" value={addForm.client_nom} autoFocus required
+                  onChange={e => setAddForm(f => ({ ...f, client_nom: e.target.value }))}
+                  placeholder="Ex : Kofi AMEVOR"
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Téléphone</label>
+                <input type="text" value={addForm.client_tel}
+                  onChange={e => setAddForm(f => ({ ...f, client_tel: e.target.value }))}
+                  placeholder="+228 90 00 00 00"
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Adresse de livraison</label>
+                <input type="text" value={addForm.adresse}
+                  onChange={e => setAddForm(f => ({ ...f, adresse: e.target.value }))}
+                  placeholder="Quartier, rue…"
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Contact livraison</label>
+                <input type="text" value={addForm.contact_livraison}
+                  onChange={e => setAddForm(f => ({ ...f, contact_livraison: e.target.value }))}
+                  placeholder="Téléphone du destinataire si différent"
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Lien localisation</label>
+                <input type="url" value={addForm.lien_localisation}
+                  onChange={e => setAddForm(f => ({ ...f, lien_localisation: e.target.value }))}
+                  placeholder="https://maps.google.com/..."
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Note</label>
+                <textarea value={addForm.note} rows={2}
+                  onChange={e => setAddForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="Instructions, remarques…"
+                  className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-amber-400 outline-none resize-none" />
+              </div>
+              <button type="submit" disabled={savingAdd}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 disabled:opacity-50 transition-all">
+                {savingAdd ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Créer la livraison
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ════ MODAL : Créer livreur ════ */}
       {showLivreurModal && (

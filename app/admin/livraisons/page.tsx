@@ -1,4 +1,4 @@
-import { listLivraisonsAdmin, listLivreurs } from "@/lib/admin-db";
+import { listLivraisonsAdmin, listLivreurs, getLivraisonsStats } from "@/lib/admin-db";
 import type { LivraisonAdmin, Livreur } from "@/lib/admin-db";
 import LivraisonsManager from "@/components/admin/LivraisonsManager";
 
@@ -8,16 +8,19 @@ export default async function LivraisonsPage() {
   let items:    LivraisonAdmin[] = [];
   let total     = 0;
   let livreurs: Livreur[]        = [];
+  let livStats  = { total: 0, en_attente: 0, en_cours: 0, livre: 0 };
   let errMsg    = "";
 
   try {
-    const [res, liv] = await Promise.all([
+    const [res, liv, st] = await Promise.all([
       listLivraisonsAdmin({ limit: 50 }),
       listLivreurs(),
+      getLivraisonsStats(),
     ]);
     items    = res.items;
     total    = res.total;
     livreurs = liv;
+    livStats = st;
   } catch (err) {
     errMsg = err instanceof Error ? err.message : String(err);
     console.error("[LivraisonsPage]", err);
@@ -39,6 +42,7 @@ export default async function LivraisonsPage() {
       initialLivraisons={items}
       initialTotal={total}
       initialLivreurs={livreurs}
+      initialStats={livStats}
     />
   );
 }
