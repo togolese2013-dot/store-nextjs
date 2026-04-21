@@ -11,9 +11,7 @@ import {
   Boxes, AlertTriangle, XCircle, TrendingDown, TrendingUp, DollarSign,
   Activity,
 } from "lucide-react";
-import { Suspense } from "react";
 import PageHeader from "@/components/admin/PageHeader";
-import ProductsViewTabs from "@/components/admin/ProductsViewTabs";
 
 export const metadata = { title: "Tous les produits" };
 
@@ -222,10 +220,35 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
       {/* ── Filter tabs ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Left: tab bar */}
-        <Suspense fallback={<div className="flex gap-0 border-b border-slate-100 h-10" />}>
-          <ProductsViewTabs tabs={viewTabs} active={view} />
-        </Suspense>
+        {/* Left: view tab bar — pure Links, no useSearchParams */}
+        <div className="flex gap-0 border-b border-slate-100">
+          {viewTabs.map(tab => {
+            const isActive = view === tab.key;
+            const href = buildUrl(
+              { q: q || undefined, filter: activeFilter, statut: statut !== "all" ? statut : undefined },
+              { view: tab.key !== "stock" ? tab.key : "" }
+            );
+            return (
+              <Link
+                key={tab.key}
+                href={href}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  isActive
+                    ? "border-brand-900 text-brand-900"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                  isActive ? "bg-brand-100 text-brand-800" : "bg-slate-100 text-slate-500"
+                }`}>
+                  {tab.count}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
 
         {/* Right: statut tabs (only for stock view) */}
         {isStockView && (
