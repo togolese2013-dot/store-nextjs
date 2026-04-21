@@ -173,6 +173,11 @@ export default function VentesManager({
   /* ── Modal état ── */
   const [modal,      setModal]      = useState<NewVenteModal | null>(null);
 
+  /* ── Modal Voir / Modifier ── */
+  type EditState = { facture: Facture; statut: string; statut_paiement: string; mode_paiement: string; saving: boolean; error: string };
+  const [viewFacture, setViewFacture] = useState<Facture | null>(null);
+  const [editState,   setEditState]   = useState<EditState | null>(null);
+
   /* ── Client autocomplete ── */
   const [clientSuggestions, setClientSuggestions] = useState<{id:number;nom:string;telephone:string|null}[]>([]);
   const [showSuggestions,   setShowSuggestions]   = useState(false);
@@ -215,7 +220,7 @@ export default function VentesManager({
     setModal(emptyModal());
     setLoadingStock(true);
     try {
-      const res  = await fetch("/api/admin/stock-boutique?limit=200");
+      const res  = await fetch("/api/admin/stock-boutique?limit=500&filter=disponible");
       const data = await res.json();
       if (res.ok) setBoutiqueStock(data.items ?? []);
     } finally {
@@ -235,15 +240,16 @@ export default function VentesManager({
 
   /* ── Client autocomplete handlers ── */
   async function handleClientNomChange(val: string) {
-    setModal(m => m ? { ...m, clientNom: val, clientTel: "" } : m);
+    const upper = val.toUpperCase();
+    setModal(m => m ? { ...m, clientNom: upper, clientTel: "" } : m);
     setIsNewClient(false);
-    if (val.trim().length < 2) {
+    if (upper.trim().length < 2) {
       setClientSuggestions([]);
       setShowSuggestions(false);
       return;
     }
     try {
-      const res  = await fetch(`/api/admin/boutique-clients?q=${encodeURIComponent(val)}&page=1`);
+      const res  = await fetch(`/api/admin/boutique-clients?q=${encodeURIComponent(upper)}&page=1`);
       const data = await res.json();
       const list = (data.data ?? []).slice(0, 6) as {id:number;nom:string;telephone:string|null}[];
       setClientSuggestions(list);
@@ -253,7 +259,7 @@ export default function VentesManager({
   }
 
   function selectClient(c: {id:number;nom:string;telephone:string|null}) {
-    setModal(m => m ? { ...m, clientNom: c.nom, clientTel: c.telephone ?? "" } : m);
+    setModal(m => m ? { ...m, clientNom: c.nom.toUpperCase(), clientTel: c.telephone ?? "" } : m);
     setClientSuggestions([]);
     setShowSuggestions(false);
     setIsNewClient(false);
@@ -410,6 +416,46 @@ export default function VentesManager({
 
   function handlePrint(ref: string) { window.print(); void ref; }
 
+  /* ── Voir détail ── */
+  function handleView(f: Facture) { setViewFacture(f); }
+
+  /* ── Modifier ── */
+  function handleEdit(f: Facture) {
+    setEditState({
+      facture:         f,
+      statut:          f.statut,
+      statut_paiement: f.statut_paiement ?? "paye_total",
+      mode_paiement:   f.mode_paiement   ?? "especes",
+      saving:          false,
+      error:           "",
+    });
+  }
+
+  async function submitEdit() {
+    if (!editState) return;
+    setEditState(s => s ? { ...s, saving: true, error: "" } : s);
+    const res = await fetch(`/api/admin/ventes/factures/${editState.facture.id}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        statut:          editState.statut,
+        statut_paiement: editState.statut_paiement,
+        mode_paiement:   editState.mode_paiement,
+      }),
+    });
+    if (res.ok) {
+      setFactures(prev => prev.map(f => f.id === editState.facture.id
+        ? { ...f, statut: editState.statut as Facture["statut"], statut_paiement: editState.statut_paiement, mode_paiement: editState.mode_paiement }
+        : f
+      ));
+      setEditState(null);
+      showFlash("Vente mise à jour ✓");
+    } else {
+      const data = await res.json();
+      setEditState(s => s ? { ...s, saving: false, error: data.error ?? "Erreur" } : s);
+    }
+  }
+
   /* ── Pagination ── */
   const currentTotal = tab === "ventes" ? totals.factures : totals.livraisons;
   const totalPages   = Math.ceil(currentTotal / LIMIT);
@@ -543,7 +589,7 @@ export default function VentesManager({
                         {/* Référence */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">{row.reference}</span>
+                            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">{row.reference.replace(/-\d{4}$/, "")}</span>
                             {isVente && f.avec_livraison === 1 && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full border border-indigo-100">
                                 <Truck className="w-3 h-3" /> Livraison
@@ -554,7 +600,7 @@ export default function VentesManager({
 
                         {/* Client */}
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-900">{row.client_nom}</div>
+                          <div className="font-semibold text-slate-900">{row.client_nom?.toUpperCase()}</div>
                         </td>
 
                         {/* Montant */}
@@ -592,8 +638,8 @@ export default function VentesManager({
 
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <button title="Voir"      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye    className="w-4 h-4" /></button>
-                            <button title="Modifier"  className="p-1.5 rounded-lg hover:bg-amber-50  text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>
+                            {isVente && <button onClick={() => handleView(f)} title="Voir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>}
+                            {isVente && <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>}
                             {!isLivraison && (
                               <button onClick={() => handlePrint(row.reference)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
                             )}
@@ -978,6 +1024,171 @@ export default function VentesManager({
                     Annuler
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+          MODAL VOIR DÉTAIL
+      ════════════════════════════════════ */}
+      {viewFacture && (() => {
+        let parsedItems: { nom: string; reference: string; qty: number; prix: number; total: number }[] = [];
+        try { parsedItems = JSON.parse(viewFacture.items); } catch { /* ignore */ }
+        const modeLbl = MODES_PAIEMENT.find(m => m.value === viewFacture.mode_paiement)?.label ?? viewFacture.mode_paiement ?? "—";
+        const statutLbl = STATUTS_PAIEMENT.find(s => s.value === viewFacture.statut_paiement)?.label ?? viewFacture.statut_paiement ?? "—";
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setViewFacture(null)} />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-y-auto" style={{ maxHeight: "90vh" }}>
+              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-lg">Détail vente</h3>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">{viewFacture.reference.replace(/-\d{4}$/, "")}</p>
+                </div>
+                <button onClick={() => setViewFacture(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                {/* Client */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Client</span>
+                  <span className="font-semibold text-slate-900">{viewFacture.client_nom?.toUpperCase()}</span>
+                </div>
+                {viewFacture.client_tel && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Téléphone</span>
+                    <span className="text-slate-700">{viewFacture.client_tel}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Date</span>
+                  <span className="text-slate-700">{formatDate(viewFacture.created_at)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Mode de paiement</span>
+                  <span className="text-slate-700">{modeLbl}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Statut paiement</span>
+                  <span className="text-slate-700">{statutLbl}</span>
+                </div>
+                {viewFacture.montant_acompte != null && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Acompte versé</span>
+                    <span className="text-amber-700 font-semibold">{formatPrice(viewFacture.montant_acompte)}</span>
+                  </div>
+                )}
+                {/* Articles */}
+                <div className="border border-slate-100 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500">Article</th>
+                        <th className="text-center px-3 py-2.5 text-xs font-semibold text-slate-500">Qté</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {parsedItems.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-2.5 text-slate-700 font-medium">{it.nom}</td>
+                          <td className="px-3 py-2.5 text-center text-slate-500">{it.qty}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-slate-900">{formatPrice(it.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Totaux */}
+                {viewFacture.remise > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Remise</span>
+                    <span className="text-red-600">−{formatPrice(viewFacture.remise)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-bold border-t border-slate-100 pt-3">
+                  <span className="text-slate-700">Total</span>
+                  <span className="text-slate-900">{formatPrice(viewFacture.total)}</span>
+                </div>
+                {viewFacture.note && (
+                  <p className="text-xs text-slate-500 italic border-t border-slate-100 pt-3">{viewFacture.note}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ════════════════════════════════════
+          MODAL MODIFIER VENTE
+      ════════════════════════════════════ */}
+      {editState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditState(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg">Modifier la vente</h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{editState.facture.reference.replace(/-\d{4}$/, "")}</p>
+              </div>
+              <button onClick={() => setEditState(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {/* Statut facture */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Statut</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {FACTURE_STATUTS.map(s => (
+                    <button key={s.value}
+                      onClick={() => setEditState(p => p ? { ...p, statut: s.value } : p)}
+                      className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${editState.statut === s.value ? `${s.color} border-current ring-2 ring-offset-1 ring-current` : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Statut paiement */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Statut paiement</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {STATUTS_PAIEMENT.map(s => (
+                    <button key={s.value}
+                      onClick={() => setEditState(p => p ? { ...p, statut_paiement: s.value } : p)}
+                      className={`px-2 py-2 rounded-xl border text-xs font-semibold transition-all ${editState.statut_paiement === s.value ? `${s.color} ring-2 ring-offset-1 ring-amber-400` : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Mode paiement */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Mode de paiement</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODES_PAIEMENT.map(m => (
+                    <button key={m.value}
+                      onClick={() => setEditState(p => p ? { ...p, mode_paiement: m.value } : p)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${editState.mode_paiement === m.value ? "border-amber-400 bg-amber-50 text-amber-700 ring-2 ring-offset-1 ring-amber-300" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                      <m.icon className="w-3.5 h-3.5" /> {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {editState.error && (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                  <AlertTriangle className="w-4 h-4 shrink-0" /> {editState.error}
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button onClick={submitEdit} disabled={editState.saving}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 disabled:opacity-50 transition-all">
+                  {editState.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Enregistrer
+                </button>
+                <button onClick={() => setEditState(null)}
+                  className="px-4 py-3 rounded-2xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+                  Annuler
+                </button>
               </div>
             </div>
           </div>

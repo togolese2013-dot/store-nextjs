@@ -98,6 +98,20 @@ export async function createStockSortie(data: {
       [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
     );
 
+    // Track the entry in boutique_mouvements
+    await conn.execute(
+      `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+       VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
+      [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
+    );
+    // Update boutique_stock (INSERT or increment)
+    await conn.execute(
+      `INSERT INTO boutique_stock (produit_id, quantite)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE quantite = quantite + VALUES(quantite), updated_at = NOW()`,
+      [data.produit_id, data.quantite]
+    );
+
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -1096,7 +1110,7 @@ export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
 
 export async function getStockBoutiqueList(opts: {
   search?: string;
-  filter?: "all" | "faible" | "epuise";
+  filter?: "all" | "faible" | "epuise" | "disponible";
   limit?: number;
   offset?: number;
 }): Promise<{ items: BoutiqueStockItem[]; total: number }> {
@@ -1114,8 +1128,9 @@ export async function getStockBoutiqueList(opts: {
     conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
   }
-  if (filter === "faible") conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
-  if (filter === "epuise") conditions.push("bs.quantite = 0");
+  if (filter === "faible")     conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
+  if (filter === "epuise")     conditions.push("bs.quantite = 0");
+  if (filter === "disponible") conditions.push("bs.quantite > 0");
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -1322,6 +1337,7 @@ export async function createVenteWithStock(data: {
 
     // 2. Insert facture
     const reference = generateVenteRef("VT");
+    data.client_nom = data.client_nom.trim().toUpperCase();
     const [result] = await conn.execute<mysql.ResultSetHeader>(
       `INSERT INTO factures
          (reference, client_nom, client_tel, items,
@@ -1390,6 +1406,23 @@ export async function createVenteWithStock(data: {
       ).catch(() => {});
     }
 
+    // Auto-create finance entry for paid/partial sales
+    if (data.statut_paiement && data.statut_paiement !== "non_paye") {
+      const montantFinance = data.statut_paiement === "acompte"
+        ? (data.montant_acompte ?? 0)
+        : data.total;
+      if (montantFinance > 0) {
+        await createFinanceEntry({
+          type:          "rentree",
+          mode_paiement: data.mode_paiement ?? "especes",
+          categorie:     "Vente boutique",
+          description:   `Vente ${reference} – ${data.client_nom.trim()}`,
+          montant:       montantFinance,
+          date_entree:   new Date().toISOString().slice(0, 10),
+        }).catch(() => {});
+      }
+    }
+
     return factureId;
   } catch (err) {
     await conn.rollback();
@@ -1401,6 +1434,21 @@ export async function createVenteWithStock(data: {
 
 export async function updateFactureStatut(id: number, statut: Facture["statut"]) {
   await db.execute("UPDATE factures SET statut = ? WHERE id = ?", [statut, id]);
+}
+
+export async function updateFacture(id: number, data: {
+  statut?:          Facture["statut"];
+  statut_paiement?: string;
+  mode_paiement?:   string;
+}) {
+  const sets: string[] = [];
+  const params: (string | number | null)[] = [];
+  if (data.statut !== undefined)           { sets.push("statut = ?");           params.push(data.statut); }
+  if (data.statut_paiement !== undefined)  { sets.push("statut_paiement = ?");  params.push(data.statut_paiement); }
+  if (data.mode_paiement !== undefined)    { sets.push("mode_paiement = ?");    params.push(data.mode_paiement); }
+  if (sets.length === 0) return;
+  params.push(id);
+  await db.execute(`UPDATE factures SET ${sets.join(", ")} WHERE id = ?`, params);
 }
 
 export async function deleteFacture(id: number) {
@@ -1858,15 +1906,25 @@ export async function deleteAchat(id: number) {
 // ─── Livreurs ──────────────────────────────────────────────────────────────────
 
 export interface Livreur {
-  id:         number;
-  nom:        string;
-  telephone:  string | null;
-  code_acces: string;
-  statut:     "disponible" | "indisponible";
-  created_at: string;
+  id:             number;
+  nom:            string;
+  telephone:      string | null;
+  numero_plaque:  string | null;
+  code_acces:     string;
+  statut:         "disponible" | "indisponible";
+  created_at:     string;
+}
+
+async function ensureLivreurCols(): Promise<void> {
+  try {
+    await db.execute(
+      "ALTER TABLE livreurs ADD COLUMN numero_plaque VARCHAR(30) NULL AFTER telephone"
+    );
+  } catch { /* column already exists */ }
 }
 
 export async function listLivreurs(): Promise<Livreur[]> {
+  await ensureLivreurCols();
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     "SELECT * FROM livreurs ORDER BY nom ASC"
   );
@@ -1884,7 +1942,7 @@ function generateCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
-export async function createLivreur(data: { nom: string; telephone?: string }): Promise<Livreur> {
+export async function createLivreur(data: { nom: string; telephone?: string; numero_plaque?: string }): Promise<Livreur> {
   let code = generateCode();
   // Ensure uniqueness
   let [existing] = await db.execute<mysql.RowDataPacket[]>("SELECT id FROM livreurs WHERE code_acces = ?", [code]);
@@ -1893,19 +1951,20 @@ export async function createLivreur(data: { nom: string; telephone?: string }): 
     [existing] = await db.execute<mysql.RowDataPacket[]>("SELECT id FROM livreurs WHERE code_acces = ?", [code]);
   }
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    "INSERT INTO livreurs (nom, telephone, code_acces) VALUES (?,?,?)",
-    [data.nom, data.telephone ?? null, code]
+    "INSERT INTO livreurs (nom, telephone, numero_plaque, code_acces) VALUES (?,?,?,?)",
+    [data.nom, data.telephone ?? null, data.numero_plaque ?? null, code]
   );
   const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT * FROM livreurs WHERE id = ?", [result.insertId]);
   return rows[0] as Livreur;
 }
 
-export async function updateLivreur(id: number, data: { nom?: string; telephone?: string; statut?: Livreur["statut"] }) {
+export async function updateLivreur(id: number, data: { nom?: string; telephone?: string; numero_plaque?: string; statut?: Livreur["statut"] }) {
   const fields: string[] = [];
   const values: (string | number | boolean | null | Buffer)[] = [];
-  if (data.nom      !== undefined) { fields.push("nom = ?");      values.push(data.nom); }
-  if (data.telephone !== undefined) { fields.push("telephone = ?"); values.push(data.telephone); }
-  if (data.statut   !== undefined) { fields.push("statut = ?");   values.push(data.statut); }
+  if (data.nom           !== undefined) { fields.push("nom = ?");           values.push(data.nom); }
+  if (data.telephone     !== undefined) { fields.push("telephone = ?");     values.push(data.telephone); }
+  if (data.numero_plaque !== undefined) { fields.push("numero_plaque = ?"); values.push(data.numero_plaque); }
+  if (data.statut        !== undefined) { fields.push("statut = ?");        values.push(data.statut); }
   if (fields.length === 0) return;
   values.push(id);
   await db.execute(`UPDATE livreurs SET ${fields.join(", ")} WHERE id = ?`, values);
@@ -1928,15 +1987,25 @@ export interface LivraisonAdmin {
   lien_localisation: string | null;
   livreur_id:        number | null;
   livreur:           string | null;
+  montant_livraison: number | null;
   statut:            "en_attente" | "acceptee" | "en_cours" | "livre" | "echoue";
   note:              string | null;
   livree_le:         string | null;
   created_at:        string;
 }
 
+async function ensureLivraisonCols(): Promise<void> {
+  try {
+    await db.execute(
+      "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL AFTER lien_localisation"
+    );
+  } catch { /* column already exists */ }
+}
+
 export async function listLivraisonsAdmin(opts: {
   limit?: number; offset?: number; search?: string; statut?: string;
 } = {}): Promise<{ items: LivraisonAdmin[]; total: number }> {
+  await ensureLivraisonCols();
   const { limit = 50, offset = 0, search, statut } = opts;
   const conditions: string[] = [];
   const params: (string | number | boolean | null | Buffer)[] = [];
@@ -1978,7 +2047,7 @@ export async function updateLivraisonAdmin(id: number, data: {
 }
 
 // Called by driver: accept a delivery (atomic — only if still en_attente)
-export async function accepterLivraison(livraisonId: number, livreurId: number): Promise<boolean> {
+export async function accepterLivraison(livraisonId: number, livreurId: number, montantLivraison?: number): Promise<boolean> {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -1988,15 +2057,15 @@ export async function accepterLivraison(livraisonId: number, livreurId: number):
     const liv = rows[0] as mysql.RowDataPacket | undefined;
     if (!liv || liv.statut !== "en_attente") {
       await conn.rollback();
-      return false; // already taken
+      return false;
     }
     const [livreurRow] = await conn.execute<mysql.RowDataPacket[]>(
       "SELECT nom FROM livreurs WHERE id = ?", [livreurId]
     );
     const nomLivreur = (livreurRow[0] as mysql.RowDataPacket)?.nom ?? null;
     await conn.execute(
-      "UPDATE livraisons_ventes SET statut = 'acceptee', livreur_id = ?, livreur = ? WHERE id = ?",
-      [livreurId, nomLivreur, livraisonId]
+      "UPDATE livraisons_ventes SET statut = 'acceptee', livreur_id = ?, livreur = ?, montant_livraison = ? WHERE id = ?",
+      [livreurId, nomLivreur, montantLivraison ?? null, livraisonId]
     );
     await conn.commit();
     return true;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { updateFactureStatut, deleteFacture, getFactureById } from "@/lib/admin-db";
+import { updateFactureStatut, updateFacture, deleteFacture, getFactureById } from "@/lib/admin-db";
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();
@@ -15,9 +15,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   const { id } = await params;
-  const { statut } = await req.json();
-  if (!statut) return NextResponse.json({ error: "statut requis." }, { status: 400 });
-  await updateFactureStatut(Number(id), statut);
+  const body = await req.json();
+  const { statut, statut_paiement, mode_paiement } = body;
+  if (statut && !statut_paiement && !mode_paiement) {
+    await updateFactureStatut(Number(id), statut);
+  } else {
+    await updateFacture(Number(id), { statut, statut_paiement, mode_paiement });
+  }
   return NextResponse.json({ ok: true });
 }
 

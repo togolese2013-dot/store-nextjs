@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   try {
-    const { nom, telephone } = await req.json();
+    const { nom, telephone, numero_plaque } = await req.json();
     if (!nom?.trim()) return NextResponse.json({ error: "nom requis." }, { status: 400 });
-    const livreur = await createLivreur({ nom: nom.trim(), telephone });
+    const livreur = await createLivreur({ nom: nom.trim(), telephone, numero_plaque: numero_plaque?.trim() || undefined });
     return NextResponse.json({ ok: true, livreur });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });

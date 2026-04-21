@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { listFactures, createVenteWithStock, getVentesStats } from "@/lib/admin-db";
+import { emitAdminEvent } from "@/lib/admin-events";
 
 export async function GET(req: NextRequest) {
   const session = await getAdminSession();
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
     if (!body.client_nom || !body.items?.length)
       return NextResponse.json({ error: "client_nom et items sont requis." }, { status: 400 });
     const id = await createVenteWithStock({ ...body, admin_id: session.id });
+    emitAdminEvent("vente");
     return NextResponse.json({ ok: true, id });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });

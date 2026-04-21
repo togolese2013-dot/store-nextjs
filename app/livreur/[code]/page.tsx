@@ -28,6 +28,7 @@ export default function LivreurPage() {
   const [error,   setError]         = useState("");
   const [flash,   setFlash]         = useState("");
   const [accepting, setAccepting]   = useState<number | null>(null);
+  const [montants,  setMontants]    = useState<Record<number, string>>({});
 
   function showFlash(msg: string) { setFlash(msg); setTimeout(() => setFlash(""), 3000); }
 
@@ -54,9 +55,10 @@ export default function LivreurPage() {
 
   async function accepter(livraisonId: number) {
     setAccepting(livraisonId);
+    const montant = montants[livraisonId] ? Number(montants[livraisonId]) : undefined;
     const res  = await fetch(`/api/livreur/${code}/accepter`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ livraison_id: livraisonId }),
+      body: JSON.stringify({ livraison_id: livraisonId, montant_livraison: montant }),
     });
     const data = await res.json();
     if (res.ok) {
@@ -181,17 +183,29 @@ export default function LivreurPage() {
                     <Clock className="w-3.5 h-3.5" />{formatDate(liv.created_at)}
                   </div>
 
-                  <button
-                    onClick={() => accepter(liv.id)}
-                    disabled={accepting === liv.id}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-60 transition-all"
-                  >
-                    {accepting === liv.id
-                      ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : <Check className="w-4 h-4" />
-                    }
-                    Accepter cette course
-                  </button>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-slate-500">Montant de livraison (FCFA)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={montants[liv.id] ?? ""}
+                      onChange={e => setMontants(m => ({ ...m, [liv.id]: e.target.value }))}
+                      placeholder="Ex : 1500"
+                      className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-indigo-400 outline-none"
+                      style={{ fontSize: "16px" }}
+                    />
+                    <button
+                      onClick={() => accepter(liv.id)}
+                      disabled={accepting === liv.id}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-60 transition-all"
+                    >
+                      {accepting === liv.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Check className="w-4 h-4" />
+                      }
+                      Accepter cette course
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

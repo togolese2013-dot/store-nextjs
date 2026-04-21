@@ -5,6 +5,7 @@ import {
   getFinanceStats,
   createFinanceEntry,
 } from "@/lib/admin-db";
+import { emitAdminEvent } from "@/lib/admin-events";
 
 export async function GET(req: NextRequest) {
   const session = await getAdminSession();
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "type, montant et date_entree sont requis." }, { status: 400 });
     }
     const id = await createFinanceEntry({ type, mode_paiement, categorie, description, montant: Number(montant), date_entree });
+    emitAdminEvent("finance");
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Erreur" }, { status: 500 });

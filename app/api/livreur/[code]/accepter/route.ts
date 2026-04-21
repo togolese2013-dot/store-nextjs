@@ -8,10 +8,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   if (livreur.statut === "indisponible")
     return NextResponse.json({ error: "Vous êtes marqué indisponible." }, { status: 403 });
 
-  const { livraison_id } = await req.json();
+  const { livraison_id, montant_livraison } = await req.json();
   if (!livraison_id) return NextResponse.json({ error: "livraison_id requis." }, { status: 400 });
 
-  const accepted = await accepterLivraison(Number(livraison_id), livreur.id);
+  const accepted = await accepterLivraison(Number(livraison_id), livreur.id, montant_livraison ? Number(montant_livraison) : undefined);
   if (!accepted) return NextResponse.json({ error: "Cette livraison a déjà été prise." }, { status: 409 });
   return NextResponse.json({ ok: true });
 }

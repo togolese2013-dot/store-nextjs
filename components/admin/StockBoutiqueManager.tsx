@@ -33,8 +33,20 @@ const MOTIFS = [
 
 const LIMIT = 50;
 
+type MainTab    = "stock" | "entrees";
 type FilterTab  = "all" | "faible" | "epuise";
 type ModalMode  = "retrait" | "entree" | null;
+
+interface EntreeItem {
+  id:           number;
+  produit_id:   number;
+  nom_produit:  string;
+  reference:    string;
+  quantite:     number;
+  motif:        string | null;
+  ref_commande: string | null;
+  created_at:   string;
+}
 
 /* ─── Component ─── */
 export default function StockBoutiqueManager({
@@ -49,11 +61,21 @@ export default function StockBoutiqueManager({
   const [total,     setTotal]     = useState(initialTotal);
   const [movements, setMovements] = useState<BoutiqueMouvement[]>(initialMovements);
 
-  /* ── Filtres ── */
+  /* ── Onglet principal ── */
+  const [mainTab,    setMainTab]    = useState<MainTab>("stock");
+
+  /* ── Filtres stock ── */
   const [search,     setSearch]     = useState("");
   const [filterTab,  setFilterTab]  = useState<FilterTab>("all");
   const [offset,     setOffset]     = useState(0);
   const [loading,    setLoading]    = useState(false);
+
+  /* ── Entrées boutique ── */
+  const [entrees,        setEntrees]        = useState<EntreeItem[]>([]);
+  const [entreesTotal,   setEntreesTotal]   = useState(0);
+  const [entreesOffset,  setEntreesOffset]  = useState(0);
+  const [entreesSearch,  setEntreesSearch]  = useState("");
+  const [entreesLoading, setEntreesLoading] = useState(false);
 
   /* ── Modal mouvement ── */
   const [modalMode,       setModalMode]       = useState<ModalMode>(null);
@@ -105,6 +127,24 @@ export default function StockBoutiqueManager({
   function paginate(newOffset: number) {
     setOffset(newOffset);
     fetchData({ q: search, filter: filterTab, off: newOffset });
+  }
+
+  /* ── Fetch entrées boutique ── */
+  const fetchEntrees = useCallback(async (q = "", off = 0) => {
+    setEntreesLoading(true);
+    const params = new URLSearchParams();
+    if (q)   params.set("q",      q);
+    if (off) params.set("offset", String(off));
+    params.set("limit", "50");
+    const res  = await fetch(`/api/admin/stock-boutique/entrees?${params}`);
+    const data = await res.json();
+    if (res.ok) { setEntrees(data.items); setEntreesTotal(data.total); }
+    setEntreesLoading(false);
+  }, []);
+
+  function switchMainTab(tab: MainTab) {
+    setMainTab(tab);
+    if (tab === "entrees" && entrees.length === 0) fetchEntrees();
   }
 
   /* ── Modal open ── */
@@ -248,23 +288,116 @@ export default function StockBoutiqueManager({
       </div>
 
       {/* ══════════════════════════════════════
-          FILTRES
+          ONGLETS PRINCIPAUX
       ══════════════════════════════════════ */}
       <TabBar
         tabs={[
-          { key: "all",    label: "Tous" },
-          { key: "faible", label: "Stock faible", count: stats.stock_faible },
-          { key: "epuise", label: "Épuisés",      count: stats.epuises },
+          { key: "stock",   label: "Stock boutique" },
+          { key: "entrees", label: "Entrée boutique", count: entreesTotal || undefined },
         ]}
-        active={filterTab}
-        onChange={k => applyFilter(k as FilterTab)}
+        active={mainTab}
+        onChange={k => switchMainTab(k as MainTab)}
         accent="amber"
       />
 
+      {/* ── Sous-filtres stock ── */}
+      {mainTab === "stock" && (
+        <TabBar
+          tabs={[
+            { key: "all",    label: "Tous" },
+            { key: "faible", label: "Stock faible", count: stats.stock_faible },
+            { key: "epuise", label: "Épuisés",      count: stats.epuises },
+          ]}
+          active={filterTab}
+          onChange={k => applyFilter(k as FilterTab)}
+          accent="amber"
+        />
+      )}
+
       {/* ══════════════════════════════════════
-          TABLE PRODUITS
+          TABLE ENTRÉES BOUTIQUE
       ══════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      {mainTab === "entrees" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+            <input
+              type="text"
+              value={entreesSearch}
+              onChange={e => { setEntreesSearch(e.target.value); fetchEntrees(e.target.value, 0); setEntreesOffset(0); }}
+              placeholder="Rechercher un produit…"
+              className="px-3 py-2 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:border-amber-400 outline-none w-64"
+            />
+            <button onClick={() => fetchEntrees(entreesSearch, entreesOffset)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
+              <Loader2 className={`w-4 h-4 ${entreesLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+          {entreesLoading ? (
+            <div className="py-16 flex flex-col items-center gap-3 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <p className="text-sm font-semibold">Chargement…</p>
+            </div>
+          ) : entrees.length === 0 ? (
+            <div className="py-16 flex flex-col items-center gap-3 text-slate-400">
+              <ArrowUpRight className="w-10 h-10 opacity-20" />
+              <p className="font-semibold text-sm">Aucune entrée boutique</p>
+              <p className="text-xs">Les sorties du stock magasin vers la boutique apparaîtront ici</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Produit</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden sm:table-cell">Référence</th>
+                    <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Qté entrée</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden md:table-cell">Motif</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden sm:table-cell">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {entrees.map(e => (
+                    <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-slate-800">{e.nom_produit}</p>
+                      </td>
+                      <td className="px-5 py-4 hidden sm:table-cell">
+                        <span className="font-mono text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">{e.reference}</span>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <span className="text-lg font-display font-800 text-emerald-600">+{e.quantite}</span>
+                      </td>
+                      <td className="px-5 py-4 text-slate-500 text-xs hidden md:table-cell">{e.motif ?? "—"}</td>
+                      <td className="px-5 py-4 text-slate-500 text-xs hidden sm:table-cell">
+                        {new Date(e.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {entreesTotal > 50 && (
+                <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100">
+                  <p className="text-sm text-slate-500">{entreesTotal} entrées</p>
+                  <div className="flex gap-2">
+                    <button disabled={entreesOffset === 0} onClick={() => { const o = entreesOffset - 50; setEntreesOffset(o); fetchEntrees(entreesSearch, o); }}
+                      className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-all">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button disabled={entreesOffset + 50 >= entreesTotal} onClick={() => { const o = entreesOffset + 50; setEntreesOffset(o); fetchEntrees(entreesSearch, o); }}
+                      className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-all">
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════
+          TABLE PRODUITS (stock)
+      ══════════════════════════════════════ */}
+      {mainTab === "stock" && <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -287,7 +420,6 @@ export default function StockBoutiqueManager({
                     <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600">Stock (u.)</th>
                     <th className="text-center px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden lg:table-cell">Statut</th>
                     <th className="text-right px-5 py-3.5 font-semibold text-xs uppercase tracking-wider text-slate-600 hidden md:table-cell">Valeur</th>
-                    <th className="px-5 py-3.5 w-24" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -331,7 +463,6 @@ export default function StockBoutiqueManager({
                           <span className={`text-lg font-display font-800 ${stockColor(item)}`}>
                             {item.quantite}
                           </span>
-                          <span className="text-xs text-slate-400 ml-1">u.</span>
                         </td>
 
                         {/* Statut badge */}
@@ -344,25 +475,6 @@ export default function StockBoutiqueManager({
                           {formatPrice(item.valeur)}
                         </td>
 
-                        {/* Actions */}
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => openModal("entree", item)}
-                              className="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors"
-                              title="Ajouter du stock"
-                            >
-                              <ArrowUpRight className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openModal("retrait", item)}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                              title="Retrait / retour client"
-                            >
-                              <ArrowDownLeft className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
                       </tr>
                     );
                   })}
@@ -396,12 +508,12 @@ export default function StockBoutiqueManager({
             )}
           </>
         )}
-      </div>
+      </div>}
 
       {/* ══════════════════════════════════════
           JOURNAL DES MOUVEMENTS RÉCENTS
       ══════════════════════════════════════ */}
-      {movements.length > 0 && (
+      {mainTab === "stock" && movements.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <h2 className="font-bold text-slate-800 text-sm">Mouvements récents</h2>

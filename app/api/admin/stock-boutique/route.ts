@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
   try {
     const sp     = req.nextUrl.searchParams;
     const q      = sp.get("q") || undefined;
-    const filter = (sp.get("filter") || "all") as "all" | "faible" | "epuise";
-    const limit  = Math.min(100, Math.max(1, Number(sp.get("limit")) || 50));
+    const filter = (sp.get("filter") || "all") as "all" | "faible" | "epuise" | "disponible";
+    const limit  = Math.min(500, Math.max(1, Number(sp.get("limit")) || 50));
     const offset = Math.max(0, Number(sp.get("offset")) || 0);
 
     const [stats, { items, total }, movements] = await Promise.all([
