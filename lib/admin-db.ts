@@ -1229,6 +1229,15 @@ export async function createFacture(data: {
      JSON.stringify(data.items), data.sous_total, data.remise ?? 0, data.total,
      data.statut ?? "brouillon", data.note ?? null, data.admin_id ?? null]
   );
+  // Sync to boutique_clients if client has a name and phone
+  if (data.client_nom?.trim() && data.client_tel?.trim()) {
+    await db.execute(
+      `INSERT INTO boutique_clients (nom, telephone, email, type_client)
+       SELECT ?, ?, ?, 'particulier' FROM DUAL
+       WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
+      [data.client_nom.trim(), data.client_tel.trim(), data.client_email ?? null, data.client_tel.trim()]
+    ).catch(() => {});
+  }
   return result.insertId;
 }
 
@@ -1323,6 +1332,17 @@ export async function createVenteWithStock(data: {
     }
 
     await conn.commit();
+
+    // Sync client to boutique_clients after successful sale
+    if (data.client_nom?.trim() && data.client_tel?.trim()) {
+      await db.execute(
+        `INSERT INTO boutique_clients (nom, telephone, type_client)
+         SELECT ?, ?, 'particulier' FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
+        [data.client_nom.trim(), data.client_tel.trim(), data.client_tel.trim()]
+      ).catch(() => {});
+    }
+
     return factureId;
   } catch (err) {
     await conn.rollback();

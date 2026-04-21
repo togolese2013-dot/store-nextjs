@@ -1,5 +1,4 @@
 import { getCRMStats } from "@/lib/admin-db";
-import ClientsTable from "@/components/admin/ClientsTable";
 import PageHeader from "@/components/admin/PageHeader";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
@@ -84,11 +83,6 @@ export default async function CRMPage() {
         </div>
       )}
 
-      {/* Full client list */}
-      <div>
-        <h2 className="font-bold text-slate-800 mb-3">Tous les clients</h2>
-        <ClientsTable />
-      </div>
     </div>
   );
 }
