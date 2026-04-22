@@ -72,14 +72,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   const defaultMovCounts = { total: 0, entrees: 0, sorties: 0, ajustements: 0 };
 
   const [categoriesRes, marquesRes, statsRes] = await Promise.all([
-    apiGet<{ categories: Category[] }>("/api/admin/categories").catch(() => ({ categories: [] })),
-    apiGet<{ marques: AdminMarque[] }>("/api/admin/marques").catch(() => ({ marques: [] })),
+    apiGet<{ data: Category[] }>("/api/admin/categories").catch(() => ({ data: [] })),
+    apiGet<{ data: AdminMarque[] }>("/api/admin/marques").catch(() => ({ data: [] })),
     apiGet<{ stockStats: typeof defaultStats; statusCounts: typeof defaultStatus }>("/api/admin/products/stats")
       .catch(() => ({ stockStats: defaultStats, statusCounts: defaultStatus })),
   ]);
 
-  const categories   = categoriesRes.categories;
-  const marques      = marquesRes.marques;
+  const categories   = categoriesRes.data ?? [];
+  const marques      = marquesRes.data ?? [];
   const stats        = statsRes.stockStats;
   const statusCounts = statsRes.statusCounts;
 
