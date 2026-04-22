@@ -1,0 +1,75 @@
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+
+import adminAuthRoutes      from "./routes/admin/auth";
+import adminProductsRoutes  from "./routes/admin/products";
+import adminStockRoutes     from "./routes/admin/stock";
+import adminStockBoutiqueRoutes from "./routes/admin/stock-boutique";
+import adminVentesRoutes    from "./routes/admin/ventes";
+import adminLivraisonsRoutes from "./routes/admin/livraisons";
+import adminFinanceRoutes   from "./routes/admin/finance";
+import adminClientsRoutes   from "./routes/admin/clients";
+import adminOrdersRoutes    from "./routes/admin/orders";
+import adminUploadRoutes    from "./routes/admin/upload";
+import adminSettingsRoutes  from "./routes/admin/settings";
+import adminFournisseursRoutes from "./routes/admin/fournisseurs";
+import adminCategoriesRoutes   from "./routes/admin/categories";
+import adminBoutiqueClientsRoutes from "./routes/admin/boutique-clients";
+import adminNewsletterRoutes from "./routes/admin/newsletter";
+import adminSchemaRoutes    from "./routes/admin/schema";
+import adminEventsRoutes    from "./routes/admin/events";
+import adminUsersRoutes     from "./routes/admin/users";
+import livreurRoutes        from "./routes/livreur";
+import publicRoutes         from "./routes/public";
+
+const app  = express();
+const PORT = Number(process.env.PORT) || 4000;
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:3000",
+].filter(Boolean) as string[];
+
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+      cb(null, true);
+    } else {
+      cb(new Error(`CORS: origine non autorisée — ${origin}`));
+    }
+  },
+  credentials: true,
+}));
+
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(cookieParser());
+
+// ── Routes ──────────────────────────────────────────────────────────────────
+app.use(adminAuthRoutes);
+app.use(adminProductsRoutes);
+app.use(adminStockRoutes);
+app.use(adminStockBoutiqueRoutes);
+app.use(adminVentesRoutes);
+app.use(adminLivraisonsRoutes);
+app.use(adminFinanceRoutes);
+app.use(adminClientsRoutes);
+app.use(adminOrdersRoutes);
+app.use(adminUploadRoutes);
+app.use(adminSettingsRoutes);
+app.use(adminFournisseursRoutes);
+app.use(adminCategoriesRoutes);
+app.use(adminBoutiqueClientsRoutes);
+app.use(adminNewsletterRoutes);
+app.use(adminSchemaRoutes);
+app.use(adminEventsRoutes);
+app.use(adminUsersRoutes);
+app.use(livreurRoutes);
+app.use(publicRoutes);
+
+app.listen(PORT, () => {
+  console.log(`[backend] Serveur démarré sur le port ${PORT}`);
+});
+
+export default app;

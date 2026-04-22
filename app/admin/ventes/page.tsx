@@ -1,30 +1,29 @@
-import { listFactures, listLivraisons, getVentesStats } from "@/lib/admin-db";
+import { apiGet } from "@/lib/api";
 import VentesManager from "@/components/admin/VentesManager";
 
 export const metadata = { title: "Ventes" };
+export const dynamic  = "force-dynamic";
 
 export default async function VentesPage() {
-  let factures:   Awaited<ReturnType<typeof listFactures>>["items"]   = [];
-  let livraisons: Awaited<ReturnType<typeof listLivraisons>>["items"] = [];
-  let stats      = { factures: 0, livraisons: 0, ca_total: 0, factures_payees: 0 };
-  let totals     = { factures: 0, livraisons: 0 };
-  let migrationNeeded = false;
-
   try {
-    const [f, l, s] = await Promise.all([
-      listFactures({ limit: 50 }),
-      listLivraisons({ limit: 50 }),
-      getVentesStats(),
+    const [facturesRes, livraisonsRes, stats] = await Promise.all([
+      apiGet<{ items: unknown[]; total: number }>("/api/admin/ventes/factures?limit=50"),
+      apiGet<{ items: unknown[]; total: number }>("/api/admin/ventes/livraisons?limit=50"),
+      apiGet<{ factures: number; livraisons: number; ca_total: number; factures_payees: number }>(
+        "/api/admin/ventes/factures"
+      ).then(r => (r as { stats: { factures: number; livraisons: number; ca_total: number; factures_payees: number } }).stats),
     ]);
-    factures   = f.items;
-    livraisons = l.items;
-    stats      = s;
-    totals     = { factures: f.total, livraisons: l.total };
-  } catch {
-    migrationNeeded = true;
-  }
 
-  if (migrationNeeded) {
+    return (
+      <VentesManager
+        initialFactures={facturesRes.items as Parameters<typeof VentesManager>[0]["initialFactures"]}
+        initialLivraisons={livraisonsRes.items as Parameters<typeof VentesManager>[0]["initialLivraisons"]}
+        initialStats={stats}
+        totalFactures={facturesRes.total}
+        totalLivraisons={livraisonsRes.total}
+      />
+    );
+  } catch {
     return (
       <div className="space-y-6 max-w-2xl">
         <div>
@@ -41,14 +40,4 @@ export default async function VentesPage() {
       </div>
     );
   }
-
-  return (
-    <VentesManager
-      initialFactures={factures}
-      initialLivraisons={livraisons}
-      initialStats={stats}
-      totalFactures={totals.factures}
-      totalLivraisons={totals.livraisons}
-    />
-  );
 }

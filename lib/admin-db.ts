@@ -1,4 +1,3 @@
-import "server-only";
 import { db } from "./db";
 import type mysql from "mysql2/promise";
 

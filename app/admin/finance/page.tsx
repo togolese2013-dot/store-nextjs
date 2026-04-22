@@ -1,15 +1,16 @@
-import { getAdminSession } from "@/lib/auth";
-import { listFinanceEntries, getFinanceStats } from "@/lib/admin-db";
+import { apiGet } from "@/lib/api";
 import FinanceManager from "@/components/admin/FinanceManager";
 
 export const metadata = { title: "Finance" };
+export const dynamic  = "force-dynamic";
 
 export default async function FinancePage() {
   try {
-    const [{ items, total }, stats] = await Promise.all([
-      listFinanceEntries({ limit: 200 }),
-      getFinanceStats(),
-    ]);
+    const { items, total, stats } = await apiGet<{
+      items: Parameters<typeof FinanceManager>[0]["initialItems"];
+      total: number;
+      stats: Parameters<typeof FinanceManager>[0]["initialStats"];
+    }>("/api/admin/finance?limit=200");
 
     return (
       <FinanceManager

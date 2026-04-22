@@ -1,4 +1,3 @@
-import "server-only";
 import mysql from "mysql2/promise";
 export type { Product, Category } from "./utils";
 export { finalPrice, formatPrice } from "./utils";
@@ -19,10 +18,9 @@ function createPool() {
     return mysql.createPool({
       uri:                url,
       waitForConnections: true,
-      connectionLimit:    10,
+      connectionLimit:    3,
       charset:            "utf8mb4",
       timezone:           "+00:00",
-      // Railway MySQL proxy requires SSL in production
       ssl: isProduction ? { rejectUnauthorized: false } : undefined,
     });
   }
@@ -33,7 +31,7 @@ function createPool() {
     password:           process.env.DB_PASSWORD || "",
     database:           process.env.DB_NAME     || "togol2600657",
     waitForConnections: true,
-    connectionLimit:    10,
+    connectionLimit:    3,
     charset:            "utf8mb4",
     timezone:           "+00:00",
   });

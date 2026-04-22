@@ -1,5 +1,7 @@
 import { Suspense } from "react";
-import { getProducts, finalPrice, formatPrice } from "@/lib/db";
+import { finalPrice, formatPrice } from "@/lib/utils";
+import { apiGet } from "@/lib/api";
+import type { Product } from "@/lib/utils";
 import ProductCard from "@/components/ProductCard";
 import HeroSection from "@/components/HeroSection";
 import Newsletter from "@/components/Newsletter";
@@ -94,7 +96,7 @@ function Section({
 }
 
 /* ─── Products grid — server component, no event handlers ─── */
-function ProductGrid({ products }: { products: Awaited<ReturnType<typeof getProducts>> }) {
+function ProductGrid({ products }: { products: Product[] }) {
   if (!products.length) {
     return (
       <div className="py-16 text-center text-slate-400">
@@ -209,19 +211,18 @@ function Testimonials() {
 /* ─── PAGE ─── */
 export default async function HomePage() {
   // Server-side data fetching — wrapped to prevent crash if DB is unreachable
-  let bestsellers: Awaited<ReturnType<typeof getProducts>> = [];
-  let promos: Awaited<ReturnType<typeof getProducts>> = [];
-  let newItems: Awaited<ReturnType<typeof getProducts>> = [];
+  let bestsellers: Product[] = [];
+  let promos:      Product[] = [];
+  let newItems:    Product[] = [];
 
   try {
     [bestsellers, promos, newItems] = await Promise.all([
-      getProducts({ limit: 8 }),
-      getProducts({ promoOnly: true, limit: 8 }),
-      getProducts({ newOnly: true, limit: 8 }),
+      apiGet<{ data: Product[] }>("/api/products?limit=8").then(r => r.data),
+      apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
+      apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
     ]);
   } catch (err) {
-    console.error("[HomePage] DB fetch failed:", err);
-    // Page renders with empty data rather than crashing
+    console.error("[HomePage] API fetch failed:", err);
   }
 
   return (

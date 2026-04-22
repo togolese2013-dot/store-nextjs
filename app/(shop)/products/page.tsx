@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getProducts, getProductCount, getCategories } from "@/lib/db";
+import { apiGet } from "@/lib/api";
+import type { Product, Category } from "@/lib/utils";
 import ProductCard from "@/components/ProductCard";
 import CatalogueFilters from "@/components/CatalogueFilters";
 import Link from "next/link";
@@ -44,11 +45,23 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const page      = Math.max(1, Number(params.page) || 1);
   const offset    = (page - 1) * PER_PAGE;
 
-  const [categories, products, total] = await Promise.all([
-    getCategories(),
-    getProducts({ categoryId: catId, search: q, promoOnly, newOnly, limit: PER_PAGE, offset }),
-    getProductCount({ categoryId: catId, search: q, promoOnly, newOnly }),
+  const qs = new URLSearchParams();
+  if (catId)    qs.set("category", String(catId));
+  if (q)        qs.set("q", q);
+  if (promoOnly) qs.set("promo", "true");
+  if (newOnly)   qs.set("new", "true");
+  qs.set("limit", String(PER_PAGE));
+  qs.set("offset", String(offset));
+
+  const [categoriesRes, productsRes] = await Promise.all([
+    apiGet<{ data: Category[] }>("/api/categories", { noAuth: true }),
+    apiGet<{ data: Product[]; total?: number }>(`/api/admin/products?${qs.toString()}`).catch(() =>
+      apiGet<{ data: Product[]; total?: number }>(`/api/products?${qs.toString()}`)
+    ),
   ]);
+  const categories = categoriesRes.data;
+  const products   = productsRes.data ?? [];
+  const total      = (productsRes as { total?: number }).total ?? products.length;
 
   const totalPages = Math.ceil(total / PER_PAGE);
   const activeCat  = categories.find(c => c.id === catId);

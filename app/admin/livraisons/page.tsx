@@ -1,4 +1,4 @@
-import { listLivraisonsAdmin, listLivreurs, getLivraisonsStats } from "@/lib/admin-db";
+import { apiGet } from "@/lib/api";
 import type { LivraisonAdmin, Livreur } from "@/lib/admin-db";
 import LivraisonsManager from "@/components/admin/LivraisonsManager";
 
@@ -12,15 +12,14 @@ export default async function LivraisonsPage() {
   let errMsg    = "";
 
   try {
-    const [res, liv, st] = await Promise.all([
-      listLivraisonsAdmin({ limit: 50 }),
-      listLivreurs(),
-      getLivraisonsStats(),
+    const [livRes, livrRes] = await Promise.all([
+      apiGet<{ items: LivraisonAdmin[]; total: number; stats: typeof livStats }>("/api/admin/livraisons?limit=50"),
+      apiGet<{ items: Livreur[] }>("/api/admin/livreurs"),
     ]);
-    items    = res.items;
-    total    = res.total;
-    livreurs = liv;
-    livStats = st;
+    items    = livRes.items;
+    total    = livRes.total;
+    livreurs = livrRes.items;
+    livStats = livRes.stats;
   } catch (err) {
     errMsg = err instanceof Error ? err.message : String(err);
     console.error("[LivraisonsPage]", err);

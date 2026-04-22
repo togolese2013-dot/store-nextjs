@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProductBySlug, getProducts, getProductVariants, finalPrice, formatPrice } from "@/lib/db";
+import { finalPrice, formatPrice } from "@/lib/utils";
+import type { Product } from "@/lib/utils";
+import { apiGet } from "@/lib/api";
 import { getRelatedProductsWithDetails } from "@/lib/related-products";
 import ProductCard from "@/components/ProductCard";
 import AddToCartButton from "@/components/AddToCartButton";
@@ -17,9 +19,18 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+async function fetchProductBySlug(slug: string): Promise<Product | null> {
+  try {
+    const res = await apiGet<{ data: Product[] }>(`/api/products?q=${encodeURIComponent(slug)}&limit=1`, { noAuth: true });
+    return res.data?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product  = await getProductBySlug(slug);
+  const product  = await fetchProductBySlug(slug);
   if (!product) return { title: "Produit introuvable" };
 
   const price = finalPrice(product);
@@ -36,7 +47,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ProductPage({ params }: PageProps) {
   const { slug } = await params;
-  const product  = await getProductBySlug(slug);
+  const product  = await fetchProductBySlug(slug);
 
   if (!product) notFound();
 
@@ -77,14 +88,16 @@ export default async function ProductPage({ params }: PageProps) {
     : null;
 
   /* Variants */
-  const variants = await getProductVariants(product.id);
+  const variants = await apiGet<{ variants: { id: number; nom: string; options: Record<string, string>; prix: number; stock: number; reference_sku: string | null }[] }>(
+    `/api/admin/products/${product.id}/variants`
+  ).then(r => r.variants).catch(() => []);
   const hasVariants = variants.length > 0;
 
   /* Related products (same category, excluding this one) */
-  const related = product.categorie_id
-    ? (await getProducts({ categoryId: product.categorie_id, limit: 5 }))
-        .filter(p => p.id !== product.id)
-        .slice(0, 4)
+  const related: Product[] = product.categorie_id
+    ? await apiGet<{ data: Product[] }>(`/api/products?category=${product.categorie_id}&limit=5`, { noAuth: true })
+        .then(r => r.data.filter(p => p.id !== product!.id).slice(0, 4))
+        .catch(() => [])
     : [];
 
   /* Recommended products (manually linked) */
