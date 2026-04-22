@@ -11,10 +11,11 @@ interface PageProps { params: Promise<{ id: string }> }
 
 export default async function EditProductPage({ params }: PageProps) {
   const { id } = await params;
-  const [{ categories }, productRes] = await Promise.all([
-    apiGet<{ categories: Category[] }>("/api/admin/categories").catch(() => ({ categories: [] })),
+  const [categoriesRes, productRes] = await Promise.all([
+    apiGet<{ data: Category[] }>("/api/admin/categories").catch(() => ({ data: [] })),
     apiGet<{ product: Record<string, unknown> }>(`/api/admin/products/${id}`).catch(() => null),
   ]);
+  const categories = categoriesRes.data ?? [];
 
   if (!productRes?.product) notFound();
   const product = productRes.product;

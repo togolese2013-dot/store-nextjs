@@ -112,6 +112,16 @@ export default function ProductForm({ categories, initial }: Props) {
     });
   }
 
+  // ── Base64 helper ──────────────────────────────────────────────────────────
+  function toBase64(file: File): Promise<{ data: string; type: string }> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload  = () => resolve({ data: r.result as string, type: file.type });
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
   // ── Gallery upload ─────────────────────────────────────────────────────────
   async function handleUploadImages(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -119,9 +129,12 @@ export default function ProductForm({ categories, initial }: Props) {
     setUploading(true);
     try {
       const compressed = await Promise.all(Array.from(files).map(f => compressImage(f)));
-      const fd = new FormData();
-      compressed.forEach(f => fd.append("files", f));
-      const res  = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const b64Files   = await Promise.all(compressed.map(toBase64));
+      const res  = await fetch("/api/admin/upload", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ files: b64Files }),
+      });
       const data = await res.json();
       if (res.ok && data.urls) {
         const newImages = [...form.images, ...data.urls];
@@ -141,10 +154,13 @@ export default function ProductForm({ categories, initial }: Props) {
 
   async function uploadVariantImage(key: string, file: File) {
     updateVariant(key, { uploading: true });
-    const fd = new FormData();
-    fd.append("files", file);
     try {
-      const res  = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const b64 = await toBase64(file);
+      const res  = await fetch("/api/admin/upload", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ files: [b64] }),
+      });
       const data = await res.json();
       if (res.ok && data.urls?.[0]) updateVariant(key, { imageUrl: data.urls[0], uploading: false });
       else updateVariant(key, { uploading: false });
