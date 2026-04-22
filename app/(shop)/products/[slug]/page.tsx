@@ -8,12 +8,12 @@ import ProductCard from "@/components/ProductCard";
 import AddToCartButton from "@/components/AddToCartButton";
 import ProductVariantSelector, { type Variant } from "@/components/ProductVariantSelector";
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
-import Image from "next/image";
 import Link from "next/link";
 import {
-  Tag, Zap, ShieldCheck, Truck, ChevronRight,
-  Sparkles,
+  Zap, ShieldCheck, Truck, ChevronRight,
+  Sparkles, Star, CreditCard,
 } from "lucide-react";
+import type { Review } from "@/lib/admin-db";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -107,6 +107,14 @@ export default async function ProductPage({ params }: PageProps) {
 
   /* Recommended products (manually linked) */
   const recommended = await getRelatedProductsWithDetails(product.id);
+
+  /* Reviews */
+  const reviews: Review[] = await apiGet<{ reviews: Review[] }>(
+    `/api/reviews?produit_id=${product.id}`, { noAuth: true }
+  ).then(r => r.reviews.filter(rv => rv.approved)).catch(() => []);
+  const avgRating = reviews.length
+    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+    : 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -209,13 +217,13 @@ export default async function ProductPage({ params }: PageProps) {
               ) : (
                 <>
                   {/* Price */}
-                  <div className="flex items-end gap-3 mb-6">
-                    <span className="font-display text-4xl font-800 text-slate-900">
+                  <div className="flex items-end gap-3 mb-1">
+                    <span className="font-display text-3xl font-800 text-slate-900">
                       {formatPrice(price)}
                     </span>
                     {isPromo && (
                       <div className="flex flex-col">
-                        <span className="text-lg text-slate-400 line-through mb-0.5">
+                        <span className="text-base text-slate-400 line-through mb-0.5">
                           {formatPrice(product.prix_unitaire)}
                         </span>
                         <span className="text-xs font-bold text-accent-500 bg-accent-50 px-2 py-0.5 rounded-full">
@@ -224,6 +232,7 @@ export default async function ProductPage({ params }: PageProps) {
                       </div>
                     )}
                   </div>
+                  <p className="text-xs text-slate-400 mb-6">Taxes incluses. Livraison calculée lors du paiement.</p>
 
                   {/* Stock badge */}
                   <div className="mb-6">
@@ -246,8 +255,17 @@ export default async function ProductPage({ params }: PageProps) {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col sm:flex-row gap-3 mt-auto">
+                  <div className="flex flex-col gap-3 mt-auto">
                     <AddToCartButton product={product} />
+                    {!outOf && (
+                      <a
+                        href={`/checkout?product=${product.id}`}
+                        className="flex items-center justify-center gap-2 w-full px-6 py-3.5 rounded-2xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-700 transition-colors"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Payer maintenant
+                      </a>
+                    )}
                   </div>
                 </>
               )}
@@ -279,6 +297,42 @@ export default async function ProductPage({ params }: PageProps) {
             <h2 className="font-display text-xl font-800 text-slate-900 mb-4">Description du produit</h2>
             <div className="prose prose-sm prose-slate max-w-none text-slate-600 leading-relaxed whitespace-pre-line">
               {product.description}
+            </div>
+          </div>
+        )}
+
+        {/* ── Avis clients ── */}
+        {reviews.length > 0 && (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8 lg:p-10 mb-10">
+            <div className="flex items-center gap-3 mb-6">
+              <h2 className="font-display text-xl font-800 text-slate-900">Avis clients</h2>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <div className="flex">
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} className={`w-4 h-4 ${s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-slate-200 fill-slate-200"}`} />
+                  ))}
+                </div>
+                <span className="text-sm font-semibold text-slate-700">{avgRating.toFixed(1)}</span>
+                <span className="text-sm text-slate-400">({reviews.length} avis)</span>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {reviews.map(rv => (
+                <div key={rv.id} className="border border-slate-100 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm text-slate-800">{rv.nom}</span>
+                    <div className="flex gap-0.5">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} className={`w-3.5 h-3.5 ${s <= rv.rating ? "fill-amber-400 text-amber-400" : "text-slate-200 fill-slate-200"}`} />
+                      ))}
+                    </div>
+                  </div>
+                  {rv.comment && <p className="text-sm text-slate-600 leading-relaxed">{rv.comment}</p>}
+                  <p className="text-xs text-slate-400 mt-2">
+                    {new Date(rv.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -718,14 +718,34 @@ export interface Review {
   created_at: string;
 }
 
-export async function listReviews(approvedOnly = false): Promise<Review[]> {
-  const where = approvedOnly ? "WHERE approved = 1" : "";
+export async function listReviews(
+  filter: { produit_id?: number; approvedOnly?: boolean } | boolean = false
+): Promise<Review[]> {
+  const opts = typeof filter === "boolean"
+    ? { approvedOnly: filter }
+    : filter;
+  const conditions: string[] = [];
+  const params: (number | boolean)[] = [];
+  if (opts.approvedOnly) { conditions.push("r.approved = 1"); }
+  if (opts.produit_id)   { conditions.push("r.product_id = ?"); params.push(opts.produit_id); }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT r.*, p.nom as product_nom FROM reviews r
      LEFT JOIN produits p ON r.product_id = p.id
-     ${where} ORDER BY r.created_at DESC`
+     ${where} ORDER BY r.created_at DESC`,
+    params
   );
   return rows.map(r => ({ ...r, approved: Boolean(r.approved) })) as Review[];
+}
+
+export async function createReview(data: {
+  produit_id: number; nom: string; note: number; commentaire?: string;
+}) {
+  await db.execute(
+    `INSERT INTO reviews (product_id, nom, rating, comment, approved, created_at)
+     VALUES (?, ?, ?, ?, 0, NOW())`,
+    [data.produit_id, data.nom, data.note, data.commentaire ?? ""]
+  );
 }
 
 export async function approveReview(id: number, approved: boolean) {
