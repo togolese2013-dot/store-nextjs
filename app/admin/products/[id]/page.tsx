@@ -1,46 +1,37 @@
 import { notFound } from "next/navigation";
-import { getCategories } from "@/lib/db";
-import { db } from "@/lib/db";
-import type { RowDataPacket } from "mysql2";
+import { apiGet } from "@/lib/api";
+import type { Category } from "@/lib/utils";
 import ProductForm from "@/components/admin/ProductForm";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
 export const metadata = { title: "Modifier un produit" };
 
-async function getProductById(id: number) {
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT p.*, c.nom AS categorie_nom
-     FROM produits p LEFT JOIN categories c ON p.categorie_id = c.id
-     WHERE p.id = ? LIMIT 1`,
-    [id]
-  );
-  return rows[0] ?? null;
-}
-
 interface PageProps { params: Promise<{ id: string }> }
 
 export default async function EditProductPage({ params }: PageProps) {
   const { id } = await params;
-  const [product, categories] = await Promise.all([
-    getProductById(Number(id)),
-    getCategories(),
+  const [{ categories }, productRes] = await Promise.all([
+    apiGet<{ categories: Category[] }>("/api/admin/categories").catch(() => ({ categories: [] })),
+    apiGet<{ product: Record<string, unknown> }>(`/api/admin/products/${id}`).catch(() => null),
   ]);
-  if (!product) notFound();
+
+  if (!productRes?.product) notFound();
+  const product = productRes.product;
 
   const initial = {
     id:             Number(product.id),
-    reference:      product.reference ?? "",
-    nom:            product.nom ?? "",
-    description:    product.description ?? "",
+    reference:      (product.reference as string) ?? "",
+    nom:            (product.nom as string) ?? "",
+    description:    (product.description as string) ?? "",
     categorie_id:   product.categorie_id ? Number(product.categorie_id) : ("" as const),
     prix_unitaire:  Number(product.prix_unitaire),
     stock_magasin:  Number(product.stock_magasin ?? 0),
     remise:         Number(product.remise ?? 0),
     neuf:           Boolean(product.neuf),
     actif:          Boolean(product.actif),
-    image_url:      (product.image_url || product.image) ?? "",
-    images:         (() => { try { return JSON.parse(product.images_json || "[]"); } catch { return []; } })(),
+    image_url:      ((product.image_url || product.image) as string) ?? "",
+    images:         (() => { try { return JSON.parse((product.images_json as string) || "[]"); } catch { return []; } })(),
   };
 
   return (
@@ -53,7 +44,7 @@ export default async function EditProductPage({ params }: PageProps) {
         </Link>
         <div>
           <h1 className="font-display font-800 text-2xl text-slate-900">Modifier le produit</h1>
-          <p className="text-slate-400 text-sm font-mono">{product.reference}</p>
+          <p className="text-slate-400 text-sm font-mono">{product.reference as string}</p>
         </div>
       </div>
       <ProductForm categories={categories} initial={initial} />

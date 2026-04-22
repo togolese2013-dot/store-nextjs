@@ -1,28 +1,47 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
-import { getProducts, getProductCount, getCategories, db } from "@/lib/db";
+import { getProducts, getProductCount, getProductStatusCounts, getCategories, db } from "@/lib/db";
+import { getStockStats } from "@/lib/admin-db";
 import type mysql from "mysql2/promise";
 
 const router = express.Router();
+
+router.get("/api/admin/products/stats", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const [stockStats, statusCounts] = await Promise.all([
+      getStockStats(),
+      getProductStatusCounts(),
+    ]);
+    res.json({ stockStats, statusCounts });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 
 router.get("/api/admin/products", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
-  const q      = (req.query.q as string) || undefined;
-  const catId  = req.query.category ? Number(req.query.category) : undefined;
-  const page   = Math.max(1, Number(req.query.page) || 1);
-  const limit  = 20;
-  const offset = (page - 1) * limit;
+  const q       = (req.query.q as string) || undefined;
+  const catId   = req.query.category ? Number(req.query.category) : undefined;
+  const brandId = req.query.brand    ? Number(req.query.brand)    : undefined;
+  const statut  = (req.query.statut as string) || undefined;
+  const page    = Math.max(1, Number(req.query.page) || 1);
+  const limit   = Math.min(100, Number(req.query.limit) || 20);
+  const offset  = req.query.offset !== undefined ? Number(req.query.offset) : (page - 1) * limit;
+  const statutFilter = ["disponible","faible","epuise"].includes(statut ?? "")
+    ? statut as "disponible" | "faible" | "epuise"
+    : undefined;
 
-  const [products, total, categories] = await Promise.all([
-    getProducts({ search: q, categoryId: catId, limit, offset, includeInactive: true }),
-    getProductCount({ search: q, categoryId: catId, includeInactive: true }),
-    getCategories(),
+  const [products, total] = await Promise.all([
+    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true }),
+    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true }),
   ]);
 
-  res.json({ products, total, categories, page, limit });
+  res.json({ products, total, page, limit });
 });
 
 router.post("/api/admin/products", async (req, res) => {

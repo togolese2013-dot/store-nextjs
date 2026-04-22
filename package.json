@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.4.1",
+    "mysql2": "^3.11.5",
     "clsx": "^2.1.1",
     "framer-motion": "^12.6.3",
     "jose": "^6.2.2",

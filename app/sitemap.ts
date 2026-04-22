@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
-import { getProducts, getCategories } from "@/lib/db";
+import { apiGet } from "@/lib/api";
+import type { Product, Category } from "@/lib/utils";
 
 const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-nextjs-production.up.railway.app";
 
@@ -19,17 +20,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let categoryPages: MetadataRoute.Sitemap = [];
 
   try {
-    const products = await getProducts({ limit: 500 });
-    productPages = products.map(p => ({
+    const { data } = await apiGet<{ data: Product[] }>("/api/products?limit=500", { noAuth: true });
+    productPages = data.map(p => ({
       url:             `${BASE}/products/${p.reference}`,
       lastModified:    new Date(p.date_creation || new Date()),
       changeFrequency: "weekly" as const,
       priority:        0.8,
     }));
-  } catch { /* DB unavailable — skip dynamic pages */ }
+  } catch { /* backend unavailable — skip dynamic pages */ }
 
   try {
-    const categories = await getCategories();
+    const { categories } = await apiGet<{ categories: Category[] }>("/api/categories", { noAuth: true });
     categoryPages = categories.map(c => ({
       url:             `${BASE}/products?category=${c.id}`,
       lastModified:    new Date(),

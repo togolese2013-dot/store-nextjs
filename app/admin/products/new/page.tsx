@@ -1,4 +1,5 @@
-import { getCategories } from "@/lib/db";
+import { apiGet } from "@/lib/api";
+import type { Category } from "@/lib/utils";
 import ProductForm from "@/components/admin/ProductForm";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -6,7 +7,7 @@ import { ChevronLeft } from "lucide-react";
 export const metadata = { title: "Nouveau produit" };
 
 export default async function NewProductPage() {
-  const categories = await getCategories();
+  const { categories } = await apiGet<{ categories: Category[] }>("/api/admin/categories").catch(() => ({ categories: [] }));
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">

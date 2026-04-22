@@ -1,6 +1,6 @@
-import { getProducts, getProductCount, getCategories, getProductStatusCounts } from "@/lib/db";
-import { getStockStats, getStockMovements, getStockMovementCounts, listAdminMarques } from "@/lib/admin-db";
+import { apiGet } from "@/lib/api";
 import { finalPrice, formatPrice } from "@/lib/utils";
+import type { Product, Category } from "@/lib/utils";
 import Link from "next/link";
 import AdminProductActions from "@/components/admin/AdminProductActions";
 import MouvementModal from "@/components/admin/MouvementModal";
@@ -18,11 +18,22 @@ export const metadata = { title: "Tous les produits" };
 type View   = "stock" | "mouvements";
 type Statut = "all" | "disponible" | "faible" | "epuise";
 
+type StockMovement = {
+  id: number;
+  created_at: string;
+  nom_produit: string | null;
+  type: "entree" | "retrait" | "vente" | "sortie" | "ajustement";
+  quantite: number;
+  stock_apres: number;
+  reference: string | null;
+  note: string | null;
+};
+
+type AdminMarque = { id: number; nom: string };
+
 interface PageProps {
   searchParams: Promise<{ q?: string; category?: string; brand?: string; filter?: string; page?: string; view?: string; statut?: string }>;
 }
-
-// ─── Filter buttons ────────────────────────────────────────────────────────────
 
 function buildUrl(base: Record<string, string | undefined>, override: Record<string, string>) {
   const p = new URLSearchParams();
@@ -34,7 +45,6 @@ function buildUrl(base: Record<string, string | undefined>, override: Record<str
 export default async function AdminProductsPage({ searchParams }: PageProps) {
   const sp      = await searchParams;
   const q       = sp.q?.trim() || undefined;
-  // filter param: "cat:N" or "brand:N" from the unified select
   const filterVal = sp.filter || "";
   const catId   = filterVal.startsWith("cat:")   ? Number(filterVal.slice(4))   :
                   sp.category                     ? Number(sp.category)          : undefined;
@@ -57,40 +67,54 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
   const isStockView = view === "stock";
 
-  const [categories, marques, stats, movCounts, statusCounts] = await Promise.all([
-    getCategories().catch(() => []),
-    listAdminMarques().catch(() => []),
-    getStockStats().catch(() => ({ en_stock: 0, en_rupture: 0, stock_faible: 0, valeur_totale: 0, entrees_jour: 0, sorties_jour: 0 })),
-    getStockMovementCounts().catch(() => ({ total: 0, entrees: 0, sorties: 0, ajustements: 0 })),
-    getProductStatusCounts().catch(() => ({ total: 0, disponible: 0, faible: 0, epuise: 0 })),
+  const defaultStats = { en_stock: 0, en_rupture: 0, stock_faible: 0, valeur_totale: 0, entrees_jour: 0, sorties_jour: 0 };
+  const defaultStatus = { total: 0, disponible: 0, faible: 0, epuise: 0 };
+  const defaultMovCounts = { total: 0, entrees: 0, sorties: 0, ajustements: 0 };
+
+  const [categoriesRes, marquesRes, statsRes] = await Promise.all([
+    apiGet<{ categories: Category[] }>("/api/admin/categories").catch(() => ({ categories: [] })),
+    apiGet<{ marques: AdminMarque[] }>("/api/admin/marques").catch(() => ({ marques: [] })),
+    apiGet<{ stockStats: typeof defaultStats; statusCounts: typeof defaultStatus }>("/api/admin/products/stats")
+      .catch(() => ({ stockStats: defaultStats, statusCounts: defaultStatus })),
   ]);
 
-  // Load data based on view
-  let products: Awaited<ReturnType<typeof getProducts>> = [];
+  const categories   = categoriesRes.categories;
+  const marques      = marquesRes.marques;
+  const stats        = statsRes.stockStats;
+  const statusCounts = statsRes.statusCounts;
+
+  let products: Product[] = [];
   let total = 0;
-  let movements: Awaited<ReturnType<typeof getStockMovements>>["items"] = [];
+  let movements: StockMovement[] = [];
   let movTotal = 0;
+  let movCounts = defaultMovCounts;
 
   if (isStockView) {
-    const statutFilter = statut !== "all" ? statut as "disponible" | "faible" | "epuise" : undefined;
-    [products, total] = await Promise.all([
-      getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true }).catch(() => []),
-      getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true }).catch(() => 0),
-    ]);
+    const statutParam = statut !== "all" ? `&statut=${statut}` : "";
+    const catParam    = catId   ? `&category=${catId}`   : "";
+    const brandParam  = brandId ? `&brand=${brandId}`    : "";
+    const qParam      = q       ? `&q=${encodeURIComponent(q)}` : "";
+    const res = await apiGet<{ products: Product[]; total: number }>(
+      `/api/admin/products?limit=${limit}&offset=${offset}${qParam}${catParam}${brandParam}${statutParam}`
+    ).catch(() => ({ products: [], total: 0 }));
+    products = res.products;
+    total    = res.total;
   } else {
-    const res = await getStockMovements({ type: "tous", search: q, limit, offset }).catch(() => ({ items: [], total: 0 }));
-    movements = res.items;
-    movTotal  = res.total;
-    total     = movTotal;
+    const qParam = q ? `&q=${encodeURIComponent(q)}` : "";
+    const res = await apiGet<{ items: StockMovement[]; total: number; counts: typeof defaultMovCounts }>(
+      `/api/admin/stock/mouvements?type=tous&limit=${limit}&offset=${offset}${qParam}`
+    ).catch(() => ({ items: [], total: 0, counts: defaultMovCounts }));
+    movements  = res.items;
+    movTotal   = res.total;
+    movCounts  = res.counts;
+    total      = movTotal;
   }
 
   const totalPages = Math.ceil(total / limit);
 
-  function pageUrl(p: number) {
-    return buildUrl(base, { page: p > 1 ? String(p) : "" });
-  }
-
-  const prodTotal = isStockView ? total : await getProductCount({ includeInactive: true }).catch(() => 0);
+  const prodTotal = isStockView ? total :
+    await apiGet<{ total: number }>("/api/admin/products?limit=1&offset=0")
+      .then(r => r.total).catch(() => 0);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewTabs: { key: View; label: string; icon: any; count: number }[] = [
@@ -104,6 +128,10 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
     { key: "faible",     label: "Faible",     count: statusCounts.faible     },
     { key: "epuise",     label: "Épuisé",     count: statusCounts.epuise     },
   ];
+
+  function pageUrl(p: number) {
+    return buildUrl(base, { page: p > 1 ? String(p) : "" });
+  }
 
   return (
     <div className="space-y-6">
@@ -220,7 +248,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
       {/* ── Filter tabs ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Left: view tab bar — pure Links, no useSearchParams */}
         <div className="flex gap-0 border-b border-slate-100">
           {viewTabs.map(tab => {
             const isActive = view === tab.key;
@@ -250,7 +277,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           })}
         </div>
 
-        {/* Right: statut tabs (only for stock view) */}
         {isStockView && (
           <div className="flex items-center bg-slate-100 rounded-2xl p-1 gap-1">
             {statutTabs.map(tab => {
@@ -284,7 +310,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       {/* ── Table ── */}
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
 
-        {/* ── Stock view ── */}
         {isStockView && (
           products.length === 0 ? (
             <div className="py-20 flex flex-col items-center text-slate-400">
@@ -309,7 +334,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                     {products.map(p => {
                       const price   = finalPrice(p);
                       const isPromo = p.remise > 0;
-                      // Normalize image URL: handle legacy filenames (no prefix) and full paths
                       const imgSrc = p.image_url
                         ? (p.image_url.startsWith("http") || p.image_url.startsWith("/"))
                           ? p.image_url
@@ -374,7 +398,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           )
         )}
 
-        {/* ── Movements view ── */}
         {!isStockView && (
           movements.length === 0 ? (
             <div className="py-20 flex flex-col items-center text-slate-400">
@@ -432,7 +455,6 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           )
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100">
             <p className="text-sm text-slate-500">
