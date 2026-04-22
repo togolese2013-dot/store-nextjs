@@ -4,8 +4,6 @@ import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { X, Plus, Trash2, Loader2, ImagePlus, GripVertical } from "lucide-react";
 import type { Category } from "@/lib/utils";
-import type { AdminMarque } from "@/lib/admin-db";
-
 interface PendingVariant {
   _key:      string;
   nom:       string;
@@ -17,7 +15,7 @@ interface PendingVariant {
 
 interface Props {
   categories: Category[];
-  marques:    AdminMarque[];
+  marques:    { id: number; nom: string }[];
 }
 
 const inp = "w-full px-3.5 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
