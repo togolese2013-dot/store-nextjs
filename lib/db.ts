@@ -119,6 +119,7 @@ export async function getProducts(opts?: {
   categoryId?: number;
   marqueId?:   number;
   search?: string;
+  referenceExact?: string;
   promoOnly?: boolean;
   newOnly?: boolean;
   limit?: number;
@@ -127,7 +128,7 @@ export async function getProducts(opts?: {
   includeInactive?: boolean;
 }): Promise<Product[]> {
   const {
-    categoryId, marqueId, search, promoOnly, newOnly,
+    categoryId, marqueId, search, referenceExact, promoOnly, newOnly,
     limit = 60, offset = 0, statut, includeInactive = false,
   } = opts ?? {};
 
@@ -136,9 +137,10 @@ export async function getProducts(opts?: {
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
   const params: (string | number)[] = [];
 
-  if (categoryId) { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
-  if (marqueId)   { conditions.push("p.marque_id = ?");    params.push(marqueId); }
-  if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (categoryId)      { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
+  if (marqueId)        { conditions.push("p.marque_id = ?");    params.push(marqueId); }
+  if (referenceExact)  { conditions.push("p.reference = ?");    params.push(referenceExact); }
+  if (search)          { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise)  { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)    { conditions.push("p.neuf = 1"); }
   if (statut === "disponible")   { conditions.push("COALESCE(p.stock_magasin, 0) > 5"); }

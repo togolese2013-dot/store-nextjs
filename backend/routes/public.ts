@@ -33,12 +33,13 @@ router.get("/api/products", async (req, res) => {
       return res.json({ success: true, data: products });
     }
     const products = await getProducts({
-      categoryId: req.query.category ? Number(req.query.category) : undefined,
-      search:     (req.query.q as string)     || undefined,
-      promoOnly:  req.query.promo  === "true",
-      newOnly:    req.query.new    === "true",
-      limit:      req.query.limit  ? Number(req.query.limit)  : 60,
-      offset:     req.query.offset ? Number(req.query.offset) : 0,
+      categoryId:     req.query.category  ? Number(req.query.category) : undefined,
+      search:         (req.query.q as string)         || undefined,
+      referenceExact: (req.query.reference as string) || undefined,
+      promoOnly:      req.query.promo === "true",
+      newOnly:        req.query.new   === "true",
+      limit:          req.query.limit  ? Number(req.query.limit)  : 60,
+      offset:         req.query.offset ? Number(req.query.offset) : 0,
     });
     res.json({ success: true, data: products });
   } catch (err) {

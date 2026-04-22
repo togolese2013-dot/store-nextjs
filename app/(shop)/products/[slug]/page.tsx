@@ -21,7 +21,7 @@ interface PageProps {
 
 async function fetchProductBySlug(slug: string): Promise<Product | null> {
   try {
-    const res = await apiGet<{ data: Product[] }>(`/api/products?q=${encodeURIComponent(slug)}&limit=1`, { noAuth: true });
+    const res = await apiGet<{ data: Product[] }>(`/api/products?reference=${encodeURIComponent(slug)}&limit=1`, { noAuth: true });
     return res.data?.[0] ?? null;
   } catch {
     return null;
