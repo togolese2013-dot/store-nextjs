@@ -120,7 +120,9 @@ export default function OrderNotifier() {
 
     es.onmessage = (e) => {
       try {
-        const order: NewOrder = JSON.parse(e.data);
+        const data = JSON.parse(e.data);
+        if (data?.type === "connected" || !data?.id) return;
+        const order: NewOrder = data;
         sinceRef.current = order.created_at;
 
         // Sound + vibration
