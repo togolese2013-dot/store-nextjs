@@ -1,5 +1,5 @@
 [build]
-buildCommand = "cd backend && npm install"
+buildCommand = "npm install mysql2 && cd backend && npm install"
 
 [deploy]
 startCommand = "cd backend && node_modules/.bin/ts-node --transpile-only -r tsconfig-paths/register --project tsconfig.json index.ts"
