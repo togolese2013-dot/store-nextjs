@@ -21,8 +21,9 @@ export async function apiGet<T = unknown>(
       "Content-Type": "application/json",
       ...(cookieHeader ? { Cookie: cookieHeader } : {}),
     },
-    next: { revalidate: opts?.revalidate ?? 0 },
-    cache: opts?.revalidate !== undefined ? "force-cache" : "no-store",
+    ...(opts?.revalidate !== undefined
+      ? { next: { revalidate: opts.revalidate } }
+      : { cache: "no-store" as const }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
