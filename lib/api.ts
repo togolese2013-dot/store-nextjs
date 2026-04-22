@@ -5,7 +5,7 @@ const BACKEND = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL |
 async function getCookieHeader(): Promise<string> {
   try {
     const jar = await cookies();
-    return jar.toString();
+    return jar.getAll().map(c => `${c.name}=${c.value}`).join("; ");
   } catch {
     return "";
   }
