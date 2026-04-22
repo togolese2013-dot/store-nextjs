@@ -9,9 +9,9 @@ export default async function VentesPage() {
     const [facturesRes, livraisonsRes, stats] = await Promise.all([
       apiGet<{ items: unknown[]; total: number }>("/api/admin/ventes/factures?limit=50"),
       apiGet<{ items: unknown[]; total: number }>("/api/admin/ventes/livraisons?limit=50"),
-      apiGet<{ factures: number; livraisons: number; ca_total: number; factures_payees: number }>(
-        "/api/admin/ventes/factures"
-      ).then(r => (r as { stats: { factures: number; livraisons: number; ca_total: number; factures_payees: number } }).stats),
+      apiGet<{ items: unknown[]; total: number; stats: { factures: number; livraisons: number; ca_total: number; factures_payees: number } }>(
+        "/api/admin/ventes/factures?limit=1"
+      ).then(r => r.stats),
     ]);
 
     return (
