@@ -88,7 +88,7 @@ export default async function ProductPage({ params }: PageProps) {
     : null;
 
   /* Variants */
-  const variants = await apiGet<{ variants: { id: number; nom: string; options: Record<string, string>; prix: number; stock: number; reference_sku: string | null }[] }>(
+  const variants = await apiGet<{ variants: { id: number; produit_id: number; nom: string; options: Record<string, string>; prix: number; stock: number; reference_sku: string | null }[] }>(
     `/api/admin/products/${product.id}/variants`
   ).then(r => r.variants).catch(() => []);
   const hasVariants = variants.length > 0;
