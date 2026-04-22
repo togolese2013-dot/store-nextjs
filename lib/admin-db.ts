@@ -1412,7 +1412,7 @@ export async function createVenteWithStock(data: {
         : data.total;
       if (montantFinance > 0) {
         await createFinanceEntry({
-          type:          "rentree",
+          type:          "vente",
           mode_paiement: data.mode_paiement ?? "especes",
           categorie:     "Vente boutique",
           description:   `Vente ${reference} – ${data.client_nom.trim()}`,
@@ -1451,7 +1451,15 @@ export async function updateFacture(id: number, data: {
 }
 
 export async function deleteFacture(id: number) {
+  const [[row]] = await db.execute<mysql.RowDataPacket[]>("SELECT reference FROM factures WHERE id = ?", [id]);
+  const ref = (row as mysql.RowDataPacket)?.reference as string | undefined;
   await db.execute("DELETE FROM factures WHERE id = ?", [id]);
+  if (ref) {
+    await db.execute(
+      "DELETE FROM finance_entries WHERE type = 'vente' AND description LIKE ?",
+      [`Vente ${ref}%`]
+    ).catch(() => {});
+  }
 }
 
 /* ─── Ventes : Devis ─── */
@@ -1711,7 +1719,14 @@ export async function getVentesStats(): Promise<{
   const [[f], [l], [ca], [fp]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures"),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
-    db.execute<mysql.RowDataPacket[]>("SELECT COALESCE(SUM(total),0) AS total FROM factures WHERE statut != 'annule'"),
+    db.execute<mysql.RowDataPacket[]>(`
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN statut_paiement = 'paye'    THEN total
+          WHEN statut_paiement = 'acompte' THEN COALESCE(montant_acompte, 0)
+          ELSE 0
+        END
+      ), 0) AS total FROM factures WHERE statut != 'annule'`),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures WHERE statut = 'paye'"),
   ]);
   return {

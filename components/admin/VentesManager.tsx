@@ -350,9 +350,9 @@ export default function VentesManager({
       : `/api/admin/ventes/livraisons/${id}`;
     const res = await fetch(url, { method: "DELETE" });
     if (res.ok) {
-      if (type === "ventes")     setFactures(p => p.filter(x => x.id !== id));
       if (type === "livraisons") setLivraisons(p => p.filter(x => x.id !== id));
       showFlash("Supprimé ✓");
+      fetchTab(tab, search, offset);
     }
   }
 
