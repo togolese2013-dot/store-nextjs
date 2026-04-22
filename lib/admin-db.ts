@@ -1562,7 +1562,7 @@ export async function deleteLivraison(id: number) {
 export interface FinanceEntry {
   id:             number;
   reference:      string;
-  type:           "caisse" | "depense" | "rentree";
+  type:           "caisse" | "depense" | "rentree" | "vente";
   mode_paiement:  "especes" | "moov_money" | "tmoney" | "virement_bancaire" | null;
   categorie:      string | null;
   description:    string | null;
