@@ -2,7 +2,7 @@ import express from "express";
 import { getSession } from "../../lib/auth";
 import {
   listAdminCategories, createCategory, updateCategory, deleteCategory,
-  listMarques, createMarque, updateMarque, deleteMarque,
+  listAdminMarques, createMarque, updateMarque, deleteMarque,
   listEntrepots, createEntrepot, updateEntrepot, deleteEntrepot,
 } from "@/lib/admin-db";
 
@@ -44,7 +44,7 @@ router.delete("/api/admin/categories/:id", async (req, res) => {
 router.get("/api/admin/marques", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  const marques = await listMarques();
+  const marques = await listAdminMarques();
   res.json({ success: true, data: marques });
 });
 
