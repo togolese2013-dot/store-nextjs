@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { Suspense } from "react";
 import { finalPrice, formatPrice } from "@/lib/utils";
 import { apiGet } from "@/lib/api";
