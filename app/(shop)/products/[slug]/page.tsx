@@ -147,7 +147,7 @@ export default async function ProductPage({ params }: PageProps) {
           <div className="grid lg:grid-cols-2 gap-0">
 
             {/* Image column */}
-            <div className="lg:rounded-l-3xl overflow-hidden">
+            <div className="lg:rounded-l-3xl overflow-hidden border-r border-slate-100">
               <ProductImageGallerySimple 
                 images={product.images || []}
                 productName={product.nom}

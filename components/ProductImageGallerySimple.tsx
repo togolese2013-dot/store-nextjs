@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -16,15 +16,19 @@ function resolveUrl(src: string): string {
   return `${base}${src.startsWith("/") ? src : `/${src}`}`;
 }
 
+const THUMB_VISIBLE = 4;
+
 export default function ProductImageGallerySimple({ images, productName, defaultImage }: Props) {
-  const all = [...images];
+  const all: string[] = [...images];
   if (defaultImage && !all.includes(defaultImage)) all.unshift(defaultImage);
 
-  const [idx, setIdx] = useState(0);
+  const [idx,       setIdx]       = useState(0);
+  const [thumbOff,  setThumbOff]  = useState(0);
+  const stripRef = useRef<HTMLDivElement>(null);
 
   if (all.length === 0) {
     return (
-      <div className="aspect-square bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-300">
+      <div className="aspect-[4/3] bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-300">
         <div className="w-20 h-20 border-2 border-dashed border-slate-300 rounded-2xl flex items-center justify-center">
           <span className="text-2xl">📷</span>
         </div>
@@ -33,75 +37,97 @@ export default function ProductImageGallerySimple({ images, productName, default
     );
   }
 
-  const prev = () => setIdx(i => (i - 1 + all.length) % all.length);
-  const next = () => setIdx(i => (i + 1) % all.length);
+  const canPrevThumb = thumbOff > 0;
+  const canNextThumb = thumbOff + THUMB_VISIBLE < all.length;
+
+  function selectImg(i: number) {
+    setIdx(i);
+    if (i < thumbOff) setThumbOff(i);
+    else if (i >= thumbOff + THUMB_VISIBLE) setThumbOff(i - THUMB_VISIBLE + 1);
+  }
+
+  function prevThumb() { if (canPrevThumb) setThumbOff(o => o - 1); }
+  function nextThumb() { if (canNextThumb) setThumbOff(o => o + 1); }
+
+  const visibleThumbs = all.slice(thumbOff, thumbOff + THUMB_VISIBLE);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col bg-white">
 
-      {/* ── Main image — square, covers full zone ── */}
-      <div className="relative aspect-square bg-slate-50 overflow-hidden group">
+      {/* ── Main image ── */}
+      <div className="relative w-full aspect-[4/3] bg-slate-50 overflow-hidden">
         <Image
           key={all[idx]}
           src={resolveUrl(all[idx])}
           alt={`${productName} — ${idx + 1}`}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
-          className="object-cover transition-opacity duration-300"
+          className="object-contain transition-opacity duration-300"
           priority={idx === 0}
         />
-
-        {/* Prev / Next arrows — visible on hover */}
         {all.length > 1 && (
-          <>
-            <button
-              onClick={prev}
-              aria-label="Image précédente"
-              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
-            >
-              <ChevronLeft className="w-5 h-5 text-slate-700" />
-            </button>
-            <button
-              onClick={next}
-              aria-label="Image suivante"
-              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
-            >
-              <ChevronRight className="w-5 h-5 text-slate-700" />
-            </button>
-          </>
-        )}
-
-        {/* Image counter */}
-        {all.length > 1 && (
-          <span className="absolute bottom-3 right-3 px-2 py-0.5 rounded-md bg-black/40 text-white text-xs font-medium backdrop-blur-sm">
+          <span className="absolute bottom-2 right-3 px-2 py-0.5 rounded-md bg-black/30 text-white text-xs font-medium backdrop-blur-sm">
             {idx + 1} / {all.length}
           </span>
         )}
       </div>
 
-      {/* ── Thumbnails — horizontal scroll ── */}
+      {/* ── Thumbnail strip ── */}
       {all.length > 1 && (
-        <div className="flex gap-2 mt-3 overflow-x-auto px-4 pb-1 scrollbar-thin">
-          {all.map((src, i) => (
-            <button
-              key={i}
-              onClick={() => setIdx(i)}
-              aria-label={`Voir image ${i + 1}`}
-              className={`relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                i === idx
-                  ? "border-brand-600 shadow-md"
-                  : "border-transparent hover:border-slate-300"
-              }`}
-            >
-              <Image
-                src={resolveUrl(src)}
-                alt={`${productName} miniature ${i + 1}`}
-                fill
-                sizes="64px"
-                className="object-cover"
-              />
-            </button>
-          ))}
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-100">
+
+          {/* Prev arrow */}
+          <button
+            onClick={prevThumb}
+            disabled={!canPrevThumb}
+            aria-label="Précédent"
+            className="shrink-0 w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          {/* Thumbnails */}
+          <div ref={stripRef} className="flex flex-1 gap-2">
+            {visibleThumbs.map((src, vi) => {
+              const globalIdx = thumbOff + vi;
+              const active    = globalIdx === idx;
+              return (
+                <button
+                  key={globalIdx}
+                  onClick={() => selectImg(globalIdx)}
+                  aria-label={`Voir image ${globalIdx + 1}`}
+                  className={`relative flex-1 aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                    active
+                      ? "border-brand-700 shadow-md"
+                      : "border-slate-200 hover:border-slate-400"
+                  }`}
+                >
+                  <Image
+                    src={resolveUrl(src)}
+                    alt={`${productName} miniature ${globalIdx + 1}`}
+                    fill
+                    sizes="(max-width: 1024px) 25vw, 12vw"
+                    className="object-cover"
+                  />
+                </button>
+              );
+            })}
+            {/* Filler slots si moins de THUMB_VISIBLE images */}
+            {visibleThumbs.length < THUMB_VISIBLE && Array.from({ length: THUMB_VISIBLE - visibleThumbs.length }).map((_, i) => (
+              <div key={`empty-${i}`} className="flex-1 aspect-square" />
+            ))}
+          </div>
+
+          {/* Next arrow */}
+          <button
+            onClick={nextThumb}
+            disabled={!canNextThumb}
+            aria-label="Suivant"
+            className="shrink-0 w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
         </div>
       )}
     </div>

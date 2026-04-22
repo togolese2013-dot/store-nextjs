@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { X, Plus, Trash2, Loader2, ImagePlus, GripVertical } from "lucide-react";
 import type { Category } from "@/lib/utils";
+import type { AdminMarque } from "@/lib/admin-db";
 
 interface PendingVariant {
   _key:      string;
@@ -16,19 +17,21 @@ interface PendingVariant {
 
 interface Props {
   categories: Category[];
+  marques:    AdminMarque[];
 }
 
 const inp = "w-full px-3.5 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
 const lbl = "block text-xs font-semibold text-slate-500 mb-1.5";
 
 
-export default function AddProductModal({ categories }: Props) {
+export default function AddProductModal({ categories, marques }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
   // Form fields
   const [nom,          setNom]         = useState("");
   const [categorie_id, setCategorie]   = useState<number | "">("");
+  const [marque_id,    setMarque]      = useState<number | "">("");
   const [description,  setDescription] = useState("");
   const [prixAchat,    setPrixAchat]   = useState("");
   const [prixVente,    setPrixVente]   = useState("");
@@ -55,19 +58,30 @@ export default function AddProductModal({ categories }: Props) {
 
 
   // ── Upload images ──────────────────────────────────────────────────────────
+  async function toBase64(file: File): Promise<{ data: string; type: string }> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload  = () => resolve({ data: r.result as string, type: file.type });
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
   async function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
     setUploadingImgs(true);
     setError("");
     try {
-      const fd = new FormData();
-      files.forEach(f => fd.append("files", f));
-      const res  = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const b64Files = await Promise.all(files.map(toBase64));
+      const res  = await fetch("/api/admin/upload", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ files: b64Files }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.errors?.[0] || data.error || "Erreur upload");
-      const urls: string[] = data.urls ?? [];
-      setImages(prev => [...prev, ...urls]);
+      setImages(prev => [...prev, ...(data.urls ?? [])]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur upload");
     } finally {
@@ -108,9 +122,12 @@ export default function AddProductModal({ categories }: Props) {
   async function uploadVariantImage(key: string, file: File) {
     setVariants(vs => vs.map(v => v._key === key ? { ...v, uploading: true } : v));
     try {
-      const fd = new FormData();
-      fd.append("files", file);
-      const res  = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const b64 = await toBase64(file);
+      const res  = await fetch("/api/admin/upload", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ files: [b64] }),
+      });
       const data = await res.json();
       if (res.ok && data.urls?.[0])
         setVariants(vs => vs.map(v => v._key === key ? { ...v, imageUrl: data.urls[0], uploading: false } : v));
@@ -123,7 +140,7 @@ export default function AddProductModal({ categories }: Props) {
 
   // ── Reset & close ──────────────────────────────────────────────────────────
   const reset = useCallback(() => {
-    setNom(""); setCategorie(""); setDescription("");
+    setNom(""); setCategorie(""); setMarque(""); setDescription("");
     setPrixAchat(""); setPrixVente(""); setRemise("");
     setStockMag(""); setSeuilMin("5"); setActif(true); setNeuf(false);
     setImages([]); setVariants([]); setError("");
@@ -144,6 +161,7 @@ export default function AddProductModal({ categories }: Props) {
         nom:           nom.trim(),
         description:   description || null,
         categorie_id:  categorie_id || null,
+        marque_id:     marque_id    || null,
         prix_unitaire: Number(prixVente),
         remise:        remise ? Number(remise) : 0,
         stock_magasin: stockMag  ? Number(stockMag)  : 0,
@@ -334,12 +352,21 @@ export default function AddProductModal({ categories }: Props) {
                       />
                     </div>
 
-                    <div>
-                      <label className={lbl}>Catégorie *</label>
-                      <select value={categorie_id} onChange={e => setCategorie(e.target.value ? Number(e.target.value) : "")} className={inp} required>
-                        <option value="">Sélectionner une catégorie…</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                      </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className={lbl}>Catégorie *</label>
+                        <select value={categorie_id} onChange={e => setCategorie(e.target.value ? Number(e.target.value) : "")} className={inp} required>
+                          <option value="">Sélectionner une catégorie…</option>
+                          {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lbl}>Marque</label>
+                        <select value={marque_id} onChange={e => setMarque(e.target.value ? Number(e.target.value) : "")} className={inp}>
+                          <option value="">— Aucune —</option>
+                          {marques.map(m => <option key={m.id} value={m.id}>{m.nom}</option>)}
+                        </select>
+                      </div>
                     </div>
 
                     <div>

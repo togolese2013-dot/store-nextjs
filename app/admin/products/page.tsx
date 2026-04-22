@@ -153,7 +153,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         accent="brand"
         extra={
           view === "stock" ? (
-            <AddProductModal categories={categories} />
+            <AddProductModal categories={categories} marques={marques} />
           ) : (
             <MouvementModal />
           )
