@@ -53,15 +53,23 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   qs.set("limit", String(PER_PAGE));
   qs.set("offset", String(offset));
 
-  const [categoriesRes, productsRes] = await Promise.all([
-    apiGet<{ data: Category[] }>("/api/categories", { noAuth: true }),
-    apiGet<{ data: Product[]; total?: number }>(`/api/admin/products?${qs.toString()}`).catch(() =>
-      apiGet<{ data: Product[]; total?: number }>(`/api/products?${qs.toString()}`)
-    ),
-  ]);
-  const categories = categoriesRes.data;
-  const products   = productsRes.data ?? [];
-  const total      = (productsRes as { total?: number }).total ?? products.length;
+  let categories: Category[] = [];
+  let products:   Product[]  = [];
+  let total = 0;
+
+  try {
+    const [categoriesRes, productsRes] = await Promise.all([
+      apiGet<{ data: Category[] }>("/api/categories", { noAuth: true }),
+      apiGet<{ data: Product[]; total?: number }>(`/api/admin/products?${qs.toString()}`, { noAuth: true }).catch(() =>
+        apiGet<{ data: Product[]; total?: number }>(`/api/products?${qs.toString()}`, { noAuth: true })
+      ),
+    ]);
+    categories = categoriesRes.data ?? [];
+    products   = productsRes.data   ?? [];
+    total      = (productsRes as { total?: number }).total ?? products.length;
+  } catch {
+    /* backend unreachable — show empty catalogue */
+  }
 
   const totalPages = Math.ceil(total / PER_PAGE);
   const activeCat  = categories.find(c => c.id === catId);
