@@ -2,8 +2,8 @@ import { getSettings } from "@/lib/admin-db";
 import { unstable_noStore as noStore } from "next/cache";
 
 export default async function AnnouncementBar() {
-  noStore(); // always fetch fresh settings
-  const settings = await getSettings();
+  noStore();
+  const settings = await getSettings().catch(() => ({} as Record<string, string>));
 
   const text  = settings.announcement_bar?.trim();
   if (!text) return null;
