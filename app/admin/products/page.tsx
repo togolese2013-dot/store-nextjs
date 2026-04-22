@@ -88,6 +88,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   let movements: StockMovement[] = [];
   let movTotal = 0;
   let movCounts = defaultMovCounts;
+  let fetchError: string | null = null;
 
   if (isStockView) {
     const statutParam = statut !== "all" ? `&statut=${statut}` : "";
@@ -96,7 +97,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
     const qParam      = q       ? `&q=${encodeURIComponent(q)}` : "";
     const res = await apiGet<{ products: Product[]; total: number }>(
       `/api/admin/products?limit=${limit}&offset=${offset}${qParam}${catParam}${brandParam}${statutParam}`
-    ).catch(() => ({ products: [], total: 0 }));
+    ).catch((e: Error) => { fetchError = e.message; return { products: [], total: 0 }; });
     products = res.products;
     total    = res.total;
   } else {
@@ -133,8 +134,18 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
     return buildUrl(base, { page: p > 1 ? String(p) : "" });
   }
 
+  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "(vide)";
+
   return (
     <div className="space-y-6">
+
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-700">
+          <p className="font-bold mb-1">Erreur chargement produits</p>
+          <p className="font-mono text-xs">{fetchError}</p>
+          <p className="text-xs mt-1 text-red-500">Backend URL: {backendUrl}</p>
+        </div>
+      )}
 
       <PageHeader
         title="Tous les produits"
