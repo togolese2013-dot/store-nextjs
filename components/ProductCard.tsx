@@ -64,7 +64,7 @@ export default function ProductCard({ product, className }: Props) {
       )}
     >
       {/* ── Image — square format ── */}
-      <Link href={`/products/${product.reference}`} className="block relative" tabIndex={-1}>
+      <Link href={`/products/${product.id}`} className="block relative" tabIndex={-1}>
         <div className="relative overflow-hidden bg-slate-50 aspect-square">
 
           {/* Skeleton */}
@@ -150,7 +150,7 @@ export default function ProductCard({ product, className }: Props) {
         )}
 
         {/* Name */}
-        <Link href={`/products/${product.reference}`}>
+        <Link href={`/products/${product.id}`}>
           <h3 className="font-sans text-sm text-slate-700 leading-snug mb-2.5 line-clamp-2 hover:text-brand-800 transition-colors">
             {product.nom}
           </h3>

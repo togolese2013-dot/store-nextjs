@@ -278,7 +278,7 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
 
   // Filtered items for current tab
   const filtered = items.filter(item => {
-    const matchTab    = tab === "depense" ? item.type === "depense" : item.type !== "depense";
+    const matchTab    = tab === "depense" ? item.type === "depense" : item.type === "rentree";
     const matchSearch = !search
       || item.reference.toLowerCase().includes(search.toLowerCase())
       || (item.categorie ?? "").toLowerCase().includes(search.toLowerCase())

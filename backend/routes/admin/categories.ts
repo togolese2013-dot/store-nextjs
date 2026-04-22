@@ -51,9 +51,9 @@ router.get("/api/admin/marques", async (req, res) => {
 router.post("/api/admin/marques", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  const { nom } = req.body;
+  const { nom, description = "" } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createMarque(nom.trim());
+  const id = await createMarque({ nom: nom.trim(), description: description.trim() });
   res.json({ success: true, id });
 });
 

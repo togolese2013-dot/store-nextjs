@@ -21,6 +21,11 @@ interface PageProps {
 
 async function fetchProductBySlug(slug: string): Promise<Product | null> {
   try {
+    const id = Number(slug);
+    if (!isNaN(id) && id > 0) {
+      const res = await apiGet<{ data: Product[] }>(`/api/products?ids=${id}`, { noAuth: true });
+      return res.data?.[0] ?? null;
+    }
     const res = await apiGet<{ data: Product[] }>(`/api/products?reference=${encodeURIComponent(slug)}&limit=1`, { noAuth: true });
     return res.data?.[0] ?? null;
   } catch {

@@ -1,4 +1,6 @@
-import { listAchats, countAchats, getAchatStats, listFournisseurs } from "@/lib/admin-db";
+import { listAchats, countAchats, getAchatStats } from "@/lib/admin-db";
+import { apiGet } from "@/lib/api";
+import type { Fournisseur } from "@/lib/admin-db";
 import AchatsManager from "@/components/admin/AchatsManager";
 
 export const metadata = { title: "Achats fournisseurs" };
@@ -13,12 +15,13 @@ export default async function AchatsPage({ searchParams }: PageProps) {
   const limit  = 20;
   const offset = (page - 1) * limit;
 
-  const [achats, total, stats, fournisseurs] = await Promise.all([
+  const [achats, total, stats, fournisseursRes] = await Promise.all([
     listAchats(limit, offset).catch(() => []),
     countAchats().catch(() => 0),
     getAchatStats().catch(() => ({ total: 0, en_attente: 0, recu: 0, montant_total: 0 })),
-    listFournisseurs().catch(() => []),
+    apiGet<{ fournisseurs: Fournisseur[] }>("/api/admin/fournisseurs").catch(() => ({ fournisseurs: [] })),
   ]);
+  const fournisseurs = fournisseursRes.fournisseurs;
 
   return (
     <AchatsManager
