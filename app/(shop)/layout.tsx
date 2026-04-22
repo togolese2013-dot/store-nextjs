@@ -6,10 +6,12 @@ import AnnouncementBar from "@/components/AnnouncementBar";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import ReferralBanner from "@/components/ReferralBanner";
 import RefDetector from "@/components/RefDetector";
-import { getSetting } from "@/lib/admin-db";
+import { apiGet } from "@/lib/api";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
-  const waNumber = await getSetting("whatsapp_number").catch(() => "");
+  const waNumber = await apiGet<{ settings: Record<string, string> }>(
+    "/api/settings/public", { noAuth: true }
+  ).then(r => r.settings.whatsapp_number || "").catch(() => "");
 
   return (
     <CartProvider>

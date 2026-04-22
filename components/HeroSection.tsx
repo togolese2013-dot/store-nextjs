@@ -1,7 +1,7 @@
 /**
  * Server component — fetches hero slides from DB settings, falls back to defaults.
  */
-import { getSettings } from "@/lib/admin-db";
+import { apiGet } from "@/lib/api";
 import HeroSectionClient from "@/components/HeroSectionClient";
 
 const DEFAULTS = [
@@ -41,8 +41,9 @@ const DEFAULTS = [
 ];
 
 export default async function HeroSection() {
-  let settings: Record<string, string> = {};
-  try { settings = await getSettings(); } catch { /* fallback to defaults */ }
+  const settings: Record<string, string> = await apiGet<{ settings: Record<string, string> }>(
+    "/api/settings/public", { noAuth: true }
+  ).then(r => r.settings).catch(() => ({}));
 
   const slides = DEFAULTS.map((def, i) => {
     const n = i + 1;

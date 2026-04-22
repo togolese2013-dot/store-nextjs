@@ -1,7 +1,7 @@
 import express from "express";
 import { getProducts, getProductsByIds, getCategories, db } from "@/lib/db";
 import {
-  subscribeNewsletter, addFidelitePoints, listReviews, createReview,
+  subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -85,6 +85,15 @@ router.post("/api/reviews", async (req, res) => {
     if (!produit_id || !nom || !note) return res.status(400).json({ error: "Champs requis." });
     await createReview({ produit_id: Number(produit_id), nom, note: Number(note), commentaire });
     res.status(201).json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.get("/api/settings/public", async (_req, res) => {
+  try {
+    const settings = await getSettings();
+    res.json({ settings });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }

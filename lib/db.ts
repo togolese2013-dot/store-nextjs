@@ -41,8 +41,17 @@ function createPool() {
   });
 }
 
-export const db: mysql.Pool =
-  globalThis.__db_pool ?? (globalThis.__db_pool = createPool());
+function getOrCreatePool(): mysql.Pool {
+  if (globalThis.__db_pool) return globalThis.__db_pool;
+  const pool = createPool();
+  // Prevent uncaught EventEmitter errors from crashing the process
+  (pool as unknown as { on: (e: string, fn: (err: Error) => void) => void })
+    .on("error", (err: Error) => console.error("[db pool]", err.message));
+  globalThis.__db_pool = pool;
+  return pool;
+}
+
+export const db: mysql.Pool = getOrCreatePool();
 
 /* ─── Schema introspection (cached) ─── */
 let _cols: Record<string, boolean> | null = null;
