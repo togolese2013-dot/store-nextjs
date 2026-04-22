@@ -1,8 +1,6 @@
 import { apiGet } from "@/lib/api";
-import { unstable_noStore as noStore } from "next/cache";
 
 export default async function AnnouncementBar() {
-  noStore();
   const settings = await apiGet<{ settings: Record<string, string> }>(
     "/api/settings/public", { noAuth: true }
   ).then(r => r.settings).catch(() => ({} as Record<string, string>));
