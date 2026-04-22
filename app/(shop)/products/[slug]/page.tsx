@@ -6,7 +6,7 @@ import { apiGet } from "@/lib/api";
 import { getRelatedProductsWithDetails } from "@/lib/related-products";
 import ProductCard from "@/components/ProductCard";
 import AddToCartButton from "@/components/AddToCartButton";
-import ProductVariantSelector from "@/components/ProductVariantSelector";
+import ProductVariantSelector, { type Variant } from "@/components/ProductVariantSelector";
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
 import Image from "next/image";
 import Link from "next/link";
@@ -88,7 +88,7 @@ export default async function ProductPage({ params }: PageProps) {
     : null;
 
   /* Variants */
-  const variants = await apiGet<{ variants: { id: number; produit_id: number; nom: string; options: Record<string, string>; prix: number; stock: number; reference_sku: string | null }[] }>(
+  const variants: Variant[] = await apiGet<{ variants: Variant[] }>(
     `/api/admin/products/${product.id}/variants`
   ).then(r => r.variants).catch(() => []);
   const hasVariants = variants.length > 0;
