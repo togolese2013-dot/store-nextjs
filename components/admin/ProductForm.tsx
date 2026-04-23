@@ -51,6 +51,10 @@ export default function ProductForm({ categories, initial }: Props) {
   const router  = useRouter();
   const isEdit  = !!initial?.id;
 
+  const initialImages = initial?.images?.length
+    ? initial.images
+    : initial?.image_url ? [initial.image_url] : [];
+
   const [form, setForm] = useState<ProductData>({
     reference:     initial?.reference     ?? "",
     nom:           initial?.nom           ?? "",
@@ -65,6 +69,7 @@ export default function ProductForm({ categories, initial }: Props) {
     image_url:     initial?.image_url     ?? "",
     images:        initial?.images        ?? [],
     ...initial,
+    images:        initialImages,
   });
 
   const [loading,   setLoading]   = useState(false);
