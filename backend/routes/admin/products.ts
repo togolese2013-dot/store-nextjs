@@ -78,7 +78,8 @@ router.post("/api/admin/products", async (req, res) => {
     const imagesJson  = cleanImages.length > 0 ? JSON.stringify(cleanImages) : null;
     const stockMagasin = Number(stock_magasin ?? 0);
 
-    // Force-refresh schema cache so images_json/marque_id columns are always detected
+    // Guarantee images_json column exists before INSERT (ALTER TABLE is no-op if already present)
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`); } catch { /* already exists */ }
     invalidateProduitColsCache();
     const cols = await produitCols();
 
@@ -95,7 +96,8 @@ router.post("/api/admin/products", async (req, res) => {
     columns.push("actif"); values.push(actif !== false ? 1 : 0);
     if (cols.image_url)      { columns.push("image_url");      values.push(image_url ?? null); }
     else if (cols.image)     { columns.push("image");          values.push(image_url ?? null); }
-    if (cols.images_json)    { columns.push("images_json");    values.push(imagesJson); }
+    // images_json is guaranteed to exist at this point
+    columns.push("images_json"); values.push(imagesJson);
 
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await (db as import("mysql2/promise").Pool).execute<mysql.ResultSetHeader>(
@@ -147,7 +149,8 @@ router.patch("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    // Ensure images_json/marque_id columns exist before updating
+    // Guarantee images_json column exists before UPDATE
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`); } catch { /* already exists */ }
     invalidateProduitColsCache();
     await produitCols();
     const body = req.body;

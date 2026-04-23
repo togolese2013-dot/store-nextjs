@@ -187,7 +187,7 @@ export default function ProductForm({ categories, initial }: Props) {
 
     try {
       const url    = isEdit ? `/api/admin/products/${initial!.id}` : "/api/admin/products";
-      const method = isEdit ? "PUT" : "POST";
+      const method = isEdit ? "PATCH" : "POST";
 
       const payload: Record<string, unknown> = {
         reference:     form.reference,
@@ -202,7 +202,7 @@ export default function ProductForm({ categories, initial }: Props) {
       };
       if (schema.hasRemise)    payload.remise = form.remise;
       if (schema.hasNeuf)      payload.neuf   = form.neuf;
-      if (schema.hasImagesJson && form.images.length > 0) payload.images = form.images;
+      if (form.images.length > 0) payload.images = form.images;
 
       const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
