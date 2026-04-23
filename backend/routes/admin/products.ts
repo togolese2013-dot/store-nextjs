@@ -1,7 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
-import { getProducts, getProductCount, getProductStatusCounts, getCategories, db, produitCols } from "@/lib/db";
+import { getProducts, getProductCount, getProductStatusCounts, getCategories, db, produitCols, invalidateProduitColsCache } from "@/lib/db";
 import { getStockStats } from "@/lib/admin-db";
 import type mysql from "mysql2/promise";
 
@@ -78,7 +78,8 @@ router.post("/api/admin/products", async (req, res) => {
     const imagesJson  = cleanImages.length > 0 ? JSON.stringify(cleanImages) : null;
     const stockMagasin = Number(stock_magasin ?? 0);
 
-    // Use produitCols() to ensure images_json column is auto-migrated before we need it
+    // Force-refresh schema cache so images_json/marque_id columns are always detected
+    invalidateProduitColsCache();
     const cols = await produitCols();
 
     const columns: string[] = ["reference", "nom", "description", "categorie_id", "prix_unitaire"];
@@ -146,6 +147,9 @@ router.patch("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
+    // Ensure images_json/marque_id columns exist before updating
+    invalidateProduitColsCache();
+    await produitCols();
     const body = req.body;
     const sets: string[] = [];
     const vals: (string | number | boolean | null)[] = [];
