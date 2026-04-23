@@ -19,8 +19,8 @@ function resolveUrl(src: string): string {
 const THUMB_VISIBLE = 4;
 
 export default function ProductImageGallerySimple({ images, productName, defaultImage }: Props) {
-  const all: string[] = [...images];
-  if (defaultImage && !all.includes(defaultImage)) all.unshift(defaultImage);
+  const all: string[] = [...images].filter(u => typeof u === "string" && u.trim() !== "");
+  if (defaultImage && defaultImage.trim() !== "" && !all.includes(defaultImage)) all.unshift(defaultImage);
 
   const [idx,       setIdx]       = useState(0);
   const [thumbOff,  setThumbOff]  = useState(0);

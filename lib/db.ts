@@ -56,7 +56,7 @@ export const db: mysql.Pool = getOrCreatePool();
 /* ─── Schema introspection (cached) ─── */
 let _cols: Record<string, boolean> | null = null;
 
-async function produitCols() {
+export async function produitCols() {
   if (_cols) return _cols;
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COLUMN_NAME
@@ -104,6 +104,7 @@ async function produitCols() {
     neuf:            names.has("neuf"),
     stock_boutique:  names.has("stock_boutique"),
     stock_magasin:   names.has("stock_magasin"),
+    stock_minimum:   names.has("stock_minimum"),
     variations_json: names.has("variations_json"),
     images_json:     names.has("images_json"),
     image:           names.has("image"),

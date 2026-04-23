@@ -1,7 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
-import { getProducts, getProductCount, getProductStatusCounts, getCategories, db } from "@/lib/db";
+import { getProducts, getProductCount, getProductStatusCounts, getCategories, db, produitCols } from "@/lib/db";
 import { getStockStats } from "@/lib/admin-db";
 import type mysql from "mysql2/promise";
 
@@ -74,29 +74,27 @@ router.post("/api/admin/products", async (req, res) => {
       return res.status(400).json({ error: "Champs obligatoires manquants." });
     }
 
-    const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
+    const cleanImages = Array.isArray(images) ? images.filter((u: unknown) => typeof u === "string" && u.trim() !== "") : [];
+    const imagesJson  = cleanImages.length > 0 ? JSON.stringify(cleanImages) : null;
     const stockMagasin = Number(stock_magasin ?? 0);
 
-    const [colRows] = await (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produits'`
-    );
-    const colNames = new Set(colRows.map((r) => (r.COLUMN_NAME as string).toLowerCase()));
+    // Use produitCols() to ensure images_json column is auto-migrated before we need it
+    const cols = await produitCols();
 
     const columns: string[] = ["reference", "nom", "description", "categorie_id", "prix_unitaire"];
     const values: (string | number | boolean | null)[] = [
       reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire),
     ];
 
-    if (colNames.has("stock_magasin"))  { columns.push("stock_magasin");  values.push(stockMagasin); }
-    if (colNames.has("stock_boutique")) { columns.push("stock_boutique"); values.push(Number(stock_boutique ?? 0)); }
-    if (colNames.has("remise"))         { columns.push("remise");         values.push(Number(remise ?? 0)); }
-    if (colNames.has("neuf"))           { columns.push("neuf");           values.push(neuf ? 1 : 0); }
-    if (colNames.has("stock_minimum"))  { columns.push("stock_minimum");  values.push(Number(stock_minimum ?? 5)); }
+    if (cols.stock_magasin)  { columns.push("stock_magasin");  values.push(stockMagasin); }
+    if (cols.stock_boutique) { columns.push("stock_boutique"); values.push(Number(stock_boutique ?? 0)); }
+    if (cols.remise)         { columns.push("remise");         values.push(Number(remise ?? 0)); }
+    if (cols.neuf)           { columns.push("neuf");           values.push(neuf ? 1 : 0); }
+    if (cols.stock_minimum)  { columns.push("stock_minimum");  values.push(Number(stock_minimum ?? 5)); }
     columns.push("actif"); values.push(actif !== false ? 1 : 0);
-    if (colNames.has("image_url"))      { columns.push("image_url");      values.push(image_url ?? null); }
-    else if (colNames.has("image"))     { columns.push("image");          values.push(image_url ?? null); }
-    if (colNames.has("images_json"))    { columns.push("images_json");    values.push(imagesJson); }
+    if (cols.image_url)      { columns.push("image_url");      values.push(image_url ?? null); }
+    else if (cols.image)     { columns.push("image");          values.push(image_url ?? null); }
+    if (cols.images_json)    { columns.push("images_json");    values.push(imagesJson); }
 
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await (db as import("mysql2/promise").Pool).execute<mysql.ResultSetHeader>(
