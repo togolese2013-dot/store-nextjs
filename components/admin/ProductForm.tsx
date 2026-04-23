@@ -67,7 +67,6 @@ export default function ProductForm({ categories, initial }: Props) {
     neuf:          initial?.neuf          ?? false,
     actif:         initial?.actif         ?? true,
     image_url:     initial?.image_url     ?? "",
-    images:        initial?.images        ?? [],
     ...initial,
     images:        initialImages,
   });
