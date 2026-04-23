@@ -180,15 +180,19 @@ export default async function ProductPage({ params }: PageProps) {
             {/* Info column */}
             <div className="p-6 sm:p-8 lg:p-10 flex flex-col">
 
-              {/* Category + reference */}
+              {/* Marque ou catégorie + référence */}
               <div className="flex items-center justify-between mb-3">
-                {product.categorie_nom && (
+                {product.marque_nom ? (
+                  <span className="text-xs font-bold uppercase tracking-widest text-brand-600">
+                    {product.marque_nom}
+                  </span>
+                ) : product.categorie_nom ? (
                   <Link href={`/products?category=${product.categorie_id}`}
                     className="text-xs font-bold uppercase tracking-widest text-brand-600 hover:text-brand-800 transition-colors"
                   >
                     {product.categorie_nom}
                   </Link>
-                )}
+                ) : null}
                 <span className="text-xs text-slate-400 font-mono">Réf. {product.reference}</span>
               </div>
 

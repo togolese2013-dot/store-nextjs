@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
-import { db } from "@/lib/db";
+import { db, invalidateProduitColsCache } from "@/lib/db";
 import type mysql from "mysql2/promise";
 
 const router = express.Router();
@@ -44,6 +44,7 @@ router.post("/api/admin/schema/migrate", async (req, res) => {
       results.variations_json = "colonne ajoutée";
     } else { results.variations_json = "déjà présente"; }
 
+    invalidateProduitColsCache();
     res.json({ ok: true, results });
   } catch (err) {
     res.status(500).json({ error: String(err) });

@@ -16,6 +16,8 @@ export interface Product {
   images: string[];
   variations: Record<string, string[]> | null;
   date_creation: string;
+  marque_id: number | null;
+  marque_nom: string | null;
 }
 
 export interface Category {

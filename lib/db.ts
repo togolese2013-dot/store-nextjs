@@ -73,6 +73,24 @@ export async function produitCols() {
     } catch { /* already added by concurrent request */ }
   }
 
+  // Auto-migrate: add marque_id column if missing
+  if (!names.has("marque_id")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`);
+      names.add("marque_id");
+    } catch { /* already added */ }
+  }
+
+  // Ensure marques table exists
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS marques (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nom VARCHAR(255) NOT NULL,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+  } catch { /* already exists */ }
+
   // Auto-migrate: add stock_magasin column directly on produits if missing
   if (!names.has("stock_magasin")) {
     try {
@@ -111,9 +129,12 @@ export async function produitCols() {
     image_url:       names.has("image_url"),
     date_creation:   names.has("date_creation"),
     created_at:      names.has("created_at"),
+    marque_id:       names.has("marque_id"),
   };
   return _cols;
 }
+
+export function invalidateProduitColsCache() { _cols = null; }
 
 /* ─── Queries ─── */
 export async function getProducts(opts?: {
@@ -169,10 +190,13 @@ export async function getProducts(opts?: {
        ${imageCol}                                                                          AS image_url,
        ${cols.variations_json ? "p.variations_json"                            : "NULL" } AS variations_json,
        ${cols.images_json     ? "p.images_json"                                : "NULL" } AS images_json,
+       ${cols.marque_id       ? "p.marque_id"                                  : "NULL" } AS marque_id,
+       ${cols.marque_id       ? "m.nom"                                        : "NULL" } AS marque_nom,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
+     ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
      WHERE ${where}
      ORDER BY ${orderCol} DESC
      LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -195,6 +219,8 @@ export async function getProducts(opts?: {
     images:         r.images_json ? tryParse(r.images_json as string) : [],
     variations:     r.variations_json ? tryParse(r.variations_json as string) : null,
     date_creation:  (r.sort_col ?? "") as string,
+    marque_id:      r.marque_id ? Number(r.marque_id) : null,
+    marque_nom:     (r.marque_nom ?? null) as string | null,
   })) as Product[];
 }
 
@@ -218,10 +244,13 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
        ${imageCol}                                                                          AS image_url,
        ${cols.variations_json ? "p.variations_json"                            : "NULL" } AS variations_json,
        ${cols.images_json     ? "p.images_json"                                : "NULL" } AS images_json,
+       ${cols.marque_id       ? "p.marque_id"                                  : "NULL" } AS marque_id,
+       ${cols.marque_id       ? "m.nom"                                        : "NULL" } AS marque_nom,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
+     ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
      WHERE p.id IN (${placeholders}) AND p.actif = 1`,
     ids
   );
@@ -242,6 +271,8 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
     images:         r.images_json ? tryParse(r.images_json as string) : [],
     variations:     r.variations_json ? tryParse(r.variations_json as string) : null,
     date_creation:  (r.sort_col ?? "") as string,
+    marque_id:      r.marque_id ? Number(r.marque_id) : null,
+    marque_nom:     (r.marque_nom ?? null) as string | null,
   })) as Product[];
 }
 
@@ -263,10 +294,13 @@ export async function getProductBySlug(reference: string): Promise<Product | nul
        ${imageCol}                                                                      AS image_url,
        ${cols.variations_json ? "p.variations_json"                         : "NULL"} AS variations_json,
        ${cols.images_json     ? "p.images_json"                             : "NULL"} AS images_json,
+       ${cols.marque_id       ? "p.marque_id"                               : "NULL"} AS marque_id,
+       ${cols.marque_id       ? "m.nom"                                     : "NULL"} AS marque_nom,
        ${orderCol}                                                                      AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
+     ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
      WHERE p.reference = ? AND p.actif = 1
      LIMIT 1`,
     [reference]
@@ -290,6 +324,8 @@ export async function getProductBySlug(reference: string): Promise<Product | nul
     images:         r.images_json ? tryParse(r.images_json as string) : [],
     variations:     r.variations_json ? tryParse(r.variations_json as string) : null,
     date_creation:  (r.sort_col ?? "") as string,
+    marque_id:      r.marque_id ? Number(r.marque_id) : null,
+    marque_nom:     (r.marque_nom ?? null) as string | null,
   };
 }
 

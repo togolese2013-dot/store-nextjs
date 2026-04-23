@@ -125,8 +125,7 @@ export default function Footer() {
       {/* Bottom bar */}
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <span>© {year} Togolese Shop — Tous droits réservés</span>
-          <span>Fait avec ❤️ au Togo 🇹🇬</span>
+          <span>©2020-{year} Togolese Group (Vente-distribution) — Tous droits réservés</span>
         </div>
       </div>
     </footer>

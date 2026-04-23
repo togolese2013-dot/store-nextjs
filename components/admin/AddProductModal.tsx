@@ -155,6 +155,9 @@ export default function AddProductModal({ categories, marques }: Props) {
     if (!prixVente)            { setError("Le prix de vente est obligatoire."); return; }
     setError(""); setLoading(true);
     try {
+      // Ensure images_json column exists before inserting (invalidates backend cache)
+      await fetch("/api/admin/schema/migrate", { method: "POST" }).catch(() => {});
+
       const payload: Record<string, unknown> = {
         nom:           nom.trim(),
         description:   description || null,

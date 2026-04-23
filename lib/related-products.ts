@@ -121,6 +121,8 @@ export function relatedToProduct(related: RelatedProduct): Product {
     images: related.image_url ? [related.image_url] : [],
     variations: null,
     date_creation: "",
+    marque_id:  null,
+    marque_nom: null,
   };
 }
 
