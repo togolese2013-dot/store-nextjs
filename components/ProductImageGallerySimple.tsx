@@ -73,7 +73,7 @@ export default function ProductImageGallerySimple({ images, productName, default
       </div>
 
       {/* ── Thumbnail strip ── */}
-      {all.length > 1 && (
+      {all.length >= 1 && (
         <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-100">
 
           {/* Prev arrow */}

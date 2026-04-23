@@ -260,9 +260,9 @@ export default async function ProductPage({ params }: PageProps) {
                     {!outOf && (
                       <a
                         href={`/checkout?product=${product.id}`}
-                        className="flex items-center justify-center gap-2 w-full px-6 py-3.5 rounded-2xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-700 transition-colors"
+                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-md bg-brand-900 text-white font-sans font-medium text-xs hover:bg-brand-800 transition-colors"
                       >
-                        <CreditCard className="w-4 h-4" />
+                        <CreditCard className="w-3.5 h-3.5" />
                         Payer maintenant
                       </a>
                     )}

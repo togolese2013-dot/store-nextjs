@@ -13,7 +13,13 @@ router.get("/api/admin/schema/columns", async (req, res) => {
     `SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`, [table]
   );
-  res.json({ columns: cols });
+  const names = new Set(cols.map(r => (r.COLUMN_NAME as string).toLowerCase()));
+  res.json({
+    columns:       cols,
+    hasRemise:     names.has("remise"),
+    hasNeuf:       names.has("neuf"),
+    hasImagesJson: names.has("images_json"),
+  });
 });
 
 router.post("/api/admin/schema/migrate", async (req, res) => {
