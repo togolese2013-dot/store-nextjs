@@ -53,7 +53,7 @@ router.post("/api/admin/products", async (req, res) => {
 
   try {
     const body = req.body;
-    const { nom, description, categorie_id, prix_unitaire,
+    const { nom, description, categorie_id, marque_id, prix_unitaire,
             stock_magasin, stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
     let reference = body.reference?.trim() || "";
@@ -96,6 +96,7 @@ router.post("/api/admin/products", async (req, res) => {
     columns.push("actif"); values.push(actif !== false ? 1 : 0);
     if (cols.image_url)      { columns.push("image_url");      values.push(image_url ?? null); }
     else if (cols.image)     { columns.push("image");          values.push(image_url ?? null); }
+    if (cols.marque_id && marque_id) { columns.push("marque_id"); values.push(Number(marque_id)); }
     // images_json is guaranteed to exist at this point
     columns.push("images_json"); values.push(imagesJson);
 
