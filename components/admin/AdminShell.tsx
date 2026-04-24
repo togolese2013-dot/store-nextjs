@@ -21,8 +21,7 @@ export default function AdminShell({ nom, role, children }: Props) {
     let retryTimer: ReturnType<typeof setTimeout>;
 
     function connect() {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "";
-      es = new EventSource(`${backendUrl}/api/admin/events`);
+      es = new EventSource(`/api/admin/events`);
       es.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data) as { type: string };
