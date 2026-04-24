@@ -110,13 +110,21 @@ export default function HeroSettingsForm({ settings }: Props) {
 
   async function uploadSlideImage(i: number, file: File) {
     setUploading(i);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/admin/upload", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ file: { data: base64, type: file.type, name: file.name } }),
+    });
     const data = await res.json();
     setUploading(null);
-    if (res.ok) updateSlide(i, "image", data.url);
-    else setMsg(data.error ?? "Erreur upload");
+    if (res.ok && data.urls?.[0]) updateSlide(i, "image", data.urls[0]);
+    else setMsg(data.errors?.[0] ?? "Erreur upload");
   }
 
   function addSlide() {

@@ -67,9 +67,9 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
         </div>
       )}
 
-      {/* Text content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 h-full flex items-center">
-        <div className="max-w-lg py-10 sm:py-14">
+      {/* Text content — absolute so it fills full section height for true vertical center */}
+      <div className="absolute inset-0 z-10 flex items-center px-6 sm:px-10 lg:px-16">
+        <div className="max-w-lg w-full">
           {/* Eyebrow */}
           {slide.eyebrow && (
             <p className="text-[11px] sm:text-xs font-bold uppercase tracking-widest mb-3"

@@ -54,13 +54,21 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
   }
   async function uploadLogo(file: File) {
     setUploadingLogo(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/admin/upload", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ file: { data: base64, type: file.type, name: file.name } }),
+    });
     const data = await res.json();
     setUploadingLogo(false);
-    if (res.ok) setLogo(data.url);
-    else setMsg(data.error ?? "Erreur upload logo");
+    if (res.ok && data.urls?.[0]) setLogo(data.urls[0]);
+    else setMsg(data.errors?.[0] ?? "Erreur upload logo");
   }
 
   function applyPreset(p: typeof PRESETS[0]) {

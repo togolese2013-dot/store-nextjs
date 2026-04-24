@@ -41,8 +41,10 @@ export default function AdminShell({ nom, role, children }: Props) {
     };
   }, [router]);
 
-  // Landing page — no sidebar
-  if (pathname === "/admin") {
+  // Landing page + Admin zone — no sidebar, no chrome
+  const ADMIN_ZONE = ["/admin/config", "/admin/settings", "/admin/users", "/admin/rapports", "/admin/tendances"];
+  const isAdminZone = pathname === "/admin" || ADMIN_ZONE.some(p => pathname === p || pathname.startsWith(p + "/"));
+  if (isAdminZone) {
     return <>{children}</>;
   }
 
