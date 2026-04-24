@@ -148,7 +148,7 @@ export default function Header() {
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-9 sm:h-14 gap-1.5 sm:gap-3">
+          <div className="flex items-center h-14 gap-1.5 sm:gap-3">
 
             {/* Hamburger — mobile/tablet only, LEFT of logo */}
             <button

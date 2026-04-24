@@ -9,6 +9,7 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import ReferralBanner from "@/components/ReferralBanner";
 import RefDetector from "@/components/RefDetector";
 import { apiGet } from "@/lib/api";
+import BottomNav from "@/components/BottomNav";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const waNumber = await apiGet<{ settings: Record<string, string> }>(
@@ -24,11 +25,12 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <ReferralBanner />
       <AnnouncementBar />
       <Header />
-      <main className="flex-1">
+      <main className="flex-1 pb-16 lg:pb-0">
         {children}
       </main>
       <Footer />
       {waNumber && <WhatsAppButton number={waNumber} />}
+      <BottomNav />
     </CartProvider>
   );
 }

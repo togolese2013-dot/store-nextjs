@@ -26,15 +26,15 @@ function TrustBar() {
   return (
     <div className="bg-white border-b border-slate-100">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-4 divide-x divide-slate-100">
-          {items.map(({ icon: Icon, label, sub }) => (
-            <div key={label} className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-2.5 lg:py-5">
-              <div className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-lg sm:rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-                <Icon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-brand-700" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-slate-100 sm:divide-x">
+          {items.map(({ icon: Icon, label, sub }, i) => (
+            <div key={label} className={`flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 lg:py-5 ${i % 2 === 0 ? "border-r sm:border-r-0 border-slate-100" : ""} ${i < 2 ? "border-b sm:border-b-0 border-slate-100" : ""}`}>
+              <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                <Icon className="w-4 h-4 lg:w-5 lg:h-5 text-brand-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] sm:text-xs lg:text-sm font-bold text-slate-900 leading-tight line-clamp-2">{label}</p>
-                <p className="text-[8px] lg:text-xs text-slate-500 leading-tight hidden lg:block">{sub}</p>
+                <p className="text-xs lg:text-sm font-bold text-slate-900 leading-tight">{label}</p>
+                <p className="text-[10px] lg:text-xs text-slate-500 leading-tight">{sub}</p>
               </div>
             </div>
           ))}
@@ -230,7 +230,8 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection />
-      <div className="hidden md:block"><TrustBar /></div>
+      {/* TrustBar: 2-col on mobile, 4-col on desktop */}
+      <TrustBar />
 
       <Section
         title="Meilleures ventes"
