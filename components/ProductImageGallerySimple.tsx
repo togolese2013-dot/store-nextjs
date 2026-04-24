@@ -55,7 +55,7 @@ export default function ProductImageGallerySimple({ images, productName, default
     <div className="flex flex-col bg-white">
 
       {/* ── Main image ── */}
-      <div className="relative w-full aspect-[4/3] bg-slate-50 overflow-hidden">
+      <div className="relative w-full aspect-[4/3] bg-white overflow-hidden">
         <Image
           key={all[idx]}
           src={resolveUrl(all[idx])}

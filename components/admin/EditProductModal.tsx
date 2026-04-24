@@ -57,7 +57,12 @@ export default function EditProductModal({ productId, productRef, onClose }: Pro
         neuf:          Boolean(p.neuf),
         actif:         Boolean(p.actif),
         image_url:     ((p.image_url || p.image) as string) ?? "",
-        images:        (() => { try { return JSON.parse((p.images_json as string) || "[]"); } catch { return []; } })(),
+        images:        (() => {
+          const raw = p.images_json;
+          // MySQL JSON columns are returned already parsed (array), not as string
+          if (Array.isArray(raw)) return raw as string[];
+          try { return JSON.parse((raw as string) || "[]"); } catch { return []; }
+        })(),
       });
       setCategories((catRes.data as Category[]) ?? []);
       setState("ready");
