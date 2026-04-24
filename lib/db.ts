@@ -411,7 +411,8 @@ export async function getCategories(): Promise<Category[]> {
   return rows as Category[];
 }
 
-function tryParse(json: unknown): unknown {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function tryParse(json: unknown): any {
   // MySQL JSON columns are already parsed as objects/arrays by mysql2 — return them directly
   if (Array.isArray(json) || (typeof json === "object" && json !== null)) return json;
   if (!json) return null;
