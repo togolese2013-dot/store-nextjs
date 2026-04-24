@@ -47,24 +47,36 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
       <div className="absolute inset-0 opacity-[0.04]"
         style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
 
-      {/* Accent circles */}
-      <div className="absolute -right-24 -top-24 w-[380px] h-[380px] rounded-full pointer-events-none"
-        style={{ background: `${slide.accent}10` }} />
-      <div className="absolute right-[30%] bottom-0 w-64 h-64 rounded-full pointer-events-none"
-        style={{ background: `${slide.accent}08` }} />
-
-      {/* Hero image */}
+      {/* Hero image — full cover */}
       {slide.image && !imgError[slide.id] && (
-        <div className="absolute right-0 bottom-0 h-[82%] w-[42%] sm:w-[36%] md:w-[32%] pointer-events-none">
-          <img
-            src={slide.image}
-            alt=""
-            loading={cur === 0 ? "eager" : "lazy"}
-            onError={() => setImgErr(prev => ({ ...prev, [slide.id]: true }))}
-            className="absolute right-0 bottom-0 h-full w-full object-contain object-right-bottom opacity-80 sm:opacity-90"
-            aria-hidden
-          />
-        </div>
+        <img
+          src={slide.image}
+          alt=""
+          loading={cur === 0 ? "eager" : "lazy"}
+          onError={() => setImgErr(prev => ({ ...prev, [slide.id]: true }))}
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+          aria-hidden
+        />
+      )}
+
+      {/* Overlay — gradient sombre pour lisibilité du texte, plus dense quand image présente */}
+      <div
+        className="absolute inset-0 transition-all duration-700"
+        style={{
+          background: slide.image && !imgError[slide.id]
+            ? "linear-gradient(to right, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.35) 60%, rgba(0,0,0,0.10) 100%)"
+            : undefined,
+        }}
+      />
+
+      {/* Accent circles (visible uniquement sans image) */}
+      {(!slide.image || imgError[slide.id]) && (
+        <>
+          <div className="absolute -right-24 -top-24 w-[380px] h-[380px] rounded-full pointer-events-none"
+            style={{ background: `${slide.accent}10` }} />
+          <div className="absolute right-[30%] bottom-0 w-64 h-64 rounded-full pointer-events-none"
+            style={{ background: `${slide.accent}08` }} />
+        </>
       )}
 
       {/* Text content — absolute so it fills full section height for true vertical center */}
