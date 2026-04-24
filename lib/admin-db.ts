@@ -1828,6 +1828,7 @@ export interface Achat {
   statut:         "en_attente" | "recu" | "valide";
   montant_total:  number;
   notes:          string | null;
+  transport?:     "avion" | "bateau" | null;
 }
 
 export interface AchatItem {
@@ -1887,19 +1888,34 @@ export async function getAchatById(id: number): Promise<{ achat: Achat; items: A
 
 export async function createAchat(data: {
   fournisseur_id: number | null;
-  reference:      string;
+  reference?:     string;
   date_achat:     string;
   statut:         string;
   note:           string | null;
+  transport?:     string | null;
   items: Array<{ produit_id: number | null; designation: string; quantite: number; prix_unitaire: number }>;
 }): Promise<number> {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+    // Auto-generate reference if not provided
+    let reference = data.reference?.trim();
+    if (!reference) {
+      const year = new Date().getFullYear();
+      const [cntRows] = await conn.execute<mysql.RowDataPacket[]>(
+        `SELECT COUNT(*) AS cnt FROM achats WHERE YEAR(date_achat) = ?`, [year]
+      );
+      const num = (Number((cntRows[0] as mysql.RowDataPacket).cnt) + 1).toString().padStart(3, "0");
+      reference = `ACH-${year}-${num}`;
+    }
     const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
+    // Add transport column if missing
+    try {
+      await conn.execute(`ALTER TABLE achats ADD COLUMN IF NOT EXISTS transport VARCHAR(10) NULL`);
+    } catch { /* ignore */ }
     const [res] = await conn.execute<mysql.ResultSetHeader>(
-      `INSERT INTO achats (fournisseur_id, reference, date_achat, statut, montant_total, notes) VALUES (?,?,?,?,?,?)`,
-      [data.fournisseur_id ?? null, data.reference, data.date_achat, data.statut, montant_total, data.note ?? null]
+      `INSERT INTO achats (fournisseur_id, reference, date_achat, statut, montant_total, notes, transport) VALUES (?,?,?,?,?,?,?)`,
+      [data.fournisseur_id ?? null, reference, data.date_achat, data.statut, montant_total, data.note ?? null, data.transport ?? null]
     );
     const achatId = res.insertId;
     for (const item of data.items) {

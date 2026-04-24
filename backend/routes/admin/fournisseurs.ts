@@ -62,11 +62,10 @@ router.post("/api/admin/achats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { fournisseur_id, reference, date_achat, statut, note, items } = req.body;
-    if (!reference?.trim()) return res.status(400).json({ error: "La référence est obligatoire." });
-    if (!date_achat)         return res.status(400).json({ error: "La date est obligatoire." });
-    if (!items?.length)      return res.status(400).json({ error: "Au moins un article est requis." });
-    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference, date_achat, statut: statut ?? "en_attente", note: note ?? null, items });
+    const { fournisseur_id, reference, date_achat, statut, note, transport, items } = req.body;
+    if (!date_achat)    return res.status(400).json({ error: "La date est obligatoire." });
+    if (!items?.length) return res.status(400).json({ error: "Au moins un article est requis." });
+    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference: reference || undefined, date_achat, statut: statut ?? "en_attente", note: note ?? null, transport: transport ?? null, items });
     emitAdminEvent("achat");
     res.status(201).json({ ok: true, id });
   } catch (err) {

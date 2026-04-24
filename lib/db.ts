@@ -70,7 +70,13 @@ export async function produitCols() {
     try {
       await db.execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`);
       names.add("images_json");
-    } catch { /* already added by concurrent request */ }
+    } catch (e: unknown) {
+      // ER_DUP_FIELDNAME = column already exists (race or prior migration) — still mark as present
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("images_json");
+      }
+    }
   }
 
   // Auto-migrate: add marque_id column if missing
@@ -78,7 +84,12 @@ export async function produitCols() {
     try {
       await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`);
       names.add("marque_id");
-    } catch { /* already added */ }
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("marque_id");
+      }
+    }
   }
 
   // Ensure marques table exists

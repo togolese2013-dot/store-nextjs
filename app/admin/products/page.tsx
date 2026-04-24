@@ -162,54 +162,29 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Produits en stock</p>
-            <Boxes className="w-8 h-8 text-slate-400 opacity-20" />
+        {[
+          { label: "Produits en stock",    icon: Boxes,         val: stats.en_stock,      money: false, iconCls: "text-slate-400"  },
+          { label: "Valeur totale",         icon: DollarSign,    val: stats.valeur_totale,  money: true,  iconCls: "text-slate-400"  },
+          { label: "Stock faible",          icon: AlertTriangle, val: stats.stock_faible,   money: false, iconCls: "text-amber-400", badge: stats.stock_faible  > 0 ? { txt: "Action requise", cls: "bg-amber-100 text-amber-700" } : null },
+          { label: "Rupture de stock",      icon: XCircle,       val: stats.en_rupture,     money: false, iconCls: "text-red-400",   badge: stats.en_rupture    > 0 ? { txt: "Épuisé",          cls: "bg-red-100 text-red-700"     } : null },
+          { label: "Entrées aujourd'hui",   icon: TrendingDown,  val: stats.entrees_jour,   money: false, iconCls: "text-emerald-400" },
+          { label: "Sorties aujourd'hui",   icon: TrendingUp,    val: stats.sorties_jour,   money: false, iconCls: "text-red-400"    },
+        ].map(({ label, icon: Icon, val, money, iconCls, badge }) => (
+          <div key={label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400 leading-tight">{label}</p>
+              <Icon className={`w-7 h-7 opacity-20 shrink-0 ${iconCls}`} />
+            </div>
+            {money ? (
+              <p className="text-3xl font-bold text-slate-900 tabular-nums leading-none">
+                {val.toLocaleString("fr-FR")}<span className="text-sm font-bold text-emerald-500 ml-1">FCFA</span>
+              </p>
+            ) : (
+              <p className="text-3xl font-bold text-slate-900 tabular-nums leading-none">{val}</p>
+            )}
+            {badge && <span className={`self-start mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.cls}`}>{badge.txt}</span>}
           </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.en_stock}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Valeur totale</p>
-            <DollarSign className="w-8 h-8 text-slate-400 opacity-20" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{formatPrice(stats.valeur_totale)}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Articles stock faible</p>
-            <AlertTriangle className="w-8 h-8 text-amber-400 opacity-20" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.stock_faible}</p>
-          {stats.stock_faible > 0 && (
-            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">Action requise</span>
-          )}
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Articles en rupture</p>
-            <XCircle className="w-8 h-8 text-red-400 opacity-20" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.en_rupture}</p>
-          {stats.en_rupture > 0 && (
-            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">Épuisé</span>
-          )}
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Entrées aujourd&apos;hui</p>
-            <TrendingDown className="w-8 h-8 text-emerald-400 opacity-20" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.entrees_jour}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Sorties aujourd&apos;hui</p>
-            <TrendingUp className="w-8 h-8 text-red-400 opacity-20" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.sorties_jour}</p>
-        </div>
+        ))}
       </div>
 
       {/* ── Search ── */}

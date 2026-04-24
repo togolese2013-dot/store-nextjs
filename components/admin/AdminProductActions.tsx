@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import ProductQuickViewModal from "./ProductQuickViewModal";
+import EditProductModal from "./EditProductModal";
 
 interface Product {
   id:             number;
@@ -21,8 +21,9 @@ interface Product {
 }
 
 export default function AdminProductActions({ product }: { product: Product }) {
-  const [showModal, setShowModal] = useState(false);
-  const [deleting,  setDeleting]  = useState(false);
+  const [showView, setShowView] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
 
   async function handleDelete() {
@@ -48,21 +49,21 @@ export default function AdminProductActions({ product }: { product: Product }) {
       <div className="flex items-center justify-end gap-1">
         {/* Quick view */}
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowView(true)}
           title="Voir les détails"
           className="p-2 rounded-xl hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
         >
           <Eye className="w-4 h-4" />
         </button>
 
-        {/* Edit */}
-        <Link
-          href={`/admin/products/${product.id}`}
+        {/* Edit — opens modal */}
+        <button
+          onClick={() => setShowEdit(true)}
           title="Modifier"
           className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
         >
           <Pencil className="w-4 h-4" />
-        </Link>
+        </button>
 
         {/* Delete */}
         <button
@@ -75,8 +76,15 @@ export default function AdminProductActions({ product }: { product: Product }) {
         </button>
       </div>
 
-      {showModal && (
-        <ProductQuickViewModal product={product} onClose={() => setShowModal(false)} />
+      {showView && (
+        <ProductQuickViewModal product={product} onClose={() => setShowView(false)} />
+      )}
+      {showEdit && (
+        <EditProductModal
+          productId={product.id}
+          productRef={product.reference}
+          onClose={() => setShowEdit(false)}
+        />
       )}
     </>
   );

@@ -38,6 +38,7 @@ interface PendingVariant {
 interface Props {
   categories: Category[];
   initial?:   Partial<ProductData>;
+  onSuccess?: () => void;
 }
 
 const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
@@ -47,7 +48,7 @@ function newVariant(): PendingVariant {
   return { _key: Math.random().toString(36).slice(2), nom: "", rawOptions: "", prix: "", stock: "", reference_sku: "", imageUrl: "", uploading: false };
 }
 
-export default function ProductForm({ categories, initial }: Props) {
+export default function ProductForm({ categories, initial, onSuccess }: Props) {
   const router  = useRouter();
   const isEdit  = !!initial?.id;
 
@@ -222,6 +223,7 @@ export default function ProductForm({ categories, initial }: Props) {
       }
 
       setSuccess(true);
+      if (onSuccess) { onSuccess(); return; }
       if (!isEdit) router.push(`/admin/products/${data.id}`);
       else         router.refresh();
     } catch { setError("Erreur réseau."); }
