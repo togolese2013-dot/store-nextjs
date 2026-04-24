@@ -1909,13 +1909,25 @@ export async function createAchat(data: {
       reference = `ACH-${year}-${num}`;
     }
     const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
-    // Add transport column if missing
+    // Ensure transport column exists (try/catch on ER_DUP_FIELDNAME like images_json)
+    let hasTransport = false;
     try {
-      await conn.execute(`ALTER TABLE achats ADD COLUMN IF NOT EXISTS transport VARCHAR(10) NULL`);
-    } catch { /* ignore */ }
+      await conn.execute(`ALTER TABLE achats ADD COLUMN transport VARCHAR(10) NULL`);
+      hasTransport = true;
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        hasTransport = true;
+      }
+    }
+    const achatCols  = ["fournisseur_id","reference","date_achat","statut","montant_total","notes"];
+    const achatVals: (string | number | null)[] = [
+      data.fournisseur_id ?? null, reference, data.date_achat, data.statut, montant_total, data.note ?? null,
+    ];
+    if (hasTransport) { achatCols.push("transport"); achatVals.push(data.transport ?? null); }
     const [res] = await conn.execute<mysql.ResultSetHeader>(
-      `INSERT INTO achats (fournisseur_id, reference, date_achat, statut, montant_total, notes, transport) VALUES (?,?,?,?,?,?,?)`,
-      [data.fournisseur_id ?? null, reference, data.date_achat, data.statut, montant_total, data.note ?? null, data.transport ?? null]
+      `INSERT INTO achats (${achatCols.join(",")}) VALUES (${achatCols.map(() => "?").join(",")})`,
+      achatVals
     );
     const achatId = res.insertId;
     for (const item of data.items) {

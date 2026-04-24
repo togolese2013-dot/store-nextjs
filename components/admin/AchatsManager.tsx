@@ -87,7 +87,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
       ...ln,
       produit_id:    prod.id,
       designation:   prod.nom,
-      prix_unitaire: prod.prix_unitaire,
+      prix_unitaire: "",   // user enters actual purchase price
       search:        prod.nom,
       showDropdown:  false,
     }));
@@ -309,9 +309,9 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
       {/* ── Create modal ── */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8 p-6 space-y-5">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8 p-8 space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg text-slate-900">Nouvel achat fournisseur</h2>
+              <h2 className="font-bold text-xl text-slate-900">Nouvel achat fournisseur</h2>
               <button onClick={() => { setShowForm(false); resetForm(); }} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -382,25 +382,15 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
               {/* Transport */}
               <div>
                 <label className={labelCls}>Mode de transport</label>
-                <div className="flex gap-2">
-                  {(["avion", "bateau"] as const).map(t => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, transport: f.transport === t ? "" : t }))}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${
-                        form.transport === t
-                          ? t === "avion"
-                            ? "border-sky-500 bg-sky-50 text-sky-700"
-                            : "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-slate-200 text-slate-500 hover:border-slate-300"
-                      }`}
-                    >
-                      {t === "avion" ? <Plane className="w-4 h-4" /> : <Ship className="w-4 h-4" />}
-                      {t === "avion" ? "Avion" : "Bateau"}
-                    </button>
-                  ))}
-                </div>
+                <select
+                  value={form.transport}
+                  onChange={e => setForm(f => ({ ...f, transport: e.target.value as "" | "avion" | "bateau" }))}
+                  className={inputCls}
+                >
+                  <option value="">— Non spécifié —</option>
+                  <option value="avion">✈ Avion</option>
+                  <option value="bateau">🚢 Bateau</option>
+                </select>
               </div>
 
               {/* Statut */}
@@ -441,11 +431,12 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
               </div>
               <div className="space-y-2">
                 {lines.map((ln, i) => {
-                  const filtered = products.filter(p =>
-                    ln.search.length > 0
-                      ? p.nom.toLowerCase().includes(ln.search.toLowerCase()) || p.reference.toLowerCase().includes(ln.search.toLowerCase())
-                      : true
-                  ).slice(0, 8);
+                  const filtered = ln.search.length > 0
+                    ? products.filter(p =>
+                        p.nom.toLowerCase().includes(ln.search.toLowerCase()) ||
+                        p.reference.toLowerCase().includes(ln.search.toLowerCase())
+                      ).slice(0, 10)
+                    : products.slice(0, 10);
 
                   return (
                     <div key={i} className="space-y-1">
