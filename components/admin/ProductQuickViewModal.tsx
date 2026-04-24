@@ -33,12 +33,14 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
   const price    = product.remise > 0 ? Math.max(0, product.prix_unitaire - product.remise) : product.prix_unitaire;
   const hasPromo = product.remise > 0;
 
-  // Build ordered image list: images array first, fallback to image_url
-  const allImages: string[] = product.images && product.images.length > 0
-    ? product.images.map(normalizeUrl)
-    : product.image_url
-      ? [normalizeUrl(product.image_url)]
-      : [];
+  // Build image list: main photo first, then secondary (deduplicated)
+  const mainUrl = product.image_url ? normalizeUrl(product.image_url) : null;
+  const allImages: string[] = [
+    ...(mainUrl ? [mainUrl] : []),
+    ...(product.images || [])
+      .filter(url => url !== product.image_url)
+      .map(normalizeUrl),
+  ];
 
   const [activeIdx, setActiveIdx] = useState(0);
   const mainImg = allImages[activeIdx] ?? null;

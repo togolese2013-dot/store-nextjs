@@ -170,17 +170,17 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           { label: "Entrées aujourd'hui",   icon: TrendingDown,  val: stats.entrees_jour,   money: false, iconCls: "text-emerald-400" },
           { label: "Sorties aujourd'hui",   icon: TrendingUp,    val: stats.sorties_jour,   money: false, iconCls: "text-red-400"    },
         ].map(({ label, icon: Icon, val, money, iconCls, badge }) => (
-          <div key={label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex flex-col gap-1">
+          <div key={label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-400 leading-tight">{label}</p>
               <Icon className={`w-7 h-7 opacity-20 shrink-0 ${iconCls}`} />
             </div>
             {money ? (
-              <p className="text-3xl font-bold text-slate-900 tabular-nums leading-none">
-                {val.toLocaleString("fr-FR")}<span className="text-sm font-bold text-emerald-500 ml-1">FCFA</span>
+              <p className="text-xl font-bold text-slate-900 tabular-nums leading-none">
+                {val.toLocaleString("fr-FR")}<span className="text-xs font-bold text-emerald-500 ml-1">FCFA</span>
               </p>
             ) : (
-              <p className="text-3xl font-bold text-slate-900 tabular-nums leading-none">{val}</p>
+              <p className="text-xl font-bold text-slate-900 tabular-nums leading-none">{val}</p>
             )}
             {badge && <span className={`self-start mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.cls}`}>{badge.txt}</span>}
           </div>
@@ -264,32 +264,25 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         </div>
 
         {isStockView && (
-          <div className="flex items-center bg-slate-100 rounded-2xl p-1 gap-1">
-            {statutTabs.map(tab => {
-              const isActive = statut === tab.key;
-              const activeColor =
-                tab.key === "disponible" ? "bg-green-500 text-white shadow-sm" :
-                tab.key === "faible"     ? "bg-amber-400 text-white shadow-sm" :
-                tab.key === "epuise"     ? "bg-red-500 text-white shadow-sm"   :
-                                           "bg-slate-600 text-white shadow-sm";
-              return (
-                <Link
-                  key={tab.key}
-                  href={buildUrl({ ...base, statut: tab.key !== "all" ? tab.key : undefined, page: undefined }, {})}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    isActive ? activeColor : "text-slate-500 hover:text-slate-800 hover:bg-white/60"
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${
-                    isActive ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"
-                  }`}>
-                    {tab.count}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+          <form method="GET" className="flex items-center gap-2">
+            <input type="hidden" name="view"   value={view !== "stock" ? view : ""} />
+            <input type="hidden" name="q"      value={q || ""} />
+            <input type="hidden" name="filter" value={activeFilter || ""} />
+            <select
+              name="statut"
+              defaultValue={statut}
+              className="px-4 py-2 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans font-semibold text-slate-600"
+            >
+              {statutTabs.map(tab => (
+                <option key={tab.key} value={tab.key !== "all" ? tab.key : ""}>
+                  {tab.label} ({tab.count})
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="px-4 py-2 rounded-2xl bg-slate-700 text-white font-bold text-sm hover:bg-slate-600 transition-colors">
+              OK
+            </button>
+          </form>
         )}
       </div>
 

@@ -52,9 +52,8 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
   const router  = useRouter();
   const isEdit  = !!initial?.id;
 
-  const initialImages = initial?.images?.length
-    ? initial.images
-    : initial?.image_url ? [initial.image_url] : [];
+  // Secondary images = images_json WITHOUT image_url (strip duplicates)
+  const secondaryImages = (initial?.images ?? []).filter(url => url !== initial?.image_url);
 
   const [form, setForm] = useState<ProductData>({
     reference:     initial?.reference     ?? "",
@@ -69,12 +68,13 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
     actif:         initial?.actif         ?? true,
     image_url:     initial?.image_url     ?? "",
     ...initial,
-    images:        initialImages,
+    images:        secondaryImages,
   });
 
-  const [loading,   setLoading]   = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error,     setError]     = useState("");
+  const [loading,        setLoading]        = useState(false);
+  const [uploadingMain,  setUploadingMain]  = useState(false);
+  const [uploadingSecond,setUploadingSecond]= useState(false);
+  const [error,          setError]          = useState("");
   const [success,   setSuccess]   = useState(false);
   const [schema,    setSchema]    = useState({ hasRemise: true, hasNeuf: true, hasImagesJson: true });
 
@@ -127,29 +127,40 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
     });
   }
 
-  // ── Gallery upload ─────────────────────────────────────────────────────────
-  async function handleUploadImages(e: React.ChangeEvent<HTMLInputElement>) {
+  // ── Upload helpers ─────────────────────────────────────────────────────────
+  async function uploadFiles(files: File[]): Promise<string[]> {
+    const compressed = await Promise.all(files.map(f => compressImage(f)));
+    const b64Files   = await Promise.all(compressed.map(toBase64));
+    const res  = await fetch("/api/admin/upload", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ files: b64Files }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Erreur upload");
+    return data.urls ?? [];
+  }
+
+  async function handleUploadMain(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingMain(true); setError("");
+    try {
+      const urls = await uploadFiles([file]);
+      if (urls[0]) set("image_url", urls[0]);
+    } catch (err) { setError(err instanceof Error ? err.message : "Erreur réseau"); }
+    finally { setUploadingMain(false); e.target.value = ""; }
+  }
+
+  async function handleUploadSecondary(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files?.length) return;
-    setUploading(true);
+    setUploadingSecond(true); setError("");
     try {
-      const compressed = await Promise.all(Array.from(files).map(f => compressImage(f)));
-      const b64Files   = await Promise.all(compressed.map(toBase64));
-      const res  = await fetch("/api/admin/upload", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ files: b64Files }),
-      });
-      const data = await res.json();
-      if (res.ok && data.urls) {
-        const newImages = [...form.images, ...data.urls];
-        set("images", newImages);
-        if (!form.image_url && data.urls[0]) set("image_url", data.urls[0]);
-      } else {
-        setError(data.error || "Erreur lors de l'upload");
-      }
-    } catch { setError("Erreur réseau"); }
-    finally   { setUploading(false); e.target.value = ""; }
+      const urls = await uploadFiles(Array.from(files));
+      set("images", [...form.images, ...urls]);
+    } catch (err) { setError(err instanceof Error ? err.message : "Erreur réseau"); }
+    finally { setUploadingSecond(false); e.target.value = ""; }
   }
 
   // ── Variant helpers ────────────────────────────────────────────────────────
@@ -244,45 +255,70 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
         <div className="flex flex-col lg:flex-row min-h-0">
 
           {/* ── Left — Images ── */}
-          <div className="w-full lg:w-72 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-slate-100 p-5 space-y-3 bg-slate-50/60">
-            <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Images produit</p>
-            <p className="text-xs text-slate-400 mb-3">La 1ère image = image principale.</p>
+          <div className="w-full lg:w-72 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-slate-100 p-5 space-y-4 bg-slate-50/60">
 
-            <label className={clsx(
-              "flex flex-col items-center gap-2 py-7 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-400 cursor-pointer",
-              "hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50/40 transition-all",
-              uploading && "opacity-60 pointer-events-none"
-            )}>
-              {uploading ? <Loader2 className="w-7 h-7 animate-spin" /> : <ImagePlus className="w-7 h-7" />}
-              <span className="text-sm font-semibold">{uploading ? "Upload…" : "Ajouter des images"}</span>
-              <span className="text-xs">JPG, PNG, WebP</span>
-              <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={handleUploadImages} disabled={uploading} className="sr-only" />
-            </label>
-
-            {form.images.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {form.images.map((url, idx) => (
-                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden bg-slate-100 border-2 border-transparent hover:border-brand-300 transition-all">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                    {idx === 0 && (
-                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-brand-900 text-white text-[9px] font-bold leading-none">Principal</span>
-                    )}
-                    <button type="button"
-                      onClick={() => {
-                        const next = form.images.filter((_, i) => i !== idx);
-                        set("images", next);
-                        if (form.image_url === url) set("image_url", next[0] ?? "");
-                      }}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center shadow-sm hover:bg-red-600 transition-colors"
-                    >×</button>
+            {/* Photo principale */}
+            <div>
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-2">Photo principale</p>
+              <label className={clsx(
+                "relative flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden cursor-pointer",
+                "hover:border-brand-400 transition-all",
+                uploadingMain && "opacity-60 pointer-events-none"
+              )}>
+                {form.image_url ? (
+                  <img src={form.image_url} alt="" className="w-full h-full object-contain p-1" />
+                ) : uploadingMain ? (
+                  <div className="flex flex-col items-center gap-2 text-slate-400">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span className="text-xs">Upload…</span>
                   </div>
-                ))}
-              </div>
-            )}
-            {form.images.length === 0 && (
-              <p className="text-xs text-slate-400 text-center">Aucune image</p>
-            )}
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-slate-400 hover:text-brand-600">
+                    <ImagePlus className="w-7 h-7" />
+                    <span className="text-xs font-semibold">Choisir une photo</span>
+                  </div>
+                )}
+                <input type="file" accept="image/jpeg,image/png,image/webp"
+                  onChange={handleUploadMain} disabled={uploadingMain} className="sr-only" />
+              </label>
+              {form.image_url && (
+                <button type="button" onClick={() => set("image_url", "")}
+                  className="mt-1.5 w-full text-xs text-red-500 hover:text-red-600 font-semibold text-center">
+                  Supprimer
+                </button>
+              )}
+            </div>
+
+            {/* Photos secondaires */}
+            <div>
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-2">Photos secondaires</p>
+              <label className={clsx(
+                "flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 bg-white text-slate-400 cursor-pointer text-xs font-semibold",
+                "hover:border-brand-400 hover:text-brand-600 transition-all",
+                uploadingSecond && "opacity-60 pointer-events-none"
+              )}>
+                {uploadingSecond ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                {uploadingSecond ? "Upload…" : "Ajouter des photos"}
+                <input type="file" multiple accept="image/jpeg,image/png,image/webp"
+                  onChange={handleUploadSecondary} disabled={uploadingSecond} className="sr-only" />
+              </label>
+
+              {form.images.length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5 mt-2">
+                  {form.images.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 border border-transparent hover:border-brand-300 transition-all">
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <button type="button"
+                        onClick={() => set("images", form.images.filter((_, i) => i !== idx))}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center hover:bg-red-600">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {form.images.length === 0 && (
+                <p className="text-[10px] text-slate-400 text-center mt-1">Aucune photo secondaire</p>
+              )}
+            </div>
           </div>
 
           {/* ── Right — Form fields ── */}

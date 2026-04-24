@@ -39,12 +39,15 @@ export default function AddProductModal({ categories, marques }: Props) {
   const [actif,        setActif]       = useState(true);
   const [neuf,         setNeuf]        = useState(false);
 
-  // Images — ordered array, index 0 = principale
-  const [images,        setImages]        = useState<string[]>([]);
-  const [uploadingImgs, setUploadingImgs] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Images — main (single) + secondary (multiple)
+  const [mainImage,       setMainImage]       = useState("");
+  const [secondImages,    setSecondImages]    = useState<string[]>([]);
+  const [uploadingMain,   setUploadingMain]   = useState(false);
+  const [uploadingSecond, setUploadingSecond] = useState(false);
+  const mainInputRef   = useRef<HTMLInputElement>(null);
+  const secondInputRef = useRef<HTMLInputElement>(null);
 
-  // Drag-to-reorder state
+  // Drag-to-reorder state (secondary images)
   const dragIdx = useRef<number | null>(null);
 
   // Variants
@@ -55,7 +58,7 @@ export default function AddProductModal({ categories, marques }: Props) {
   const [error,   setError]   = useState("");
 
 
-  // ── Upload images ──────────────────────────────────────────────────────────
+  // ── Upload helpers ─────────────────────────────────────────────────────────
   async function toBase64(file: File): Promise<{ data: string; type: string }> {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -65,37 +68,48 @@ export default function AddProductModal({ categories, marques }: Props) {
     });
   }
 
-  async function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    setUploadingImgs(true);
-    setError("");
-    try {
-      const b64Files = await Promise.all(files.map(toBase64));
-      const res  = await fetch("/api/admin/upload", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ files: b64Files }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.errors?.[0] || data.error || "Erreur upload");
-      setImages(prev => [...prev, ...(data.urls ?? [])]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur upload");
-    } finally {
-      setUploadingImgs(false);
-      e.target.value = "";
-    }
+  async function uploadFiles(files: File[]): Promise<string[]> {
+    const b64Files = await Promise.all(files.map(toBase64));
+    const res  = await fetch("/api/admin/upload", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ files: b64Files }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.errors?.[0] || data.error || "Erreur upload");
+    return data.urls ?? [];
   }
 
-  // ── Drag-to-reorder ────────────────────────────────────────────────────────
+  async function handleMainImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingMain(true); setError("");
+    try {
+      const urls = await uploadFiles([file]);
+      if (urls[0]) setMainImage(urls[0]);
+    } catch (err) { setError(err instanceof Error ? err.message : "Erreur upload"); }
+    finally { setUploadingMain(false); e.target.value = ""; }
+  }
+
+  async function handleSecondaryImages(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setUploadingSecond(true); setError("");
+    try {
+      const urls = await uploadFiles(files);
+      setSecondImages(prev => [...prev, ...urls]);
+    } catch (err) { setError(err instanceof Error ? err.message : "Erreur upload"); }
+    finally { setUploadingSecond(false); e.target.value = ""; }
+  }
+
+  // ── Drag-to-reorder (secondary images) ────────────────────────────────────
   function onDragStart(idx: number) { dragIdx.current = idx; }
 
   function onDragOver(e: React.DragEvent, idx: number) {
     e.preventDefault();
     const from = dragIdx.current;
     if (from === null || from === idx) return;
-    setImages(prev => {
+    setSecondImages(prev => {
       const arr = [...prev];
       const [item] = arr.splice(from, 1);
       arr.splice(idx, 0, item);
@@ -106,9 +120,9 @@ export default function AddProductModal({ categories, marques }: Props) {
 
   function onDragEnd() { dragIdx.current = null; }
 
-  function moveImage(from: number, to: number) {
-    if (to < 0 || to >= images.length) return;
-    setImages(prev => {
+  function moveSecondary(from: number, to: number) {
+    if (to < 0 || to >= secondImages.length) return;
+    setSecondImages(prev => {
       const arr = [...prev];
       const [item] = arr.splice(from, 1);
       arr.splice(to, 0, item);
@@ -141,7 +155,7 @@ export default function AddProductModal({ categories, marques }: Props) {
     setNom(""); setCategorie(""); setMarque(""); setDescription("");
     setPrixAchat(""); setPrixVente(""); setRemise("");
     setStockMag(""); setSeuilMin("5"); setActif(true); setNeuf(false);
-    setImages([]); setVariants([]); setError("");
+    setMainImage(""); setSecondImages([]); setVariants([]); setError("");
   }, []);
 
   function closeModal() { setOpen(false); reset(); }
@@ -169,8 +183,8 @@ export default function AddProductModal({ categories, marques }: Props) {
         stock_minimum: seuilMin  ? Number(seuilMin)  : 5,
         actif,
         neuf,
-        image_url:     images[0] ?? null,
-        images:        images.length > 0 ? images : undefined,
+        image_url:     mainImage || null,
+        images:        secondImages.length > 0 ? secondImages : undefined,
       };
 
       const res  = await fetch("/api/admin/products", {
@@ -236,99 +250,92 @@ export default function AddProductModal({ categories, marques }: Props) {
               <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
 
                 {/* ── Left — Images ── */}
-                <div className="w-full lg:w-72 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-slate-100 overflow-y-auto p-4 space-y-3 bg-slate-50/60 max-h-56 lg:max-h-none">
+                <div className="w-full lg:w-72 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-slate-100 overflow-y-auto p-4 space-y-4 bg-slate-50/60 max-h-64 lg:max-h-none">
+
+                  {/* Photo principale */}
                   <div>
-                    <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Images produit</p>
-                    <p className="text-xs text-slate-400 mb-3">La 1ère image = image principale. Glisse pour réordonner.</p>
+                    <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-2">Photo principale</p>
+                    <button
+                      type="button"
+                      onClick={() => mainInputRef.current?.click()}
+                      disabled={uploadingMain}
+                      className="w-full relative aspect-square rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden hover:border-brand-400 transition-all disabled:opacity-50"
+                    >
+                      {mainImage ? (
+                        <img src={mainImage} alt="" className="w-full h-full object-contain p-1" />
+                      ) : uploadingMain ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400">
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                          <span className="text-xs">Upload…</span>
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-brand-600">
+                          <ImagePlus className="w-7 h-7" />
+                          <span className="text-xs font-semibold">Choisir une photo</span>
+                        </div>
+                      )}
+                    </button>
+                    {mainImage && (
+                      <button type="button" onClick={() => setMainImage("")}
+                        className="mt-1.5 w-full text-xs text-red-500 hover:text-red-600 font-semibold text-center">
+                        Supprimer
+                      </button>
+                    )}
+                    <input ref={mainInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+                      onChange={handleMainImage} className="sr-only" />
                   </div>
 
-                  {/* Upload zone */}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImgs}
-                    className="w-full flex flex-col items-center gap-2 py-8 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50/40 transition-all disabled:opacity-50"
-                  >
-                    {uploadingImgs
-                      ? <Loader2 className="w-7 h-7 animate-spin" />
-                      : <ImagePlus className="w-7 h-7" />
-                    }
-                    <span className="text-sm font-semibold">
-                      {uploadingImgs ? "Upload en cours…" : "Ajouter des images"}
-                    </span>
-                    <span className="text-xs">JPG, PNG, WebP — plusieurs à la fois</span>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handleImageFiles}
-                    className="sr-only"
-                  />
+                  {/* Photos secondaires */}
+                  <div>
+                    <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-2">Photos secondaires</p>
+                    <button
+                      type="button"
+                      onClick={() => secondInputRef.current?.click()}
+                      disabled={uploadingSecond}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 transition-all disabled:opacity-50 text-xs font-semibold"
+                    >
+                      {uploadingSecond ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      {uploadingSecond ? "Upload…" : "Ajouter des photos"}
+                    </button>
+                    <input ref={secondInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp"
+                      onChange={handleSecondaryImages} className="sr-only" />
 
-                  {/* Image grid with drag-to-reorder */}
-                  {images.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {images.map((url, idx) => (
-                        <div
-                          key={url + idx}
-                          draggable
-                          onDragStart={() => onDragStart(idx)}
-                          onDragOver={e => onDragOver(e, idx)}
-                          onDragEnd={onDragEnd}
-                          className="relative group aspect-square rounded-xl overflow-hidden bg-slate-100 border-2 border-transparent hover:border-blue-300 cursor-grab active:cursor-grabbing transition-all"
-                        >
-                          <img src={url} alt="" className="w-full h-full object-cover" />
-
-                          {/* Badge principale */}
-                          {idx === 0 && (
-                            <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-blue-600 text-white text-[9px] font-bold leading-none">
-                              Principal
-                            </span>
-                          )}
-
-                          {/* Drag handle — desktop only */}
-                          <div className="absolute bottom-1.5 left-1.5 hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity">
-                            <GripVertical className="w-4 h-4 text-white drop-shadow" />
+                    {secondImages.length > 0 && (
+                      <div className="grid grid-cols-3 gap-1.5 mt-2">
+                        {secondImages.map((url, idx) => (
+                          <div
+                            key={url + idx}
+                            draggable
+                            onDragStart={() => onDragStart(idx)}
+                            onDragOver={e => onDragOver(e, idx)}
+                            onDragEnd={onDragEnd}
+                            className="relative group aspect-square rounded-lg overflow-hidden bg-slate-100 border border-transparent hover:border-blue-300 cursor-grab transition-all"
+                          >
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <div className="absolute bottom-0.5 right-0.5 flex gap-0.5">
+                              {idx > 0 && (
+                                <button type="button" onClick={() => moveSecondary(idx, idx - 1)}
+                                  className="w-4 h-4 rounded bg-black/60 text-white text-[10px] flex items-center justify-center">‹</button>
+                              )}
+                              {idx < secondImages.length - 1 && (
+                                <button type="button" onClick={() => moveSecondary(idx, idx + 1)}
+                                  className="w-4 h-4 rounded bg-black/60 text-white text-[10px] flex items-center justify-center">›</button>
+                              )}
+                            </div>
+                            <button type="button"
+                              onClick={() => setSecondImages(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center hover:bg-red-600">×</button>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                    {secondImages.length > 0 && (
+                      <p className="text-[10px] text-center text-slate-400 mt-1">{secondImages.length} photo{secondImages.length > 1 ? "s" : ""} · glisse pour réordonner</p>
+                    )}
+                  </div>
 
-                          {/* Move buttons — always visible */}
-                          <div className="absolute bottom-1.5 right-1.5 flex gap-0.5">
-                            {idx > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => moveImage(idx, idx - 1)}
-                                className="w-5 h-5 rounded bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black/80"
-                                title="Déplacer à gauche"
-                              >‹</button>
-                            )}
-                            {idx < images.length - 1 && (
-                              <button
-                                type="button"
-                                onClick={() => moveImage(idx, idx + 1)}
-                                className="w-5 h-5 rounded bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black/80"
-                                title="Déplacer à droite"
-                              >›</button>
-                            )}
-                          </div>
-
-                          {/* Delete */}
-                          <button
-                            type="button"
-                            onClick={() => setImages(prev => prev.filter((_, i) => i !== idx))}
-                            className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600 shadow-sm transition-colors"
-                          >×</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {images.length > 1 && (
-                    <p className="text-xs text-center text-slate-400">
-                      {images.length} images · glisse pour changer l&apos;ordre
-                    </p>
-                  )}
+                  {/* hidden — drag handle icon kept for legacy import */}
+                  <span className="hidden"><GripVertical /></span>
                 </div>
 
                 {/* ── Right — Form ── */}

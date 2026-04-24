@@ -62,8 +62,12 @@ export default async function ProductPage({ params }: PageProps) {
   const outOf    = stockDisp === 0;
   const isLow    = stockDisp > 0 && stockDisp <= 5;
 
-  /* Image src */
+  /* Image list: main first, then secondary (no duplicates) */
   const rawUrl = product.image_url || product.images?.[0] || null;
+  const allProductImages: string[] = [
+    ...(product.image_url ? [product.image_url] : []),
+    ...(product.images ?? []).filter(url => url !== product.image_url),
+  ];
 
   /* JSON-LD — Schema.org Product */
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-nextjs-production.up.railway.app";
@@ -156,10 +160,9 @@ export default async function ProductPage({ params }: PageProps) {
 
             {/* Image column */}
             <div className="lg:rounded-l-3xl overflow-hidden border-r border-slate-100">
-              <ProductImageGallerySimple 
-                images={product.images || []}
+              <ProductImageGallerySimple
+                images={allProductImages}
                 productName={product.nom}
-                defaultImage={imgSrc}
               />
 
               {/* Badges overlay */}
