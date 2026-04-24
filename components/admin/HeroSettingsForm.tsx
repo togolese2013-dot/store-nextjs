@@ -22,14 +22,6 @@ interface Props { settings: Record<string, string> }
 const inputCls  = "w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
 const labelCls  = "block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wide";
 
-const GRADIENT_PRESETS = [
-  { label: "Vert forêt",  value: "from-[#052e16] via-[#14532d] to-[#166534]",  dot: "#14532d" },
-  { label: "Vert foncé",  value: "from-[#052e16] via-[#0f3d1e] to-[#14532d]",  dot: "#0f3d1e" },
-  { label: "Vert moyen",  value: "from-[#14532d] via-[#15803d] to-[#16a34a]",  dot: "#15803d" },
-  { label: "Noir",        value: "from-[#111827] via-[#1f2937] to-[#374151]",  dot: "#1f2937" },
-  { label: "Navy bleu",   value: "from-[#0A2463] via-[#1E3A8A] to-[#1e40af]",  dot: "#1E3A8A" },
-  { label: "Violet",      value: "from-[#1a0533] via-[#3b0764] to-[#4c0d99]",  dot: "#3b0764" },
-];
 
 const DEFAULT_SLIDE: HeroSlide = {
   eyebrow:   "Nouveau",
@@ -206,10 +198,11 @@ export default function HeroSettingsForm({ settings }: Props) {
                 <GripVertical className="w-4 h-4 text-slate-300 shrink-0" />
 
                 {/* Mini preview */}
-                <div className={`w-12 h-8 rounded-lg bg-gradient-to-br ${slide.gradient} shrink-0 overflow-hidden relative`}>
-                  {slide.image && (
-                    <img src={slide.image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />
-                  )}
+                <div className="w-12 h-8 rounded-lg bg-slate-200 shrink-0 overflow-hidden relative">
+                  {slide.image
+                    ? <img src={slide.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    : <div className="absolute inset-0 flex items-center justify-center"><ImageIcon className="w-4 h-4 text-slate-400" /></div>
+                  }
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -279,18 +272,25 @@ export default function HeroSettingsForm({ settings }: Props) {
 
                   {/* Image upload */}
                   <div>
-                    <label className={labelCls}>Image (droite du hero)</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className={labelCls} style={{ marginBottom: 0 }}>Image de fond</label>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        Recommandé : <strong>1920 × 600 px</strong> · JPG / PNG / WebP · max 10 Mo
+                      </span>
+                    </div>
                     {slide.image ? (
-                      <div className="flex items-start gap-3">
-                        <img src={slide.image} alt="Preview"
-                          className="h-24 w-auto rounded-xl border border-slate-200 object-contain bg-slate-50" />
-                        <div className="flex flex-col gap-2">
+                      <div className="space-y-2">
+                        <div className="relative w-full rounded-xl overflow-hidden bg-slate-100" style={{ aspectRatio: "16/5" }}>
+                          <img src={slide.image} alt="Preview"
+                            className="absolute inset-0 w-full h-full object-cover" />
+                          <div className="absolute inset-0"
+                            style={{ background: "linear-gradient(to right,rgba(0,0,0,0.55) 0%,rgba(0,0,0,0.25) 55%,rgba(0,0,0,0.05) 100%)" }} />
+                        </div>
+                        <div className="flex gap-2">
                           <label className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-slate-300 hover:border-brand-400 text-xs font-semibold text-slate-600 hover:text-brand-700 transition-colors cursor-pointer">
-                            {uploading === i
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <Upload className="w-3.5 h-3.5" />}
+                            {uploading === i ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                             Remplacer
-                            <input type="file" accept="image/*" className="hidden"
+                            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
                               onChange={e => { const f = e.target.files?.[0]; if (f) uploadSlideImage(i, f); }} />
                           </label>
                           <button type="button" onClick={() => updateSlide(i, "image", "")}
@@ -301,89 +301,53 @@ export default function HeroSettingsForm({ settings }: Props) {
                         </div>
                       </div>
                     ) : (
-                      <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-400 transition-colors cursor-pointer group">
+                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-400 transition-colors cursor-pointer group bg-slate-50" style={{ aspectRatio: "16/5" }}>
                         {uploading === i ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+                          <Loader2 className="w-7 h-7 animate-spin text-brand-500" />
                         ) : (
                           <>
-                            <ImageIcon className="w-6 h-6 text-slate-300 group-hover:text-brand-400 transition-colors mb-1" />
-                            <span className="text-xs text-slate-400 group-hover:text-brand-600 font-medium transition-colors">
-                              Cliquer pour uploader une image
-                            </span>
+                            <ImageIcon className="w-7 h-7 text-slate-300 group-hover:text-brand-400 transition-colors mb-2" />
+                            <span className="text-xs text-slate-400 group-hover:text-brand-600 font-semibold transition-colors">Cliquer pour uploader</span>
+                            <span className="text-[11px] text-slate-300 mt-0.5">1920 × 600 px recommandé</span>
                           </>
                         )}
-                        <input type="file" accept="image/*" className="hidden"
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
                           onChange={e => { const f = e.target.files?.[0]; if (f) uploadSlideImage(i, f); }} />
                       </label>
                     )}
                   </div>
 
-                  {/* Dégradé + accent */}
-                  <div className="grid sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className={labelCls}>Dégradé de fond</label>
-                      <div className="flex flex-wrap gap-2">
-                        {GRADIENT_PRESETS.map(g => (
-                          <button key={g.value} type="button"
-                            onClick={() => updateSlide(i, "gradient", g.value)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all ${
-                              slide.gradient === g.value
-                                ? "border-brand-700 text-brand-800 bg-brand-50"
-                                : "border-slate-200 text-slate-600 hover:border-slate-300"
-                            }`}
-                          >
-                            <span className={`w-8 h-3.5 rounded-md bg-gradient-to-r ${g.value}`} />
-                            {g.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Couleur accent</label>
-                      <div className="flex gap-2 items-center">
-                        <input type="color" value={slide.accent}
-                          onChange={e => updateSlide(i, "accent", e.target.value)}
-                          className="w-10 h-10 rounded-xl border border-slate-200 cursor-pointer p-1 shrink-0"
-                        />
-                        <input type="text" value={slide.accent}
-                          onChange={e => updateSlide(i, "accent", e.target.value)}
-                          className={`${inputCls} font-mono`}
-                          placeholder="#22c55e"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live preview */}
+                  {/* Live preview — fidèle au rendu vitrine */}
                   <div>
-                    <label className={labelCls}>Aperçu</label>
-                    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${slide.gradient} p-5 min-h-[120px] flex items-center gap-4`}
-                      style={{ boxShadow: `0 8px 24px ${slide.accent}30` }}>
-                      {/* Dot grid */}
-                      <div className="absolute inset-0 opacity-[0.04]"
-                        style={{ backgroundImage: "radial-gradient(circle,#fff 1px,transparent 1px)", backgroundSize: "24px 24px" }} />
-                      {/* Accent circle */}
-                      <div className="absolute -right-16 -top-16 w-48 h-48 rounded-full pointer-events-none"
-                        style={{ background: `${slide.accent}15` }} />
-
-                      <div className="flex-1 relative z-10 text-white">
-                        {slide.eyebrow && (
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: slide.accent }}>
-                            {slide.eyebrow}
-                          </p>
-                        )}
-                        <p className="font-bold text-lg leading-tight whitespace-pre-line">{slide.title || "Titre"}</p>
-                        <p className="text-white/70 text-xs mt-1 line-clamp-2">{slide.subtitle}</p>
-                        {slide.cta_label && (
-                          <span className="inline-block mt-3 px-4 py-1.5 rounded-xl text-xs font-bold text-white"
-                            style={{ background: slide.accent }}>
-                            {slide.cta_label}
-                          </span>
-                        )}
-                      </div>
+                    <label className={labelCls}>Aperçu vitrine</label>
+                    <div className="relative overflow-hidden rounded-2xl bg-slate-800" style={{ aspectRatio: "16/5" }}>
+                      {/* Image plein fond */}
                       {slide.image && (
-                        <img src={slide.image} alt="" className="h-20 w-auto object-contain opacity-80 relative z-10 shrink-0" />
+                        <img src={slide.image} alt=""
+                          className="absolute inset-0 w-full h-full object-cover" />
                       )}
+                      {/* Overlay gradient */}
+                      <div className="absolute inset-0"
+                        style={{ background: "linear-gradient(to right,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.30) 55%,rgba(0,0,0,0.05) 100%)" }} />
+                      {/* Texte */}
+                      <div className="absolute inset-0 flex items-center px-6">
+                        <div>
+                          {slide.eyebrow && (
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-brand-400 mb-1">{slide.eyebrow}</p>
+                          )}
+                          <p className="font-bold text-sm text-white leading-tight whitespace-pre-line">
+                            {slide.title || "Titre du slide"}
+                          </p>
+                          {slide.subtitle && (
+                            <p className="text-white/60 text-[10px] mt-1 line-clamp-1">{slide.subtitle}</p>
+                          )}
+                          {slide.cta_label && (
+                            <span className="inline-block mt-2 px-3 py-1 rounded-lg text-[10px] font-bold text-white bg-brand-600">
+                              {slide.cta_label}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
