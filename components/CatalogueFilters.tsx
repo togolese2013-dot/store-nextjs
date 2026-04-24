@@ -1,32 +1,42 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import type { Category } from "@/lib/utils";
 import {
   SlidersHorizontal, Search, Tag, Sparkles, X, ChevronDown, Check,
+  Package, DollarSign,
 } from "lucide-react";
 import { clsx } from "clsx";
 
 interface Props {
-  categories:        Category[];
+  categories:         Category[];
   currentCategoryId?: number;
-  currentSearch?:    string;
-  promoOnly:         boolean;
-  newOnly:           boolean;
-  mobileOnly?:       boolean;
+  currentSearch?:     string;
+  promoOnly:          boolean;
+  newOnly:            boolean;
+  inStock?:           boolean;
+  minPrice?:          number;
+  maxPrice?:          number;
+  mobileOnly?:        boolean;
 }
 
 function FilterPanel({
-  categories, currentCategoryId, currentSearch, promoOnly, newOnly, onClose,
+  categories, currentCategoryId, currentSearch,
+  promoOnly, newOnly, inStock: initInStock,
+  minPrice: initMin, maxPrice: initMax,
+  onClose,
 }: Omit<Props, "mobileOnly"> & { onClose?: () => void }) {
   const router   = useRouter();
   const pathname = usePathname();
 
-  const [q,      setQ]      = useState(currentSearch ?? "");
-  const [catId,  setCatId]  = useState<number | undefined>(currentCategoryId);
-  const [promo,  setPromo]  = useState(promoOnly);
-  const [isNew,  setIsNew]  = useState(newOnly);
+  const [q,        setQ]       = useState(currentSearch ?? "");
+  const [catId,    setCatId]   = useState<number | undefined>(currentCategoryId);
+  const [promo,    setPromo]   = useState(promoOnly);
+  const [isNew,    setIsNew]   = useState(newOnly);
+  const [stock,    setStock]   = useState(initInStock ?? false);
+  const [minP,     setMinP]    = useState(initMin != null ? String(initMin) : "");
+  const [maxP,     setMaxP]    = useState(initMax != null ? String(initMax) : "");
 
   function apply() {
     const sp = new URLSearchParams();
@@ -34,19 +44,28 @@ function FilterPanel({
     if (catId)     sp.set("category", String(catId));
     if (promo)     sp.set("promo", "true");
     if (isNew)     sp.set("new", "true");
+    if (stock)     sp.set("inStock", "true");
+    const minNum = Number(minP.replace(/\s/g, ""));
+    const maxNum = Number(maxP.replace(/\s/g, ""));
+    if (minP.trim() && !isNaN(minNum) && minNum > 0) sp.set("minPrice", String(minNum));
+    if (maxP.trim() && !isNaN(maxNum) && maxNum > 0) sp.set("maxPrice", String(maxNum));
     const qs = sp.toString();
     router.push(`/products${qs ? `?${qs}` : ""}`);
     onClose?.();
   }
 
   function reset() {
-    setQ(""); setCatId(undefined); setPromo(false); setIsNew(false);
+    setQ(""); setCatId(undefined); setPromo(false);
+    setIsNew(false); setStock(false); setMinP(""); setMaxP("");
     router.push("/products");
     onClose?.();
   }
 
   const dirty = q.trim() !== (currentSearch ?? "") ||
-    catId !== currentCategoryId || promo !== promoOnly || isNew !== newOnly;
+    catId !== currentCategoryId || promo !== promoOnly || isNew !== newOnly ||
+    stock !== (initInStock ?? false) ||
+    minP !== (initMin != null ? String(initMin) : "") ||
+    maxP !== (initMax != null ? String(initMax) : "");
 
   return (
     <div className="bg-white rounded-3xl border border-slate-200 p-5 space-y-6">
@@ -109,6 +128,77 @@ function FilterPanel({
             Nouveautés seulement
             {isNew && <Check className="w-4 h-4 ml-auto text-brand-500" />}
           </button>
+          <button
+            onClick={() => setStock(!stock)}
+            className={clsx(
+              "flex items-center gap-2 px-4 py-2.5 rounded-2xl border-2 text-sm font-semibold transition-all",
+              stock
+                ? "border-green-500 bg-green-50 text-green-700"
+                : "border-slate-200 text-slate-600 hover:border-slate-300"
+            )}
+          >
+            <Package className="w-4 h-4" />
+            En stock uniquement
+            {stock && <Check className="w-4 h-4 ml-auto text-green-500" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Price range */}
+      <div>
+        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+          Prix (FCFA)
+        </label>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              type="number"
+              value={minP}
+              onChange={e => setMinP(e.target.value)}
+              placeholder="Min"
+              min={0}
+              className="w-full px-3 py-2.5 text-sm bg-slate-50 rounded-2xl border-2 border-slate-200 focus:border-brand-500 focus:bg-white outline-none transition-all font-sans"
+            />
+          </div>
+          <span className="text-slate-400 text-sm font-medium shrink-0">—</span>
+          <div className="relative flex-1">
+            <input
+              type="number"
+              value={maxP}
+              onChange={e => setMaxP(e.target.value)}
+              placeholder="Max"
+              min={0}
+              className="w-full px-3 py-2.5 text-sm bg-slate-50 rounded-2xl border-2 border-slate-200 focus:border-brand-500 focus:bg-white outline-none transition-all font-sans"
+            />
+          </div>
+        </div>
+        {/* Quick price presets */}
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {[
+            { label: "< 10k",   min: undefined, max: 10000 },
+            { label: "10–50k",  min: 10000,     max: 50000 },
+            { label: "50–100k", min: 50000,     max: 100000 },
+            { label: "> 100k",  min: 100000,    max: undefined },
+          ].map(preset => {
+            const active = String(preset.min ?? "") === minP && String(preset.max ?? "") === maxP;
+            return (
+              <button
+                key={preset.label}
+                onClick={() => {
+                  setMinP(preset.min != null ? String(preset.min) : "");
+                  setMaxP(preset.max != null ? String(preset.max) : "");
+                }}
+                className={clsx(
+                  "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                  active
+                    ? "border-brand-500 bg-brand-50 text-brand-700"
+                    : "border-slate-200 text-slate-600 hover:border-slate-300"
+                )}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -170,6 +260,14 @@ function FilterPanel({
 export default function CatalogueFilters(props: Props) {
   const [open, setOpen] = useState(false);
 
+  // Count active non-default filters for badge
+  const activeCount = [
+    props.promoOnly, props.newOnly, props.inStock,
+    props.currentCategoryId != null,
+    props.currentSearch,
+    props.minPrice != null || props.maxPrice != null,
+  ].filter(Boolean).length;
+
   if (props.mobileOnly) {
     return (
       <>
@@ -178,8 +276,10 @@ export default function CatalogueFilters(props: Props) {
           className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-700 hover:border-brand-400 transition-all"
         >
           <SlidersHorizontal className="w-4 h-4" /> Filtres
-          {(props.promoOnly || props.newOnly || props.currentCategoryId || props.currentSearch) && (
-            <span className="w-2 h-2 rounded-full bg-accent-500 shrink-0" />
+          {activeCount > 0 && (
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-brand-700 text-white text-[10px] font-bold shrink-0">
+              {activeCount}
+            </span>
           )}
         </button>
 

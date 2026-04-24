@@ -22,6 +22,9 @@ interface PageProps {
     new?:      string;
     page?:     string;
     sort?:     string;
+    inStock?:  string;
+    minPrice?: string;
+    maxPrice?: string;
   }>;
 }
 
@@ -40,8 +43,11 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const params   = await searchParams;
   const q        = params.q?.trim() || undefined;
   const catId    = params.category ? Number(params.category) : undefined;
-  const promoOnly = params.promo === "true";
-  const newOnly   = params.new   === "true";
+  const promoOnly = params.promo   === "true";
+  const newOnly   = params.new     === "true";
+  const inStock   = params.inStock === "true";
+  const minPrice  = params.minPrice ? Number(params.minPrice) : undefined;
+  const maxPrice  = params.maxPrice ? Number(params.maxPrice) : undefined;
   const page      = Math.max(1, Number(params.page) || 1);
   const offset    = (page - 1) * PER_PAGE;
 
@@ -50,6 +56,9 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   if (q)        qs.set("q", q);
   if (promoOnly) qs.set("promo", "true");
   if (newOnly)   qs.set("new", "true");
+  if (inStock)   qs.set("inStock", "true");
+  if (minPrice != null) qs.set("minPrice", String(minPrice));
+  if (maxPrice != null) qs.set("maxPrice", String(maxPrice));
   qs.set("limit", String(PER_PAGE));
   qs.set("offset", String(offset));
 
@@ -77,10 +86,13 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   /* Build URL helper for pagination (preserving other params) */
   function pageUrl(p: number) {
     const sp = new URLSearchParams();
-    if (q)       sp.set("q", q);
-    if (catId)   sp.set("category", String(catId));
+    if (q)         sp.set("q", q);
+    if (catId)     sp.set("category", String(catId));
     if (promoOnly) sp.set("promo", "true");
     if (newOnly)   sp.set("new", "true");
+    if (inStock)   sp.set("inStock", "true");
+    if (minPrice != null) sp.set("minPrice", String(minPrice));
+    if (maxPrice != null) sp.set("maxPrice", String(maxPrice));
     if (p > 1) sp.set("page", String(p));
     const qs = sp.toString();
     return `/products${qs ? `?${qs}` : ""}`;
@@ -88,17 +100,30 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
   /* Active filters strip */
   const activeFilters: { label: string; clearKey: string }[] = [];
-  if (q)       activeFilters.push({ label: `"${q}"`, clearKey: "q" });
+  if (q)        activeFilters.push({ label: `"${q}"`, clearKey: "q" });
   if (activeCat) activeFilters.push({ label: activeCat.nom, clearKey: "category" });
   if (promoOnly) activeFilters.push({ label: "Promotions", clearKey: "promo" });
   if (newOnly)   activeFilters.push({ label: "Nouveautés", clearKey: "new" });
+  if (inStock)   activeFilters.push({ label: "En stock", clearKey: "inStock" });
+  if (minPrice != null || maxPrice != null) {
+    const label = minPrice != null && maxPrice != null
+      ? `${minPrice.toLocaleString("fr-FR")} – ${maxPrice.toLocaleString("fr-FR")} FCFA`
+      : minPrice != null ? `≥ ${minPrice.toLocaleString("fr-FR")} FCFA`
+      : `≤ ${maxPrice!.toLocaleString("fr-FR")} FCFA`;
+    activeFilters.push({ label, clearKey: "price" });
+  }
 
   function clearFilterUrl(key: string) {
     const sp = new URLSearchParams();
-    if (key !== "q"        && q)        sp.set("q", q);
-    if (key !== "category" && catId)    sp.set("category", String(catId));
+    if (key !== "q"        && q)         sp.set("q", q);
+    if (key !== "category" && catId)     sp.set("category", String(catId));
     if (key !== "promo"    && promoOnly) sp.set("promo", "true");
     if (key !== "new"      && newOnly)   sp.set("new", "true");
+    if (key !== "inStock"  && inStock)   sp.set("inStock", "true");
+    if (key !== "price") {
+      if (minPrice != null) sp.set("minPrice", String(minPrice));
+      if (maxPrice != null) sp.set("maxPrice", String(maxPrice));
+    }
     const qs = sp.toString();
     return `/products${qs ? `?${qs}` : ""}`;
   }
@@ -135,6 +160,9 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 currentSearch={q}
                 promoOnly={promoOnly}
                 newOnly={newOnly}
+                inStock={inStock}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
               />
             </div>
           </aside>
@@ -161,6 +189,9 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 currentSearch={q}
                 promoOnly={promoOnly}
                 newOnly={newOnly}
+                inStock={inStock}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
                 mobileOnly
               />
             </div>

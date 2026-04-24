@@ -8,6 +8,8 @@ import ProductCard from "@/components/ProductCard";
 import AddToCartButton from "@/components/AddToCartButton";
 import ProductVariantSelector, { type Variant } from "@/components/ProductVariantSelector";
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
+import RecentViewTracker from "@/components/RecentViewTracker";
+import RecentlyViewed from "@/components/RecentlyViewed";
 import Link from "next/link";
 import {
   Zap, ShieldCheck, Truck, ChevronRight,
@@ -120,8 +122,21 @@ export default async function ProductPage({ params }: PageProps) {
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
     : 0;
 
+  /* Build RecentItem for tracker */
+  const recentItem = {
+    id:        product.id,
+    reference: product.reference,
+    nom:       product.nom,
+    image_url: product.image_url,
+    prix:      product.prix_unitaire,
+    remise:    product.remise,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Track this product view (client-side, localStorage) */}
+      <RecentViewTracker item={recentItem} />
+
       {/* Schema.org JSON-LD */}
       <script
         type="application/ld+json"
@@ -346,36 +361,75 @@ export default async function ProductPage({ params }: PageProps) {
 
         {/* ── Related products ── */}
         {related.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-xl font-800 text-slate-900">Produits similaires</h2>
+          <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            {/* Section header */}
+            <div className="flex items-center justify-between px-6 sm:px-8 lg:px-10 py-5 border-b border-slate-100 bg-brand-50/60">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center shrink-0">
+                  <Star className="w-4 h-4 text-brand-700" fill="currentColor" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand-500 mb-0.5">
+                    Même catégorie
+                  </p>
+                  <h2 className="font-display text-lg font-800 text-slate-900 leading-tight">
+                    Produits similaires
+                  </h2>
+                </div>
+              </div>
               {product.categorie_id && (
                 <Link href={`/products?category=${product.categorie_id}`}
-                  className="text-sm font-semibold text-brand-700 hover:text-brand-900 transition-colors"
+                  className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:text-brand-900 transition-colors group"
                 >
-                  Voir tout →
+                  Voir tout <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
-              {related.map(p => <ProductCard key={p.id} product={p} />)}
+            <div className="p-6 sm:p-8 lg:p-10">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
+                {related.map(p => <ProductCard key={p.id} product={p} />)}
+              </div>
+              {product.categorie_id && (
+                <div className="mt-6 sm:hidden">
+                  <Link href={`/products?category=${product.categorie_id}`}
+                    className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl border-2 border-brand-200 text-brand-700 font-bold text-sm hover:bg-brand-50 transition-colors"
+                  >
+                    Voir tous les produits similaires <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              )}
             </div>
           </section>
         )}
 
         {/* ── Recommended products ── */}
         {recommended.length > 0 && (
-          <section className="mt-10">
-            <div className="flex items-center gap-2 mb-6">
-              <Sparkles className="w-5 h-5 text-amber-500" />
-              <h2 className="font-display text-xl font-800 text-slate-900">Vous aimerez aussi</h2>
+          <section className="mt-8 bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl border border-amber-100 shadow-sm overflow-hidden">
+            {/* Section header */}
+            <div className="flex items-center gap-3 px-6 sm:px-8 lg:px-10 py-5 border-b border-amber-100">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-0.5">
+                  Sélection pour vous
+                </p>
+                <h2 className="font-display text-lg font-800 text-slate-900 leading-tight">
+                  Vous aimerez aussi
+                </h2>
+              </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
-              {recommended.map(p => <ProductCard key={p.id} product={p} />)}
+            <div className="p-6 sm:p-8 lg:p-10">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
+                {recommended.map(p => <ProductCard key={p.id} product={p} />)}
+              </div>
             </div>
           </section>
         )}
       </div>
+
+      {/* ── Vus récemment ── */}
+      <RecentlyViewed excludeId={product.id} maxItems={6} />
     </div>
   );
 }

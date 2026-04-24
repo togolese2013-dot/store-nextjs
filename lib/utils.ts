@@ -18,6 +18,8 @@ export interface Product {
   date_creation: string;
   marque_id: number | null;
   marque_nom: string | null;
+  avg_rating?: number | null;
+  review_count?: number | null;
 }
 
 export interface Category {

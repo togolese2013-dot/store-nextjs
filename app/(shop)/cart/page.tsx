@@ -10,6 +10,7 @@ import {
   Truck, ShieldCheck, RefreshCw, Tag,
 } from "lucide-react";
 import { clsx } from "clsx";
+import CartSuggestions from "@/components/CartSuggestions";
 
 const WaIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden>
@@ -169,6 +170,9 @@ export default function CartPage() {
                 <Trash2 className="w-4 h-4" /> Vider le panier
               </button>
             </div>
+
+            {/* Suggestions */}
+            <CartSuggestions excludeIds={items.map(i => i.id)} />
           </div>
 
           {/* ── Order summary ── */}

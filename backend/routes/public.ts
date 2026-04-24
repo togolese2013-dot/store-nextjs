@@ -36,8 +36,11 @@ router.get("/api/products", async (req, res) => {
       categoryId:     req.query.category  ? Number(req.query.category) : undefined,
       search:         (req.query.q as string)         || undefined,
       referenceExact: (req.query.reference as string) || undefined,
-      promoOnly:      req.query.promo === "true",
-      newOnly:        req.query.new   === "true",
+      promoOnly:      req.query.promo   === "true",
+      newOnly:        req.query.new     === "true",
+      inStock:        req.query.inStock === "true",
+      minPrice:       req.query.minPrice ? Number(req.query.minPrice) : undefined,
+      maxPrice:       req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
       limit:          req.query.limit  ? Number(req.query.limit)  : 60,
       offset:         req.query.offset ? Number(req.query.offset) : 0,
     });

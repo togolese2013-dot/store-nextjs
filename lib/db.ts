@@ -160,6 +160,20 @@ export async function produitCols() {
 
 export function invalidateProduitColsCache() { _cols = null; }
 
+/* ─── Reviews table presence check (cached) ─── */
+let _hasReviews: boolean | null = null;
+
+async function checkReviewsTable(): Promise<boolean> {
+  if (_hasReviews !== null) return _hasReviews;
+  try {
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'reviews' LIMIT 1"
+    );
+    _hasReviews = (rows as mysql.RowDataPacket[]).length > 0;
+  } catch { _hasReviews = false; }
+  return _hasReviews;
+}
+
 /* ─── Queries ─── */
 export async function getProducts(opts?: {
   categoryId?: number;
@@ -168,6 +182,9 @@ export async function getProducts(opts?: {
   referenceExact?: string;
   promoOnly?: boolean;
   newOnly?: boolean;
+  inStock?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
   limit?: number;
   offset?: number;
   statut?: "disponible" | "faible" | "epuise";
@@ -175,6 +192,7 @@ export async function getProducts(opts?: {
 }): Promise<Product[]> {
   const {
     categoryId, marqueId, search, referenceExact, promoOnly, newOnly,
+    inStock, minPrice, maxPrice,
     limit = 60, offset = 0, statut, includeInactive = false,
   } = opts ?? {};
 
@@ -192,6 +210,9 @@ export async function getProducts(opts?: {
   if (statut === "disponible")   { conditions.push("COALESCE(p.stock_magasin, 0) > 5"); }
   if (statut === "faible")       { conditions.push("COALESCE(p.stock_magasin, 0) > 0 AND COALESCE(p.stock_magasin, 0) <= 5"); }
   if (statut === "epuise")       { conditions.push("COALESCE(p.stock_magasin, 0) = 0"); }
+  if (inStock)                   { conditions.push("COALESCE(p.stock_magasin, 0) + COALESCE(p.stock_boutique, 0) > 0"); }
+  if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
+  if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
 
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -201,6 +222,13 @@ export async function getProducts(opts?: {
 
   const safeLimit  = Math.max(1, Math.min(200, Number(limit)));
   const safeOffset = Math.max(0, Number(offset));
+
+  // Check if reviews table exists (cached)
+  const hasReviews = await checkReviewsTable();
+  const reviewCols = hasReviews
+    ? `(SELECT ROUND(AVG(rating), 1) FROM reviews WHERE product_id = p.id AND approved = 1) AS avg_rating,
+       (SELECT COUNT(*) FROM reviews WHERE product_id = p.id AND approved = 1) AS review_count,`
+    : `NULL AS avg_rating, NULL AS review_count,`;
 
   // Use query() to avoid LIMIT/OFFSET issues with server-side prepared statements
   const [rows] = await db.query<mysql.RowDataPacket[]>(
@@ -217,7 +245,9 @@ export async function getProducts(opts?: {
        ${cols.marque_id       ? "p.marque_id"                                  : "NULL" } AS marque_id,
        ${cols.marque_id       ? "m.nom"                                        : "NULL" } AS marque_nom,
        ${orderCol}                                                                          AS sort_col,
-       c.nom AS categorie_nom
+       c.nom AS categorie_nom,
+       ${reviewCols}
+       1 AS _dummy
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
@@ -245,6 +275,8 @@ export async function getProducts(opts?: {
     date_creation:  (r.sort_col ?? "") as string,
     marque_id:      r.marque_id ? Number(r.marque_id) : null,
     marque_nom:     (r.marque_nom ?? null) as string | null,
+    avg_rating:     r.avg_rating != null ? Number(r.avg_rating) : null,
+    review_count:   r.review_count != null ? Number(r.review_count) : null,
   })) as Product[];
 }
 
