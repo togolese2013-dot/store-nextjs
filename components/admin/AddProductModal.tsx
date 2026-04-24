@@ -189,6 +189,7 @@ export default function AddProductModal({ categories, marques }: Props) {
         images:        secondImages.length > 0 ? secondImages : undefined,
       };
 
+      console.log("[DEBUG AddProduct] secondImages:", secondImages, "payload.images:", payload.images);
       const res  = await fetch("/api/admin/products", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },

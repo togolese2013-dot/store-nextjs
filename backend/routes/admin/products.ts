@@ -76,6 +76,7 @@ router.post("/api/admin/products", async (req, res) => {
 
     const cleanImages = Array.isArray(images) ? images.filter((u: unknown) => typeof u === "string" && u.trim() !== "") : [];
     const imagesJson  = cleanImages.length > 0 ? JSON.stringify(cleanImages) : null;
+    console.log("[POST /products] images reçus:", JSON.stringify(images), "→ imagesJson:", imagesJson);
     const stockMagasin = Number(stock_magasin ?? 0);
 
     // Guarantee images_json column exists before INSERT (ALTER TABLE is no-op if already present)
