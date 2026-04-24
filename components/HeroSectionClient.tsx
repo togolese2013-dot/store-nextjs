@@ -5,22 +5,22 @@ import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 
-interface Slide {
-  id:       number;
-  eyebrow:  string;
-  title:    string;
-  sub:      string;
-  cta1:     { label: string; href: string };
-  cta2:     { label: string; href: string } | null;
-  gradient: string;
-  accent:   string;
-  image:    string;
+export interface HeroSlide {
+  id:        number;
+  eyebrow:   string;
+  title:     string;
+  subtitle:  string;
+  cta_label: string;
+  cta_href:  string;
+  gradient:  string;
+  accent:    string;
+  image:     string;
 }
 
-export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
-  const [cur,      setCur]     = useState(0);
-  const [paused,   setPause]   = useState(false);
-  const [imgError, setImgErr]  = useState<Record<number, boolean>>({});
+export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
+  const [cur,      setCur]   = useState(0);
+  const [paused,   setPause] = useState(false);
+  const [imgError, setImgErr] = useState<Record<number, boolean>>({});
   const total = slides.length;
 
   const next = useCallback(() => setCur(c => (c + 1) % total), [total]);
@@ -36,40 +36,73 @@ export default function HeroSectionClient({ slides }: { slides: Slide[] }) {
 
   return (
     <section
-      className="relative overflow-hidden aspect-[16/9] md:aspect-auto md:min-h-[400px] lg:min-h-[440px]"
+      className="relative overflow-hidden aspect-[16/9] md:aspect-auto md:min-h-[400px] lg:min-h-[460px]"
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
     >
+      {/* Gradient bg */}
       <div className={clsx("absolute inset-0 bg-gradient-to-br transition-all duration-700", slide.gradient)} />
 
-      {/* Subtle dot grid */}
+      {/* Dot grid */}
       <div className="absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-        }}
-      />
+        style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
 
-      {/* Decorative accent circle */}
-      <div className="absolute -right-24 -top-24 w-[380px] h-[380px] rounded-full"
+      {/* Accent circles */}
+      <div className="absolute -right-24 -top-24 w-[380px] h-[380px] rounded-full pointer-events-none"
         style={{ background: `${slide.accent}10` }} />
-      <div className="absolute right-[30%] bottom-0 w-64 h-64 rounded-full"
+      <div className="absolute right-[30%] bottom-0 w-64 h-64 rounded-full pointer-events-none"
         style={{ background: `${slide.accent}08` }} />
 
-      {/* Hero image — 16:9, visible mobile + desktop */}
+      {/* Hero image */}
       {slide.image && !imgError[slide.id] && (
-        <div className="absolute right-0 bottom-0 h-[80%] w-[42%] sm:w-[36%] md:w-[32%] pointer-events-none">
+        <div className="absolute right-0 bottom-0 h-[82%] w-[42%] sm:w-[36%] md:w-[32%] pointer-events-none">
           <img
-            src={slide.image} alt=""
+            src={slide.image}
+            alt=""
             loading={cur === 0 ? "eager" : "lazy"}
             onError={() => setImgErr(prev => ({ ...prev, [slide.id]: true }))}
-            className="absolute right-0 bottom-0 h-full w-full object-contain object-right-bottom opacity-75 sm:opacity-85"
+            className="absolute right-0 bottom-0 h-full w-full object-contain object-right-bottom opacity-80 sm:opacity-90"
             aria-hidden
           />
         </div>
       )}
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center" />
+      {/* Text content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 h-full flex items-center">
+        <div className="max-w-lg py-10 sm:py-14">
+          {/* Eyebrow */}
+          {slide.eyebrow && (
+            <p className="text-[11px] sm:text-xs font-bold uppercase tracking-widest mb-3"
+              style={{ color: slide.accent }}>
+              {slide.eyebrow}
+            </p>
+          )}
+
+          {/* Title */}
+          <h1 className="font-display font-800 text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-white leading-tight whitespace-pre-line mb-3 sm:mb-4">
+            {slide.title}
+          </h1>
+
+          {/* Subtitle */}
+          {slide.subtitle && (
+            <p className="text-white/65 text-sm sm:text-base leading-relaxed mb-5 sm:mb-7 max-w-sm">
+              {slide.subtitle}
+            </p>
+          )}
+
+          {/* CTA */}
+          {slide.cta_label && (
+            <Link
+              href={slide.cta_href || "/products"}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-100 transition-all duration-200"
+              style={{ background: slide.accent }}
+            >
+              {slide.cta_label}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          )}
+        </div>
+      </div>
 
       {/* Slider controls */}
       {total > 1 && (

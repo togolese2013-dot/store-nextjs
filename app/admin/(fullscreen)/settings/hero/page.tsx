@@ -1,17 +1,17 @@
 import { getSettings } from "@/lib/admin-db";
 import HeroSettingsForm from "@/components/admin/HeroSettingsForm";
 
-export const metadata = { title: "Hero & Bannières" };
+export const metadata = { title: "Hero & Bannière" };
 
 export default async function HeroSettingsPage() {
   const settings = await getSettings();
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div>
-        <h1 className="font-display font-800 text-2xl text-slate-900">Hero & Bannières</h1>
+        <h1 className="font-display font-800 text-2xl text-slate-900">Hero & Bannière</h1>
         <p className="text-slate-400 text-sm mt-1">
-          Modifiez les slides du carousel hero : titre, sous-titre, bouton CTA et image.
+          Gérez les slides du carousel hero (ajout, modification, suppression) et la barre d'annonce.
         </p>
       </div>
       <HeroSettingsForm settings={settings} />
