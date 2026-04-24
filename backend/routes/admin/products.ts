@@ -179,6 +179,9 @@ router.patch("/api/admin/products/:id", async (req, res) => {
       const cleanImgs = rawImgs.filter((u: unknown) => typeof u === "string" && (u as string).trim() !== "");
       sets.push("images_json = ?");
       vals.push(cleanImgs.length > 0 ? JSON.stringify(cleanImgs) : null);
+      console.log(`[PATCH /products/${req.params.id}] images reçus:`, rawImgs.length, "→ cleanImgs:", cleanImgs.length, JSON.stringify(cleanImgs));
+    } else {
+      console.log(`[PATCH /products/${req.params.id}] PAS de champ "images" dans le body. Clés reçues:`, Object.keys(body));
     }
     if (!sets.length) return res.json({ ok: true });
     vals.push(req.params.id);
