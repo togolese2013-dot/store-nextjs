@@ -1,6 +1,5 @@
 import express from "express";
-import { getProducts, getProductsByIds, getCategories, db, produitCols } from "@/lib/db";
-import type mysql from "mysql2/promise";
+import { getProducts, getProductsByIds, getCategories, db } from "@/lib/db";
 import {
   subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings,
 } from "@/lib/admin-db";
@@ -32,15 +31,6 @@ router.get("/api/products", async (req, res) => {
       if (!ids.length) return res.json({ success: true, data: [] });
       const products = await getProductsByIds(ids);
       return res.json({ success: true, data: products });
-    }
-    // DEBUG — log raw images_json for any reference lookup
-    if (req.query.reference) {
-      const [dbg] = await (db as import("mysql2/promise").Pool).query<mysql.RowDataPacket[]>(
-        "SELECT id, reference, images_json FROM produits WHERE reference = ? LIMIT 1",
-        [req.query.reference]
-      );
-      const cols = await produitCols();
-      console.log(`[DEBUG GET /products ref=${req.query.reference}] cols.images_json=${cols.images_json}`, dbg[0] ? { id: dbg[0].id, images_json: dbg[0].images_json, type: typeof dbg[0].images_json } : "NOT FOUND");
     }
     const products = await getProducts({
       categoryId:     req.query.category  ? Number(req.query.category) : undefined,

@@ -411,8 +411,11 @@ export async function getCategories(): Promise<Category[]> {
   return rows as Category[];
 }
 
-function tryParse(json: string) {
-  try { return JSON.parse(json); } catch { return null; }
+function tryParse(json: unknown): unknown {
+  // MySQL JSON columns are already parsed as objects/arrays by mysql2 — return them directly
+  if (Array.isArray(json) || (typeof json === "object" && json !== null)) return json;
+  if (!json) return null;
+  try { return JSON.parse(json as string); } catch { return null; }
 }
 
 /* ─── Product Variants ─── */

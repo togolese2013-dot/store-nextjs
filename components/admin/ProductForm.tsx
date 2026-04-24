@@ -217,8 +217,6 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
       if (schema.hasRemise)    payload.remise = form.remise;
       if (schema.hasNeuf)      payload.neuf   = form.neuf;
       if (form.images.length > 0) payload.images = form.images;
-      console.log("[DEBUG ProductForm] form.images:", form.images, "payload.images:", payload.images);
-
       const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur"); return; }
