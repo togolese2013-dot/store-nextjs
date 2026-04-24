@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Save, Image as ImageIcon, X, ShoppingBag, Tag } from "lucide-react";
+import { useState, useRef } from "react";
+import { Loader2, Save, Image as ImageIcon, X, ShoppingBag, Tag, Upload } from "lucide-react";
 import { applyThemeToDOM, isSystemFont, SYSTEM_FONT_STACK, buildRamp } from "@/lib/theme-utils";
 
 const FONTS = [
@@ -35,8 +35,10 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
   const [logo,    setLogo]    = useState(settings.site_logo     ?? "");
   const [siteName] = useState(settings.site_name ?? "Togolese Shop");
 
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg]         = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [msg,           setMsg]           = useState("");
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   function handlePrimary(val: string) {
     setPrimary(val);
@@ -50,6 +52,17 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
     setFont(val);
     applyThemeToDOM(primary, accent, val);
   }
+  async function uploadLogo(file: File) {
+    setUploadingLogo(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    setUploadingLogo(false);
+    if (res.ok) setLogo(data.url);
+    else setMsg(data.error ?? "Erreur upload logo");
+  }
+
   function applyPreset(p: typeof PRESETS[0]) {
     setPrimary(p.primary);
     setAccent(p.accent);
@@ -103,28 +116,46 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
         <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4 shadow-sm">
           <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">Logo</h2>
           <div>
-            <label className={labelCls}>URL du logo (externe)</label>
-            <div className="flex gap-3 items-start">
-              <input className={`${inputCls} flex-1`} placeholder="https://... (SVG ou PNG recommandé)"
-                value={logo} onChange={e => setLogo(e.target.value)} />
-              {logo && (
-                <button type="button" onClick={() => setLogo("")}
-                  className="p-2.5 rounded-xl border border-red-100 text-red-400 hover:bg-red-50 transition-colors shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            <label className={labelCls}>Logo du site</label>
             {logo ? (
-              <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100 inline-flex items-center gap-3">
-                <img src={logo} alt="Logo preview" className="h-10 w-auto object-contain" />
-                <span className="text-xs text-slate-500">Aperçu logo</span>
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <img src={logo} alt="Logo" className="h-12 w-auto object-contain max-w-[160px]" />
+                <div className="flex flex-col gap-2 ml-auto">
+                  <button type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-slate-300 hover:border-brand-400 text-xs font-semibold text-slate-600 hover:text-brand-700 transition-colors disabled:opacity-50"
+                  >
+                    {uploadingLogo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    Remplacer
+                  </button>
+                  <button type="button" onClick={() => setLogo("")}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-100 text-red-400 hover:bg-red-50 text-xs font-semibold transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" /> Supprimer
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="mt-3 h-14 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center gap-2 text-slate-400 text-xs">
-                <ImageIcon className="w-4 h-4 opacity-50" /> Aucun logo — le nom du site sera affiché
-              </div>
+              <button type="button"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+                className="w-full flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-400 transition-colors group disabled:opacity-50"
+              >
+                {uploadingLogo ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+                ) : (
+                  <>
+                    <ImageIcon className="w-5 h-5 text-slate-300 group-hover:text-brand-400 transition-colors mb-1" />
+                    <span className="text-xs text-slate-400 group-hover:text-brand-600 font-medium transition-colors">
+                      Cliquer pour uploader le logo (SVG, PNG)
+                    </span>
+                  </>
+                )}
+              </button>
             )}
+            <input ref={logoInputRef} type="file" accept="image/*,.svg" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
           </div>
         </div>
 

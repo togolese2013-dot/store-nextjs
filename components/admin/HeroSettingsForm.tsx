@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   Loader2, Save, Plus, Trash2, GripVertical,
-  ChevronDown, ChevronUp, Image as ImageIcon, X, Eye, EyeOff,
+  ChevronDown, ChevronUp, Image as ImageIcon, X, Eye, EyeOff, Upload,
 } from "lucide-react";
 
 interface HeroSlide {
@@ -91,8 +91,9 @@ function parseSlides(settings: Record<string, string>): HeroSlide[] {
 
 export default function HeroSettingsForm({ settings }: Props) {
   const [slides, setSlides]       = useState<HeroSlide[]>(() => parseSlides(settings));
-  const [open,   setOpen]         = useState<number | null>(0);
-  const [loading, setLoading]     = useState(false);
+  const [open,      setOpen]      = useState<number | null>(0);
+  const [loading,   setLoading]  = useState(false);
+  const [uploading, setUploading] = useState<number | null>(null);
   const [msg, setMsg]             = useState("");
 
   // Bannière
@@ -105,6 +106,17 @@ export default function HeroSettingsForm({ settings }: Props) {
 
   function updateSlide(i: number, field: keyof HeroSlide, value: string) {
     setSlides(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
+  }
+
+  async function uploadSlideImage(i: number, file: File) {
+    setUploading(i);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    setUploading(null);
+    if (res.ok) updateSlide(i, "image", data.url);
+    else setMsg(data.error ?? "Erreur upload");
   }
 
   function addSlide() {
@@ -257,28 +269,44 @@ export default function HeroSettingsForm({ settings }: Props) {
                     </div>
                   </div>
 
-                  {/* Image URL */}
+                  {/* Image upload */}
                   <div>
-                    <label className={labelCls}>Image (URL externe)</label>
-                    <div className="flex gap-3 items-start">
-                      <input className={`${inputCls} flex-1`} placeholder="https://... (image droite du hero)"
-                        value={slide.image} onChange={e => updateSlide(i, "image", e.target.value)} />
-                      {slide.image && (
-                        <button type="button" onClick={() => updateSlide(i, "image", "")}
-                          className="p-2.5 rounded-xl border border-red-100 text-red-400 hover:bg-red-50 transition-colors shrink-0"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    <label className={labelCls}>Image (droite du hero)</label>
                     {slide.image ? (
-                      <div className="mt-3 inline-block relative">
-                        <img src={slide.image} alt="Preview" className="h-20 w-auto rounded-xl border border-slate-200 object-contain" />
+                      <div className="flex items-start gap-3">
+                        <img src={slide.image} alt="Preview"
+                          className="h-24 w-auto rounded-xl border border-slate-200 object-contain bg-slate-50" />
+                        <div className="flex flex-col gap-2">
+                          <label className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-slate-300 hover:border-brand-400 text-xs font-semibold text-slate-600 hover:text-brand-700 transition-colors cursor-pointer">
+                            {uploading === i
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Upload className="w-3.5 h-3.5" />}
+                            Remplacer
+                            <input type="file" accept="image/*" className="hidden"
+                              onChange={e => { const f = e.target.files?.[0]; if (f) uploadSlideImage(i, f); }} />
+                          </label>
+                          <button type="button" onClick={() => updateSlide(i, "image", "")}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-100 text-red-400 hover:bg-red-50 text-xs font-semibold transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" /> Supprimer
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="mt-3 h-16 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center gap-2 text-slate-400 text-xs">
-                        <ImageIcon className="w-4 h-4 opacity-50" /> Aucune image
-                      </div>
+                      <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-400 transition-colors cursor-pointer group">
+                        {uploading === i ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+                        ) : (
+                          <>
+                            <ImageIcon className="w-6 h-6 text-slate-300 group-hover:text-brand-400 transition-colors mb-1" />
+                            <span className="text-xs text-slate-400 group-hover:text-brand-600 font-medium transition-colors">
+                              Cliquer pour uploader une image
+                            </span>
+                          </>
+                        )}
+                        <input type="file" accept="image/*" className="hidden"
+                          onChange={e => { const f = e.target.files?.[0]; if (f) uploadSlideImage(i, f); }} />
+                      </label>
                     )}
                   </div>
 
