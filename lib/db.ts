@@ -160,10 +160,10 @@ export async function produitCols() {
 
 export function invalidateProduitColsCache() { _cols = null; }
 
-/* ─── Reviews table presence check (cached) ─── */
+/* ─── Reviews table presence check (cached, exported for routes) ─── */
 let _hasReviews: boolean | null = null;
 
-async function checkReviewsTable(): Promise<boolean> {
+export async function checkReviewsTable(): Promise<boolean> {
   if (_hasReviews !== null) return _hasReviews;
   try {
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -223,13 +223,6 @@ export async function getProducts(opts?: {
   const safeLimit  = Math.max(1, Math.min(200, Number(limit)));
   const safeOffset = Math.max(0, Number(offset));
 
-  // Check if reviews table exists (cached)
-  const hasReviews = await checkReviewsTable();
-  const reviewCols = hasReviews
-    ? `(SELECT ROUND(AVG(rating), 1) FROM reviews WHERE product_id = p.id AND approved = 1) AS avg_rating,
-       (SELECT COUNT(*) FROM reviews WHERE product_id = p.id AND approved = 1) AS review_count,`
-    : `NULL AS avg_rating, NULL AS review_count,`;
-
   // Use query() to avoid LIMIT/OFFSET issues with server-side prepared statements
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT
@@ -245,9 +238,7 @@ export async function getProducts(opts?: {
        ${cols.marque_id       ? "p.marque_id"                                  : "NULL" } AS marque_id,
        ${cols.marque_id       ? "m.nom"                                        : "NULL" } AS marque_nom,
        ${orderCol}                                                                          AS sort_col,
-       c.nom AS categorie_nom,
-       ${reviewCols}
-       1 AS _dummy
+       c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
@@ -275,8 +266,8 @@ export async function getProducts(opts?: {
     date_creation:  (r.sort_col ?? "") as string,
     marque_id:      r.marque_id ? Number(r.marque_id) : null,
     marque_nom:     (r.marque_nom ?? null) as string | null,
-    avg_rating:     r.avg_rating != null ? Number(r.avg_rating) : null,
-    review_count:   r.review_count != null ? Number(r.review_count) : null,
+    avg_rating:     null,
+    review_count:   null,
   })) as Product[];
 }
 

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ShoppingBag, Heart, Zap, Star } from "lucide-react";
+import { ShoppingBag, Heart, Zap } from "lucide-react";
+import RatingBadge from "@/components/RatingBadge";
 import { clsx } from "clsx";
 import { type Product, finalPrice, formatPrice } from "@/lib/utils";
 import { useCart } from "@/context/CartContext";
@@ -156,23 +157,8 @@ export default function ProductCard({ product, className }: Props) {
           </h3>
         </Link>
 
-        {/* Star rating */}
-        {product.avg_rating != null && product.avg_rating > 0 && (
-          <div className="flex items-center gap-1 mb-2">
-            {[1, 2, 3, 4, 5].map(s => (
-              <Star
-                key={s}
-                className="w-3 h-3"
-                fill={s <= Math.round(product.avg_rating!) ? "#f59e0b" : "none"}
-                stroke={s <= Math.round(product.avg_rating!) ? "#f59e0b" : "#d1d5db"}
-              />
-            ))}
-            <span className="text-[10px] text-slate-400 font-medium ml-0.5">
-              {product.avg_rating.toFixed(1)}
-              {product.review_count ? ` (${product.review_count})` : ""}
-            </span>
-          </div>
-        )}
+        {/* Star rating — lazy loaded, batched single API call for the grid */}
+        <RatingBadge productId={product.id} />
 
         {/* Price row */}
         <div className="flex items-end gap-2 mb-3">

@@ -1,5 +1,5 @@
 import express from "express";
-import { getProducts, getProductsByIds, getCategories, db } from "@/lib/db";
+import { getProducts, getProductsByIds, getCategories, checkReviewsTable, db } from "@/lib/db";
 import {
   subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings,
 } from "@/lib/admin-db";
@@ -73,6 +73,42 @@ router.post("/api/newsletter", async (req, res) => {
 });
 
 // ── Avis clients ──────────────────────────────────────────────────────────
+// ── Bulk ratings (avg + count per product ID) ─────────────────────────────
+router.get("/api/reviews/ratings", async (req, res) => {
+  try {
+    const idsParam = req.query.ids as string;
+    if (!idsParam) return res.json({ ratings: {} });
+    const ids = idsParam.split(",").map(Number).filter(n => !isNaN(n) && n > 0).slice(0, 100);
+    if (!ids.length) return res.json({ ratings: {} });
+
+    const hasReviews = await checkReviewsTable();
+    if (!hasReviews) return res.json({ ratings: {} });
+
+    const placeholders = ids.map(() => "?").join(",");
+    const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
+      `SELECT product_id,
+              ROUND(AVG(rating), 1) AS avg_rating,
+              COUNT(*)              AS review_count
+       FROM reviews
+       WHERE product_id IN (${placeholders}) AND approved = 1
+       GROUP BY product_id`,
+      ids
+    );
+
+    const ratings: Record<string, { avg: number; count: number }> = {};
+    for (const r of rows) {
+      ratings[String(r.product_id)] = {
+        avg:   Number(r.avg_rating),
+        count: Number(r.review_count),
+      };
+    }
+    res.json({ ratings });
+  } catch {
+    // Always return empty — never crash product listings
+    res.json({ ratings: {} });
+  }
+});
+
 router.get("/api/reviews", async (req, res) => {
   try {
     const produit_id = req.query.produit_id ? Number(req.query.produit_id) : undefined;
