@@ -150,19 +150,24 @@ router.patch("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    // Guarantee images_json column exists before UPDATE
+    // Guarantee optional columns exist before UPDATE
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN stock_minimum INT NULL DEFAULT 5`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`); } catch { /* already exists */ }
     invalidateProduitColsCache();
-    await produitCols();
+    const cols = await produitCols();
     const body = req.body;
     const sets: string[] = [];
     const vals: (string | number | boolean | null)[] = [];
-    const allowed = ["nom","description","categorie_id","prix_unitaire","stock_magasin",
-                     "stock_boutique","remise","neuf","actif","image_url","image","images_json",
-                     "marque_id","stock_minimum","reference"];
-    for (const key of allowed) {
+    // Only include columns that exist in the DB schema
+    const alwaysAllowed = ["nom","description","categorie_id","prix_unitaire","stock_magasin",
+                           "stock_boutique","remise","neuf","actif","image_url","image","reference"];
+    for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }
+    if (cols.stock_minimum && "stock_minimum" in body) { sets.push("stock_minimum = ?"); vals.push(body.stock_minimum); }
+    if (cols.marque_id     && "marque_id"     in body) { sets.push("marque_id = ?");     vals.push(body.marque_id); }
+    if (cols.images_json   && "images_json"   in body) { sets.push("images_json = ?");   vals.push(body.images_json); }
     if ("images" in body) {
       sets.push("images_json = ?");
       vals.push(body.images ? JSON.stringify(body.images) : null);

@@ -79,6 +79,19 @@ export async function produitCols() {
     }
   }
 
+  // Auto-migrate: add stock_minimum column if missing
+  if (!names.has("stock_minimum")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN stock_minimum INT NULL DEFAULT 5`);
+      names.add("stock_minimum");
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("stock_minimum");
+      }
+    }
+  }
+
   // Auto-migrate: add marque_id column if missing
   if (!names.has("marque_id")) {
     try {
