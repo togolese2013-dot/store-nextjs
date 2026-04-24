@@ -169,8 +169,10 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     if (cols.marque_id     && "marque_id"     in body) { sets.push("marque_id = ?");     vals.push(body.marque_id); }
     if (cols.images_json   && "images_json"   in body) { sets.push("images_json = ?");   vals.push(body.images_json); }
     if ("images" in body) {
+      const rawImgs   = Array.isArray(body.images) ? body.images : [];
+      const cleanImgs = rawImgs.filter((u: unknown) => typeof u === "string" && (u as string).trim() !== "");
       sets.push("images_json = ?");
-      vals.push(body.images ? JSON.stringify(body.images) : null);
+      vals.push(cleanImgs.length > 0 ? JSON.stringify(cleanImgs) : null);
     }
     if (!sets.length) return res.json({ ok: true });
     vals.push(req.params.id);

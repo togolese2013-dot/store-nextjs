@@ -138,7 +138,9 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Erreur upload");
-    return data.urls ?? [];
+    const validUrls = (data.urls ?? []).filter((u: unknown) => typeof u === "string" && (u as string).trim() !== "");
+    if (!validUrls.length) throw new Error(data.errors?.[0] || "Échec de l'upload — vérifiez la taille ou le format des images");
+    return validUrls;
   }
 
   async function handleUploadMain(e: React.ChangeEvent<HTMLInputElement>) {
@@ -486,7 +488,7 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
             Annuler
           </button>
-          <button type="submit" disabled={loading}
+          <button type="submit" disabled={loading || uploadingMain || uploadingSecond}
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors disabled:opacity-60">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {loading ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer le produit"}

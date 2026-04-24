@@ -77,7 +77,9 @@ export default function AddProductModal({ categories, marques }: Props) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.errors?.[0] || data.error || "Erreur upload");
-    return data.urls ?? [];
+    const validUrls = (data.urls ?? []).filter((u: unknown) => typeof u === "string" && (u as string).trim() !== "");
+    if (!validUrls.length) throw new Error(data.errors?.[0] || "Échec de l'upload — vérifiez la taille ou le format des images");
+    return validUrls;
   }
 
   async function handleMainImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -542,7 +544,7 @@ export default function AddProductModal({ categories, marques }: Props) {
                   className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
                   <X className="w-4 h-4" /> Fermer
                 </button>
-                <button type="submit" disabled={loading}
+                <button type="submit" disabled={loading || uploadingMain || uploadingSecond}
                   className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors disabled:opacity-60">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   {loading ? "Création…" : "Créer le produit"}

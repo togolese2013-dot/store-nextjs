@@ -66,7 +66,7 @@ export default async function ProductPage({ params }: PageProps) {
   const rawUrl = product.image_url || product.images?.[0] || null;
   const allProductImages: string[] = [
     ...(product.image_url ? [product.image_url] : []),
-    ...(product.images ?? []).filter(url => url !== product.image_url),
+    ...(product.images ?? []).filter(url => url && url !== product.image_url),
   ];
 
   /* JSON-LD — Schema.org Product */
