@@ -76,7 +76,6 @@ router.post("/api/admin/products", async (req, res) => {
 
     const cleanImages = Array.isArray(images) ? images.filter((u: unknown) => typeof u === "string" && u.trim() !== "") : [];
     const imagesJson  = cleanImages.length > 0 ? JSON.stringify(cleanImages) : null;
-    console.log("[POST /products] images reçus:", JSON.stringify(images), "→ imagesJson:", imagesJson);
     const stockMagasin = Number(stock_magasin ?? 0);
 
     // Guarantee images_json column exists before INSERT (ALTER TABLE is no-op if already present)
@@ -162,9 +161,15 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     const vals: (string | number | boolean | null)[] = [];
     // Only include columns that exist in the DB schema
     const alwaysAllowed = ["nom","description","categorie_id","prix_unitaire","stock_magasin",
-                           "stock_boutique","remise","neuf","actif","image_url","image","reference"];
+                           "stock_boutique","remise","neuf","actif","reference"];
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
+    }
+    // Handle image column: body always sends "image_url", but DB may use "image" instead
+    if ("image_url" in body || "image" in body) {
+      const imgVal = ("image_url" in body ? body.image_url : body.image) as string | null;
+      const imgCol = cols.image_url ? "image_url" : cols.image ? "image" : null;
+      if (imgCol) { sets.push(`${imgCol} = ?`); vals.push(imgVal ?? null); }
     }
     if (cols.stock_minimum && "stock_minimum" in body) { sets.push("stock_minimum = ?"); vals.push(body.stock_minimum); }
     if (cols.marque_id     && "marque_id"     in body) { sets.push("marque_id = ?");     vals.push(body.marque_id); }
