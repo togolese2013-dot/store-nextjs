@@ -180,10 +180,10 @@ export default function AddProductModal({ categories, marques }: Props) {
   // ── Submit ─────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nom.trim())           { setError("Le nom est obligatoire."); return; }
-    if (!categorie_id)         { setError("La catégorie est obligatoire."); return; }
-    if (!description.trim())   { setError("La mini description est obligatoire."); return; }
-    if (!prixVente)            { setError("Le prix de vente est obligatoire."); return; }
+    if (!nom.trim())                      { setError("Le nom est obligatoire."); return; }
+    if (!categorie_id)                    { setError("La catégorie est obligatoire."); return; }
+    if (!description.trim())              { setError("La mini description est obligatoire."); return; }
+    if (!hasVariants && !prixVente)       { setError("Le prix de vente est obligatoire."); return; }
     setError(""); setLoading(true);
     try {
       // Ensure images_json column exists before inserting (invalidates backend cache)
