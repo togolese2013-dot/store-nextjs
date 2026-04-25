@@ -159,7 +159,7 @@ export default function ProductCard({ product, className, floatingCart = false }
       {/* ── Content ── */}
       <div className="p-3">
         <Link href={`/products/${product.id}`}>
-          <h3 className="font-sans text-sm text-slate-800 leading-snug mb-1 line-clamp-2 hover:text-brand-800 transition-colors">
+          <h3 className="font-sans text-sm text-slate-800 leading-snug mb-1 line-clamp-2 min-h-[2.5rem] hover:text-brand-800 transition-colors">
             {product.nom}
           </h3>
         </Link>
