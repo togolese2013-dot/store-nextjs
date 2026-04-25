@@ -1,26 +1,28 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 
 export interface HeroSlide {
-  id:        number;
-  eyebrow:   string;
-  title:     string;
-  subtitle:  string;
-  cta_label: string;
-  cta_href:  string;
-  gradient:  string;
-  accent:    string;
-  image:     string;
+  id:           number;
+  image:        string;
+  image_mobile?: string;
+  gradient:     string;
+  accent:       string;
+  /* legacy text fields — kept for backward compat but no longer rendered */
+  eyebrow?:   string;
+  title?:     string;
+  subtitle?:  string;
+  cta_label?: string;
+  cta_href?:  string;
 }
 
 export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
-  const [cur,      setCur]   = useState(0);
-  const [paused,   setPause] = useState(false);
-  const [imgError, setImgErr] = useState<Record<number, boolean>>({});
+  const [cur,    setCur]   = useState(0);
+  const [paused, setPause] = useState(false);
+  const [errD,   setErrD]  = useState<Record<number, boolean>>({});
+  const [errM,   setErrM]  = useState<Record<number, boolean>>({});
   const total = slides.length;
 
   const next = useCallback(() => setCur(c => (c + 1) % total), [total]);
@@ -34,34 +36,53 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
 
   const slide = slides[cur];
 
+  const hasDesktop = !!(slide.image && !errD[slide.id]);
+  const hasMobile  = !!(slide.image_mobile && !errM[slide.id]);
+
   return (
     <section
-      className="relative overflow-hidden aspect-[16/5] md:aspect-auto md:min-h-[400px] lg:min-h-[460px]"
+      className="relative overflow-hidden aspect-[3/2] md:aspect-auto md:min-h-[700px]"
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
     >
-      {/* Gradient bg */}
+      {/* Gradient bg fallback */}
       <div className={clsx("absolute inset-0 bg-gradient-to-br transition-all duration-700", slide.gradient)} />
 
-      {/* Dot grid */}
-      <div className="absolute inset-0 opacity-[0.04]"
-        style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
-
-      {/* Hero image — full cover */}
-      {slide.image && !imgError[slide.id] && (
+      {/* Mobile image (shown below md) */}
+      {slide.image_mobile && (
         <img
-          src={slide.image}
+          key={`m-${slide.id}`}
+          src={slide.image_mobile}
           alt=""
           loading={cur === 0 ? "eager" : "lazy"}
-          onError={() => setImgErr(prev => ({ ...prev, [slide.id]: true }))}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+          onError={() => setErrM(p => ({ ...p, [slide.id]: true }))}
+          className={clsx(
+            "md:hidden absolute inset-0 w-full h-full object-cover transition-opacity duration-700",
+            hasMobile ? "opacity-100" : "opacity-0"
+          )}
           aria-hidden
         />
       )}
 
+      {/* Desktop image (shown from md) */}
+      {slide.image && (
+        <img
+          key={`d-${slide.id}`}
+          src={slide.image}
+          alt=""
+          loading={cur === 0 ? "eager" : "lazy"}
+          onError={() => setErrD(p => ({ ...p, [slide.id]: true }))}
+          className={clsx(
+            !slide.image_mobile ? "block" : "hidden md:block",
+            "absolute inset-0 w-full h-full object-cover transition-opacity duration-700",
+            hasDesktop ? "opacity-100" : "opacity-0"
+          )}
+          aria-hidden
+        />
+      )}
 
-      {/* Accent circles (visible uniquement sans image) */}
-      {(!slide.image || imgError[slide.id]) && (
+      {/* Fallback decorative circles when no image */}
+      {!hasDesktop && !hasMobile && (
         <>
           <div className="absolute -right-24 -top-24 w-[380px] h-[380px] rounded-full pointer-events-none"
             style={{ background: `${slide.accent}10` }} />
@@ -69,43 +90,6 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
             style={{ background: `${slide.accent}08` }} />
         </>
       )}
-
-      {/* Text content — absolute so it fills full section height for true vertical center */}
-      <div className="absolute inset-0 z-10 flex items-center px-6 sm:px-10 lg:px-16">
-        <div className="max-w-lg w-full">
-          {/* Eyebrow */}
-          {slide.eyebrow && (
-            <p className="text-[11px] sm:text-xs font-bold uppercase tracking-widest mb-3"
-              style={{ color: slide.accent }}>
-              {slide.eyebrow}
-            </p>
-          )}
-
-          {/* Title */}
-          <h1 className="font-display font-800 text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-white leading-tight whitespace-pre-line mb-3 sm:mb-4">
-            {slide.title}
-          </h1>
-
-          {/* Subtitle */}
-          {slide.subtitle && (
-            <p className="text-white/65 text-sm sm:text-base leading-relaxed mb-5 sm:mb-7 max-w-sm">
-              {slide.subtitle}
-            </p>
-          )}
-
-          {/* CTA */}
-          {slide.cta_label && (
-            <Link
-              href={slide.cta_href || "/products"}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-100 transition-all duration-200"
-              style={{ background: slide.accent }}
-            >
-              {slide.cta_label}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          )}
-        </div>
-      </div>
 
       {/* Slider controls */}
       {total > 1 && (
