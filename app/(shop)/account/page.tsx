@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   User, Package, Heart, Settings, MapPin,
-  CreditCard, Bell, Star, Users, ChevronRight, LogOut,
+  CreditCard, Bell, Star, Users, ChevronRight, LogOut, Clock,
 } from "lucide-react";
 
 const MENU = [
@@ -56,6 +56,14 @@ const MENU = [
     icon:  MapPin,
     color: "bg-slate-100 text-slate-600",
     border: "hover:border-slate-300",
+  },
+  {
+    label: "Vu récemment",
+    desc:  "Produits consultés",
+    href:  "/account/recently-viewed",
+    icon:  Clock,
+    color: "bg-teal-50 text-teal-600",
+    border: "hover:border-teal-200",
   },
 ];
 

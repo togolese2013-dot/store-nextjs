@@ -8,7 +8,6 @@ import ProductCard from "@/components/ProductCard";
 import HeroSection from "@/components/HeroSection";
 import Newsletter from "@/components/Newsletter";
 import TestimonialsSlider from "@/components/TestimonialsSlider";
-import RecentlyViewed from "@/components/RecentlyViewed";
 import Link from "next/link";
 import {
   Truck, CreditCard, RefreshCw, ShieldCheck,
@@ -260,7 +259,6 @@ export default async function HomePage() {
       )}
 
       <Testimonials />
-      <RecentlyViewed maxItems={8} />
       <Newsletter />
     </>
   );
