@@ -32,7 +32,7 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
   if (outOf) {
     return (
       <button disabled
-        className="flex-1 flex items-center justify-center py-2.5 rounded-md bg-slate-100 text-slate-400 font-sans text-xs font-medium cursor-not-allowed"
+        className="w-full flex items-center justify-center py-3 rounded-2xl bg-slate-100 text-slate-400 font-sans font-semibold text-sm cursor-not-allowed"
       >
         Indisponible
       </button>
