@@ -41,7 +41,7 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
 
   return (
     <section
-      className="relative overflow-hidden aspect-[3/2] md:aspect-auto md:min-h-[700px]"
+      className="relative overflow-hidden aspect-[3/2] md:aspect-[1920/700]"
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
     >
