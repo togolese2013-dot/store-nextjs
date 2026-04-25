@@ -41,8 +41,8 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
 
   return (
     <div className="flex-1 flex flex-col gap-3">
-      {/* Quantity + Add to cart — same row */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Quantity row */}
+      <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-slate-600 shrink-0">Quantité :</span>
         <div className="flex items-center gap-2 border-2 border-slate-200 rounded-2xl px-1 shrink-0">
           <button
@@ -61,27 +61,28 @@ export default function AddToCartButton({ product, variant, stock }: Props) {
             <Plus className="w-3.5 h-3.5" />
           </button>
         </div>
-
-        <button
-          onClick={handleAdd}
-          className={clsx(
-            "flex-1 min-w-[140px] flex items-center justify-center py-2.5 rounded-md font-sans font-medium text-xs transition-all duration-200",
-            added
-              ? "bg-green-500 text-white scale-[0.98]"
-              : "bg-brand-900 text-white hover:bg-brand-800 hover:shadow-brand active:scale-[0.98]"
-          )}
-        >
-          {added ? "Ajouté au panier ✓" : "Ajouter au panier"}
-        </button>
-
-        {added && (
-          <Link href="/cart"
-            className="px-3 py-2.5 rounded-md border-2 border-brand-200 text-brand-700 font-bold text-xs hover:bg-brand-50 transition-colors whitespace-nowrap"
-          >
-            Voir le panier →
-          </Link>
-        )}
       </div>
+
+      {/* Full-width button */}
+      <button
+        onClick={handleAdd}
+        className={clsx(
+          "w-full flex items-center justify-center py-3 rounded-2xl font-sans font-semibold text-sm transition-all duration-200",
+          added
+            ? "bg-green-500 text-white scale-[0.98]"
+            : "bg-brand-900 text-white hover:bg-brand-800 hover:shadow-brand active:scale-[0.98]"
+        )}
+      >
+        {added ? "Ajouté au panier ✓" : "Ajouter au panier"}
+      </button>
+
+      {added && (
+        <Link href="/cart"
+          className="w-full flex items-center justify-center py-2.5 rounded-2xl border-2 border-brand-200 text-brand-700 font-bold text-sm hover:bg-brand-50 transition-colors"
+        >
+          Voir le panier →
+        </Link>
+      )}
     </div>
   );
 }

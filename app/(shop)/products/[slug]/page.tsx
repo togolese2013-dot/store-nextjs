@@ -238,7 +238,7 @@ export default async function ProductPage({ params }: PageProps) {
               ) : (
                 <>
                   {/* Price */}
-                  <div className="flex items-end gap-3 mb-1">
+                  <div className="flex items-end gap-3 mb-0">
                     <span className="font-display text-3xl font-800 text-slate-900">
                       {formatPrice(price)}
                     </span>
