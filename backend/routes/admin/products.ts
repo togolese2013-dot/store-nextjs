@@ -199,7 +199,7 @@ router.delete("/api/admin/products/:id", async (req, res) => {
     return res.status(403).json({ error: "Accès refusé." });
   }
   await (db as import("mysql2/promise").Pool).execute(
-    "UPDATE produits SET actif = 0 WHERE id = ?", [req.params.id]
+    "DELETE FROM produits WHERE id = ?", [req.params.id]
   );
   emitAdminEvent("produit");
   res.json({ ok: true });

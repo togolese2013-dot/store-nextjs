@@ -9,7 +9,6 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import ReferralBanner from "@/components/ReferralBanner";
 import RefDetector from "@/components/RefDetector";
 import { apiGet } from "@/lib/api";
-import BottomNav from "@/components/BottomNav";
 import ThemeLoader from "@/components/ThemeLoader";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
@@ -27,12 +26,11 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <ReferralBanner />
       <AnnouncementBar />
       <Header />
-      <main className="flex-1 pb-16 lg:pb-0">
+      <main className="flex-1">
         {children}
       </main>
       <Footer />
       {waNumber && <WhatsAppButton number={waNumber} />}
-      <BottomNav />
     </CartProvider>
   );
 }
