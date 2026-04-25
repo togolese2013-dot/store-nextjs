@@ -205,8 +205,8 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Description</p>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  {product.description.length > 160
-                    ? product.description.slice(0, 160) + "…"
+                  {product.description.length > 250
+                    ? product.description.slice(0, 250) + "…"
                     : product.description}
                 </p>
               </div>

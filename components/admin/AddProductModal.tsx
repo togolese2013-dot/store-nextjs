@@ -385,16 +385,16 @@ export default function AddProductModal({ categories, marques }: Props) {
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className={lbl + " mb-0"}>Mini description (carte produit) *</label>
-                        <span className={`text-xs font-semibold ${description.length > 160 ? "text-red-500" : "text-slate-400"}`}>
-                          {description.length}/160
+                        <span className={`text-xs font-semibold ${description.length > 250 ? "text-red-500" : "text-slate-400"}`}>
+                          {description.length}/250
                         </span>
                       </div>
                       <textarea
                         value={description}
-                        onChange={e => setDescription(e.target.value.slice(0, 160))}
-                        placeholder="Description courte affichée sur les cartes produit (160 car. max)…"
-                        rows={2}
-                        maxLength={160}
+                        onChange={e => setDescription(e.target.value.slice(0, 250))}
+                        placeholder="Description courte affichée sur les cartes produit (250 car. max)…"
+                        rows={3}
+                        maxLength={250}
                         required
                         className={`${inp} resize-none`}
                       />

@@ -222,8 +222,8 @@ export default async function ProductPage({ params }: PageProps) {
               {product.description && (
                 <div className="mb-6 pb-6 border-b border-slate-100">
                   <p className="text-slate-600 text-sm leading-relaxed">
-                    {product.description.length > 160
-                      ? product.description.slice(0, 160).trimEnd() + "…"
+                    {product.description.length > 250
+                      ? product.description.slice(0, 250).trimEnd() + "…"
                       : product.description}
                   </p>
                 </div>

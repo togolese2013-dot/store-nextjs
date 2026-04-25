@@ -177,7 +177,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
             </div>
             {money ? (
               <p className="text-xl font-bold text-slate-900 tabular-nums leading-none">
-                {val.toLocaleString("fr-FR")}<span className="text-xs font-bold text-emerald-500 ml-1">FCFA</span>
+                {val.toLocaleString("fr-FR")}
               </p>
             ) : (
               <p className="text-xl font-bold text-slate-900 tabular-nums leading-none">{val}</p>
@@ -196,7 +196,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
           <input
             type="text" name="q" defaultValue={q}
             placeholder="Rechercher un produit…"
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans"
+            className="w-full pl-9 pr-4 py-2.5 text-base sm:text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans"
           />
         </div>
         {isStockView && (
@@ -301,12 +301,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="text-left px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Produit</th>
+                      <th className="text-left px-3 sm:px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Produit</th>
                       <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden md:table-cell">Catégorie</th>
-                      <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Prix</th>
+                      <th className="text-right px-2 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Prix</th>
                       <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Stock</th>
                       <th className="text-center px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden lg:table-cell">Statut</th>
-                      <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Actions</th>
+                      <th className="text-right px-2 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -320,9 +320,9 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                         : null;
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
+                          <td className="px-3 sm:px-5 py-2 sm:py-3">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
                                 {imgSrc ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={imgSrc} alt={p.nom} className="absolute inset-0 w-full h-full object-contain p-1" />
@@ -332,9 +332,9 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                                   </div>
                                 )}
                               </div>
-                              <div>
-                                <p className="font-semibold text-slate-900 line-clamp-1">{p.nom}</p>
-                                <p className="text-xs text-slate-400 font-mono">{p.reference}</p>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900 truncate">{p.nom}</p>
+                                <p className="text-xs text-slate-400 font-mono truncate">{p.reference}</p>
                               </div>
                             </div>
                           </td>
@@ -343,7 +343,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                               ? <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{p.categorie_nom.toUpperCase()}</span>
                               : <span className="text-slate-300">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-2 sm:px-4 py-2 sm:py-3 text-right hidden sm:table-cell">
                             <span className={`font-bold text-sm ${isPromo ? "text-emerald-700" : "text-slate-900"}`}>
                               {formatPrice(price)}
                             </span>
@@ -364,7 +364,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                               {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-2 sm:px-4 py-2 sm:py-3">
                             <AdminProductActions product={p} />
                           </td>
                         </tr>
