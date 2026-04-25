@@ -111,7 +111,7 @@ export default async function ProductPage({ params }: PageProps) {
     : [];
 
   /* Recommended products (manually linked) */
-  const recommended = await getRelatedProductsWithDetails(product.id);
+  const recommended = await getRelatedProductsWithDetails(product.id).catch(() => []);
 
   /* Reviews */
   const reviews: Review[] = await apiGet<{ reviews: Review[] }>(

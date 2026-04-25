@@ -297,16 +297,81 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* ── Mobile cards (xs only) ── */}
+              <div className="sm:hidden divide-y divide-slate-100">
+                {products.map(p => {
+                  const price   = finalPrice(p);
+                  const isPromo = p.remise > 0;
+                  const imgSrc = p.image_url
+                    ? (p.image_url.startsWith("http") || p.image_url.startsWith("/"))
+                      ? p.image_url
+                      : `/api/uploads/${p.image_url}`
+                    : null;
+                  return (
+                    <div key={p.id} className="flex gap-3 px-4 py-3">
+                      {/* Image */}
+                      <div className="w-14 h-14 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
+                        {imgSrc ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={imgSrc} alt={p.nom} className="absolute inset-0 w-full h-full object-contain p-1" />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                            <Package className="w-6 h-6" strokeWidth={1} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Row 1 : nom + prix */}
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-slate-900 text-sm leading-tight line-clamp-2 flex-1">{p.nom}</p>
+                          <span className={`font-bold text-sm shrink-0 ${isPromo ? "text-emerald-700" : "text-slate-900"}`}>
+                            {formatPrice(price)}
+                          </span>
+                        </div>
+
+                        {/* Row 2 : ref + catégorie */}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-slate-400 font-mono">{p.reference}</span>
+                          {p.categorie_nom && (
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">· {p.categorie_nom}</span>
+                          )}
+                        </div>
+
+                        {/* Row 3 : stock badge + actions */}
+                        <div className="flex items-center justify-between mt-2">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                            p.stock_magasin === 0
+                              ? "bg-red-100 text-red-700"
+                              : p.stock_magasin <= 5
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-green-100 text-green-700"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              p.stock_magasin === 0 ? "bg-red-400" : p.stock_magasin <= 5 ? "bg-amber-400" : "bg-green-400"
+                            }`} />
+                            Stock {p.stock_magasin} · {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
+                          </span>
+                          <AdminProductActions product={p} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ── Desktop table (sm+) ── */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="text-left px-3 sm:px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Produit</th>
+                      <th className="text-left px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Produit</th>
                       <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden md:table-cell">Catégorie</th>
-                      <th className="text-right px-2 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Prix</th>
-                      <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Stock</th>
+                      <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Prix</th>
+                      <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Stock</th>
                       <th className="text-center px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden lg:table-cell">Statut</th>
-                      <th className="text-right px-2 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Actions</th>
+                      <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -320,9 +385,9 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                         : null;
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-3 sm:px-5 py-2 sm:py-3">
-                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
                                 {imgSrc ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={imgSrc} alt={p.nom} className="absolute inset-0 w-full h-full object-contain p-1" />
@@ -334,7 +399,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                               </div>
                               <div className="min-w-0">
                                 <p className="font-semibold text-slate-900 truncate">{p.nom}</p>
-                                <p className="text-xs text-slate-400 font-mono truncate">{p.reference}</p>
+                                <p className="text-xs text-slate-400 font-mono">{p.reference}</p>
                               </div>
                             </div>
                           </td>
@@ -343,12 +408,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                               ? <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{p.categorie_nom.toUpperCase()}</span>
                               : <span className="text-slate-300">—</span>}
                           </td>
-                          <td className="px-2 sm:px-4 py-2 sm:py-3 text-right hidden sm:table-cell">
+                          <td className="px-4 py-3 text-right">
                             <span className={`font-bold text-sm ${isPromo ? "text-emerald-700" : "text-slate-900"}`}>
                               {formatPrice(price)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right hidden sm:table-cell">
+                          <td className="px-4 py-3 text-right">
                             <span className={`font-semibold ${p.stock_magasin === 0 ? "text-red-500" : p.stock_magasin <= 5 ? "text-amber-500" : "text-green-600"}`}>
                               {p.stock_magasin}
                             </span>
@@ -364,7 +429,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                               {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
                             </span>
                           </td>
-                          <td className="px-2 sm:px-4 py-2 sm:py-3">
+                          <td className="px-4 py-3">
                             <AdminProductActions product={p} />
                           </td>
                         </tr>
