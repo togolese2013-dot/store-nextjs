@@ -382,10 +382,13 @@ export async function getProductCount(opts?: {
   search?: string;
   promoOnly?: boolean;
   newOnly?: boolean;
+  inStock?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
   statut?: "disponible" | "faible" | "epuise";
   includeInactive?: boolean;
 }): Promise<number> {
-  const { categoryId, marqueId, search, promoOnly, newOnly, statut, includeInactive = false } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false } = opts ?? {};
   const cols = await produitCols();
 
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
@@ -396,9 +399,12 @@ export async function getProductCount(opts?: {
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise) { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)   { conditions.push("p.neuf = 1"); }
+  if (inStock)  { conditions.push("COALESCE(p.stock_magasin, 0) + COALESCE(p.stock_boutique, 0) > 0"); }
   if (statut === "disponible")  { conditions.push("COALESCE(p.stock_magasin, 0) > 5"); }
   if (statut === "faible")      { conditions.push("COALESCE(p.stock_magasin, 0) > 0 AND COALESCE(p.stock_magasin, 0) <= 5"); }
   if (statut === "epuise")      { conditions.push("COALESCE(p.stock_magasin, 0) = 0"); }
+  if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
+  if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,

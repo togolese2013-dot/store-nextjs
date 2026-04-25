@@ -1,5 +1,5 @@
 import express from "express";
-import { getProducts, getProductsByIds, getCategories, checkReviewsTable, db } from "@/lib/db";
+import { getProducts, getProductsByIds, getProductCount, getCategories, checkReviewsTable, db } from "@/lib/db";
 import {
   subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings,
 } from "@/lib/admin-db";
@@ -32,19 +32,24 @@ router.get("/api/products", async (req, res) => {
       const products = await getProductsByIds(ids);
       return res.json({ success: true, data: products });
     }
-    const products = await getProducts({
-      categoryId:     req.query.category  ? Number(req.query.category) : undefined,
-      search:         (req.query.q as string)         || undefined,
-      referenceExact: (req.query.reference as string) || undefined,
-      promoOnly:      req.query.promo   === "true",
-      newOnly:        req.query.new     === "true",
-      inStock:        req.query.inStock === "true",
-      minPrice:       req.query.minPrice ? Number(req.query.minPrice) : undefined,
-      maxPrice:       req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
-      limit:          req.query.limit  ? Number(req.query.limit)  : 60,
-      offset:         req.query.offset ? Number(req.query.offset) : 0,
-    });
-    res.json({ success: true, data: products });
+    const categoryId     = req.query.category  ? Number(req.query.category) : undefined;
+    const search         = (req.query.q as string)         || undefined;
+    const referenceExact = (req.query.reference as string) || undefined;
+    const promoOnly      = req.query.promo   === "true";
+    const newOnly        = req.query.new     === "true";
+    const inStock        = req.query.inStock === "true";
+    const minPrice       = req.query.minPrice ? Number(req.query.minPrice) : undefined;
+    const maxPrice       = req.query.maxPrice ? Number(req.query.maxPrice) : undefined;
+    const limit          = req.query.limit  ? Number(req.query.limit)  : 60;
+    const offset         = req.query.offset ? Number(req.query.offset) : 0;
+
+    const [products, total] = await Promise.all([
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset }),
+      referenceExact
+        ? Promise.resolve(1)
+        : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice }),
+    ]);
+    res.json({ success: true, data: products, total });
   } catch (err) {
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }

@@ -69,13 +69,11 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   try {
     const [categoriesRes, productsRes] = await Promise.all([
       apiGet<{ data: Category[] }>("/api/categories", { noAuth: true }),
-      apiGet<{ data: Product[]; total?: number }>(`/api/admin/products?${qs.toString()}`, { noAuth: true }).catch(() =>
-        apiGet<{ data: Product[]; total?: number }>(`/api/products?${qs.toString()}`, { noAuth: true })
-      ),
+      apiGet<{ data: Product[]; total?: number }>(`/api/products?${qs.toString()}`, { noAuth: true }),
     ]);
     categories = categoriesRes.data ?? [];
     products   = productsRes.data   ?? [];
-    total      = (productsRes as { total?: number }).total ?? products.length;
+    total      = productsRes.total  ?? products.length;
   } catch {
     /* backend unreachable — show empty catalogue */
   }
