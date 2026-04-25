@@ -24,6 +24,7 @@ import adminUsersRoutes     from "./routes/admin/users";
 import livreurRoutes        from "./routes/livreur";
 import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
+import ordersRoutes         from "./routes/orders";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -72,6 +73,7 @@ app.use(adminUsersRoutes);
 app.use(livreurRoutes);
 app.use(publicRoutes);
 app.use(accountRoutes);
+app.use(ordersRoutes);
 
 app.listen(PORT, () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);

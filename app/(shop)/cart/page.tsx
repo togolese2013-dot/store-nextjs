@@ -209,18 +209,10 @@ export default function CartPage() {
               {/* CTA buttons */}
               <div className="flex flex-col gap-3">
                 <Link href="/checkout"
-                  className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-brand-900 text-white font-bold text-base hover:bg-brand-800 transition-all hover:shadow-brand"
+                  className="flex items-center justify-center w-full py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-all hover:shadow-brand"
                 >
-                  Commander maintenant <ArrowRight className="w-5 h-5" />
+                  Commander maintenant
                 </Link>
-
-                <a
-                  href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${waText}`}
-                  target="_blank" rel="noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-[#25D366] text-white font-bold text-sm hover:bg-[#1da851] transition-all"
-                >
-                  <WaIcon /> Commander sur WhatsApp
-                </a>
 
                 <Link href="/products"
                   className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-semibold text-sm hover:border-brand-300 hover:text-brand-700 transition-all"

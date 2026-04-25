@@ -4,7 +4,7 @@ import OrderTimeline from "@/components/admin/OrderTimeline";
 import OrderStatusSelect from "@/components/admin/OrderStatusSelect";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, Package, Phone, MapPin, MessageSquare } from "lucide-react";
+import { ArrowLeft, Download, Package, Phone, MapPin, MessageSquare, Link2 } from "lucide-react";
 
 export const metadata = { title: "Détail commande" };
 
@@ -147,6 +147,15 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                   <span>{order.adresse}</span>
                 </div>
+              )}
+              {(order as any).lien_localisation && (
+                <a
+                  href={(order as any).lien_localisation}
+                  target="_blank" rel="noreferrer"
+                  className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-900 hover:underline"
+                >
+                  <Link2 className="w-3.5 h-3.5" /> Voir sur la carte
+                </a>
               )}
               <p className="text-xs text-slate-400 mt-2">Zone : {order.zone_livraison}</p>
             </div>

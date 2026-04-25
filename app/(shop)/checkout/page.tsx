@@ -8,15 +8,22 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
-  User, MessageSquare, ChevronDown, Truck, Star,
+  User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2,
 } from "lucide-react";
 import { clsx } from "clsx";
 
-const WaIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden>
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 0C5.373 0 0 5.373 0 12c0 2.089.534 4.054 1.47 5.764L0 24l6.396-1.454A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.797 9.797 0 01-5.016-1.378l-.36-.214-3.72.846.862-3.636-.235-.373A9.775 9.775 0 012.182 12C2.182 6.578 6.578 2.182 12 2.182c5.423 0 9.818 4.396 9.818 9.818 0 5.423-4.395 9.818-9.818 9.818z" />
-  </svg>
-);
+const PHONE_PREFIXES = [
+  { code: "+228", flag: "🇹🇬", label: "Togo" },
+  { code: "+225", flag: "🇨🇮", label: "Côte d'Ivoire" },
+  { code: "+229", flag: "🇧🇯", label: "Bénin" },
+  { code: "+226", flag: "🇧🇫", label: "Burkina Faso" },
+  { code: "+233", flag: "🇬🇭", label: "Ghana" },
+  { code: "+221", flag: "🇸🇳", label: "Sénégal" },
+  { code: "+234", flag: "🇳🇬", label: "Nigeria" },
+  { code: "+237", flag: "🇨🇲", label: "Cameroun" },
+  { code: "+33",  flag: "🇫🇷", label: "France" },
+  { code: "+1",   flag: "🇺🇸", label: "USA / Canada" },
+];
 
 const ZONES = [
   { label: "Lomé (Tokoin / Adidogomé / Bè)",     fee: 1000  },
@@ -30,26 +37,30 @@ const ZONES = [
 ];
 
 interface Form {
-  nom:        string;
-  telephone:  string;
-  adresse:    string;
-  zone:       string;
-  note:       string;
+  nom:               string;
+  adresse:           string;
+  zone:              string;
+  note:              string;
+  lien_localisation: string;
 }
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCart();
 
   const [form, setForm] = useState<Form>({
-    nom: "", telephone: "", adresse: "", zone: "", note: "",
+    nom: "", adresse: "", zone: "", note: "", lien_localisation: "",
   });
-  const [submitted, setSubmitted]       = useState(false);
-  const [errors,    setErrors]          = useState<Partial<Form>>({});
-  const [orderedItems,  setOrderedItems]  = useState<typeof items>([]);
-  const [orderedTotal,  setOrderedTotal]  = useState(0);
-  const [refCode,   setRefCode]         = useState<string | null>(null);
+  const [phonePrefix,  setPhonePrefix]  = useState("+228");
+  const [phoneNumber,  setPhoneNumber]  = useState("");
+  const [submitted,    setSubmitted]    = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [errors,       setErrors]       = useState<Partial<Form & { telephone: string }>>({});
+  const [submitError,  setSubmitError]  = useState("");
+  const [orderedItems, setOrderedItems] = useState<typeof items>([]);
+  const [orderedTotal, setOrderedTotal] = useState(0);
+  const [orderRef,     setOrderRef]     = useState("");
+  const [refCode,      setRefCode]      = useState<string | null>(null);
 
-  // Read referral code from cookie on mount
   useEffect(() => {
     const match = document.cookie?.match?.(/ts_ref=([^;]+)/);
     if (match) setRefCode(decodeURIComponent(match[1]));
@@ -60,9 +71,9 @@ export default function CheckoutPage() {
   const grandTotal   = total + deliveryFee;
 
   function validate(): boolean {
-    const e: Partial<Form> = {};
+    const e: Partial<Form & { telephone: string }> = {};
     if (!form.nom.trim())       e.nom       = "Votre nom est requis.";
-    if (!form.telephone.trim()) e.telephone = "Votre numéro est requis.";
+    if (!phoneNumber.trim())    e.telephone = "Votre numéro est requis.";
     if (!form.adresse.trim())   e.adresse   = "Votre adresse est requise.";
     if (!form.zone)             e.zone      = "Choisissez une zone de livraison.";
     setErrors(e);
@@ -75,37 +86,51 @@ export default function CheckoutPage() {
     setErrors(err => ({ ...err, [name]: undefined }));
   }
 
-  function buildWhatsAppText() {
-    const lines = items.map(i =>
-      `• ${i.nom} × ${i.qty}  →  ${formatPrice(calcPrice(i) * i.qty)}`
-    ).join("\n");
-    return encodeURIComponent(
-      `🛒 *NOUVELLE COMMANDE*\n\n` +
-      `👤 *Nom :* ${form.nom}\n` +
-      `📞 *Téléphone :* ${form.telephone}\n` +
-      `📍 *Adresse :* ${form.adresse}\n` +
-      `🚚 *Zone :* ${form.zone}\n` +
-      (form.note ? `📝 *Note :* ${form.note}\n` : "") +
-      `\n*Articles :*\n${lines}\n\n` +
-      `💰 Sous-total : ${formatPrice(total)}\n` +
-      `🚚 Livraison : ${deliveryFee === 0 ? "À confirmer" : formatPrice(deliveryFee)}\n` +
-      `━━━━━━━━━━━━━━━\n` +
-      `*TOTAL : ${formatPrice(grandTotal)}*` +
-      (refCode ? `\n\n🎁 *Code parrain :* ${refCode}` : "")
-    );
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
     if (items.length === 0) return;
-
-    const url = `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${buildWhatsAppText()}`;
-    window.open(url, "_blank", "noreferrer");
-    setOrderedItems([...items]);
-    setOrderedTotal(grandTotal);
-    setSubmitted(true);
-    clearCart();
+    setLoading(true);
+    setSubmitError("");
+    try {
+      const telephone = `${phonePrefix} ${phoneNumber.trim()}`;
+      const orderItems = items.map(i => ({
+        id:           i.id,
+        nom:          i.nom,
+        reference:    i.reference,
+        prix_unitaire: calcPrice(i),
+        qty:          i.qty,
+        total:        calcPrice(i) * i.qty,
+      }));
+      const res = await fetch("/api/orders", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          nom:               form.nom,
+          telephone,
+          adresse:           form.adresse,
+          zone_livraison:    form.zone,
+          delivery_fee:      deliveryFee,
+          note:              form.note,
+          lien_localisation: form.lien_localisation || null,
+          items:             orderItems,
+          subtotal:          total,
+          total:             grandTotal,
+          ref_code:          refCode ?? undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSubmitError(data.error || "Erreur lors de la commande."); return; }
+      setOrderedItems([...items]);
+      setOrderedTotal(grandTotal);
+      setOrderRef(data.reference ?? "");
+      setSubmitted(true);
+      clearCart();
+    } catch {
+      setSubmitError("Erreur réseau. Vérifiez votre connexion et réessayez.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   /* Empty cart guard */
@@ -130,25 +155,25 @@ export default function CheckoutPage() {
   if (submitted) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
-
-        {/* Confirmation */}
         <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
           <Check className="w-10 h-10 text-green-600" />
         </div>
-        <h1 className="font-display text-2xl font-800 text-slate-900 mb-3">Commande envoyée !</h1>
-        <p className="text-slate-600 text-sm max-w-sm mx-auto mb-2">
-          Votre commande a été transmise sur WhatsApp. Notre équipe vous confirmera la livraison très bientôt.
-        </p>
-        <p className="text-slate-400 text-xs mb-6">
-          Si la fenêtre WhatsApp ne s'est pas ouverte, appuyez sur le bouton ci-dessous.
+        <h1 className="font-display text-2xl font-800 text-slate-900 mb-3">Commande confirmée !</h1>
+        {orderRef && (
+          <p className="text-xs font-mono bg-slate-100 text-slate-600 inline-block px-3 py-1 rounded-lg mb-4">
+            Réf. {orderRef}
+          </p>
+        )}
+        <p className="text-slate-600 text-sm max-w-sm mx-auto mb-6">
+          Votre commande a bien été enregistrée. Notre équipe vous contactera très bientôt pour confirmer la livraison.
         </p>
 
-        {/* Points estimés */}
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-50 border border-brand-100 text-brand-800 text-sm font-semibold mb-8">
           <Star className="w-4 h-4 text-brand-600" fill="currentColor" />
           ~{Math.floor(orderedTotal / 100)} points fidélité à recevoir après livraison
           <Link href="/fidelite" className="text-xs text-brand-600 hover:underline ml-1">En savoir plus →</Link>
         </div>
+
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
           <Link href="/"
             className="px-6 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-brand-300 transition-colors"
@@ -162,7 +187,6 @@ export default function CheckoutPage() {
           </Link>
         </div>
 
-        {/* ── Review invitation ── */}
         {orderedItems.length > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-left">
             <div className="flex items-center gap-2 mb-3">
@@ -174,13 +198,11 @@ export default function CheckoutPage() {
               <h2 className="font-display font-800 text-slate-900 text-base">Votre avis compte !</h2>
             </div>
             <p className="text-slate-600 text-sm mb-4">
-              Dès réception de votre commande, partagez votre expérience — cela aide d'autres clients togolais à mieux choisir.
+              Dès réception de votre commande, partagez votre expérience — cela aide d'autres clients à mieux choisir.
             </p>
             <div className="flex flex-col gap-2">
               {orderedItems.map(item => (
-                <Link
-                  key={item.id}
-                  href={`/products/${item.reference}#avis`}
+                <Link key={item.id} href={`/products/${item.reference}#avis`}
                   className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all group"
                 >
                   <span className="text-sm text-slate-800 font-medium line-clamp-1">{item.nom}</span>
@@ -196,8 +218,9 @@ export default function CheckoutPage() {
     );
   }
 
+  /* Input style — text-base (16px) prevents iOS zoom */
   const inputCls = (err?: string) => clsx(
-    "w-full px-4 py-3 rounded-2xl border-2 text-sm outline-none transition-all font-sans bg-white",
+    "w-full px-4 py-3 rounded-2xl border-2 text-base outline-none transition-all font-sans bg-white",
     err
       ? "border-red-400 focus:border-red-500"
       : "border-slate-200 focus:border-brand-500"
@@ -234,6 +257,8 @@ export default function CheckoutPage() {
                   Vos coordonnées
                 </h2>
                 <div className="grid sm:grid-cols-2 gap-4">
+
+                  {/* Nom */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
                       <User className="w-3.5 h-3.5 inline mr-1" />Nom complet *
@@ -246,16 +271,36 @@ export default function CheckoutPage() {
                     />
                     {errors.nom && <p className="text-xs text-red-500 mt-1">{errors.nom}</p>}
                   </div>
+
+                  {/* Téléphone : indicatif + numéro */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
                       <Phone className="w-3.5 h-3.5 inline mr-1" />Numéro de téléphone *
                     </label>
-                    <input
-                      type="tel" name="telephone" value={form.telephone}
-                      onChange={handleChange} placeholder="Ex : +228 90 00 00 00"
-                      className={inputCls(errors.telephone)}
-                      autoComplete="tel"
-                    />
+                    <div className="flex gap-2">
+                      <div className="relative shrink-0">
+                        <select
+                          value={phonePrefix}
+                          onChange={e => setPhonePrefix(e.target.value)}
+                          className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800"
+                        >
+                          {PHONE_PREFIXES.map(p => (
+                            <option key={p.code} value={p.code}>
+                              {p.flag} {p.code}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                      </div>
+                      <input
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={e => { setPhoneNumber(e.target.value); setErrors(err => ({ ...err, telephone: undefined })); }}
+                        placeholder="90 00 00 00"
+                        className={clsx(inputCls(errors.telephone), "flex-1 min-w-0")}
+                        autoComplete="tel-national"
+                      />
+                    </div>
                     {errors.telephone && <p className="text-xs text-red-500 mt-1">{errors.telephone}</p>}
                   </div>
                 </div>
@@ -268,6 +313,8 @@ export default function CheckoutPage() {
                   Livraison
                 </h2>
                 <div className="space-y-4">
+
+                  {/* Adresse */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
                       <MapPin className="w-3.5 h-3.5 inline mr-1" />Adresse de livraison *
@@ -280,6 +327,34 @@ export default function CheckoutPage() {
                     />
                     {errors.adresse && <p className="text-xs text-red-500 mt-1">{errors.adresse}</p>}
                   </div>
+
+                  {/* Lien de localisation */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                      <Link2 className="w-3.5 h-3.5 inline mr-1" />Lien de localisation (optionnel)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url" name="lien_localisation" value={form.lien_localisation}
+                        onChange={handleChange}
+                        placeholder="Coller un lien Google Maps, Apple Maps…"
+                        className={clsx(inputCls(), "pr-24")}
+                        autoComplete="off"
+                      />
+                      {form.lien_localisation && (
+                        <a
+                          href={form.lien_localisation}
+                          target="_blank" rel="noreferrer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-brand-700 hover:text-brand-900 flex items-center gap-1"
+                        >
+                          <MapPin className="w-3.5 h-3.5" /> Voir
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">Partagez votre position depuis Google Maps — s'ouvre dans l'application</p>
+                  </div>
+
+                  {/* Zone */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
                       <Truck className="w-3.5 h-3.5 inline mr-1" />Zone de livraison *
@@ -307,6 +382,8 @@ export default function CheckoutPage() {
                       </p>
                     )}
                   </div>
+
+                  {/* Note */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
                       <MessageSquare className="w-3.5 h-3.5 inline mr-1" />Note / instructions (optionnel)
@@ -342,9 +419,7 @@ export default function CheckoutPage() {
             {/* ── Summary ── */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-3xl border border-slate-100 p-6 sticky top-24">
-                <h2 className="font-display font-800 text-slate-900 text-lg mb-5">
-                  Votre commande
-                </h2>
+                <h2 className="font-display font-800 text-slate-900 text-lg mb-5">Votre commande</h2>
 
                 {/* Items */}
                 <div className="space-y-3 mb-5 max-h-60 overflow-y-auto pr-1">
@@ -392,21 +467,27 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3 mb-6">
+                <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3 mb-5">
                   <span className="font-display font-800 text-slate-900">Total</span>
                   <span className="font-display font-800 text-2xl text-brand-900">{formatPrice(grandTotal)}</span>
                 </div>
 
+                {submitError && (
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+                    {submitError}
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-[#25D366] text-white font-bold text-base hover:bg-[#1da851] transition-all hover:shadow-lg"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-brand-900 text-white font-bold text-base hover:bg-brand-800 transition-all disabled:opacity-60"
                 >
-                  <WaIcon />
-                  Confirmer sur WhatsApp
+                  {loading
+                    ? <><Loader2 className="w-5 h-5 animate-spin" /> Envoi en cours…</>
+                    : <><Check className="w-5 h-5" /> Confirmer ma commande</>
+                  }
                 </button>
-                <p className="text-center text-xs text-slate-400 mt-3">
-                  Votre commande sera envoyée directement sur WhatsApp
-                </p>
 
                 <Link href="/cart"
                   className="mt-3 flex items-center justify-center w-full py-2.5 rounded-2xl text-sm text-slate-500 hover:text-brand-700 transition-colors"
