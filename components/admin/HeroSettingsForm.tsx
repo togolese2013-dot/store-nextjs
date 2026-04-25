@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   Loader2, Save, Plus, Trash2, GripVertical,
-  ChevronDown, ChevronUp, Image as ImageIcon, X, Eye, EyeOff, Upload, Monitor, Smartphone,
+  ChevronDown, ChevronUp, Image as ImageIcon, X, Upload, Monitor, Smartphone,
 } from "lucide-react";
 
 interface HeroSlide {
@@ -11,6 +11,8 @@ interface HeroSlide {
   image_mobile: string;
   gradient:     string;
   accent:       string;
+  nom:          string;
+  href:         string;
 }
 
 interface Props { settings: Record<string, string> }
@@ -23,6 +25,8 @@ const DEFAULT_SLIDE: HeroSlide = {
   image_mobile: "",
   gradient:     "from-[#052e16] via-[#14532d] to-[#166534]",
   accent:       "#22c55e",
+  nom:          "",
+  href:         "",
 };
 
 function parseSlides(settings: Record<string, string>): HeroSlide[] {
@@ -35,6 +39,8 @@ function parseSlides(settings: Record<string, string>): HeroSlide[] {
           image_mobile: s.image_mobile ?? "",
           gradient:     s.gradient     ?? DEFAULT_SLIDE.gradient,
           accent:       s.accent       ?? DEFAULT_SLIDE.accent,
+          nom:          s.nom          ?? "",
+          href:         s.href         ?? "",
         }));
       }
     } catch { /* fall through */ }
@@ -46,16 +52,8 @@ export default function HeroSettingsForm({ settings }: Props) {
   const [slides,    setSlides]    = useState<HeroSlide[]>(() => parseSlides(settings));
   const [open,      setOpen]      = useState<number | null>(0);
   const [loading,   setLoading]   = useState(false);
-  const [uploading, setUploading] = useState<string | null>(null); // "d-0", "m-0" etc.
+  const [uploading, setUploading] = useState<string | null>(null);
   const [msg,       setMsg]       = useState("");
-
-  /* Bannière */
-  const [banEnabled, setBanEnabled] = useState(settings.announcement_bar_enabled !== "false");
-  const [banText,    setBanText]    = useState(settings.announcement_bar          ?? "");
-  const [banBg,      setBanBg]      = useState(settings.announcement_bar_bg       ?? "#14532d");
-  const [banColor,   setBanColor]   = useState(settings.announcement_bar_color    ?? "#ffffff");
-  const [banStart,   setBanStart]   = useState(settings.announcement_bar_start    ?? "");
-  const [banEnd,     setBanEnd]     = useState(settings.announcement_bar_end      ?? "");
 
   function updateSlide(i: number, field: keyof HeroSlide, value: string) {
     setSlides(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
@@ -104,19 +102,10 @@ export default function HeroSettingsForm({ settings }: Props) {
 
   async function save() {
     setLoading(true); setMsg("");
-    const body: Record<string, string> = {
-      hero_slides_json:         JSON.stringify(slides),
-      announcement_bar_enabled: banEnabled ? "true" : "false",
-      announcement_bar:         banText,
-      announcement_bar_bg:      banBg,
-      announcement_bar_color:   banColor,
-      announcement_bar_start:   banStart,
-      announcement_bar_end:     banEnd,
-    };
     const res = await fetch("/api/admin/settings", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(body),
+      body:    JSON.stringify({ hero_slides_json: JSON.stringify(slides) }),
     });
     setLoading(false);
     setMsg(res.ok ? "Sauvegardé ✓" : "Erreur lors de la sauvegarde");
@@ -124,8 +113,7 @@ export default function HeroSettingsForm({ settings }: Props) {
 
   /* ─── Image upload zone component ─── */
   function ImageUploadZone({
-    label, hint, aspectClass, value, uploadKey,
-    onUpload, onClear,
+    label, hint, aspectClass, value, uploadKey, onUpload, onClear,
   }: {
     label: string; hint: string; aspectClass: string; value: string; uploadKey: string;
     onUpload: (f: File) => void; onClear: () => void;
@@ -208,7 +196,6 @@ export default function HeroSettingsForm({ settings }: Props) {
               >
                 <GripVertical className="w-4 h-4 text-slate-300 shrink-0" />
 
-                {/* Desktop thumbnail */}
                 <div className="w-14 h-8 rounded-lg bg-slate-100 shrink-0 overflow-hidden relative flex items-center justify-center">
                   {slide.image
                     ? <img src={slide.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -216,7 +203,6 @@ export default function HeroSettingsForm({ settings }: Props) {
                   }
                 </div>
 
-                {/* Mobile thumbnail */}
                 <div className="w-6 h-8 rounded-lg bg-slate-100 shrink-0 overflow-hidden relative flex items-center justify-center">
                   {slide.image_mobile
                     ? <img src={slide.image_mobile} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -225,10 +211,13 @@ export default function HeroSettingsForm({ settings }: Props) {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800">Slide {i + 1}</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {slide.nom || `Slide ${i + 1}`}
+                  </p>
                   <p className="text-xs text-slate-400">
                     {slide.image ? "Desktop ✓" : "Desktop vide"}{" · "}
                     {slide.image_mobile ? "Mobile ✓" : "Mobile vide"}
+                    {slide.href ? ` · Lien: ${slide.href}` : ""}
                   </p>
                 </div>
 
@@ -254,6 +243,29 @@ export default function HeroSettingsForm({ settings }: Props) {
               {/* Slide form */}
               {open === i && (
                 <div className="border-t border-slate-100 p-5 space-y-6">
+
+                  {/* Nom + Lien */}
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Nom du slide</label>
+                      <input
+                        value={slide.nom}
+                        onChange={e => updateSlide(i, "nom", e.target.value)}
+                        placeholder="Ex: Promo été, Nouveautés…"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Lien de redirection (optionnel)</label>
+                      <input
+                        value={slide.href}
+                        onChange={e => updateSlide(i, "href", e.target.value)}
+                        placeholder="Ex: /products?promo=true"
+                        className={inputCls}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1">Lien interne (/products) ou externe (https://…)</p>
+                    </div>
+                  </div>
 
                   {/* Desktop image */}
                   <div className="space-y-1">
@@ -296,70 +308,6 @@ export default function HeroSettingsForm({ settings }: Props) {
               )}
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* ── BANNIÈRE D'ANNONCE ── */}
-      <section>
-        <h2 className="font-display font-700 text-lg text-slate-900 mb-4">Barre d'annonce</h2>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5 shadow-sm">
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Afficher la barre d'annonce</p>
-              <p className="text-xs text-slate-400 mt-0.5">La barre apparaît tout en haut du site</p>
-            </div>
-            <button type="button" onClick={() => setBanEnabled(!banEnabled)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${
-                banEnabled
-                  ? "border-brand-600 bg-brand-50 text-brand-700"
-                  : "border-slate-200 bg-slate-50 text-slate-500"
-              }`}
-            >
-              {banEnabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              {banEnabled ? "Activée" : "Désactivée"}
-            </button>
-          </div>
-
-          <div>
-            <label className={labelCls}>Texte de la bannière</label>
-            <input className={inputCls} placeholder="🚚 Livraison rapide · Paiement à la livraison ✅"
-              value={banText} onChange={e => setBanText(e.target.value)} />
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Couleur de fond</label>
-              <div className="flex gap-2 items-center">
-                <input type="color" value={banBg} onChange={e => setBanBg(e.target.value)}
-                  className="w-10 h-10 rounded-xl border border-slate-200 cursor-pointer p-1 shrink-0" />
-                <input type="text" value={banBg} onChange={e => setBanBg(e.target.value)}
-                  className={`${inputCls} font-mono`} />
-              </div>
-            </div>
-            <div>
-              <label className={labelCls}>Couleur du texte</label>
-              <div className="flex gap-2 items-center">
-                <input type="color" value={banColor} onChange={e => setBanColor(e.target.value)}
-                  className="w-10 h-10 rounded-xl border border-slate-200 cursor-pointer p-1 shrink-0" />
-                <input type="text" value={banColor} onChange={e => setBanColor(e.target.value)}
-                  className={`${inputCls} font-mono`} />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Date de début (optionnel)</label>
-              <input type="date" value={banStart} onChange={e => setBanStart(e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Date de fin (optionnel)</label>
-              <input type="date" value={banEnd} onChange={e => setBanEnd(e.target.value)} className={inputCls} />
-            </div>
-          </div>
-
         </div>
       </section>
 

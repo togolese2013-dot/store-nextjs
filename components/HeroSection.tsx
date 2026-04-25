@@ -55,15 +55,18 @@ export default async function HeroSection() {
         JSON.parse(settings.hero_slides_json);
       if (Array.isArray(parsed) && parsed.length > 0) {
         slides = parsed.map((s, i) => ({
-          id:        i + 1,
-          eyebrow:   s.eyebrow   ?? DEFAULTS[i]?.eyebrow   ?? "",
-          title:     s.title     ?? DEFAULTS[i]?.title      ?? "",
-          subtitle:  s.subtitle  ?? DEFAULTS[i]?.subtitle   ?? "",
-          cta_label: s.cta_label ?? DEFAULTS[i]?.cta_label  ?? "Voir",
-          cta_href:  s.cta_href  ?? DEFAULTS[i]?.cta_href   ?? "/products",
-          gradient:  s.gradient  ?? DEFAULTS[i]?.gradient   ?? DEFAULTS[0].gradient,
-          accent:    s.accent    ?? DEFAULTS[i]?.accent      ?? DEFAULTS[0].accent,
-          image:     s.image     ?? DEFAULTS[i]?.image       ?? "",
+          id:           i + 1,
+          nom:          s.nom          ?? "",
+          href:         s.href         ?? "",
+          eyebrow:      s.eyebrow      ?? DEFAULTS[i]?.eyebrow   ?? "",
+          title:        s.title        ?? DEFAULTS[i]?.title      ?? "",
+          subtitle:     s.subtitle     ?? DEFAULTS[i]?.subtitle   ?? "",
+          cta_label:    s.cta_label    ?? DEFAULTS[i]?.cta_label  ?? "Voir",
+          cta_href:     s.cta_href     ?? DEFAULTS[i]?.cta_href   ?? "/products",
+          gradient:     s.gradient     ?? DEFAULTS[i]?.gradient   ?? DEFAULTS[0].gradient,
+          accent:       s.accent       ?? DEFAULTS[i]?.accent      ?? DEFAULTS[0].accent,
+          image:        s.image        ?? DEFAULTS[i]?.image       ?? "",
+          image_mobile: s.image_mobile ?? "",
         }));
       } else {
         slides = DEFAULTS;
