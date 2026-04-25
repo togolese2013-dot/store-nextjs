@@ -5,7 +5,7 @@ import type mysql from "mysql2/promise";
 
 const router = express.Router();
 
-/** Ensure the product_variants table exists */
+/** Ensure the product_variants table exists and has all columns */
 async function ensureTable() {
   await (db as mysql.Pool).execute(`
     CREATE TABLE IF NOT EXISTS product_variants (
@@ -14,6 +14,7 @@ async function ensureTable() {
       nom           VARCHAR(255) NOT NULL DEFAULT '',
       options       JSON,
       prix          DECIMAL(10,2) NOT NULL DEFAULT 0,
+      remise        DECIMAL(10,2) NOT NULL DEFAULT 0,
       stock         INT NOT NULL DEFAULT 0,
       reference_sku VARCHAR(100),
       image_url     VARCHAR(500),
@@ -21,12 +22,18 @@ async function ensureTable() {
       INDEX idx_produit_id (produit_id)
     )
   `);
+  // Add remise column if missing (for existing tables)
+  try {
+    await (db as mysql.Pool).execute(
+      "ALTER TABLE product_variants ADD COLUMN remise DECIMAL(10,2) NOT NULL DEFAULT 0"
+    );
+  } catch (err: any) {
+    if (err?.code !== "ER_DUP_FIELDNAME") throw err;
+  }
 }
 
-// GET /api/admin/products/:productId/variants
+// GET /api/admin/products/:productId/variants  (public — used by storefront too)
 router.get("/api/admin/products/:productId/variants", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
     await ensureTable();
     const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
@@ -53,15 +60,16 @@ router.post("/api/admin/products/:productId/variants", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
     await ensureTable();
-    const { nom, options, prix, stock, reference_sku, image_url } = req.body;
+    const { nom, options, prix, remise, stock, reference_sku, image_url } = req.body;
     const [result] = await (db as mysql.Pool).execute<mysql.ResultSetHeader>(
-      `INSERT INTO product_variants (produit_id, nom, options, prix, stock, reference_sku, image_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO product_variants (produit_id, nom, options, prix, remise, stock, reference_sku, image_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.params.productId,
         nom || "",
         JSON.stringify(options || {}),
         Number(prix) || 0,
+        Number(remise) || 0,
         Number(stock) || 0,
         reference_sku || null,
         image_url || null,
@@ -79,14 +87,15 @@ router.put("/api/admin/products/:productId/variants/:id", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
     await ensureTable();
-    const { nom, options, prix, stock, reference_sku, image_url } = req.body;
+    const { nom, options, prix, remise, stock, reference_sku, image_url } = req.body;
     await (db as mysql.Pool).execute(
-      `UPDATE product_variants SET nom=?, options=?, prix=?, stock=?, reference_sku=?, image_url=?
+      `UPDATE product_variants SET nom=?, options=?, prix=?, remise=?, stock=?, reference_sku=?, image_url=?
        WHERE id=? AND produit_id=?`,
       [
         nom || "",
         JSON.stringify(options || {}),
         Number(prix) || 0,
+        Number(remise) || 0,
         Number(stock) || 0,
         reference_sku || null,
         image_url || null,

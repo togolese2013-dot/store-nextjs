@@ -83,8 +83,11 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
   const [schema,    setSchema]    = useState({ hasRemise: true, hasNeuf: true, hasImagesJson: true });
 
   // Pending variants (creation mode only — in edit mode VariantsManager handles it live)
-  const [variants,   setVariants]   = useState<PendingVariant[]>([]);
+  const [variants,          setVariants]          = useState<PendingVariant[]>([]);
+  const [editVariantsCount, setEditVariantsCount] = useState(0);
   const variantRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const hasVariants = isEdit ? editVariantsCount > 0 : variants.length > 0;
 
   useEffect(() => {
     fetch("/api/admin/schema/columns")
@@ -405,34 +408,40 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
             <section className="space-y-4">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Tarifs</h3>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <label className={labelCls}>Prix (FCFA) *</label>
-                  <input type="number" min="0" value={form.prix_unitaire}
-                    onChange={e => set("prix_unitaire", e.target.value ? Number(e.target.value) : "")}
-                    placeholder="25000" required className={inputCls} />
+              {hasVariants ? (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-brand-50 border border-brand-100 text-xs text-brand-700 font-semibold">
+                  <span>Prix, remise et stock gérés individuellement par variante</span>
                 </div>
-                {schema.hasRemise && (
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
-                    <label className={labelCls}>Remise (FCFA)</label>
-                    <input type="number" min="0" value={form.remise}
-                      onChange={e => set("remise", e.target.value ? Number(e.target.value) : "")}
-                      placeholder="0" className={inputCls} />
+                    <label className={labelCls}>Prix (FCFA) *</label>
+                    <input type="number" min="0" value={form.prix_unitaire}
+                      onChange={e => set("prix_unitaire", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="25000" required className={inputCls} />
                   </div>
-                )}
-                <div>
-                  <label className={labelCls}>Stock magasin</label>
-                  <input type="number" min="0" value={form.stock_magasin}
-                    onChange={e => set("stock_magasin", e.target.value ? Number(e.target.value) : "")}
-                    placeholder="10" className={inputCls} />
+                  {schema.hasRemise && (
+                    <div>
+                      <label className={labelCls}>Remise (FCFA)</label>
+                      <input type="number" min="0" value={form.remise}
+                        onChange={e => set("remise", e.target.value ? Number(e.target.value) : "")}
+                        placeholder="0" className={inputCls} />
+                    </div>
+                  )}
+                  <div>
+                    <label className={labelCls}>Stock magasin</label>
+                    <input type="number" min="0" value={form.stock_magasin}
+                      onChange={e => set("stock_magasin", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="10" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Seuil minimum</label>
+                    <input type="number" min="0" value={form.stock_minimum}
+                      onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="5" className={inputCls} />
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>Seuil minimum</label>
-                  <input type="number" min="0" value={form.stock_minimum}
-                    onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
-                    placeholder="5" className={inputCls} />
-                </div>
-              </div>
+              )}
 
               <div className="flex flex-wrap gap-5 pt-1">
                 {schema.hasNeuf && (
@@ -500,7 +509,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                   ))}
                 </div>
               )}
-              {isEdit && initial?.id && <VariantsManager productId={initial.id} />}
+              {isEdit && initial?.id && <VariantsManager productId={initial.id} onCountChange={setEditVariantsCount} />}
             </section>
 
           </div>

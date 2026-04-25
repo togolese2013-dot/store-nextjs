@@ -98,9 +98,10 @@ export default async function ProductPage({ params }: PageProps) {
     : null;
 
   /* Variants */
-  const variants: Variant[] = await apiGet<{ variants: Variant[] }>(
-    `/api/admin/products/${product.id}/variants`
-  ).then(r => r.variants).catch(() => []);
+  const variants: Variant[] = await apiGet<Variant[]>(
+    `/api/admin/products/${product.id}/variants`,
+    { noAuth: true }
+  ).catch(() => []);
   const hasVariants = variants.length > 0;
 
   /* Related products (same category, excluding this one) */

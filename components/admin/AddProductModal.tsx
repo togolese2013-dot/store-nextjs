@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { X, Plus, Trash2, Loader2, ImagePlus, GripVertical } from "lucide-react";
 import type { Category } from "@/lib/utils";
 interface PendingVariant {
-  _key:      string;
-  nom:       string;
-  prix:      string;
-  stock:     string;
-  imageUrl:  string;
-  uploading: boolean;
+  _key:       string;
+  rawOptions: string;
+  prix:       string;
+  remise:     string;
+  stock:      string;
+  imageUrl:   string;
+  uploading:  boolean;
 }
 
 interface Props {
@@ -20,6 +21,18 @@ interface Props {
 
 const inp = "w-full px-3.5 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
 const lbl = "block text-xs font-semibold text-slate-500 mb-1.5";
+
+function parseVariantOptions(raw: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  raw.split(",").forEach(pair => {
+    const [k, ...rest] = pair.split("=");
+    if (k?.trim() && rest.length) result[k.trim()] = rest.join("=").trim();
+  });
+  return result;
+}
+function autoVariantNom(opts: Record<string, string>): string {
+  return Object.values(opts).filter(Boolean).join(" · ");
+}
 
 
 export default function AddProductModal({ categories, marques }: Props) {
@@ -53,6 +66,7 @@ export default function AddProductModal({ categories, marques }: Props) {
 
   // Variants
   const [variants, setVariants] = useState<PendingVariant[]>([]);
+  const hasVariants = variants.length > 0;
 
   // Submit
   const [loading, setLoading] = useState(false);
@@ -203,17 +217,18 @@ export default function AddProductModal({ categories, marques }: Props) {
       // Save variants
       if (data.id && variants.length > 0) {
         await Promise.all(variants.map(v => {
-          const opts: Record<string, string> = {};
-          if (v.imageUrl) opts.image_url = v.imageUrl;
+          const opts = parseVariantOptions(v.rawOptions);
           return fetch(`/api/admin/products/${data.id}/variants`, {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify({
-              nom:   v.nom || "Variante",
-              options: opts,
-              prix:  Number(v.prix)  || 0,
-              stock: Number(v.stock) || 0,
+              nom:          autoVariantNom(opts) || "Variante",
+              options:      opts,
+              prix:         Number(v.prix)   || 0,
+              remise:       Number(v.remise) || 0,
+              stock:        Number(v.stock)  || 0,
               reference_sku: null,
+              image_url:    v.imageUrl || null,
             }),
           });
         }));
@@ -416,117 +431,62 @@ export default function AddProductModal({ categories, marques }: Props) {
                   <section className="space-y-4">
                     <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Tarifs</h3>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={lbl}>Prix d&apos;achat (FCFA)</label>
-                        <input type="number" min="0" value={prixAchat} onChange={e => setPrixAchat(e.target.value)}
-                          placeholder="0" className={inp} />
+                    {hasVariants ? (
+                      <div className="px-4 py-3 rounded-xl bg-brand-50 border border-brand-100 text-xs text-brand-700 font-semibold">
+                        Prix, remise et stock gérés individuellement par variante
                       </div>
-                      <div>
-                        <label className={lbl}>Prix de vente (FCFA) *</label>
-                        <input type="number" min="0" value={prixVente} onChange={e => setPrixVente(e.target.value)}
-                          placeholder="0" required className={inp} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={lbl}>Remise (FCFA)</label>
-                        <input type="number" min="0" value={remise} onChange={e => setRemise(e.target.value)}
-                          placeholder="0" className={inp} />
-                        {remise && Number(prixVente) > 0 && (
-                          <p className="text-xs text-slate-400 mt-1">
-                            Prix final : {(Number(prixVente) - Number(remise)).toLocaleString("fr-FR")} FCFA
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Variantes */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className={lbl + " mb-0"}>Variantes</label>
-                        <button
-                          type="button"
-                          onClick={() => setVariants(vs => [...vs, { _key: Math.random().toString(36).slice(2), nom: "", prix: "", stock: "", imageUrl: "", uploading: false }])}
-                          className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs font-semibold hover:border-brand-400 hover:text-brand-600 transition-colors"
-                        >
-                          <Plus className="w-3 h-3" /> Ajouter
-                        </button>
-                      </div>
-
-                      {variants.length === 0 ? (
-                        <div className="px-4 py-3 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                          Aucune variante configurée
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className={lbl}>Prix d&apos;achat (FCFA)</label>
+                            <input type="number" min="0" value={prixAchat} onChange={e => setPrixAchat(e.target.value)}
+                              placeholder="0" className={inp} />
+                          </div>
+                          <div>
+                            <label className={lbl}>Prix de vente (FCFA) *</label>
+                            <input type="number" min="0" value={prixVente} onChange={e => setPrixVente(e.target.value)}
+                              placeholder="0" required className={inp} />
+                          </div>
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {variants.map(v => (
-                            <div key={v._key} className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-                              {/* Row 1: image + nom + delete */}
-                              <div className="flex items-center gap-2">
-                                <label className="shrink-0 cursor-pointer">
-                                  <div className="w-10 h-10 rounded-lg border border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center hover:border-blue-400 transition-colors">
-                                    {v.imageUrl ? (
-                                      <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
-                                    ) : v.uploading ? (
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                                    ) : (
-                                      <ImagePlus className="w-3.5 h-3.5 text-slate-300" />
-                                    )}
-                                  </div>
-                                  <input type="file" accept="image/*" className="sr-only"
-                                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadVariantImage(v._key, f); e.target.value = ""; }} />
-                                </label>
-                                <input
-                                  value={v.nom}
-                                  onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, nom: e.target.value } : x))}
-                                  placeholder="Ex: Rouge XL"
-                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white"
-                                />
-                                <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
-                                  className="shrink-0 p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                              {/* Row 2: prix + stock */}
-                              <div className="flex gap-2 pl-12">
-                                <input
-                                  type="number" min="0" value={v.prix}
-                                  onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, prix: e.target.value } : x))}
-                                  placeholder="Prix FCFA"
-                                  className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white"
-                                />
-                                <input
-                                  type="number" min="0" value={v.stock}
-                                  onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, stock: e.target.value } : x))}
-                                  placeholder="Qté"
-                                  className="w-24 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white"
-                                />
-                              </div>
-                            </div>
-                          ))}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className={lbl}>Remise (FCFA)</label>
+                            <input type="number" min="0" value={remise} onChange={e => setRemise(e.target.value)}
+                              placeholder="0" className={inp} />
+                            {remise && Number(prixVente) > 0 && (
+                              <p className="text-xs text-slate-400 mt-1">
+                                Prix final : {(Number(prixVente) - Number(remise)).toLocaleString("fr-FR")} FCFA
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </section>
 
                   {/* Stock */}
                   <section className="space-y-4">
                     <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Stock</h3>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={lbl}>Stock Magasin</label>
-                        <input type="number" min="0" value={stockMag} onChange={e => setStockMag(e.target.value)}
-                          placeholder="0" className={inp} />
+                    {hasVariants ? (
+                      <div className="px-4 py-3 rounded-xl bg-brand-50 border border-brand-100 text-xs text-brand-700 font-semibold">
+                        Stock géré individuellement par variante
                       </div>
-                      <div>
-                        <label className={lbl}>Seuil minimum (alerte)</label>
-                        <input type="number" min="0" value={seuilMin} onChange={e => setSeuilMin(e.target.value)}
-                          placeholder="5" className={inp} />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className={lbl}>Stock Magasin</label>
+                          <input type="number" min="0" value={stockMag} onChange={e => setStockMag(e.target.value)}
+                            placeholder="0" className={inp} />
+                        </div>
+                        <div>
+                          <label className={lbl}>Seuil minimum (alerte)</label>
+                          <input type="number" min="0" value={seuilMin} onChange={e => setSeuilMin(e.target.value)}
+                            placeholder="5" className={inp} />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="flex flex-wrap gap-6">
                       <label className="flex items-center gap-3 cursor-pointer select-none">
@@ -547,6 +507,67 @@ export default function AddProductModal({ categories, marques }: Props) {
                         <span className="text-sm font-medium text-slate-700">Marquer nouveau</span>
                       </label>
                     </div>
+                  </section>
+
+                  {/* Variantes */}
+                  <section className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Variantes</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Taille, couleur… (optionnel)</p>
+                      </div>
+                      <button type="button"
+                        onClick={() => setVariants(vs => [...vs, { _key: Math.random().toString(36).slice(2), rawOptions: "", prix: "", remise: "", stock: "", imageUrl: "", uploading: false }])}
+                        className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs font-semibold hover:border-brand-400 hover:text-brand-600 transition-colors">
+                        <Plus className="w-3 h-3" /> Ajouter
+                      </button>
+                    </div>
+
+                    {variants.length === 0 ? (
+                      <div className="px-4 py-3 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                        Aucune variante — prix et stock globaux utilisés
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {variants.map(v => (
+                          <div key={v._key} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label className="shrink-0 cursor-pointer">
+                                <div className="w-10 h-10 rounded-lg border border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center hover:border-brand-400 transition-colors">
+                                  {v.imageUrl ? <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
+                                    : v.uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                                    : <ImagePlus className="w-3.5 h-3.5 text-slate-300" />}
+                                </div>
+                                <input type="file" accept="image/*" className="sr-only"
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadVariantImage(v._key, f); e.target.value = ""; }} />
+                              </label>
+                              <input value={v.rawOptions}
+                                onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, rawOptions: e.target.value } : x))}
+                                placeholder="Taille=XL, Couleur=Noir"
+                                className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white" />
+                              <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
+                                className="shrink-0 p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 pl-12">
+                              <input type="number" min="0" value={v.prix}
+                                onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, prix: e.target.value } : x))}
+                                placeholder="Prix FCFA"
+                                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white w-full" />
+                              <input type="number" min="0" value={v.remise}
+                                onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, remise: e.target.value } : x))}
+                                placeholder="Remise FCFA"
+                                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white w-full" />
+                              <input type="number" min="0" value={v.stock}
+                                onChange={e => setVariants(vs => vs.map(x => x._key === v._key ? { ...x, stock: e.target.value } : x))}
+                                placeholder="Stock"
+                                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white w-full" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </section>
 
                 </div>

@@ -9,23 +9,26 @@ export interface Variant {
   nom:           string;
   options:       Record<string, string>;
   prix:          number;
+  remise:        number;
   stock:         number;
   reference_sku: string | null;
   image_url:     string | null;
 }
 
 interface Props {
-  productId: number;
+  productId:      number;
+  onCountChange?: (count: number) => void;
 }
 
 const inputCls =
   "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
 
-type DraftVariant = Omit<Variant, "id" | "produit_id">;
+type EditDraft = { options: Record<string, string>; prix: number; remise: number; stock: number; image_url: string | null };
+type PendingDraft = EditDraft & { _key: string; rawOptions: string; uploading: boolean };
 
-const emptyDraft = (): DraftVariant => ({
-  nom: "", options: {}, prix: 0, stock: 0, reference_sku: null, image_url: null,
-});
+function emptyPending(): PendingDraft {
+  return { _key: Math.random().toString(36).slice(2), options: {}, rawOptions: "", prix: 0, remise: 0, stock: 0, image_url: null, uploading: false };
+}
 
 function parseOptions(raw: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -44,7 +47,6 @@ function autoNom(opts: Record<string, string>): string {
   return Object.values(opts).filter(Boolean).join(" · ");
 }
 
-// ── Upload helper ─────────────────────────────────────────────────────────────
 async function uploadImageFile(file: File): Promise<string | null> {
   const reader = new FileReader();
   const b64 = await new Promise<string>((resolve, reject) => {
@@ -61,7 +63,7 @@ async function uploadImageFile(file: File): Promise<string | null> {
   return (res.ok && data.urls?.[0]) ? data.urls[0] : null;
 }
 
-// ── VariantRow ─────────────────────────────────────────────────────────────────
+// ── VariantRow (existing variants — edit in-place) ────────────────────────────
 interface RowProps {
   variant:  Variant;
   onSave:   (v: Variant) => Promise<void>;
@@ -70,19 +72,24 @@ interface RowProps {
 
 function VariantRow({ variant, onSave, onDelete }: RowProps) {
   const [open,       setOpen]       = useState(false);
-  const [draft,      setDraft]      = useState<Variant>(variant);
+  const [draft,      setDraft]      = useState<EditDraft>({
+    options:   variant.options,
+    prix:      variant.prix,
+    remise:    variant.remise ?? 0,
+    stock:     variant.stock,
+    image_url: variant.image_url,
+  });
   const [rawOptions, setRawOptions] = useState(serializeOptions(variant.options));
   const [saving,     setSaving]     = useState(false);
   const [uploading,  setUploading]  = useState(false);
 
-  function setField<K extends keyof Variant>(k: K, v: Variant[K]) {
+  function setField<K extends keyof EditDraft>(k: K, v: EditDraft[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
   }
 
   function handleOptionsChange(raw: string) {
     setRawOptions(raw);
-    const opts = parseOptions(raw);
-    setDraft((d) => ({ ...d, options: opts, nom: d.nom || autoNom(opts) }));
+    setDraft((d) => ({ ...d, options: parseOptions(raw) }));
   }
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -97,7 +104,16 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
 
   async function handleSave() {
     setSaving(true);
-    await onSave({ ...draft, options: parseOptions(rawOptions) });
+    const opts = parseOptions(rawOptions);
+    await onSave({
+      ...variant,
+      options:   opts,
+      nom:       autoNom(opts) || variant.nom || "Variante",
+      prix:      draft.prix,
+      remise:    draft.remise,
+      stock:     draft.stock,
+      image_url: draft.image_url,
+    });
     setSaving(false);
     setOpen(false);
   }
@@ -111,14 +127,12 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
         className="flex items-center gap-3 px-4 py-3 bg-white cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
-        {/* Thumbnail */}
         <div className="w-9 h-9 rounded-lg bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
           {variant.image_url
             ? <img src={variant.image_url} alt="" className="w-full h-full object-cover" />
             : <ImagePlus className="w-4 h-4 text-slate-300" />
           }
         </div>
-
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap gap-1.5 mb-1">
             {optLabels.length > 0 ? (
@@ -133,12 +147,14 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
           </div>
           <div className="flex items-center gap-3 text-xs text-slate-500">
             <span className="font-bold text-slate-700">{variant.prix.toLocaleString("fr-FR")} FCFA</span>
+            {(variant.remise ?? 0) > 0 && (
+              <span className="text-emerald-600 font-semibold">-{variant.remise.toLocaleString("fr-FR")} FCFA</span>
+            )}
             <span className={`px-1.5 py-0.5 rounded-full font-medium ${
               variant.stock === 0 ? "bg-red-50 text-red-600" : variant.stock <= 5 ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
             }`}>
               Stock : {variant.stock}
             </span>
-            {variant.reference_sku && <span className="font-mono text-slate-400">{variant.reference_sku}</span>}
           </div>
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
@@ -148,7 +164,7 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
       {open && (
         <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-3">
 
-          {/* Photo variante */}
+          {/* Photo */}
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1.5">Photo de la variante</label>
             <div className="flex items-center gap-3">
@@ -176,31 +192,26 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
             </div>
           </div>
 
+          {/* Options */}
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Options (format : Taille=M, Couleur=Rouge)</label>
+            <label className="block text-xs font-bold text-slate-600 mb-1">Options (ex : Taille=M, Couleur=Rouge)</label>
             <input type="text" value={rawOptions} onChange={(e) => handleOptionsChange(e.target.value)}
               placeholder="Taille=M, Couleur=Rouge" className={inputCls} />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Nom de la variante (auto-rempli ou personnalisé)</label>
-            <input type="text" value={draft.nom} onChange={(e) => setField("nom", e.target.value)}
-              placeholder="M · Rouge" className={inputCls} />
-          </div>
-
+          {/* Prix + Remise + Stock */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">Prix (FCFA)</label>
               <input type="number" min="0" value={draft.prix} onChange={(e) => setField("prix", Number(e.target.value))} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Stock</label>
-              <input type="number" min="0" value={draft.stock} onChange={(e) => setField("stock", Number(e.target.value))} className={inputCls} />
+              <label className="block text-xs font-bold text-slate-600 mb-1">Remise (FCFA)</label>
+              <input type="number" min="0" value={draft.remise} onChange={(e) => setField("remise", Number(e.target.value))} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">SKU / Référence</label>
-              <input type="text" value={draft.reference_sku ?? ""} onChange={(e) => setField("reference_sku", e.target.value || null)}
-                placeholder="REF-M-ROUGE" className={inputCls} />
+              <label className="block text-xs font-bold text-slate-600 mb-1">Stock</label>
+              <input type="number" min="0" value={draft.stock} onChange={(e) => setField("stock", Number(e.target.value))} className={inputCls} />
             </div>
           </div>
 
@@ -222,21 +233,26 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
 }
 
 // ── VariantsManager ────────────────────────────────────────────────────────────
-export default function VariantsManager({ productId }: Props) {
-  const [variants,       setVariants]       = useState<Variant[]>([]);
-  const [loading,        setLoading]        = useState(true);
-  const [showAdd,        setShowAdd]        = useState(false);
-  const [newDraft,       setNewDraft]       = useState<DraftVariant>(emptyDraft());
-  const [rawNewOptions,  setRawNewOptions]  = useState("");
-  const [adding,         setAdding]         = useState(false);
-  const [uploadingNew,   setUploadingNew]   = useState(false);
-  const [msg,            setMsg]            = useState("");
+export default function VariantsManager({ productId, onCountChange }: Props) {
+  const [variants,    setVariants]    = useState<Variant[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [pendingNew,  setPendingNew]  = useState<PendingDraft[]>([]);
+  const [showAdd,     setShowAdd]     = useState(false);
+  const [newDraft,    setNewDraft]    = useState<PendingDraft>(emptyPending());
+  const [savingAll,   setSavingAll]   = useState(false);
+  const [uploadingNew,setUploadingNew]= useState(false);
+  const [msg,         setMsg]         = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/products/${productId}/variants`);
-    if (res.ok) setVariants(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      const arr: Variant[] = Array.isArray(data) ? data : (data.variants ?? []);
+      setVariants(arr);
+      onCountChange?.(arr.length);
+    }
     setLoading(false);
-  }, [productId]);
+  }, [productId, onCountChange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -257,40 +273,51 @@ export default function VariantsManager({ productId }: Props) {
     await load();
   }
 
-  function setNewField<K extends keyof DraftVariant>(k: K, v: DraftVariant[K]) {
-    setNewDraft((d) => ({ ...d, [k]: v }));
-  }
-
-  function handleNewOptionsChange(raw: string) {
-    setRawNewOptions(raw);
-    const opts = parseOptions(raw);
-    setNewDraft((d) => ({ ...d, options: opts, nom: d.nom || autoNom(opts) }));
-  }
-
   async function handleNewImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingNew(true);
     const url = await uploadImageFile(file);
-    if (url) setNewField("image_url", url);
+    if (url) setNewDraft(d => ({ ...d, image_url: url }));
     setUploadingNew(false);
     e.target.value = "";
   }
 
-  async function handleAdd() {
-    setAdding(true);
-    await fetch(`/api/admin/products/${productId}/variants`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newDraft, options: parseOptions(rawNewOptions) }),
-    });
-    setNewDraft(emptyDraft());
-    setRawNewOptions("");
+  function handleAddToPending() {
+    const opts = parseOptions(newDraft.rawOptions);
+    setPendingNew(prev => [...prev, { ...newDraft, options: opts }]);
+    setNewDraft(emptyPending());
     setShowAdd(false);
-    setAdding(false);
+  }
+
+  function removePending(key: string) {
+    setPendingNew(prev => prev.filter(p => p._key !== key));
+  }
+
+  async function handleSaveAll() {
+    if (pendingNew.length === 0) return;
+    setSavingAll(true);
+    const count = pendingNew.length;
+    await Promise.all(pendingNew.map(v =>
+      fetch(`/api/admin/products/${productId}/variants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom:          autoNom(v.options) || "Variante",
+          options:      v.options,
+          prix:         v.prix,
+          remise:       v.remise,
+          stock:        v.stock,
+          reference_sku: null,
+          image_url:    v.image_url,
+        }),
+      })
+    ));
+    setPendingNew([]);
+    setSavingAll(false);
     await load();
-    setMsg("Variante ajoutée ✓");
-    setTimeout(() => setMsg(""), 2000);
+    setMsg(`${count} variante(s) enregistrée(s) ✓`);
+    setTimeout(() => setMsg(""), 2500);
   }
 
   if (loading) {
@@ -308,22 +335,68 @@ export default function VariantsManager({ productId }: Props) {
       )}
 
       <p className="text-xs text-slate-500">
-        Définissez des variantes (taille, couleur…) avec prix, stock et photo spécifique.
-        Sur la fiche produit, le client choisira parmi ces options.
+        Définissez des variantes (taille, couleur…). Chaque variante a son propre prix et stock.
       </p>
 
-      {variants.length > 0 ? (
+      {/* Existing variants */}
+      {variants.length > 0 && (
         <div className="space-y-2">
           {variants.map((v) => (
             <VariantRow key={v.id} variant={v} onSave={handleSave} onDelete={handleDelete} />
           ))}
         </div>
-      ) : (
+      )}
+
+      {/* Pending new variants (not yet saved) */}
+      {pendingNew.length > 0 && (
+        <div className="space-y-2">
+          {pendingNew.map(p => {
+            const optLabels = Object.entries(p.options);
+            return (
+              <div key={p._key} className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-brand-300 rounded-2xl bg-brand-50/40">
+                <div className="w-9 h-9 rounded-lg bg-white border border-brand-200 overflow-hidden shrink-0 flex items-center justify-center">
+                  {p.image_url
+                    ? <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                    : <ImagePlus className="w-4 h-4 text-slate-300" />
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap gap-1.5 mb-1">
+                    {optLabels.length > 0 ? optLabels.map(([k, v]) => (
+                      <span key={k} className="px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 text-xs font-semibold">{k}: {v}</span>
+                    )) : <span className="text-xs text-slate-400">Sans options</span>}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span className="font-bold text-slate-700">{p.prix.toLocaleString("fr-FR")} FCFA</span>
+                    <span className="px-1.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600">Stock : {p.stock}</span>
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold text-[10px] uppercase tracking-wide">Nouveau</span>
+                  </div>
+                </div>
+                <button type="button" onClick={() => removePending(p._key)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+
+          {/* Save all pending button */}
+          <button type="button" onClick={handleSaveAll} disabled={savingAll}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-2xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 disabled:opacity-60 transition-colors">
+            {savingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {savingAll ? "Enregistrement…" : `Enregistrer ${pendingNew.length} variante${pendingNew.length > 1 ? "s" : ""}`}
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {variants.length === 0 && pendingNew.length === 0 && !showAdd && (
         <div className="py-6 text-center text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
           Aucune variante — le produit se vend tel quel (prix et stock globaux).
         </div>
       )}
 
+      {/* Add new variant form */}
       {showAdd ? (
         <div className="border-2 border-brand-200 rounded-2xl p-4 bg-brand-50/50 space-y-3">
           <h4 className="text-sm font-bold text-slate-800">Nouvelle variante</h4>
@@ -348,43 +421,42 @@ export default function VariantsManager({ productId }: Props) {
             </div>
           </div>
 
+          {/* Options */}
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Options (format : Taille=M, Couleur=Rouge)</label>
-            <input type="text" value={rawNewOptions} onChange={(e) => handleNewOptionsChange(e.target.value)}
+            <label className="block text-xs font-bold text-slate-600 mb-1">Options (ex : Taille=XL, Couleur=Noir)</label>
+            <input type="text" value={newDraft.rawOptions}
+              onChange={e => setNewDraft(d => ({ ...d, rawOptions: e.target.value, options: parseOptions(e.target.value) }))}
               placeholder="Taille=XL, Couleur=Noir" className={inputCls} />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Nom (optionnel — auto-rempli depuis les options)</label>
-            <input type="text" value={newDraft.nom} onChange={(e) => setNewField("nom", e.target.value)}
-              placeholder="XL · Noir" className={inputCls} />
-          </div>
-
+          {/* Prix + Remise + Stock */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">Prix (FCFA) *</label>
-              <input type="number" min="0" value={newDraft.prix} onChange={(e) => setNewField("prix", Number(e.target.value))}
+              <input type="number" min="0" value={newDraft.prix}
+                onChange={e => setNewDraft(d => ({ ...d, prix: Number(e.target.value) }))}
                 placeholder="25000" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Stock</label>
-              <input type="number" min="0" value={newDraft.stock} onChange={(e) => setNewField("stock", Number(e.target.value))}
-                placeholder="10" className={inputCls} />
+              <label className="block text-xs font-bold text-slate-600 mb-1">Remise (FCFA)</label>
+              <input type="number" min="0" value={newDraft.remise}
+                onChange={e => setNewDraft(d => ({ ...d, remise: Number(e.target.value) }))}
+                placeholder="0" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">SKU / Référence</label>
-              <input type="text" value={newDraft.reference_sku ?? ""} onChange={(e) => setNewField("reference_sku", e.target.value || null)}
-                placeholder="REF-XL-NOIR" className={inputCls} />
+              <label className="block text-xs font-bold text-slate-600 mb-1">Stock</label>
+              <input type="number" min="0" value={newDraft.stock}
+                onChange={e => setNewDraft(d => ({ ...d, stock: Number(e.target.value) }))}
+                placeholder="10" className={inputCls} />
             </div>
           </div>
 
           <div className="flex gap-2">
-            <button type="button" onClick={handleAdd} disabled={adding}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 disabled:opacity-60 transition-colors">
-              {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-              Ajouter
+            <button type="button" onClick={handleAddToPending}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Ajouter à la liste
             </button>
-            <button type="button" onClick={() => { setShowAdd(false); setNewDraft(emptyDraft()); setRawNewOptions(""); }}
+            <button type="button" onClick={() => { setShowAdd(false); setNewDraft(emptyPending()); }}
               className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:border-slate-300 transition-colors">
               Annuler
             </button>
