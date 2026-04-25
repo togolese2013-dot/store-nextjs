@@ -135,26 +135,6 @@ export default function ProductCard({ product, className }: Props) {
             <Heart className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} />
           </button>
 
-          {/* Add to cart — floating bottom-right, always visible */}
-          <button
-            onClick={handleAdd}
-            disabled={outOf}
-            aria-label={outOf ? "Indisponible" : "Ajouter au panier"}
-            className={clsx(
-              "absolute bottom-2.5 right-2.5 w-9 h-9 rounded-full flex items-center justify-center shadow-md",
-              "transition-all duration-200",
-              outOf
-                ? "bg-slate-300 text-white cursor-not-allowed"
-                : added
-                  ? "bg-green-500 text-white"
-                  : "bg-brand-900 text-white hover:bg-brand-800 active:scale-95"
-            )}
-          >
-            {added
-              ? <span className="text-xs font-bold">✓</span>
-              : <ShoppingBag className="w-4 h-4" />
-            }
-          </button>
         </div>
       </Link>
 
@@ -168,7 +148,7 @@ export default function ProductCard({ product, className }: Props) {
 
         <RatingBadge productId={product.id} />
 
-        <div className="flex items-baseline gap-1.5 mt-1.5">
+        <div className="flex items-baseline gap-1.5 mt-1.5 mb-3">
           <span className="font-display font-bold text-base text-slate-900">
             {formatPrice(price)}
           </span>
@@ -178,6 +158,23 @@ export default function ProductCard({ product, className }: Props) {
             </span>
           )}
         </div>
+
+        <button
+          onClick={handleAdd}
+          disabled={outOf}
+          className={clsx(
+            "w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl transition-all duration-200",
+            "font-sans text-xs font-semibold",
+            outOf
+              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+              : added
+                ? "bg-green-500 text-white"
+                : "bg-brand-900 text-white hover:bg-brand-800 active:scale-95"
+          )}
+        >
+          <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+          {outOf ? "Indisponible" : added ? "Ajouté ✓" : "Ajouter au panier"}
+        </button>
       </div>
     </article>
   );
