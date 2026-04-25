@@ -22,6 +22,7 @@ import adminEventsRoutes    from "./routes/admin/events";
 import adminUsersRoutes     from "./routes/admin/users";
 import livreurRoutes        from "./routes/livreur";
 import publicRoutes         from "./routes/public";
+import accountRoutes        from "./routes/account";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -29,6 +30,7 @@ const PORT = Number(process.env.PORT) || 4000;
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:3000",
+  "http://localhost:3003",
 ].filter(Boolean) as string[];
 
 app.use(cors({
@@ -67,6 +69,7 @@ app.use(adminEventsRoutes);
 app.use(adminUsersRoutes);
 app.use(livreurRoutes);
 app.use(publicRoutes);
+app.use(accountRoutes);
 
 app.listen(PORT, () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);
