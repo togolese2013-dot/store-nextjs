@@ -30,7 +30,8 @@ export default function AddProductModal({ categories, marques }: Props) {
   const [nom,          setNom]         = useState("");
   const [categorie_id, setCategorie]   = useState<number | "">("");
   const [marque_id,    setMarque]      = useState<number | "">("");
-  const [description,  setDescription] = useState("");
+  const [description,        setDescription]       = useState("");
+  const [descriptionLongue, setDescriptionLongue] = useState("");
   const [prixAchat,    setPrixAchat]   = useState("");
   const [prixVente,    setPrixVente]   = useState("");
   const [remise,       setRemise]      = useState("");
@@ -154,7 +155,7 @@ export default function AddProductModal({ categories, marques }: Props) {
 
   // ── Reset & close ──────────────────────────────────────────────────────────
   const reset = useCallback(() => {
-    setNom(""); setCategorie(""); setMarque(""); setDescription("");
+    setNom(""); setCategorie(""); setMarque(""); setDescription(""); setDescriptionLongue("");
     setPrixAchat(""); setPrixVente(""); setRemise("");
     setStockMag(""); setSeuilMin("5"); setActif(true); setNeuf(false);
     setMainImage(""); setSecondImages([]); setVariants([]); setError("");
@@ -175,9 +176,10 @@ export default function AddProductModal({ categories, marques }: Props) {
       await fetch("/api/admin/schema/migrate", { method: "POST" }).catch(() => {});
 
       const payload: Record<string, unknown> = {
-        nom:           nom.trim(),
-        description:   description || null,
-        categorie_id:  categorie_id || null,
+        nom:                nom.trim(),
+        description:        description || null,
+        description_longue: descriptionLongue.trim() || null,
+        categorie_id:       categorie_id || null,
         marque_id:     marque_id    || null,
         prix_unitaire: Number(prixVente),
         remise:        remise ? Number(remise) : 0,
@@ -237,8 +239,8 @@ export default function AddProductModal({ categories, marques }: Props) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl" style={{ maxHeight: "96vh", display: "flex", flexDirection: "column" }}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white sm:rounded-2xl rounded-t-3xl shadow-2xl w-full sm:max-w-6xl" style={{ maxHeight: "96dvh", display: "flex", flexDirection: "column" }}>
 
             {/* Header */}
             <div className="flex items-center justify-between px-4 sm:px-7 py-4 border-b border-slate-100 shrink-0">
@@ -382,7 +384,7 @@ export default function AddProductModal({ categories, marques }: Props) {
 
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className={lbl + " mb-0"}>Mini description (site vitrine) *</label>
+                        <label className={lbl + " mb-0"}>Mini description (carte produit) *</label>
                         <span className={`text-xs font-semibold ${description.length > 160 ? "text-red-500" : "text-slate-400"}`}>
                           {description.length}/160
                         </span>
@@ -390,11 +392,22 @@ export default function AddProductModal({ categories, marques }: Props) {
                       <textarea
                         value={description}
                         onChange={e => setDescription(e.target.value.slice(0, 160))}
-                        placeholder="Description courte affichée sur le site (160 caractères max)…"
-                        rows={3}
+                        placeholder="Description courte affichée sur les cartes produit (160 car. max)…"
+                        rows={2}
                         maxLength={160}
                         required
                         className={`${inp} resize-none`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={lbl}>Description complète (page produit)</label>
+                      <textarea
+                        value={descriptionLongue}
+                        onChange={e => setDescriptionLongue(e.target.value)}
+                        placeholder="Description détaillée : caractéristiques, matériaux, dimensions, utilisation…"
+                        rows={5}
+                        className={`${inp} resize-y`}
                       />
                     </div>
                   </section>

@@ -13,19 +13,21 @@ interface Props {
 }
 
 interface ProductData {
-  id: number;
-  reference: string;
-  nom: string;
-  description: string;
-  categorie_id: number | "";
-  prix_unitaire: number | "";
-  stock_magasin: number | "";
-  stock_minimum: number | "";
-  remise: number | "";
-  neuf: boolean;
-  actif: boolean;
-  image_url: string;
-  images: string[];
+  id:                 number;
+  reference:          string;
+  nom:                string;
+  description:        string;
+  description_longue: string;
+  categorie_id:       number | "";
+  marque_id:          number | "";
+  prix_unitaire:      number | "";
+  stock_magasin:      number | "";
+  stock_minimum:      number | "";
+  remise:             number | "";
+  neuf:               boolean;
+  actif:              boolean;
+  image_url:          string;
+  images:             string[];
 }
 
 type State = "loading" | "ready" | "error";
@@ -35,36 +37,40 @@ export default function EditProductModal({ productId, productRef, onClose }: Pro
   const [state,      setState]      = useState<State>("loading");
   const [initial,    setInitial]    = useState<Partial<ProductData> | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [marques,    setMarques]    = useState<{ id: number; nom: string }[]>([]);
 
   // Fetch product + categories on mount
   const load = useCallback(async () => {
     try {
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, catRes, marqRes] = await Promise.all([
         fetch(`/api/admin/products/${productId}`).then(r => r.json()),
         fetch("/api/admin/categories").then(r => r.json()),
+        fetch("/api/admin/marques").then(r => r.json()).catch(() => ({ data: [] })),
       ]);
       const p = prodRes.product as Record<string, unknown>;
       setInitial({
-        id:            Number(p.id),
-        reference:     (p.reference as string) ?? "",
-        nom:           (p.nom as string) ?? "",
-        description:   (p.description as string) ?? "",
-        categorie_id:  p.categorie_id ? Number(p.categorie_id) : "",
-        prix_unitaire: Number(p.prix_unitaire),
-        stock_magasin: Number(p.stock_magasin ?? 0),
-        stock_minimum: Number(p.stock_minimum ?? 5),
-        remise:        Number(p.remise ?? 0),
-        neuf:          Boolean(p.neuf),
-        actif:         Boolean(p.actif),
-        image_url:     ((p.image_url || p.image) as string) ?? "",
-        images:        (() => {
+        id:                 Number(p.id),
+        reference:          (p.reference as string) ?? "",
+        nom:                (p.nom as string) ?? "",
+        description:        (p.description as string) ?? "",
+        description_longue: (p.description_longue as string) ?? "",
+        categorie_id:       p.categorie_id ? Number(p.categorie_id) : "",
+        marque_id:          p.marque_id    ? Number(p.marque_id)    : "",
+        prix_unitaire:      Number(p.prix_unitaire),
+        stock_magasin:      Number(p.stock_magasin ?? 0),
+        stock_minimum:      Number(p.stock_minimum ?? 5),
+        remise:             Number(p.remise ?? 0),
+        neuf:               Boolean(p.neuf),
+        actif:              Boolean(p.actif),
+        image_url:          ((p.image_url || p.image) as string) ?? "",
+        images:             (() => {
           const raw = p.images_json;
-          // MySQL JSON columns are returned already parsed (array), not as string
           if (Array.isArray(raw)) return raw as string[];
           try { return JSON.parse((raw as string) || "[]"); } catch { return []; }
         })(),
       });
       setCategories((catRes.data as Category[]) ?? []);
+      setMarques((marqRes.data as { id: number; nom: string }[]) ?? []);
       setState("ready");
     } catch {
       setState("error");
@@ -111,6 +117,7 @@ export default function EditProductModal({ productId, productRef, onClose }: Pro
         {state === "ready" && initial && (
           <ProductForm
             categories={categories}
+            marques={marques}
             initial={initial}
             onSuccess={handleSuccess}
           />

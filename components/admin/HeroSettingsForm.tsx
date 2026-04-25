@@ -360,15 +360,6 @@ export default function HeroSettingsForm({ settings }: Props) {
             </div>
           </div>
 
-          {banText && (
-            <div>
-              <label className={labelCls}>Aperçu</label>
-              <div className="rounded-xl py-2 px-4 text-xs font-medium text-center"
-                style={{ backgroundColor: banBg, color: banColor }}>
-                {banText}
-              </div>
-            </div>
-          )}
         </div>
       </section>
 

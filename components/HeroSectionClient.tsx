@@ -91,16 +91,16 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
         </>
       )}
 
-      {/* Slider controls */}
+      {/* Slider controls — desktop only */}
       {total > 1 && (
         <>
           <button onClick={prev} aria-label="Slide précédente"
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+            className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white items-center justify-center hover:bg-white/20 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button onClick={next} aria-label="Slide suivante"
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+            className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white items-center justify-center hover:bg-white/20 transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>

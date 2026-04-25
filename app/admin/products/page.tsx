@@ -137,7 +137,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "(vide)";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
 
       {fetchError && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-700">
@@ -188,10 +188,10 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       </div>
 
       {/* ── Search ── */}
-      <form method="GET" className="flex flex-wrap gap-3">
+      <form method="GET" className="flex flex-wrap gap-3 w-full">
         <input type="hidden" name="view"   value={view !== "stock" ? view : ""} />
         <input type="hidden" name="statut" value={statut !== "all" ? statut : ""} />
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-0 w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text" name="q" defaultValue={q}
@@ -233,7 +233,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       </form>
 
       {/* ── Filter tabs ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 w-full overflow-x-auto">
         <div className="flex gap-0 border-b border-slate-100">
           {viewTabs.map(tab => {
             const isActive = view === tab.key;

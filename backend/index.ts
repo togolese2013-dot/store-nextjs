@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 
 import adminAuthRoutes      from "./routes/admin/auth";
 import adminProductsRoutes  from "./routes/admin/products";
+import adminVariantsRoutes  from "./routes/admin/variants";
 import adminStockRoutes     from "./routes/admin/stock";
 import adminStockBoutiqueRoutes from "./routes/admin/stock-boutique";
 import adminVentesRoutes    from "./routes/admin/ventes";
@@ -51,6 +52,7 @@ app.use(cookieParser());
 // ── Routes ──────────────────────────────────────────────────────────────────
 app.use(adminAuthRoutes);
 app.use(adminProductsRoutes);
+app.use(adminVariantsRoutes);
 app.use(adminStockRoutes);
 app.use(adminStockBoutiqueRoutes);
 app.use(adminVentesRoutes);

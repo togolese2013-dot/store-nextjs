@@ -53,7 +53,7 @@ router.post("/api/admin/products", async (req, res) => {
 
   try {
     const body = req.body;
-    const { nom, description, categorie_id, marque_id, prix_unitaire,
+    const { nom, description, description_longue, categorie_id, marque_id, prix_unitaire,
             stock_magasin, stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
     let reference = body.reference?.trim() || "";
@@ -78,8 +78,9 @@ router.post("/api/admin/products", async (req, res) => {
     const imagesJson  = cleanImages.length > 0 ? JSON.stringify(cleanImages) : null;
     const stockMagasin = Number(stock_magasin ?? 0);
 
-    // Guarantee images_json column exists before INSERT (ALTER TABLE is no-op if already present)
+    // Guarantee optional columns exist before INSERT
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN description_longue TEXT NULL`); } catch { /* already exists */ }
     invalidateProduitColsCache();
     const cols = await produitCols();
 
@@ -87,6 +88,8 @@ router.post("/api/admin/products", async (req, res) => {
     const values: (string | number | boolean | null)[] = [
       reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire),
     ];
+    // Optional description_longue
+    columns.push("description_longue"); values.push(description_longue?.trim() || null);
 
     if (cols.stock_magasin)  { columns.push("stock_magasin");  values.push(stockMagasin); }
     if (cols.stock_boutique) { columns.push("stock_boutique"); values.push(Number(stock_boutique ?? 0)); }
@@ -154,14 +157,15 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`); } catch { /* already exists */ }
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN stock_minimum INT NULL DEFAULT 5`); } catch { /* already exists */ }
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN description_longue TEXT NULL`); } catch { /* already exists */ }
     invalidateProduitColsCache();
     const cols = await produitCols();
     const body = req.body;
     const sets: string[] = [];
     const vals: (string | number | boolean | null)[] = [];
     // Only include columns that exist in the DB schema
-    const alwaysAllowed = ["nom","description","categorie_id","prix_unitaire","stock_magasin",
-                           "stock_boutique","remise","neuf","actif","reference"];
+    const alwaysAllowed = ["nom","description","description_longue","categorie_id","prix_unitaire",
+                           "stock_magasin","stock_boutique","remise","neuf","actif","reference"];
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }

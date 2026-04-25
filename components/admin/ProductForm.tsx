@@ -5,23 +5,24 @@ import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/utils";
 import { Loader2, Save, Plus, Trash2, ImagePlus, Package } from "lucide-react";
 import { clsx } from "clsx";
-import RelatedProductsManager from "./RelatedProductsManager";
 import VariantsManager from "./VariantsManager";
 
 interface ProductData {
-  id?:            number;
-  reference:      string;
-  nom:            string;
-  description:    string;
-  categorie_id:   number | "";
-  prix_unitaire:  number | "";
-  stock_magasin:  number | "";
-  stock_minimum:  number | "";
-  remise:         number | "";
-  neuf:           boolean;
-  actif:          boolean;
-  image_url:      string;
-  images:         string[];
+  id?:                number;
+  reference:          string;
+  nom:                string;
+  description:        string;
+  description_longue: string;
+  categorie_id:       number | "";
+  marque_id:          number | "";
+  prix_unitaire:      number | "";
+  stock_magasin:      number | "";
+  stock_minimum:      number | "";
+  remise:             number | "";
+  neuf:               boolean;
+  actif:              boolean;
+  image_url:          string;
+  images:             string[];
 }
 
 interface PendingVariant {
@@ -37,6 +38,7 @@ interface PendingVariant {
 
 interface Props {
   categories: Category[];
+  marques?:   { id: number; nom: string }[];
   initial?:   Partial<ProductData>;
   onSuccess?: () => void;
 }
@@ -48,7 +50,7 @@ function newVariant(): PendingVariant {
   return { _key: Math.random().toString(36).slice(2), nom: "", rawOptions: "", prix: "", stock: "", reference_sku: "", imageUrl: "", uploading: false };
 }
 
-export default function ProductForm({ categories, initial, onSuccess }: Props) {
+export default function ProductForm({ categories, marques = [], initial, onSuccess }: Props) {
   const router  = useRouter();
   const isEdit  = !!initial?.id;
 
@@ -56,19 +58,21 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
   const secondaryImages = (initial?.images ?? []).filter(url => url !== initial?.image_url);
 
   const [form, setForm] = useState<ProductData>({
-    reference:     initial?.reference     ?? "",
-    nom:           initial?.nom           ?? "",
-    description:   initial?.description   ?? "",
-    categorie_id:  initial?.categorie_id  ?? "",
-    prix_unitaire: initial?.prix_unitaire ?? "",
-    stock_magasin: initial?.stock_magasin ?? "",
-    stock_minimum: initial?.stock_minimum ?? 5,
-    remise:        initial?.remise        ?? "",
-    neuf:          initial?.neuf          ?? false,
-    actif:         initial?.actif         ?? true,
-    image_url:     initial?.image_url     ?? "",
+    reference:          initial?.reference          ?? "",
+    nom:                initial?.nom                ?? "",
+    description:        initial?.description        ?? "",
+    description_longue: initial?.description_longue ?? "",
+    categorie_id:       initial?.categorie_id       ?? "",
+    marque_id:          initial?.marque_id          ?? "",
+    prix_unitaire:      initial?.prix_unitaire      ?? "",
+    stock_magasin:      initial?.stock_magasin      ?? "",
+    stock_minimum:      initial?.stock_minimum      ?? 5,
+    remise:             initial?.remise             ?? "",
+    neuf:               initial?.neuf               ?? false,
+    actif:              initial?.actif              ?? true,
+    image_url:          initial?.image_url          ?? "",
     ...initial,
-    images:        secondaryImages,
+    images:             secondaryImages,
   });
 
   const [loading,        setLoading]        = useState(false);
@@ -204,15 +208,17 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
       const method = isEdit ? "PATCH" : "POST";
 
       const payload: Record<string, unknown> = {
-        reference:     form.reference,
-        nom:           form.nom,
-        description:   form.description,
-        categorie_id:  form.categorie_id || null,
-        prix_unitaire: form.prix_unitaire,
-        stock_magasin: form.stock_magasin !== "" ? Number(form.stock_magasin) : 0,
-        stock_minimum: form.stock_minimum !== "" ? form.stock_minimum : 5,
-        actif:         form.actif,
-        image_url:     form.image_url,
+        reference:          form.reference,
+        nom:                form.nom,
+        description:        form.description,
+        description_longue: form.description_longue || null,
+        categorie_id:       form.categorie_id || null,
+        marque_id:          form.marque_id    || null,
+        prix_unitaire:      form.prix_unitaire,
+        stock_magasin:      form.stock_magasin !== "" ? Number(form.stock_magasin) : 0,
+        stock_minimum:      form.stock_minimum !== "" ? form.stock_minimum : 5,
+        actif:              form.actif,
+        image_url:          form.image_url,
       };
       if (schema.hasRemise)    payload.remise = form.remise;
       if (schema.hasNeuf)      payload.neuf   = form.neuf;
@@ -352,27 +358,46 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
                 </div>
               </div>
 
-              <div>
-                <label className={labelCls}>Catégorie *</label>
-                <select value={form.categorie_id} onChange={e => set("categorie_id", e.target.value ? Number(e.target.value) : "")}
-                  className={inputCls} required>
-                  <option value="">Sélectionner une catégorie…</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                </select>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Catégorie *</label>
+                  <select value={form.categorie_id} onChange={e => set("categorie_id", e.target.value ? Number(e.target.value) : "")}
+                    className={inputCls} required>
+                    <option value="">Sélectionner une catégorie…</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Marque</label>
+                  <select value={form.marque_id} onChange={e => set("marque_id", e.target.value ? Number(e.target.value) : "")}
+                    className={inputCls}>
+                    <option value="">— Aucune marque —</option>
+                    {marques.map(m => <option key={m.id} value={m.id}>{m.nom}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className={labelCls + " mb-0"}>Mini description (site vitrine) *</label>
+                  <label className={labelCls + " mb-0"}>Mini description (carte produit) *</label>
                   <span className={`text-xs font-semibold ${form.description.length > 160 ? "text-red-500" : "text-slate-400"}`}>
                     {form.description.length}/160
                   </span>
                 </div>
                 <textarea value={form.description}
                   onChange={e => set("description", e.target.value.slice(0, 160))}
-                  placeholder="Description courte affichée sur le site (160 caractères max)…"
-                  rows={3} maxLength={160} required
+                  placeholder="Description courte affichée sur les cartes produit (160 car. max)…"
+                  rows={2} maxLength={160} required
                   className={clsx(inputCls, "resize-none")} />
+              </div>
+
+              <div>
+                <label className={labelCls}>Description complète (page produit)</label>
+                <textarea value={form.description_longue}
+                  onChange={e => set("description_longue", e.target.value)}
+                  placeholder="Description détaillée du produit, caractéristiques, matériaux, dimensions…"
+                  rows={6}
+                  className={clsx(inputCls, "resize-y")} />
               </div>
             </section>
 
@@ -495,15 +520,6 @@ export default function ProductForm({ categories, initial, onSuccess }: Props) {
         </div>
       </form>
 
-      {/* ── Produits recommandés (sous le formulaire) ── */}
-      {isEdit && initial?.id && (
-        <div className="border-t border-slate-100 p-6 space-y-4">
-          <h3 className="font-semibold text-slate-900 text-sm">
-            Produits recommandés <span className="text-slate-400 font-normal">"Vous aimerez aussi"</span>
-          </h3>
-          <RelatedProductsManager productId={initial.id} />
-        </div>
-      )}
     </div>
   );
 }
