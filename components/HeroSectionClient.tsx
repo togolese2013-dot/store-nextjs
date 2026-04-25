@@ -59,15 +59,6 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
         />
       )}
 
-      {/* Overlay — gradient sombre pour lisibilité du texte, plus dense quand image présente */}
-      <div
-        className="absolute inset-0 transition-all duration-700"
-        style={{
-          background: slide.image && !imgError[slide.id]
-            ? "linear-gradient(to right, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.18) 60%, rgba(0,0,0,0.05) 100%)"
-            : undefined,
-        }}
-      />
 
       {/* Accent circles (visible uniquement sans image) */}
       {(!slide.image || imgError[slide.id]) && (
