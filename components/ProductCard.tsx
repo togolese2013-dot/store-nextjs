@@ -158,6 +158,12 @@ export default function ProductCard({ product, className, floatingCart = false }
 
       {/* ── Content ── */}
       <div className="p-3">
+        {/* Brand or category label */}
+        {(product.marque_nom || product.categorie_nom) && (
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-600 mb-0.5 truncate">
+            {product.marque_nom ?? product.categorie_nom}
+          </p>
+        )}
         <Link href={`/products/${product.id}`}>
           <h3 className="font-sans text-sm text-slate-800 leading-snug mb-1 line-clamp-2 hover:text-brand-800 transition-colors">
             {product.nom}
