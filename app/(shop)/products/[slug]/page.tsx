@@ -145,29 +145,26 @@ export default async function ProductPage({ params }: PageProps) {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
 
-        {/* ── Main block: 55/45 grid on desktop ── */}
-        <div className="lg:grid lg:grid-cols-[55%_45%] lg:gap-10 mb-8">
-
-          {/* ── Image column ── */}
-          <div className="relative mb-6 lg:mb-0">
-            {/* Promo / new badges */}
-            <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
-              {isPromo && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent-500 text-white text-xs font-bold shadow-sm">
-                  <Zap className="w-3 h-3" /> -{Math.round((product.remise / product.prix_unitaire) * 100)}%
-                </span>
-              )}
-              {product.neuf && !isPromo && (
-                <span className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold">Nouveau</span>
-              )}
-            </div>
-            <div className="rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100">
-              <ProductImageGallerySimple images={allProductImages} productName={product.nom} />
-            </div>
+        {/* ── Image block ── */}
+        <div className="relative mb-6">
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
+            {isPromo && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent-500 text-white text-xs font-bold shadow-sm">
+                <Zap className="w-3 h-3" /> -{Math.round((product.remise / product.prix_unitaire) * 100)}%
+              </span>
+            )}
+            {product.neuf && !isPromo && (
+              <span className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold">Nouveau</span>
+            )}
           </div>
+          <div className="rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100">
+            <ProductImageGallerySimple images={allProductImages} productName={product.nom} />
+          </div>
+        </div>
 
-          {/* ── Info column — sticky on desktop ── */}
-          <div className="lg:sticky lg:top-20 lg:self-start flex flex-col gap-0">
+        {/* ── Info block ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 sm:p-7 mb-6">
+          <div className="flex flex-col gap-0">
 
             {/* Brand / category + ref */}
             <div className="flex items-center justify-between mb-2">
