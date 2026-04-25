@@ -14,32 +14,40 @@ import {
   Truck, CreditCard, RefreshCw, ShieldCheck,
   ArrowRight, Star, TrendingUp, Sparkles, Tag,
 } from "lucide-react";
-// Note: Sparkles is also used in Newsletter (client component) — kept here for Section icons
 
 /* ─── Trust bar ─── */
 function TrustBar() {
   const items = [
-    { icon: Truck,       label: "Livraison rapide",     sub: "Lomé & tout le Togo" },
+    { icon: Truck,       label: "Livraison rapide",        sub: "Lomé & tout le Togo" },
     { icon: CreditCard,  label: "Paiement à la livraison", sub: "Vous payez à la réception" },
-    { icon: RefreshCw,   label: "Retours acceptés",     sub: "7 jours après réception" },
-    { icon: ShieldCheck, label: "100% authentique",     sub: "Produits vérifiés" },
+    { icon: RefreshCw,   label: "Retours acceptés",        sub: "7 jours après réception" },
+    { icon: ShieldCheck, label: "100% authentique",        sub: "Produits vérifiés" },
   ];
   return (
     <div className="bg-white border-b border-slate-100">
-      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-4 divide-slate-100 sm:divide-x">
-          {items.map(({ icon: Icon, label, sub }, i) => (
-            <div key={label} className={`flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 lg:py-5 ${i % 2 === 0 ? "border-r sm:border-r-0 border-slate-100" : ""} ${i < 2 ? "border-b sm:border-b-0 border-slate-100" : ""}`}>
-              <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-                <Icon className="w-4 h-4 lg:w-5 lg:h-5 text-brand-700" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs lg:text-sm font-bold text-slate-900 leading-tight">{label}</p>
-                <p className="text-[10px] lg:text-xs text-slate-500 leading-tight">{sub}</p>
-              </div>
+      {/* Mobile: horizontal scroll strip */}
+      <div className="flex sm:hidden overflow-x-auto gap-2 px-4 py-3 scrollbar-none">
+        {items.map(({ icon: Icon, label }) => (
+          <div key={label} className="flex items-center gap-2 shrink-0 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
+            <Icon className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: 4-col grid */}
+      <div className="hidden sm:grid grid-cols-4 divide-x divide-slate-100 max-w-7xl mx-auto px-6 lg:px-8">
+        {items.map(({ icon: Icon, label, sub }) => (
+          <div key={label} className="flex items-center gap-3 px-4 py-4 lg:py-5">
+            <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 lg:w-5 lg:h-5 text-brand-700" />
             </div>
-          ))}
-        </div>
+            <div className="min-w-0">
+              <p className="text-xs lg:text-sm font-bold text-slate-900 leading-tight">{label}</p>
+              <p className="text-[10px] lg:text-xs text-slate-500 leading-tight">{sub}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -57,48 +65,41 @@ function Section({
   bg?: string;
 }) {
   return (
-    <section className={`py-12 lg:py-16 ${bg}`}>
+    <section className={`py-10 lg:py-16 ${bg}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-end justify-between mb-8">
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-5 lg:mb-8">
           <div>
-            {Icon && (
-              <div className="flex items-center gap-2 mb-2">
-                <Icon className="w-5 h-5 text-accent-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-accent-500">
+            {Icon && subtitle && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <Icon className="w-4 h-4 text-accent-500" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">
                   {subtitle}
                 </span>
               </div>
             )}
-            <h2 className="font-display text-2xl sm:text-3xl font-800 text-slate-900">
+            <h2 className="font-display text-xl sm:text-3xl font-800 text-slate-900 leading-tight">
               {title}
             </h2>
-            <div className="mt-2 w-12 h-1 rounded-full bg-accent-500" />
           </div>
           {viewAll && (
-            <Link href={viewAll.href}
-              className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:text-brand-900 group transition-colors"
+            <Link
+              href={viewAll.href}
+              className="flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-900 group transition-colors shrink-0 ml-4"
             >
-              {viewAll.label}
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <span className="hidden sm:inline">{viewAll.label}</span>
+              <span className="sm:hidden">Voir tout</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           )}
         </div>
         {children}
-        {viewAll && (
-          <div className="mt-8 sm:hidden">
-            <Link href={viewAll.href}
-              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl border-2 border-brand-200 text-brand-700 font-bold text-sm hover:bg-brand-50 transition-colors"
-            >
-              {viewAll.label} <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        )}
       </div>
     </section>
   );
 }
 
-/* ─── Products grid — server component, no event handlers ─── */
+/* ─── Products grid — carousel on mobile, grid on sm+ ─── */
 function ProductGrid({ products }: { products: Product[] }) {
   if (!products.length) {
     return (
@@ -108,9 +109,18 @@ function ProductGrid({ products }: { products: Product[] }) {
     );
   }
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-      {/* No onAddToCart — ProductCard handles cart internally via localStorage */}
-      {products.map(p => <ProductCard key={p.id} product={p} />)}
+    /* Mobile: horizontal scroll snap — Desktop: CSS grid */
+    <div className="
+      flex gap-3 overflow-x-auto snap-x snap-mandatory pb-3 -mx-4 px-4 scrollbar-none
+      sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible
+      sm:grid sm:grid-cols-3 sm:gap-4
+      lg:grid-cols-4 lg:gap-6
+    ">
+      {products.map(p => (
+        <div key={p.id} className="snap-start shrink-0 w-[42vw] sm:w-auto">
+          <ProductCard product={p} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -118,29 +128,29 @@ function ProductGrid({ products }: { products: Product[] }) {
 /* ─── Promo banner ─── */
 function PromoBanner() {
   return (
-    <section className="py-6 lg:py-8 bg-slate-50">
+    <section className="py-5 lg:py-8 bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 p-8 sm:p-12">
-          {/* Decorative circles */}
-          <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-white/5" />
-          <div className="absolute right-20 -bottom-20 w-80 h-80 rounded-full bg-accent-500/10" />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-white/[0.02]" />
+        <div className="relative overflow-hidden rounded-2xl bg-brand-950 px-6 py-8 sm:px-12 sm:py-12">
+          {/* Subtle decorative shape */}
+          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-white/[0.04]" />
+          <div className="absolute right-8 -bottom-16 w-56 h-56 rounded-full bg-accent-500/10" />
 
           <div className="relative z-10 max-w-lg">
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 text-white text-xs font-bold mb-4 border border-white/20">
-              <Tag className="w-3.5 h-3.5 text-accent-300" /> OFFRE SPÉCIALE DU MOMENT
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-white text-[11px] font-bold mb-4 border border-white/15">
+              <Tag className="w-3 h-3 text-accent-300" /> OFFRE SPÉCIALE DU MOMENT
             </span>
-            <h2 className="font-display text-3xl sm:text-4xl font-800 text-white mb-3 leading-tight">
-              Jusqu'à <span className="text-accent-300">-50%</span><br />
-              sur les articles sélectionnés
+            <h2 className="font-display text-2xl sm:text-4xl font-800 text-white mb-3 leading-tight">
+              Jusqu'à <span className="text-accent-300">-50%</span><br className="hidden sm:block" />
+              {" "}sur les articles sélectionnés
             </h2>
-            <p className="text-white/75 mb-8 text-base">
-              Promotions valables tant que le stock dure. Ne ratez pas ces offres exclusives !
+            <p className="text-white/60 mb-7 text-sm sm:text-base">
+              Promotions valables tant que le stock dure.
             </p>
-            <Link href="/products?promo=true"
-              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-accent-500 text-white font-bold text-base hover:bg-accent-400 transition-all hover:shadow-accent hover:-translate-y-0.5"
+            <Link
+              href="/products?promo=true"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent-500 text-white font-bold text-sm sm:text-base hover:bg-accent-400 transition-all active:scale-95"
             >
-              Voir les promotions <ArrowRight className="w-5 h-5" />
+              Voir les promotions <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -160,42 +170,43 @@ function Testimonials() {
   const colors = ["bg-brand-800", "bg-accent-500", "bg-brand-600", "bg-amber-500"];
 
   return (
-    <section className="py-12 lg:py-16 bg-brand-50/50">
+    <section className="py-10 lg:py-16 bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Star className="w-5 h-5 text-accent-500" fill="currentColor" />
-            <span className="text-xs font-bold uppercase tracking-widest text-accent-500">Avis clients</span>
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-1.5 mb-2">
+            <Star className="w-4 h-4 text-amber-400" fill="currentColor" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">Avis clients</span>
           </div>
-          <h2 className="font-display text-2xl sm:text-3xl font-800 text-slate-900">
+          <h2 className="font-display text-xl sm:text-3xl font-800 text-slate-900">
             Ce que disent nos clients
           </h2>
-          <div className="flex items-center justify-center gap-1 mt-3">
+          <div className="flex items-center justify-center gap-1 mt-2">
             {[...Array(5)].map((_, i) => (
-              <Star key={i} className="w-5 h-5 text-amber-400" fill="currentColor" />
+              <Star key={i} className="w-4 h-4 text-amber-400" fill="currentColor" />
             ))}
-            <span className="ml-2 text-sm font-semibold text-slate-600">4.9 / 5 · 120+ avis</span>
+            <span className="ml-2 text-xs font-semibold text-slate-500">4.9 / 5 · 120+ avis</span>
           </div>
         </div>
+
         {/* Mobile: auto-sliding single card */}
         <div className="md:hidden">
           <TestimonialsSlider reviews={reviews} colors={colors} />
         </div>
 
         {/* Desktop: static grid */}
-        <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-5">
           {reviews.map((r, i) => (
-            <div key={r.name} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col">
-              <div className="flex gap-0.5 mb-4">
+            <div key={r.name} className="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col">
+              <div className="flex gap-0.5 mb-3">
                 {[...Array(r.rating)].map((_, j) => (
-                  <Star key={j} className="w-4 h-4 text-amber-400" fill="currentColor" />
+                  <Star key={j} className="w-3.5 h-3.5 text-amber-400" fill="currentColor" />
                 ))}
               </div>
-              <p className="text-slate-700 text-sm leading-relaxed mb-6 italic flex-1">
+              <p className="text-slate-600 text-sm leading-relaxed mb-5 italic flex-1">
                 &ldquo;{r.text}&rdquo;
               </p>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${colors[i % colors.length]} text-white text-sm font-bold flex items-center justify-center shrink-0`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-full ${colors[i % colors.length]} text-white text-xs font-bold flex items-center justify-center shrink-0`}>
                   {r.avatar}
                 </div>
                 <div>
@@ -213,7 +224,6 @@ function Testimonials() {
 
 /* ─── PAGE ─── */
 export default async function HomePage() {
-  // Server-side data fetching — wrapped to prevent crash if DB is unreachable
   let bestsellers: Product[] = [];
   let promos:      Product[] = [];
   let newItems:    Product[] = [];
@@ -231,7 +241,6 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection />
-      {/* TrustBar: 2-col on mobile, 4-col on desktop */}
       <TrustBar />
 
       <Section
@@ -252,7 +261,7 @@ export default async function HomePage() {
           subtitle="Soldes"
           icon={Tag}
           viewAll={{ label: "Toutes les promos", href: "/products?promo=true" }}
-          bg="bg-slate-50"
+          bg="bg-white"
         >
           <ProductGrid products={promos} />
         </Section>
@@ -264,12 +273,11 @@ export default async function HomePage() {
           subtitle="Nouveautés"
           icon={Sparkles}
           viewAll={{ label: "Voir les nouveautés", href: "/products?new=true" }}
-          bg="bg-white"
+          bg="bg-slate-50/60"
         >
           <ProductGrid products={newItems} />
         </Section>
       )}
-
 
       <Testimonials />
       <RecentlyViewed maxItems={8} />

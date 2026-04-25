@@ -148,29 +148,68 @@ export default function Header() {
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-14 gap-1.5 sm:gap-3">
-
-            {/* Hamburger — mobile/tablet only, LEFT of logo */}
+          {/* ── Mobile top bar (logo centered) ── */}
+          <div className="lg:hidden flex items-center h-14 relative">
+            {/* Hamburger — left */}
             <button
               onClick={() => setOpen(!open)}
-              className="lg:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+              className="p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
               aria-label="Menu"
               aria-expanded={open}
             >
-              {open ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            {/* Logo */}
-            <Link href="/" className="flex items-center shrink-0 mr-1 sm:mr-2">
+            {/* Logo — absolutely centered */}
+            <Link href="/" className="absolute left-1/2 -translate-x-1/2">
               <img
                 src="/logo-togolese-shop.svg"
                 alt="Togolese Shop"
-                className="h-5 sm:h-7 w-auto"
+                className="h-6 w-auto"
+              />
+            </Link>
+
+            {/* Icons — right */}
+            <div className="flex items-center gap-0.5 ml-auto">
+              <Link href="/wishlist"
+                className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                aria-label={`Favoris (${wishlistCount})`}
+              >
+                <Heart className="w-5 h-5" />
+                {wishlistCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
+                    {wishlistCount > 9 ? "9+" : wishlistCount}
+                  </span>
+                )}
+              </Link>
+              <Link href="/cart"
+                className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                aria-label={`Panier (${cartCount})`}
+              >
+                <ShoppingBag className="w-5 h-5" />
+                {cartCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-accent-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
+                    {cartCount > 9 ? "9+" : cartCount}
+                  </span>
+                )}
+              </Link>
+            </div>
+          </div>
+
+          {/* ── Desktop top bar ── */}
+          <div className="hidden lg:flex items-center h-14 gap-3">
+
+            {/* Logo */}
+            <Link href="/" className="flex items-center shrink-0 mr-2">
+              <img
+                src="/logo-togolese-shop.svg"
+                alt="Togolese Shop"
+                className="h-7 w-auto"
               />
             </Link>
 
             {/* Search bar — desktop */}
-            <div ref={dropdownRef} className="hidden md:flex flex-1 max-w-lg relative">
+            <div ref={dropdownRef} className="flex flex-1 max-w-lg relative">
               <form onSubmit={handleSearch} className="w-full">
                 <div className={clsx(
                   "flex items-center w-full rounded-2xl border-2 transition-all duration-200 bg-slate-50",
@@ -246,7 +285,7 @@ export default function Header() {
             </div>
 
             {/* Desktop nav */}
-            <nav className="hidden lg:flex items-center gap-1 mx-2">
+            <nav className="flex items-center gap-1 mx-2">
               {NAV.map(({ label, href, icon: Icon, hot }) => (
                 <Link
                   key={label} href={href}
@@ -347,8 +386,8 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Mobile search bar + dropdown */}
-          <div ref={mobileDropdownRef} className="md:hidden pt-1 pb-2 relative">
+          {/* Mobile/tablet search bar + dropdown */}
+          <div ref={mobileDropdownRef} className="lg:hidden pt-1 pb-2 relative">
             <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
