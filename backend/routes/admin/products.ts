@@ -70,7 +70,7 @@ router.post("/api/admin/products", async (req, res) => {
       reference = `PROD-${String(isNaN(lastNum) ? 1 : lastNum + 1).padStart(3, "0")}`;
     }
 
-    if (!nom || !prix_unitaire) {
+    if (!nom || prix_unitaire == null) {
       return res.status(400).json({ error: "Champs obligatoires manquants." });
     }
 
