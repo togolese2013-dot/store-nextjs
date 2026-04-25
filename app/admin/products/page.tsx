@@ -188,48 +188,33 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
       </div>
 
       {/* ── Search ── */}
-      <form method="GET" className="flex flex-wrap gap-3 w-full">
+      <form method="GET" className="w-full">
         <input type="hidden" name="view"   value={view !== "stock" ? view : ""} />
         <input type="hidden" name="statut" value={statut !== "all" ? statut : ""} />
-        <div className="relative flex-1 min-w-0 w-full sm:w-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <div className="relative w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
             type="text" name="q" defaultValue={q}
             placeholder="Rechercher un produit…"
-            className="w-full pl-9 pr-4 py-2.5 text-base sm:text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans"
+            className="w-full pl-10 pr-24 py-3 text-base bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans shadow-sm"
           />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {q && (
+              <Link
+                href={buildUrl({ view: view !== "stock" ? view : undefined, statut: statut !== "all" ? statut : undefined }, {})}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                title="Effacer"
+              >
+                ✕
+              </Link>
+            )}
+            <button type="submit"
+              className="px-4 py-1.5 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
+            >
+              OK
+            </button>
+          </div>
         </div>
-        {isStockView && (
-          <select
-            name="filter"
-            defaultValue={activeFilter ?? ""}
-            className="px-4 py-2.5 text-sm bg-white rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans"
-          >
-            <option value="">Toutes les catégories & marques</option>
-            {categories.length > 0 && (
-              <optgroup label="Catégories">
-                {categories.map(c => <option key={`cat-${c.id}`} value={`cat:${c.id}`}>{c.nom}</option>)}
-              </optgroup>
-            )}
-            {marques.length > 0 && (
-              <optgroup label="Marques">
-                {marques.map(m => <option key={`brand-${m.id}`} value={`brand:${m.id}`}>{m.nom}</option>)}
-              </optgroup>
-            )}
-          </select>
-        )}
-        <button type="submit"
-          className="px-5 py-2.5 rounded-2xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
-        >
-          Filtrer
-        </button>
-        {(q || activeFilter) && (
-          <Link href={buildUrl({ view: view !== "stock" ? view : undefined, statut: statut !== "all" ? statut : undefined }, {})}
-            className="px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
-          >
-            Réinitialiser
-          </Link>
-        )}
       </form>
 
       {/* ── Filter tabs ── */}
