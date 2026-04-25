@@ -377,7 +377,7 @@ export default async function ProductPage({ params }: PageProps) {
             </div>
             <div className="p-6 sm:p-8 lg:p-10">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
-                {related.map(p => <ProductCard key={p.id} product={p} />)}
+                {related.map(p => <ProductCard key={p.id} product={p} floatingCart />)}
               </div>
               {product.categorie_id && (
                 <div className="mt-6 sm:hidden">
@@ -411,7 +411,7 @@ export default async function ProductPage({ params }: PageProps) {
             </div>
             <div className="p-6 sm:p-8 lg:p-10">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
-                {recommended.map(p => <ProductCard key={p.id} product={p} />)}
+                {recommended.map(p => <ProductCard key={p.id} product={p} floatingCart />)}
               </div>
             </div>
           </section>
