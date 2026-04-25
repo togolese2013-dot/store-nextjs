@@ -25,17 +25,7 @@ function TrustBar() {
   ];
   return (
     <div className="bg-white border-b border-slate-100">
-      {/* Mobile: horizontal scroll strip */}
-      <div className="flex sm:hidden overflow-x-auto gap-2 px-4 py-3 scrollbar-none">
-        {items.map(({ icon: Icon, label }) => (
-          <div key={label} className="flex items-center gap-2 shrink-0 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
-            <Icon className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Desktop: 4-col grid */}
+      {/* Hidden on mobile, 4-col grid on sm+ */}
       <div className="hidden sm:grid grid-cols-4 divide-x divide-slate-100 max-w-7xl mx-auto px-6 lg:px-8">
         {items.map(({ icon: Icon, label, sub }) => (
           <div key={label} className="flex items-center gap-3 px-4 py-4 lg:py-5">
@@ -99,7 +89,7 @@ function Section({
   );
 }
 
-/* ─── Products grid — carousel on mobile, grid on sm+ ─── */
+/* ─── Products grid ─── */
 function ProductGrid({ products }: { products: Product[] }) {
   if (!products.length) {
     return (
@@ -109,18 +99,8 @@ function ProductGrid({ products }: { products: Product[] }) {
     );
   }
   return (
-    /* Mobile: horizontal scroll snap — Desktop: CSS grid */
-    <div className="
-      flex gap-3 overflow-x-auto snap-x snap-mandatory pb-3 -mx-4 px-4 scrollbar-none
-      sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible
-      sm:grid sm:grid-cols-3 sm:gap-4
-      lg:grid-cols-4 lg:gap-6
-    ">
-      {products.map(p => (
-        <div key={p.id} className="snap-start shrink-0 w-[42vw] sm:w-auto">
-          <ProductCard product={p} />
-        </div>
-      ))}
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      {products.map(p => <ProductCard key={p.id} product={p} />)}
     </div>
   );
 }

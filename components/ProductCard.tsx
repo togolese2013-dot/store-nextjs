@@ -135,7 +135,7 @@ export default function ProductCard({ product, className }: Props) {
             <Heart className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} />
           </button>
 
-          {/* Add to cart — floating bottom-right, always visible on mobile, hover on desktop */}
+          {/* Add to cart — floating bottom-right, always visible */}
           <button
             onClick={handleAdd}
             disabled={outOf}
@@ -143,7 +143,6 @@ export default function ProductCard({ product, className }: Props) {
             className={clsx(
               "absolute bottom-2.5 right-2.5 w-9 h-9 rounded-full flex items-center justify-center shadow-md",
               "transition-all duration-200",
-              "sm:opacity-0 sm:translate-y-2 sm:group-hover:opacity-100 sm:group-hover:translate-y-0",
               outOf
                 ? "bg-slate-300 text-white cursor-not-allowed"
                 : added

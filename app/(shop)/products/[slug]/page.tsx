@@ -13,7 +13,7 @@ import RecentlyViewed from "@/components/RecentlyViewed";
 import Link from "next/link";
 import {
   Zap, ShieldCheck, Truck, ChevronRight,
-  Sparkles, Star, CreditCard,
+  Sparkles, Star,
 } from "lucide-react";
 import type { Review } from "@/lib/admin-db";
 
@@ -277,17 +277,8 @@ export default async function ProductPage({ params }: PageProps) {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-3 mt-auto">
+                  <div className="mt-auto">
                     <AddToCartButton product={product} />
-                    {!outOf && (
-                      <a
-                        href={`/checkout?product=${product.id}`}
-                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-md bg-brand-900 text-white font-sans font-medium text-xs hover:bg-brand-800 transition-colors"
-                      >
-                        <CreditCard className="w-3.5 h-3.5" />
-                        Payer maintenant
-                      </a>
-                    )}
                   </div>
                 </>
               )}

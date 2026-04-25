@@ -10,6 +10,7 @@ import ReferralBanner from "@/components/ReferralBanner";
 import RefDetector from "@/components/RefDetector";
 import { apiGet } from "@/lib/api";
 import BottomNav from "@/components/BottomNav";
+import ThemeLoader from "@/components/ThemeLoader";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const waNumber = await apiGet<{ settings: Record<string, string> }>(
@@ -18,6 +19,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
 
   return (
     <CartProvider>
+      <ThemeLoader />
       {/* Detect ?ref= param and set cookie */}
       <Suspense fallback={null}>
         <RefDetector />

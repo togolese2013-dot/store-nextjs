@@ -2,7 +2,7 @@ import { getAdminSession } from "@/lib/auth";
 import Link from "next/link";
 import {
   BarChart2, Settings, Megaphone, Palette,
-  Globe, MessageCircle, Users, ArrowRight,
+  Globe, MessageCircle, Users, ArrowRight, ChevronLeft,
 } from "lucide-react";
 
 export const metadata = { title: "Admin — Configuration" };
@@ -66,6 +66,9 @@ export default async function AdminConfigPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
 
       <div className="mb-8">
+        <Link href="/admin" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-4">
+          <ChevronLeft className="w-4 h-4" /> Retour
+        </Link>
         <h1 className="font-display font-800 text-2xl text-slate-900">Administration</h1>
         <p className="text-slate-400 text-sm mt-1">Configuration du site, apparence et gestion des accès.</p>
       </div>
