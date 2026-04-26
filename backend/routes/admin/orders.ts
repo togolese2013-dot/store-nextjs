@@ -1,10 +1,22 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
+import { db } from "@/lib/db";
+import type mysql from "mysql2/promise";
 import {
   listOrders, countOrders, createOrder, addOrderEvent,
-  updateOrderStatus, getOrderById,
+  updateOrderStatus, updateOrderFields, deleteOrder, getOrderById,
 } from "@/lib/admin-db";
+
+async function ensurePaymentColumn() {
+  try {
+    await (db as mysql.Pool).execute(
+      "ALTER TABLE orders ADD COLUMN statut_paiement VARCHAR(50) NULL DEFAULT 'non_paye'"
+    );
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code !== "ER_DUP_FIELDNAME") throw err;
+  }
+}
 
 const router = express.Router();
 
@@ -55,9 +67,52 @@ router.get("/api/admin/orders/:id", async (req, res) => {
 router.patch("/api/admin/orders/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  const { status, note } = req.body;
-  await updateOrderStatus(Number(req.params.id), status);
-  await addOrderEvent(Number(req.params.id), status, note ?? "", session.nom);
+  const id = Number(req.params.id);
+
+  /* ── Status change (existing) ── */
+  if (req.body.status !== undefined && req.body.field !== "update") {
+    const { status, note } = req.body;
+    await updateOrderStatus(id, status);
+    await addOrderEvent(id, status, note ?? "", session.nom);
+    return res.json({ ok: true });
+  }
+
+  /* ── Payment status ── */
+  if (req.body.field === "payment") {
+    await ensurePaymentColumn();
+    const { payment_status } = req.body;
+    await updateOrderFields(id, { statut_paiement: payment_status });
+    return res.json({ ok: true });
+  }
+
+  /* ── Full order update ── */
+  if (req.body.field === "update") {
+    const { nom, telephone, adresse, zone_livraison, note, delivery_fee, items } = req.body;
+    const parsedItems  = Array.isArray(items) ? items : [];
+    const subtotal     = parsedItems.reduce((s: number, i: { total: number }) => s + i.total, 0);
+    const deliveryFee  = Number(delivery_fee ?? 0);
+    const total        = subtotal + deliveryFee;
+    await updateOrderFields(id, {
+      nom, telephone, adresse, zone_livraison, note,
+      delivery_fee: deliveryFee,
+      subtotal,
+      total,
+      items: JSON.stringify(parsedItems),
+    });
+    await addOrderEvent(id, "modifiée", "Commande modifiée par l'admin", session.nom);
+    return res.json({ ok: true });
+  }
+
+  return res.status(400).json({ error: "Action non reconnue." });
+});
+
+router.delete("/api/admin/orders/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
+  await deleteOrder(Number(req.params.id));
   res.json({ ok: true });
 });
 

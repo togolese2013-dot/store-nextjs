@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
+import { getOrderEvents } from "@/lib/admin-db";
 import {
   signClientToken, getClientSession,
   setClientCookie, clearClientCookie,
@@ -277,6 +278,69 @@ router.get("/api/account/google/callback", async (req, res) => {
     console.error("[google/callback]", err);
     const siteUrl2 = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3003";
     return res.redirect(`${siteUrl2}/?auth_error=server`);
+  }
+});
+
+/* ──────────────────────────────────────────────
+   GET /api/account/orders  — commandes du client connecté
+────────────────────────────────────────────── */
+router.get("/api/account/orders", async (req, res) => {
+  try {
+    const session = await getClientSession(req);
+    if (!session) return res.status(401).json({ error: "Non connecté." });
+
+    const pool = db as import("mysql2/promise").Pool;
+    const [userRows] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT telephone FROM client_users WHERE id = ? LIMIT 1",
+      [session.id]
+    );
+    const telephone = userRows[0]?.telephone as string | null;
+    if (!telephone) return res.json({ orders: [] });
+
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
+      `SELECT id, reference, nom, telephone, total, subtotal, delivery_fee,
+              status, items, adresse, zone_livraison, created_at
+       FROM orders WHERE telephone = ? ORDER BY created_at DESC`,
+      [telephone]
+    );
+    return res.json({ orders: rows });
+  } catch (err) {
+    console.error("[account/orders]", err);
+    return res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ──────────────────────────────────────────────
+   GET /api/account/orders/:ref  — détail d'une commande
+────────────────────────────────────────────── */
+router.get("/api/account/orders/:ref", async (req, res) => {
+  try {
+    const session = await getClientSession(req);
+    if (!session) return res.status(401).json({ error: "Non connecté." });
+
+    const pool = db as import("mysql2/promise").Pool;
+    const [userRows] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT telephone FROM client_users WHERE id = ? LIMIT 1",
+      [session.id]
+    );
+    const telephone = userRows[0]?.telephone as string | null;
+
+    const [orderRows] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT * FROM orders WHERE reference = ? LIMIT 1",
+      [req.params.ref]
+    );
+    const order = orderRows[0];
+    if (!order) return res.status(404).json({ error: "Commande introuvable." });
+
+    if (telephone && order.telephone !== telephone) {
+      return res.status(403).json({ error: "Accès refusé." });
+    }
+
+    const events = await getOrderEvents(order.id as number);
+    return res.json({ order, events });
+  } catch (err) {
+    console.error("[account/orders/:ref]", err);
+    return res.status(500).json({ error: "Erreur serveur." });
   }
 });
 

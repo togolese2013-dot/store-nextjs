@@ -55,9 +55,9 @@ export default function CommandeDetailPage() {
 
   useEffect(() => {
     if (!ref) return;
-    (async () => {
+    const load = async () => {
       try {
-        const res  = await fetch(`/api/account/orders/${ref}`);
+        const res  = await fetch(`/api/account/orders/${ref}`, { credentials: "include" });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
         setOrder(json.order);
@@ -67,7 +67,10 @@ export default function CommandeDetailPage() {
       } finally {
         setLoading(false);
       }
-    })();
+    };
+    load();
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
   }, [ref]);
 
   if (loading) return (
@@ -94,12 +97,12 @@ export default function CommandeDetailPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center gap-4">
-          <Link href="/account/commandes" className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center gap-4">
+          <Link href="/account/commandes" className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500 shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div>
-            <h1 className="font-display text-xl font-800 text-slate-900">Commande #{order.reference}</h1>
+          <div className="min-w-0">
+            <h1 className="font-display text-xl font-bold text-slate-900 truncate">Commande #{order.reference}</h1>
             <p className="text-sm text-slate-400">
               {new Date(order.created_at).toLocaleDateString("fr-FR", {
                 day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -109,7 +112,7 @@ export default function CommandeDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
 
         {/* Delivery timeline */}
         {!isCancelled ? (

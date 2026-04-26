@@ -12,7 +12,7 @@ export default async function ReviewsPage() {
       <PageHeader
         title="Avis clients"
         subtitle={`${reviews.length} avis au total`}
-        accent="indigo"
+        accent="emerald"
       />
       <ReviewsClient reviews={reviews} />
     </div>

@@ -43,7 +43,12 @@ export default function AdminShell({ nom, role, children }: Props) {
 
   // Landing page + Admin zone — no sidebar, no chrome
   const ADMIN_ZONE = ["/admin/config", "/admin/settings", "/admin/users", "/admin/rapports", "/admin/tendances"];
-  const isAdminZone = pathname === "/admin" || ADMIN_ZONE.some(p => pathname === p || pathname.startsWith(p + "/"));
+  // STORE settings pages must keep sidebar despite being under /admin/settings
+  const STORE_EXCEPTIONS = ["/admin/settings/delivery", "/admin/settings/payment", "/admin/store"];
+  const isAdminZone = pathname === "/admin" || ADMIN_ZONE.some(p =>
+    (pathname === p || pathname.startsWith(p + "/")) &&
+    !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
+  );
   if (isAdminZone) {
     return <>{children}</>;
   }

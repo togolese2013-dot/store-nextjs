@@ -69,11 +69,12 @@ export default function ProductReviews({ productId }: Props) {
   const [error, setError]     = useState("");
 
   useEffect(() => {
-    fetch(`/api/reviews?productId=${productId}`)
+    fetch(`/api/reviews?produit_id=${productId}`)
       .then(r => r.json())
       .then(data => {
-        setReviews(data.reviews ?? []);
-        setAvg(data.avg ?? null);
+        const list: Review[] = data.reviews ?? [];
+        setReviews(list);
+        setAvg(list.length ? list.reduce((s, r) => s + r.rating, 0) / list.length : null);
       })
       .finally(() => setLoading(false));
   }, [productId]);
@@ -90,7 +91,7 @@ export default function ProductReviews({ productId }: Props) {
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: productId, nom: nom.trim(), rating, comment: comment.trim() }),
+        body: JSON.stringify({ produit_id: productId, nom: nom.trim(), note: rating, commentaire: comment.trim() }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Erreur"); return; }

@@ -30,7 +30,7 @@ const MODULES = [
     label: "Store",
     sub:   "E-COMMERCE",
     desc:  "Commandes en ligne, coupons, zones de livraison, paiements",
-    href:  "/admin/orders",
+    href:  "/admin/store",
     icon:  Settings,
     grad:  "from-emerald-800 to-emerald-700",
     dot:   "bg-emerald-400",
