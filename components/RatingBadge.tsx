@@ -55,7 +55,7 @@ function queueRating(productId: number, cb: (r: Rating | null) => void) {
 function fakeRating(id: number): Rating {
   const h     = ((id * 2654435761) >>> 0);
   const avg   = 4.0 + (h % 11) * 0.1;          // 4.0 → 5.0 in 0.1 steps
-  const count = 5  + (h % 53);                  // 5 → 57
+  const count = h % 6;                           // 0 → 5
   return { avg: Math.round(avg * 10) / 10, count, fake: true };
 }
 
