@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   ArrowLeft, Package, CheckCircle, Truck,
   Clock, XCircle, MapPin, Phone, User, Loader2,
-  Check, ExternalLink,
+  Check, ExternalLink, CreditCard,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
@@ -38,6 +38,21 @@ interface Event {
   note:       string;
   created_at: string;
 }
+interface Tranche {
+  id:            number;
+  numero:        number;
+  montant:       number;
+  date_echeance: string;
+  date_paiement: string | null;
+  statut:        "en_attente" | "payee" | "en_retard";
+}
+interface PaymentPlan {
+  nb_tranches:     number;
+  montant_total:   number;
+  montant_tranche: number;
+  statut:          string;
+  tranches:        Tranche[];
+}
 
 const STATUS_STEPS = [
   { key: "en attente", label: "Reçue",      icon: Clock,        shortLabel: "Reçue"    },
@@ -58,10 +73,11 @@ function parseItems(raw: string | object[]): OrderItem[] {
 
 export default function CommandeDetailPage() {
   const { ref }             = useParams<{ ref: string }>();
-  const [order, setOrder]   = useState<Order | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState("");
+  const [order,       setOrder]       = useState<Order | null>(null);
+  const [events,      setEvents]      = useState<Event[]>([]);
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState("");
 
   useEffect(() => {
     if (!ref) return;
@@ -72,6 +88,7 @@ export default function CommandeDetailPage() {
         if (!res.ok) throw new Error(json.error);
         setOrder(json.order);
         setEvents(json.events ?? []);
+        setPaymentPlan(json.paymentPlan ?? null);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Erreur");
       } finally {
@@ -198,6 +215,65 @@ export default function CommandeDetailPage() {
                 <p className="text-xs text-red-500 mt-0.5">{events.find(e => e.note)?.note}</p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Plan de paiement échelonné ────────────────────────────── */}
+        {paymentPlan && (
+          <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-700">
+                Paiement en {paymentPlan.nb_tranches} fois
+              </p>
+              <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                paymentPlan.statut === "solde"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : paymentPlan.statut === "annule"
+                  ? "bg-red-100 text-red-600"
+                  : "bg-amber-100 text-amber-700"
+              }`}>
+                {paymentPlan.statut === "solde" ? "Soldé" : paymentPlan.statut === "annule" ? "Annulé" : "En cours"}
+              </span>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {paymentPlan.tranches.map((t) => (
+                <div key={t.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                    t.statut === "payee" ? "bg-emerald-100" : t.statut === "en_retard" ? "bg-red-100" : "bg-slate-100"
+                  }`}>
+                    {t.statut === "payee"
+                      ? <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      : t.statut === "en_retard"
+                      ? <XCircle className="w-3.5 h-3.5 text-red-500" />
+                      : <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800">Tranche {t.numero}</p>
+                    <p className="text-[11px] text-slate-400">
+                      Échéance : {new Date(t.date_echeance).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                      {t.date_paiement && (
+                        <span className="text-emerald-600 ml-1">
+                          · Payée le {new Date(t.date_paiement).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <p className={`text-sm font-bold shrink-0 ${t.statut === "payee" ? "text-emerald-600" : "text-slate-900"}`}>
+                    {new Intl.NumberFormat("fr-FR").format(t.montant)} FCFA
+                  </p>
+                </div>
+              ))}
+            </div>
+            {paymentPlan.statut === "en_cours" && (
+              <div className="px-5 py-3 bg-amber-50 border-t border-amber-100">
+                <p className="text-[11px] text-amber-700 leading-snug">
+                  ⚠️ Le produit sera livré après confirmation du dernier versement par notre équipe.
+                  Contactez-nous sur WhatsApp pour valider chaque paiement.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

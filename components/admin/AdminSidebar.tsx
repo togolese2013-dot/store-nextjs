@@ -57,9 +57,10 @@ const MODULES: Record<string, {
       { label: "Dashboard",          href: "/admin/store",             icon: BarChart2 },
       { label: "Commandes",          href: "/admin/orders",            icon: ShoppingCart },
       { label: "Coupons",            href: "/admin/coupons",           icon: Tag },
-      { label: "Avis clients",       href: "/admin/reviews",           icon: Star },
+      { label: "Avis clients",        href: "/admin/reviews",           icon: Star },
+      { label: "Paiements échelonnés", href: "/admin/paiements",       icon: CreditCard },
       { label: "Zones de livraison", href: "/admin/settings/delivery", icon: MapPin },
-      { label: "Paiements",          href: "/admin/settings/payment",  icon: CreditCard },
+      { label: "Paiements config",   href: "/admin/settings/payment",  icon: CreditCard },
     ],
   },
   crm: {

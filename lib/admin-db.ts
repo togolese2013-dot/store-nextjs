@@ -1568,6 +1568,129 @@ export async function createDevis(data: {
   return result.insertId;
 }
 
+/* ─── Paiements échelonnés ─── */
+
+export interface PaymentPlan {
+  id:              number;
+  order_id:        number;
+  nb_tranches:     number;
+  montant_total:   number;
+  montant_tranche: number;
+  statut:          "en_cours" | "solde" | "annule";
+  created_at:      string;
+  reference?:      string;
+  nom?:            string;
+}
+
+export interface PaymentTranche {
+  id:            number;
+  plan_id:       number;
+  numero:        number;
+  montant:       number;
+  date_echeance: string;
+  date_paiement: string | null;
+  statut:        "en_attente" | "payee" | "en_retard";
+  note:          string | null;
+}
+
+export async function createPaymentPlan(data: {
+  order_id:      number;
+  nb_tranches:   number;
+  montant_total: number;
+}): Promise<number> {
+  const mt = Math.round((data.montant_total / data.nb_tranches) * 100) / 100;
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO payment_plans (order_id, nb_tranches, montant_total, montant_tranche) VALUES (?,?,?,?)`,
+    [data.order_id, data.nb_tranches, data.montant_total, mt]
+  );
+  const planId = result.insertId;
+  for (let i = 1; i <= data.nb_tranches; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + (i - 1) * 7);
+    await db.execute(
+      `INSERT INTO payment_tranches (plan_id, numero, montant, date_echeance) VALUES (?,?,?,?)`,
+      [planId, i, mt, d.toISOString().split("T")[0]]
+    );
+  }
+  return planId;
+}
+
+export async function listPaymentPlans(): Promise<PaymentPlan[]> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT pp.*, o.reference, o.nom
+     FROM payment_plans pp JOIN orders o ON o.id = pp.order_id
+     ORDER BY pp.created_at DESC`
+  );
+  return rows as PaymentPlan[];
+}
+
+export async function getPaymentPlanByOrderId(
+  orderId: number
+): Promise<(PaymentPlan & { tranches: PaymentTranche[] }) | null> {
+  const [planRows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT pp.*, o.reference, o.nom FROM payment_plans pp
+     JOIN orders o ON o.id = pp.order_id WHERE pp.order_id = ? LIMIT 1`,
+    [orderId]
+  );
+  if (!planRows.length) return null;
+  const plan = planRows[0] as PaymentPlan;
+  const [tranches] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT * FROM payment_tranches WHERE plan_id = ? ORDER BY numero`, [plan.id]
+  );
+  return { ...plan, tranches: tranches as PaymentTranche[] };
+}
+
+export async function markTranchePaid(trancheId: number, note?: string): Promise<void> {
+  await db.execute(
+    `UPDATE payment_tranches SET statut='payee', date_paiement=NOW(), note=? WHERE id=?`,
+    [note ?? null, trancheId]
+  );
+  const [tRow] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT plan_id FROM payment_tranches WHERE id=? LIMIT 1`, [trancheId]
+  );
+  const planId = tRow[0]?.plan_id;
+  if (!planId) return;
+  const [rem] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM payment_tranches WHERE plan_id=? AND statut!='payee'`, [planId]
+  );
+  if (Number(rem[0]?.cnt) === 0) {
+    await db.execute(`UPDATE payment_plans SET statut='solde' WHERE id=?`, [planId]);
+    const [pRow] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT order_id FROM payment_plans WHERE id=? LIMIT 1`, [planId]
+    );
+    if (pRow[0]?.order_id) {
+      await db.execute(`UPDATE orders SET status='confirmée' WHERE id=?`, [pRow[0].order_id]);
+      await addOrderEvent(pRow[0].order_id as number, "confirmée", "Paiement échelonné soldé — commande confirmée");
+    }
+  }
+}
+
+export async function markTrancheUnpaid(trancheId: number): Promise<void> {
+  await db.execute(
+    `UPDATE payment_tranches SET statut='en_attente', date_paiement=NULL, note=NULL WHERE id=?`,
+    [trancheId]
+  );
+  const [tRow] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT plan_id FROM payment_tranches WHERE id=? LIMIT 1`, [trancheId]
+  );
+  if (tRow[0]?.plan_id) {
+    await db.execute(
+      `UPDATE payment_plans SET statut='en_cours' WHERE id=? AND statut='solde'`,
+      [tRow[0].plan_id]
+    );
+  }
+}
+
+export async function cancelPaymentPlan(planId: number): Promise<void> {
+  await db.execute(`UPDATE payment_plans SET statut='annule' WHERE id=?`, [planId]);
+  const [pRow] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT order_id FROM payment_plans WHERE id=? LIMIT 1`, [planId]
+  );
+  if (pRow[0]?.order_id) {
+    await db.execute(`UPDATE orders SET status='annulée' WHERE id=?`, [pRow[0].order_id]);
+  }
+}
+
 export async function updateDevisStatut(id: number, statut: Devis["statut"]) {
   await db.execute("UPDATE devis SET statut = ? WHERE id = ?", [statut, id]);
 }

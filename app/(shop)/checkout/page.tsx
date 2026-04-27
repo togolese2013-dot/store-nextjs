@@ -60,15 +60,25 @@ export default function CheckoutPage() {
   const [orderedTotal, setOrderedTotal] = useState(0);
   const [orderRef,     setOrderRef]     = useState("");
   const [refCode,      setRefCode]      = useState<string | null>(null);
+  const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
 
   useEffect(() => {
     const match = document.cookie?.match?.(/ts_ref=([^;]+)/);
     if (match) setRefCode(decodeURIComponent(match[1]));
   }, []);
 
-  const selectedZone = ZONES.find(z => z.label === form.zone);
-  const deliveryFee  = selectedZone?.fee ?? 0;
-  const grandTotal   = total + deliveryFee;
+  const selectedZone   = ZONES.find(z => z.label === form.zone);
+  const deliveryFee    = selectedZone?.fee ?? 0;
+  const grandTotal     = total + deliveryFee;
+  const montantTranche = nbTranches > 0
+    ? Math.round((grandTotal / nbTranches) * 100) / 100
+    : grandTotal;
+
+  function trancheDate(index: number) {
+    const d = new Date();
+    d.setDate(d.getDate() + index * 7);
+    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  }
 
   function validate(): boolean {
     const e: Partial<Form & { telephone: string }> = {};
@@ -117,6 +127,8 @@ export default function CheckoutPage() {
           subtotal:          total,
           total:             grandTotal,
           ref_code:          refCode ?? undefined,
+          payment_mode:      nbTranches > 0 ? `${nbTranches}x` : "comptant",
+          nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
         }),
       });
       const data = await res.json();
@@ -399,20 +411,83 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Payment info */}
-              <div className="bg-brand-50 rounded-3xl border border-brand-100 p-5">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-brand-900 flex items-center justify-center shrink-0">
-                    <Check className="w-5 h-5 text-white" />
+              {/* Mode de paiement */}
+              <div className="bg-white rounded-3xl border border-slate-100 p-6">
+                <h2 className="font-display font-800 text-slate-900 text-base mb-5 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">3</div>
+                  Mode de paiement
+                </h2>
+
+                {/* Options */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                  {([
+                    { v: 0, label: "Comptant",  sub: "En une fois" },
+                    { v: 2, label: "2 fois",    sub: `${formatPrice(Math.round(grandTotal / 2 * 100) / 100)} / sem.` },
+                    { v: 3, label: "3 fois",    sub: `${formatPrice(Math.round(grandTotal / 3 * 100) / 100)} / sem.` },
+                    { v: 4, label: "4 fois",    sub: `${formatPrice(Math.round(grandTotal / 4 * 100) / 100)} / sem.` },
+                  ] as { v: 0|2|3|4; label: string; sub: string }[]).map(opt => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setNbTranches(opt.v)}
+                      className={clsx(
+                        "flex flex-col items-center gap-0.5 px-3 py-3 rounded-2xl border-2 text-center transition-all",
+                        nbTranches === opt.v
+                          ? "border-brand-600 bg-brand-50 text-brand-900"
+                          : "border-slate-200 text-slate-600 hover:border-brand-300"
+                      )}
+                    >
+                      <span className="font-bold text-sm">{opt.label}</span>
+                      <span className="text-[10px] text-slate-400">{opt.sub}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Comptant info */}
+                {nbTranches === 0 && (
+                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-brand-50 border border-brand-100">
+                    <div className="w-8 h-8 rounded-xl bg-brand-900 flex items-center justify-center shrink-0">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-brand-900 text-sm">Paiement à la livraison</p>
+                      <p className="text-brand-700 text-xs mt-0.5 leading-relaxed">
+                        Espèces ou Mobile Money (Flooz / T-Money) à la réception. Aucune info bancaire requise.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-brand-900 text-sm mb-1">Paiement à la livraison</h3>
-                    <p className="text-brand-700 text-xs leading-relaxed">
-                      Vous ne payez qu'à la réception de votre colis. Aucune information bancaire requise.
-                      Paiement en espèces, Mobile Money (Flooz / T-Money) acceptés.
+                )}
+
+                {/* Échéancier */}
+                {nbTranches > 0 && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-3">
+                      Votre échéancier — {nbTranches} versements hebdomadaires
+                    </p>
+                    <div className="space-y-2">
+                      {Array.from({ length: nbTranches }, (_, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={clsx(
+                              "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+                              i === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-700"
+                            )}>
+                              {i + 1}
+                            </div>
+                            <span className="text-xs text-slate-600">
+                              {i === 0 ? "Aujourd'hui" : trancheDate(i)}
+                              {i === 0 && <span className="ml-1 text-amber-600 font-semibold">← à payer pour confirmer</span>}
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold text-slate-900">{formatPrice(montantTranche)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-amber-700 mt-3 leading-snug">
+                      ⚠️ Le produit sera livré après le dernier versement confirmé par notre équipe.
                     </p>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 

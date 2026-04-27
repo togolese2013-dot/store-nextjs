@@ -1,8 +1,9 @@
 import express from "express";
 import { emitAdminEvent } from "../lib/admin-events";
-import { createOrder, addOrderEvent } from "@/lib/admin-db";
+import { createOrder, addOrderEvent, createPaymentPlan } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 import { getClientSession } from "../lib/client-auth";
+import { ensurePaymentTables } from "./admin/payment-plans";
 import type mysql from "mysql2/promise";
 
 const router = express.Router();
@@ -23,15 +24,21 @@ async function ensureOrderCols() {
 router.post("/api/orders", async (req, res) => {
   try {
     await ensureOrderCols();
+    await ensurePaymentTables();
 
     const {
       nom, telephone, adresse, zone_livraison, delivery_fee,
       note, lien_localisation, items, subtotal, total,
+      payment_mode, nb_tranches,
     } = req.body;
 
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Téléphone et articles requis." });
     }
+
+    // Validate installment params
+    const isEchelonne = ["2x", "3x", "4x"].includes(payment_mode);
+    const tranches    = isEchelonne ? Math.max(2, Math.min(4, Number(nb_tranches) || 4)) : null;
 
     const id = await createOrder({
       nom:            nom          ?? "",
@@ -45,25 +52,42 @@ router.post("/api/orders", async (req, res) => {
       total:          Number(total   ?? 0),
     });
 
+    const pool = db as mysql.Pool;
+
     // Link to client account if logged in
     const clientSession = await getClientSession(req).catch(() => null);
     if (clientSession?.id) {
-      await (db as mysql.Pool).execute(
+      await pool.execute(
         "UPDATE orders SET client_user_id = ? WHERE id = ?",
         [clientSession.id, id]
       );
     }
 
     if (lien_localisation) {
-      await (db as mysql.Pool).execute(
+      await pool.execute(
         "UPDATE orders SET lien_localisation = ? WHERE id = ?",
         [lien_localisation, id]
       );
     }
 
-    await addOrderEvent(id, "pending", "Commande passée en ligne");
+    // Payment plan: put order in "plan_paiement" status and create tranches
+    if (isEchelonne && tranches) {
+      await pool.execute(
+        "UPDATE orders SET status = 'plan_paiement' WHERE id = ?", [id]
+      );
+      await createPaymentPlan({
+        order_id:      id,
+        nb_tranches:   tranches,
+        montant_total: Number(total ?? 0),
+      });
+      await addOrderEvent(id, "plan_paiement",
+        `Paiement en ${tranches} fois — tranche 1 à régler pour confirmer`
+      );
+    } else {
+      await addOrderEvent(id, "pending", "Commande passée en ligne");
+    }
 
-    const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
       "SELECT reference, created_at FROM orders WHERE id = ? LIMIT 1", [id]
     );
     const reference = (rows[0]?.reference as string) ?? `CMD-${id}`;
@@ -76,7 +100,7 @@ router.post("/api/orders", async (req, res) => {
       created_at: String(rows[0]?.created_at ?? new Date().toISOString().slice(0, 19).replace("T", " ")),
     });
 
-    return res.json({ success: true, id, reference });
+    return res.json({ success: true, id, reference, payment_mode: payment_mode ?? "comptant" });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }

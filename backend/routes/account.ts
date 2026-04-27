@@ -348,7 +348,15 @@ router.get("/api/account/orders/:ref", async (req, res) => {
     }
 
     const events = await getOrderEvents(order.id as number);
-    return res.json({ order, events });
+
+    // Attach payment plan if exists
+    let paymentPlan = null;
+    try {
+      const { getPaymentPlanByOrderId } = await import("@/lib/admin-db");
+      paymentPlan = await getPaymentPlanByOrderId(order.id as number);
+    } catch { /* no plan */ }
+
+    return res.json({ order, events, paymentPlan });
   } catch (err) {
     console.error("[account/orders/:ref]", err);
     return res.status(500).json({ error: "Erreur serveur." });
