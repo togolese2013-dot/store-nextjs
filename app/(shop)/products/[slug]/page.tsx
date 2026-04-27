@@ -10,6 +10,7 @@ import ProductVariantSelector, { type Variant } from "@/components/ProductVarian
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
 import RecentViewTracker from "@/components/RecentViewTracker";
 import Link from "next/link";
+import RatingBadge from "@/components/RatingBadge";
 import {
   Zap, ShieldCheck, Truck, ChevronRight,
   Sparkles, Star,
@@ -207,9 +208,11 @@ export default async function ProductPage({ params }: PageProps) {
               </div>
 
               {/* Name */}
-              <h1 className="font-display text-2xl sm:text-3xl font-800 text-slate-900 leading-tight mb-5">
+              <h1 className="font-display text-2xl sm:text-3xl font-800 text-slate-900 leading-tight mb-2">
                 {product.nom}
               </h1>
+
+              <RatingBadge productId={product.id} size="md" />
 
               {/* Mini description */}
               {product.description && (
