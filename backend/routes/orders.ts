@@ -62,12 +62,19 @@ router.post("/api/orders", async (req, res) => {
     }
 
     await addOrderEvent(id, "pending", "Commande passée en ligne");
-    emitAdminEvent("commande");
 
     const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
-      "SELECT reference FROM orders WHERE id = ?", [id]
+      "SELECT reference, created_at FROM orders WHERE id = ? LIMIT 1", [id]
     );
     const reference = (rows[0]?.reference as string) ?? `CMD-${id}`;
+
+    emitAdminEvent("commande", {
+      id,
+      reference,
+      nom:        nom        ?? "",
+      total:      Number(total ?? 0),
+      created_at: String(rows[0]?.created_at ?? new Date().toISOString().slice(0, 19).replace("T", " ")),
+    });
 
     return res.json({ success: true, id, reference });
   } catch (err) {

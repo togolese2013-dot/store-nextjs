@@ -41,19 +41,18 @@ router.post("/api/admin/orders", async (req, res) => {
   const total    = subtotal + Number(delivery_fee ?? 0);
   const id = await createOrder({ nom, telephone, adresse, zone_livraison, delivery_fee: Number(delivery_fee ?? 0), note, items, subtotal, total });
   await addOrderEvent(id, "pending", "Commande créée par l'admin", session.nom);
-  emitAdminEvent("commande");
-  res.json({ success: true, id });
-});
 
-router.get("/api/admin/orders/sse", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).end();
-  // SSE handled by events route — fallback empty
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
-  req.on("close", () => res.end());
+  const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+    "SELECT reference, created_at FROM orders WHERE id = ? LIMIT 1", [id]
+  );
+  emitAdminEvent("commande", {
+    id,
+    reference:  rows[0]?.reference  ?? `CMD-${id}`,
+    nom:        nom                 ?? "",
+    total,
+    created_at: String(rows[0]?.created_at ?? new Date().toISOString().slice(0, 19).replace("T", " ")),
+  });
+  res.json({ success: true, id });
 });
 
 router.get("/api/admin/orders/:id", async (req, res) => {

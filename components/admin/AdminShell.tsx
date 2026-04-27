@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
+import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
 
 interface Props {
   nom:      string;
@@ -11,47 +13,39 @@ interface Props {
   children: React.ReactNode;
 }
 
-export default function AdminShell({ nom, role, children }: Props) {
-  const pathname    = usePathname();
-  const router      = useRouter();
-  const [mobileOpen, setMobileOpen] = useState(false);
+/* ── Inner shell — consumes SSE context ─────────────────────────────────── */
+function AdminShellContent({ nom, role, children }: Props) {
+  const pathname = usePathname();
+  const router   = useRouter();
 
+  const [mobileOpen,  setMobileOpen]  = useState(false);
+  const [hasUpdates,  setHasUpdates]  = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { subscribe } = useAdminSSE();
+
+  // Debounced update banner: group any burst of events into a single notification
   useEffect(() => {
-    let es: EventSource;
-    let retryTimer: ReturnType<typeof setTimeout>;
+    return subscribe((event) => {
+      if (event.type === "connected" || event.type === "heartbeat") return;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => setHasUpdates(true), 3_000);
+    });
+  }, [subscribe]);
 
-    function connect() {
-      es = new EventSource(`/api/admin/events`);
-      es.onmessage = (e) => {
-        try {
-          const event = JSON.parse(e.data) as { type: string };
-          if (event.type !== "connected") router.refresh();
-        } catch { /* ignore parse errors */ }
-      };
-      es.onerror = () => {
-        es.close();
-        retryTimer = setTimeout(connect, 5_000);
-      };
-    }
-
-    connect();
-    return () => {
-      es?.close();
-      clearTimeout(retryTimer);
-    };
+  const handleRefresh = useCallback(() => {
+    setHasUpdates(false);
+    router.refresh();
   }, [router]);
 
-  // Landing page + Admin zone — no sidebar, no chrome
   const ADMIN_ZONE = ["/admin/config", "/admin/settings", "/admin/users", "/admin/rapports", "/admin/tendances"];
-  // STORE settings pages must keep sidebar despite being under /admin/settings
   const STORE_EXCEPTIONS = ["/admin/settings/delivery", "/admin/settings/payment", "/admin/store"];
   const isAdminZone = pathname === "/admin" || ADMIN_ZONE.some(p =>
     (pathname === p || pathname.startsWith(p + "/")) &&
     !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
   );
-  if (isAdminZone) {
-    return <>{children}</>;
-  }
+
+  if (isAdminZone) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -63,7 +57,7 @@ export default function AdminShell({ nom, role, children }: Props) {
       />
       <div className="lg:pl-60 xl:pl-64">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
-          {/* Mobile hamburger — top of content */}
+          {/* Mobile hamburger */}
           <button
             onClick={() => setMobileOpen(true)}
             className="lg:hidden mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-900 text-white text-sm font-semibold"
@@ -75,10 +69,35 @@ export default function AdminShell({ nom, role, children }: Props) {
             </span>
             Menu
           </button>
+
+          {/* Update banner — appears after debounce, dismissed on refresh */}
+          {hasUpdates && (
+            <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl animate-fade-up">
+              <span className="text-sm text-emerald-800 font-medium">
+                Nouvelles données disponibles
+              </span>
+              <button
+                onClick={handleRefresh}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Actualiser
+              </button>
+            </div>
+          )}
+
           {children}
         </main>
       </div>
       <OrderNotifier />
     </div>
+  );
+}
+
+/* ── Public export — provides SSE context then renders shell ─────────────── */
+export default function AdminShell(props: Props) {
+  return (
+    <AdminSSEProvider>
+      <AdminShellContent {...props} />
+    </AdminSSEProvider>
   );
 }

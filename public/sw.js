@@ -55,8 +55,10 @@ self.addEventListener("fetch", (event) => {
 
   const path = url.pathname;
 
-  // SSE endpoint — never intercept
-  if (path.startsWith("/api/admin/orders/sse")) return;
+  // SSE endpoints — never intercept
+  if (path.startsWith("/api/admin/sse") ||
+      path.startsWith("/api/admin/events") ||
+      path.startsWith("/api/admin/orders/sse")) return;
 
   // Orders API — Network First with cache fallback
   if (path.startsWith("/api/admin/orders") && request.method === "GET") {

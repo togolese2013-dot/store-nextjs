@@ -22,7 +22,7 @@ function createPool() {
     return mysql.createPool({
       uri:                url,
       waitForConnections: true,
-      connectionLimit:    3,
+      connectionLimit:    8,
       charset:            "utf8mb4",
       timezone:           "+00:00",
       ssl: isProduction ? { rejectUnauthorized: false } : undefined,
@@ -35,7 +35,7 @@ function createPool() {
     password:           process.env.DB_PASSWORD || "",
     database:           process.env.DB_NAME     || "togol2600657",
     waitForConnections: true,
-    connectionLimit:    3,
+    connectionLimit:    8,
     charset:            "utf8mb4",
     timezone:           "+00:00",
   });
@@ -177,13 +177,18 @@ export async function checkReviewsTable(): Promise<boolean> {
 
 async function _ensureReviewsRatingCol() {
   try {
-    await db.execute("ALTER TABLE reviews CHANGE COLUMN note rating TINYINT NOT NULL DEFAULT 5");
-  } catch (e: unknown) {
-    const err = e as { code?: string };
-    if (err?.code !== "ER_BAD_FIELD_ERROR" && err?.code !== "ER_DUP_FIELDNAME") {
-      // Column already named 'rating' or 'note' doesn't exist — both fine
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'reviews'
+       AND COLUMN_NAME IN ('note', 'rating')`
+    );
+    const cols = new Set((rows as mysql.RowDataPacket[]).map(r => r.COLUMN_NAME as string));
+    if (cols.has("note") && !cols.has("rating")) {
+      await db.execute("ALTER TABLE reviews CHANGE COLUMN note rating TINYINT NOT NULL DEFAULT 5");
+    } else if (!cols.has("note") && !cols.has("rating")) {
+      await db.execute("ALTER TABLE reviews ADD COLUMN rating TINYINT NOT NULL DEFAULT 5");
     }
-  }
+  } catch { /* ignore — table may not exist yet */ }
 }
 
 /* ─── Queries ─── */

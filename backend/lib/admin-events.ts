@@ -12,6 +12,6 @@ export const adminEmitter: EventEmitter =
 export type AdminEventType =
   | "stock" | "achat" | "vente" | "commande" | "produit" | "finance" | "livraison";
 
-export function emitAdminEvent(type: AdminEventType) {
-  adminEmitter.emit("admin", { type, ts: Date.now() });
+export function emitAdminEvent(type: AdminEventType, payload?: Record<string, unknown>) {
+  adminEmitter.emit("admin", { type, ts: Date.now(), ...(payload ?? {}) });
 }
