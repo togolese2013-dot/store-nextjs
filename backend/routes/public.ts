@@ -128,6 +128,7 @@ router.post("/api/reviews", async (req, res) => {
   try {
     const { produit_id, nom, note, commentaire } = req.body;
     if (!produit_id || !nom || !note) return res.status(400).json({ error: "Champs requis." });
+    await checkReviewsTable(); // ensures note→rating migration ran before INSERT
     await createReview({ produit_id: Number(produit_id), nom, note: Number(note), commentaire });
     res.status(201).json({ ok: true });
   } catch (err) {
