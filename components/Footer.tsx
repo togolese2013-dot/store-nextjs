@@ -20,8 +20,8 @@ export default function Footer() {
               />
             </Link>
             <p className="text-slate-400 text-sm leading-relaxed mb-6">
-              Votre boutique premium d'électronique et d'accessoires au Togo.
-              Livraison rapide, produits de qualité, paiement à la réception.
+              Votre boutique spécialisée en accessoires photographiques au Togo.
+              Livraison le jour même, produits de qualité, paiement à la réception.
             </p>
             <div className="flex gap-3">
               {[
@@ -101,11 +101,11 @@ export default function Footer() {
               </li>
               <li className="flex gap-3 text-sm">
                 <Phone className="w-4 h-4 text-accent-400 shrink-0 mt-0.5" />
-                <span className="text-slate-400 font-semibold">+228 90 00 00 00</span>
+                <span className="text-slate-400 font-semibold">+228 90 52 79 12 · +228 90 22 64 91</span>
               </li>
               <li className="flex gap-3 text-sm">
                 <Clock className="w-4 h-4 text-accent-400 shrink-0 mt-0.5" />
-                <span className="text-slate-400">Lun–Sam · 8h–20h</span>
+                <span className="text-slate-400">Lun–Sam · 8h–18h30</span>
               </li>
             </ul>
 

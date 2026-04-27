@@ -141,7 +141,7 @@ function PromoBanner() {
 /* ─── Testimonials ─── */
 function Testimonials() {
   const reviews = [
-    { name: "Kossi A.",   loc: "Lomé",       rating: 5, text: "Livraison en 2 jours, produit exactement comme décrit. Service client disponible sur WhatsApp, super réactif !", avatar: "KA" },
+    { name: "Kossi A.",   loc: "Lomé",       rating: 5, text: "Livraison le jour même, produit exactement comme décrit. Service client disponible sur WhatsApp, super réactif !", avatar: "KA" },
     { name: "Afia M.",    loc: "Kpalimé",    rating: 5, text: "J'ai commandé un casque audio, qualité top et prix très correct. Je recommande à 100%.", avatar: "AM" },
     { name: "Edem K.",    loc: "Atakpamé",   rating: 5, text: "Paiement à la livraison, c'est ce qui m'a convaincu. Produit reçu en parfait état.", avatar: "EK" },
     { name: "Délali S.",  loc: "Lomé",       rating: 4, text: "Bonne expérience globale. Le site est facile à naviguer et la livraison est ponctuelle.", avatar: "DS" },
