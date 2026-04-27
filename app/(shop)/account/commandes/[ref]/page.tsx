@@ -11,10 +11,13 @@ import {
 import { formatPrice } from "@/lib/utils";
 
 interface OrderItem {
-  nom:       string;
-  quantite:  number;
-  prix:      number;
-  image_url?: string;
+  nom:           string;
+  qty?:          number;
+  quantite?:     number;
+  prix_unitaire?: number;
+  prix?:         number;
+  total?:        number;
+  image_url?:    string;
 }
 interface Order {
   reference:         string;
@@ -221,10 +224,13 @@ export default function CommandeDetailPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">{item.nom}</p>
-                    <p className="text-xs text-slate-400">Qté : {item.quantite}</p>
+                    <p className="text-xs text-slate-400">Qté : {item.qty ?? item.quantite ?? 1}</p>
                   </div>
                   <p className="text-sm font-bold text-slate-900 shrink-0">
-                    {formatPrice(item.prix * item.quantite)}
+                    {formatPrice(
+                      item.total ??
+                      ((item.prix_unitaire ?? item.prix ?? 0) * (item.qty ?? item.quantite ?? 1))
+                    )}
                   </p>
                 </div>
               ))}

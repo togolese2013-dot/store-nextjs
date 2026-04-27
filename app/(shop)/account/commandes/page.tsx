@@ -8,6 +8,15 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
+interface OrderItem {
+  nom:           string;
+  qty?:          number;
+  quantite?:     number;
+  prix_unitaire?: number;
+  prix?:         number;
+  total?:        number;
+}
+
 interface Order {
   id:         number;
   reference:  string;
@@ -15,7 +24,7 @@ interface Order {
   telephone:  string;
   total:      number;
   status:     string;
-  items:      string | { nom: string; quantite: number; prix: number }[];
+  items:      string | OrderItem[];
   created_at: string;
 }
 
@@ -29,8 +38,8 @@ function statusMeta(status: string) {
   }
 }
 
-function parseItems(raw: string | unknown[]): { nom: string; quantite: number; prix: number }[] {
-  if (Array.isArray(raw)) return raw as { nom: string; quantite: number; prix: number }[];
+function parseItems(raw: string | unknown[]): OrderItem[] {
+  if (Array.isArray(raw)) return raw as OrderItem[];
   try { return JSON.parse(raw as string); } catch { return []; }
 }
 
@@ -199,7 +208,7 @@ export default function CommandesPage() {
                       </div>
                       {items.length > 0 && (
                         <p className="text-sm text-slate-600 truncate">
-                          {items.slice(0, 2).map(i => `${i.nom} ×${i.quantite}`).join(", ")}
+                          {items.slice(0, 2).map(i => `${i.nom} ×${i.qty ?? i.quantite ?? 1}`).join(", ")}
                           {items.length > 2 && (
                             <span className="text-slate-400"> +{items.length - 2} article{items.length - 2 > 1 ? "s" : ""}</span>
                           )}
