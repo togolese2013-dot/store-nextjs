@@ -343,7 +343,6 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
                 </div>
               ))}
             </div>
-            </div>
           </div>
 
           {/* Frais livraison + totaux */}
