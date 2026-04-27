@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import {
   Edit2, Trash2, X, Check, Loader2, AlertTriangle,
-  Plus, Minus,
+  Plus, Minus, Search, Link2,
 } from "lucide-react";
 
 interface OrderItem {
@@ -16,20 +16,25 @@ interface OrderItem {
   total:         number;
 }
 
+interface Product {
+  id: number; nom: string; reference: string; prix: number; stock: number;
+}
+
 interface Order {
-  id:              number;
-  reference:       string;
-  nom:             string;
-  telephone:       string;
-  adresse:         string;
-  zone_livraison:  string;
-  delivery_fee:    number;
-  note:            string;
-  subtotal:        number;
-  total:           number;
-  status:          string;
-  statut_paiement: string | null;
-  items:           OrderItem[];
+  id:                 number;
+  reference:          string;
+  nom:                string;
+  telephone:          string;
+  adresse:            string;
+  zone_livraison:     string;
+  delivery_fee:       number;
+  note:               string;
+  subtotal:           number;
+  total:              number;
+  status:             string;
+  statut_paiement:    string | null;
+  lien_localisation:  string;
+  items:              OrderItem[];
 }
 
 /* ── Payment status options ── */
@@ -126,15 +131,49 @@ function DeleteConfirm({ orderId, reference }: { orderId: number; reference: str
 /* ── Edit modal ── */
 function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
   const router = useRouter();
-  const [nom,          setNom]          = useState(order.nom);
-  const [telephone,    setTelephone]    = useState(order.telephone);
-  const [adresse,      setAdresse]      = useState(order.adresse);
-  const [zone,         setZone]         = useState(order.zone_livraison);
-  const [note,         setNote]         = useState(order.note ?? "");
-  const [deliveryFee,  setDeliveryFee]  = useState(order.delivery_fee);
-  const [items,        setItems]        = useState<OrderItem[]>(order.items.map(i => ({ ...i })));
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState("");
+  const [nom,               setNom]               = useState(order.nom);
+  const [telephone,         setTelephone]         = useState(order.telephone);
+  const [adresse,           setAdresse]           = useState(order.adresse);
+  const [zone,              setZone]              = useState(order.zone_livraison);
+  const [note,              setNote]              = useState(order.note ?? "");
+  const [lienLocalisation,  setLienLocalisation]  = useState(order.lien_localisation ?? "");
+  const [deliveryFee,       setDeliveryFee]       = useState(order.delivery_fee);
+  const [items,             setItems]             = useState<OrderItem[]>(order.items.map(i => ({ ...i })));
+  const [saving,            setSaving]            = useState(false);
+  const [error,             setError]             = useState("");
+
+  // Product search state
+  const [query,     setQuery]     = useState("");
+  const [results,   setResults]   = useState<Product[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearch = useCallback((q: string) => {
+    setQuery(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim()) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await fetch(`/api/admin/products/search?q=${encodeURIComponent(q)}`);
+        const j = await r.json();
+        setResults(j.data ?? []);
+      } finally { setSearching(false); }
+    }, 300);
+  }, []);
+
+  function addProduct(p: Product) {
+    setItems(prev => {
+      const idx = prev.findIndex(i => (i as unknown as { product_id?: number }).product_id === p.id || i.nom === p.nom);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], qty: next[idx].qty + 1, total: (next[idx].qty + 1) * next[idx].prix_unitaire };
+        return next;
+      }
+      return [...prev, { nom: p.nom, reference: p.reference, qty: 1, prix_unitaire: p.prix, total: p.prix } as OrderItem];
+    });
+    setQuery(""); setResults([]);
+  }
 
   function updateItem(idx: number, field: "qty" | "prix_unitaire", raw: string) {
     const val = field === "qty" ? Math.max(1, parseInt(raw) || 1) : Math.max(0, parseFloat(raw) || 0);
@@ -161,7 +200,7 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
       const res = await fetch(`/api/admin/orders/${order.id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ field: "update", nom, telephone, adresse, zone_livraison: zone, note, delivery_fee: deliveryFee, items }),
+        body:    JSON.stringify({ field: "update", nom, telephone, adresse, zone_livraison: zone, note, lien_localisation: lienLocalisation, delivery_fee: deliveryFee, items }),
         credentials: "include",
       });
       if (!res.ok) throw new Error("Erreur serveur");
@@ -226,9 +265,48 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
             </div>
           </div>
 
+          {/* Lien localisation */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
+              <Link2 className="w-3.5 h-3.5" /> Lien de localisation (Maps)
+            </label>
+            <input value={lienLocalisation} onChange={e => setLienLocalisation(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-500 focus:outline-none"
+              placeholder="https://maps.google.com/..." />
+          </div>
+
           {/* Articles */}
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Articles</p>
+
+            {/* Product search */}
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={e => handleSearch(e.target.value)}
+                placeholder="Rechercher un produit à ajouter…"
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-400"
+                autoComplete="off"
+              />
+              {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />}
+              {results.length > 0 && (
+                <div className="absolute z-20 w-full mt-1 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
+                  {results.map(p => (
+                    <button key={p.id} type="button" onClick={() => addProduct(p)}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-emerald-50 text-left transition-colors">
+                      <div>
+                        <p className="font-semibold text-sm text-slate-800">{p.nom}</p>
+                        <p className="text-xs text-slate-400">{p.reference} · stock: {p.stock}</p>
+                      </div>
+                      <span className="text-sm font-bold text-emerald-700">{formatPrice(p.prix)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               {items.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2 bg-slate-50 rounded-xl p-3">
@@ -264,6 +342,7 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
                   </button>
                 </div>
               ))}
+            </div>
             </div>
           </div>
 

@@ -38,18 +38,19 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   /* Build typed order for client component */
   const orderForActions = {
-    id:              order.id,
-    reference:       order.reference,
-    nom:             order.nom,
-    telephone:       order.telephone,
-    adresse:         order.adresse,
-    zone_livraison:  order.zone_livraison,
-    delivery_fee:    order.delivery_fee,
-    note:            order.note,
-    subtotal:        order.subtotal,
-    total:           order.total,
-    status:          order.status,
-    statut_paiement: order.statut_paiement ?? null,
+    id:                 order.id,
+    reference:          order.reference,
+    nom:                order.nom,
+    telephone:          order.telephone,
+    adresse:            order.adresse,
+    zone_livraison:     order.zone_livraison,
+    delivery_fee:       order.delivery_fee,
+    note:               order.note,
+    subtotal:           order.subtotal,
+    total:              order.total,
+    status:             order.status,
+    statut_paiement:    order.statut_paiement ?? null,
+    lien_localisation:  (order as unknown as { lien_localisation?: string }).lien_localisation ?? "",
     items,
   };
 

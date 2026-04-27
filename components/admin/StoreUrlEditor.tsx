@@ -210,20 +210,20 @@ export default function StoreUrlEditor({ initialUrl, initialShareText }: Props) 
               href={`https://wa.me/?text=${encodedText}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/20 text-xs font-bold transition-colors"
+              className="w-9 h-9 rounded-lg bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/20 flex items-center justify-center transition-colors"
               title="Partager sur WhatsApp"
             >
-              <WhatsAppIcon /> WhatsApp
+              <WhatsAppIcon />
             </a>
 
             <a
               href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 text-xs font-bold transition-colors"
+              className="w-9 h-9 rounded-lg bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 flex items-center justify-center transition-colors"
               title="Partager sur Facebook"
             >
-              <FacebookIcon /> Facebook
+              <FacebookIcon />
             </a>
 
             <a
@@ -231,10 +231,10 @@ export default function StoreUrlEditor({ initialUrl, initialShareText }: Props) 
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/5 text-slate-800 hover:bg-black/10 text-xs font-bold transition-colors"
+              className="w-9 h-9 rounded-lg bg-black/5 text-slate-800 hover:bg-black/10 flex items-center justify-center transition-colors"
               title="Copier pour TikTok"
             >
-              <TikTokIcon /> TikTok
+              <TikTokIcon />
             </a>
           </div>
         )}

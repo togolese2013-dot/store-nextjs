@@ -170,8 +170,20 @@ export async function checkReviewsTable(): Promise<boolean> {
       "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'reviews' LIMIT 1"
     );
     _hasReviews = (rows as mysql.RowDataPacket[]).length > 0;
+    if (_hasReviews) await _ensureReviewsRatingCol();
   } catch { _hasReviews = false; }
   return _hasReviews;
+}
+
+async function _ensureReviewsRatingCol() {
+  try {
+    await db.execute("ALTER TABLE reviews CHANGE COLUMN note rating TINYINT NOT NULL DEFAULT 5");
+  } catch (e: unknown) {
+    const err = e as { code?: string };
+    if (err?.code !== "ER_BAD_FIELD_ERROR" && err?.code !== "ER_DUP_FIELDNAME") {
+      // Column already named 'rating' or 'note' doesn't exist — both fine
+    }
+  }
 }
 
 /* ─── Queries ─── */

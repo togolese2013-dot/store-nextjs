@@ -243,39 +243,39 @@ export default async function StoreDashboardPage() {
             <p className="font-semibold text-sm">Aucune commande pour le moment</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-px">
+            <table className="w-full text-sm min-w-[420px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Réf.</th>
-                  <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Client</th>
-                  <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden md:table-cell">Zone</th>
-                  <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Total</th>
-                  <th className="text-center px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Statut</th>
-                  <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
+                  <th className="text-left px-3 sm:px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Réf.</th>
+                  <th className="text-left px-3 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Client</th>
+                  <th className="text-left px-3 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden md:table-cell">Zone</th>
+                  <th className="text-right px-3 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Total</th>
+                  <th className="text-center px-3 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Statut</th>
+                  <th className="text-right px-3 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {stats.recentOrders.map(order => (
                   <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-3">
+                    <td className="px-3 sm:px-5 py-3">
                       <Link href={`/admin/orders/${order.id}`}
                         className="font-mono text-xs text-emerald-700 hover:underline">
                         {order.reference}
                       </Link>
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900">{order.nom || "—"}</p>
-                      <p className="text-xs text-slate-400">{order.telephone}</p>
+                    <td className="px-3 sm:px-4 py-3">
+                      <p className="font-semibold text-slate-900 text-xs sm:text-sm">{order.nom || "—"}</p>
+                      <p className="text-xs text-slate-400 hidden sm:block">{order.telephone}</p>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{order.zone_livraison}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="font-bold text-slate-900">{formatPrice(order.total)}</span>
+                    <td className="px-3 py-3 text-slate-500 text-xs hidden md:table-cell">{order.zone_livraison}</td>
+                    <td className="px-3 sm:px-4 py-3 text-right">
+                      <span className="font-bold text-slate-900 text-xs sm:text-sm">{formatPrice(order.total)}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 sm:px-4 py-3 text-center">
                       <OrderStatusSelect orderId={order.id} currentStatus={order.status} />
                     </td>
-                    <td className="px-4 py-3 text-right text-xs text-slate-400 hidden sm:table-cell">
+                    <td className="px-3 py-3 text-right text-xs text-slate-400 hidden sm:table-cell">
                       {new Date(order.created_at).toLocaleDateString("fr-FR")}
                     </td>
                   </tr>

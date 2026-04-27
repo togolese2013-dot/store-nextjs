@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, User, Phone, MapPin, MessageSquare } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, User, Phone, MapPin, MessageSquare, Link2 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
 interface Product {
@@ -45,11 +45,12 @@ export default function CreateOrderForm({ zones }: Props) {
   const [items, setItems] = useState<OrderItem[]>([]);
 
   // Client fields
-  const [nom, setNom]               = useState("");
-  const [telephone, setTelephone]   = useState("");
-  const [adresse, setAdresse]       = useState("");
-  const [note, setNote]             = useState("");
-  const [zoneId, setZoneId]         = useState<number>(zones[0]?.id ?? 0);
+  const [nom, setNom]                           = useState("");
+  const [telephone, setTelephone]               = useState("");
+  const [adresse, setAdresse]                   = useState("");
+  const [lienLocalisation, setLienLocalisation] = useState("");
+  const [note, setNote]                         = useState("");
+  const [zoneId, setZoneId]                     = useState<number>(zones[0]?.id ?? 0);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
@@ -116,6 +117,7 @@ export default function CreateOrderForm({ zones }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nom, telephone, adresse,
+          lien_localisation: lienLocalisation || undefined,
           zone_livraison: selectedZone?.nom ?? "",
           delivery_fee: deliveryFee,
           note,
@@ -263,6 +265,15 @@ export default function CreateOrderForm({ zones }: Props) {
               <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
               <textarea value={adresse} onChange={e => setAdresse(e.target.value)} rows={2} placeholder="Adresse de livraison"
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400 resize-none" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Lien de localisation (Maps)</label>
+            <div className="relative">
+              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input value={lienLocalisation} onChange={e => setLienLocalisation(e.target.value)} type="url"
+                placeholder="https://maps.google.com/..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400" />
             </div>
           </div>
           <div>

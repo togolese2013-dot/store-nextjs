@@ -87,7 +87,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
 
   /* ── Full order update ── */
   if (req.body.field === "update") {
-    const { nom, telephone, adresse, zone_livraison, note, delivery_fee, items } = req.body;
+    const { nom, telephone, adresse, zone_livraison, note, delivery_fee, items, lien_localisation } = req.body;
     const parsedItems  = Array.isArray(items) ? items : [];
     const subtotal     = parsedItems.reduce((s: number, i: { total: number }) => s + i.total, 0);
     const deliveryFee  = Number(delivery_fee ?? 0);
@@ -98,6 +98,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
       subtotal,
       total,
       items: JSON.stringify(parsedItems),
+      lien_localisation: lien_localisation ?? null,
     });
     await addOrderEvent(id, "modifiée", "Commande modifiée par l'admin", session.nom);
     return res.json({ ok: true });

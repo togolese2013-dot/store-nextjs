@@ -39,16 +39,16 @@ export default async function OrdersPage() {
             <p className="font-semibold">Aucune commande</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-px">
+            <table className="w-full text-sm min-w-[420px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Réf.</th>
-                  <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Client</th>
-                  <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden md:table-cell">Zone</th>
-                  <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Total</th>
-                  <th className="text-center px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Statut</th>
-                  <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
+                  <th className="text-left px-3 sm:px-5 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Réf.</th>
+                  <th className="text-left px-3 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Client</th>
+                  <th className="text-left px-3 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden md:table-cell">Zone</th>
+                  <th className="text-right px-3 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Total</th>
+                  <th className="text-center px-3 sm:px-4 py-3 font-bold text-xs uppercase tracking-widest text-slate-400">Statut</th>
+                  <th className="text-right px-3 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
                 </tr>
               </thead>
               <OrdersTableBody orders={stats.recentOrders} />

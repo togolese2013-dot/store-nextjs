@@ -2,24 +2,27 @@ import express from "express";
 import { emitAdminEvent } from "../lib/admin-events";
 import { createOrder, addOrderEvent } from "@/lib/admin-db";
 import { db } from "@/lib/db";
+import { getClientSession } from "../lib/client-auth";
 import type mysql from "mysql2/promise";
 
 const router = express.Router();
 
-async function ensureLienLocalisation() {
-  try {
-    await (db as mysql.Pool).execute(
-      "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL"
-    );
-  } catch (err: any) {
-    if (err?.code !== "ER_DUP_FIELDNAME") throw err;
+async function ensureOrderCols() {
+  const pool = db as mysql.Pool;
+  for (const ddl of [
+    "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
+    "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
+  ]) {
+    try { await pool.execute(ddl); } catch (e: any) {
+      if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+    }
   }
 }
 
 // POST /api/orders  — public, no auth required
 router.post("/api/orders", async (req, res) => {
   try {
-    await ensureLienLocalisation();
+    await ensureOrderCols();
 
     const {
       nom, telephone, adresse, zone_livraison, delivery_fee,
@@ -42,7 +45,15 @@ router.post("/api/orders", async (req, res) => {
       total:          Number(total   ?? 0),
     });
 
-    // Store lien_localisation separately (column added above)
+    // Link to client account if logged in
+    const clientSession = await getClientSession(req).catch(() => null);
+    if (clientSession?.id) {
+      await (db as mysql.Pool).execute(
+        "UPDATE orders SET client_user_id = ? WHERE id = ?",
+        [clientSession.id, id]
+      );
+    }
+
     if (lien_localisation) {
       await (db as mysql.Pool).execute(
         "UPDATE orders SET lien_localisation = ? WHERE id = ?",

@@ -295,13 +295,24 @@ router.get("/api/account/orders", async (req, res) => {
       [session.id]
     );
     const telephone = userRows[0]?.telephone as string | null;
-    if (!telephone) return res.json({ orders: [] });
+
+    // Ensure client_user_id column exists
+    try {
+      await pool.execute("ALTER TABLE orders ADD COLUMN client_user_id INT NULL");
+    } catch (e: any) { if (e?.code !== "ER_DUP_FIELDNAME") throw e; }
+
+    const conditions: string[] = ["client_user_id = ?"];
+    const params: (string | number)[] = [session.id];
+    if (telephone) {
+      conditions.push("telephone = ?");
+      params.push(telephone);
+    }
 
     const [rows] = await pool.execute<mysql.RowDataPacket[]>(
       `SELECT id, reference, nom, telephone, total, subtotal, delivery_fee,
               status, items, adresse, zone_livraison, created_at
-       FROM orders WHERE telephone = ? ORDER BY created_at DESC`,
-      [telephone]
+       FROM orders WHERE ${conditions.join(" OR ")} ORDER BY created_at DESC`,
+      params
     );
     return res.json({ orders: rows });
   } catch (err) {

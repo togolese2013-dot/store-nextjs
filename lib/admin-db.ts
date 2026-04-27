@@ -502,29 +502,31 @@ export async function updateOrderStatus(id: number, status: string) {
 }
 
 export async function updateOrderFields(id: number, data: {
-  nom?:             string;
-  telephone?:       string;
-  adresse?:         string;
-  zone_livraison?:  string;
-  note?:            string;
-  delivery_fee?:    number;
-  subtotal?:        number;
-  total?:           number;
-  items?:           string;
-  statut_paiement?: string;
+  nom?:               string;
+  telephone?:         string;
+  adresse?:           string;
+  zone_livraison?:    string;
+  note?:              string;
+  delivery_fee?:      number;
+  subtotal?:          number;
+  total?:             number;
+  items?:             string;
+  statut_paiement?:   string;
+  lien_localisation?: string | null;
 }) {
   const sets:   string[]                        = [];
   const params: (string | number | null)[] = [];
-  if (data.nom             !== undefined) { sets.push("nom = ?");             params.push(data.nom); }
-  if (data.telephone       !== undefined) { sets.push("telephone = ?");       params.push(data.telephone); }
-  if (data.adresse         !== undefined) { sets.push("adresse = ?");         params.push(data.adresse); }
-  if (data.zone_livraison  !== undefined) { sets.push("zone_livraison = ?");  params.push(data.zone_livraison); }
-  if (data.note            !== undefined) { sets.push("note = ?");            params.push(data.note); }
-  if (data.delivery_fee    !== undefined) { sets.push("delivery_fee = ?");    params.push(data.delivery_fee); }
-  if (data.subtotal        !== undefined) { sets.push("subtotal = ?");        params.push(data.subtotal); }
-  if (data.total           !== undefined) { sets.push("total = ?");           params.push(data.total); }
-  if (data.items           !== undefined) { sets.push("items = ?");           params.push(data.items); }
-  if (data.statut_paiement !== undefined) { sets.push("statut_paiement = ?"); params.push(data.statut_paiement); }
+  if (data.nom               !== undefined) { sets.push("nom = ?");               params.push(data.nom); }
+  if (data.telephone         !== undefined) { sets.push("telephone = ?");         params.push(data.telephone); }
+  if (data.adresse           !== undefined) { sets.push("adresse = ?");           params.push(data.adresse); }
+  if (data.zone_livraison    !== undefined) { sets.push("zone_livraison = ?");    params.push(data.zone_livraison); }
+  if (data.note              !== undefined) { sets.push("note = ?");              params.push(data.note); }
+  if (data.delivery_fee      !== undefined) { sets.push("delivery_fee = ?");      params.push(data.delivery_fee); }
+  if (data.subtotal          !== undefined) { sets.push("subtotal = ?");          params.push(data.subtotal); }
+  if (data.total             !== undefined) { sets.push("total = ?");             params.push(data.total); }
+  if (data.items             !== undefined) { sets.push("items = ?");             params.push(data.items); }
+  if (data.statut_paiement   !== undefined) { sets.push("statut_paiement = ?");   params.push(data.statut_paiement); }
+  if (data.lien_localisation !== undefined) { sets.push("lien_localisation = ?"); params.push(data.lien_localisation ?? null); }
   if (sets.length === 0) return;
   params.push(id);
   await db.execute(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, params);
