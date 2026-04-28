@@ -9,6 +9,7 @@ import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
   User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2, ShieldCheck,
+  Smartphone, Wifi,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -78,7 +79,12 @@ export default function CheckoutPage() {
   const [orderRef,     setOrderRef]     = useState("");
   const [refCode,      setRefCode]      = useState<string | null>(null);
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
-  const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null); // null = loading
+  const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
+  const [mmOperator,   setMmOperator]   = useState<"flooz" | "yas" | null>(null);
+  const [mmPhone,      setMmPhone]      = useState("");
+  const [mmWaiting,    setMmWaiting]    = useState(false);
+  const [mmTxId,       setMmTxId]       = useState<number | null>(null);
+  const [mmError,      setMmError]      = useState("");
 
   useEffect(() => {
     fetch("/api/account/verification", { credentials: "include" })
@@ -86,6 +92,33 @@ export default function CheckoutPage() {
       .then(d => setIsVerifie(d.statut === "verifie"))
       .catch(() => setIsVerifie(false));
   }, []);
+
+  /* Polling USSD — vérifie statut FedaPay toutes les 5s */
+  useEffect(() => {
+    if (!mmWaiting || !mmTxId) return;
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/orders/pay/status/${mmTxId}`);
+        const d = await r.json() as { status: string };
+        if (d.status === "approved") {
+          clearInterval(interval);
+          setMmWaiting(false);
+          setSubmitted(true);
+          clearCart();
+        } else if (["declined", "canceled", "failed"].includes(d.status)) {
+          clearInterval(interval);
+          setMmWaiting(false);
+          setMmError("Paiement refusé ou annulé. Votre commande est enregistrée — contactez-nous si nécessaire.");
+        }
+      } catch { /* retry next tick */ }
+    }, 5000);
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      setMmWaiting(false);
+      setMmError("Délai dépassé. Votre commande est enregistrée — contactez-nous si le paiement a été effectué.");
+    }, 180_000);
+    return () => { clearInterval(interval); clearTimeout(timeout); };
+  }, [mmWaiting, mmTxId, clearCart]);
 
   useEffect(() => {
     const match = document.cookie?.match?.(/ts_ref=([^;]+)/);
@@ -152,15 +185,43 @@ export default function CheckoutPage() {
           subtotal:          selectedTotal,
           total:             grandTotal,
           ref_code:          refCode ?? undefined,
-          payment_mode:      nbTranches > 0 ? `${nbTranches}x` : "comptant",
+          payment_mode:      mmOperator ? "mobile_money" : nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) { setSubmitError(data.error || "Erreur lors de la commande."); return; }
+
       setOrderedItems([...selectedItems]);
       setOrderedTotal(grandTotal);
       setOrderRef(data.reference ?? "");
+
+      /* Paiement Mobile Money → initier le push USSD */
+      if (mmOperator) {
+        const payRes = await fetch("/api/orders/pay/mobile-money", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            orderId:  data.id,
+            orderRef: data.reference,
+            operator: mmOperator,
+            phone:    mmPhone || `${phonePrefix} ${phoneNumber}`,
+            total:    grandTotal,
+            nom:      form.nom,
+          }),
+        });
+        const payData = await payRes.json() as { ok?: boolean; transactionId?: number; error?: string };
+        if (!payRes.ok || !payData.transactionId) {
+          setSubmitError(payData.error || "Commande créée mais paiement mobile non initié. Contactez-nous.");
+          setSubmitted(true);
+          clearCart();
+          return;
+        }
+        setMmTxId(payData.transactionId);
+        setMmWaiting(true);
+        return;
+      }
+
       setSubmitted(true);
       clearCart();
     } catch {
@@ -168,6 +229,41 @@ export default function CheckoutPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  /* Mobile Money — écran attente USSD */
+  if (mmWaiting) {
+    const opLabel = mmOperator === "flooz" ? "Flooz" : "Mix by Yas";
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="max-w-sm w-full text-center">
+          <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6 relative">
+            <Smartphone className="w-10 h-10 text-green-600" />
+            <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center animate-pulse">
+              <Wifi className="w-3.5 h-3.5 text-white" />
+            </span>
+          </div>
+          <h2 className="font-display font-bold text-2xl text-slate-900 mb-3">
+            Confirmez sur votre téléphone
+          </h2>
+          <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+            Une notification <span className="font-semibold text-slate-800">{opLabel}</span> a été envoyée
+            au <span className="font-semibold text-slate-800">{mmPhone || phonePrefix + " " + phoneNumber}</span>.
+            Entrez votre PIN pour confirmer le paiement de{" "}
+            <span className="font-semibold text-slate-800">{formatPrice(grandTotal)}</span>.
+          </p>
+          <div className="flex justify-center gap-1.5 mb-6">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="w-2.5 h-2.5 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+          <p className="text-xs text-slate-400">Vérification automatique en cours…</p>
+          {mmError && (
+            <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">{mmError}</p>
+          )}
+        </div>
+      </div>
+    );
   }
 
   /* Empty cart guard */
@@ -539,6 +635,71 @@ export default function CheckoutPage() {
                 )}
               </div>
             </div>
+
+              {/* ── Étape 4 : Payer maintenant via Mobile Money ── */}
+              <div className="bg-white rounded-3xl border border-slate-100 p-6">
+                <h2 className="font-display font-800 text-slate-900 text-base mb-5 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">4</div>
+                  Payer maintenant (optionnel)
+                </h2>
+
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {([
+                    { v: null,   label: "À la livraison", sub: "Espèces / Mobile Money" },
+                    { v: "flooz", label: "Flooz",          sub: "Moov Africa Togo" },
+                    { v: "yas",   label: "Mix by Yas",     sub: "Yas / Moov Togo" },
+                  ] as { v: "flooz" | "yas" | null; label: string; sub: string }[]).map(opt => (
+                    <button
+                      key={String(opt.v)}
+                      type="button"
+                      onClick={() => setMmOperator(opt.v)}
+                      className={clsx(
+                        "flex flex-col items-center gap-0.5 px-2 py-3 rounded-2xl border-2 text-center transition-all",
+                        mmOperator === opt.v
+                          ? "border-green-500 bg-green-50 text-green-900"
+                          : "border-slate-200 text-slate-600 hover:border-green-300"
+                      )}
+                    >
+                      {opt.v ? <Smartphone className="w-4 h-4 mb-0.5" /> : <Check className="w-4 h-4 mb-0.5" />}
+                      <span className="font-bold text-xs">{opt.label}</span>
+                      <span className="text-[10px] text-slate-400 leading-tight">{opt.sub}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {mmOperator && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                        <Phone className="w-3.5 h-3.5 inline mr-1" />
+                        Numéro {mmOperator === "flooz" ? "Flooz" : "Mix by Yas"} *
+                      </label>
+                      <input
+                        type="tel"
+                        value={mmPhone}
+                        onChange={e => setMmPhone(e.target.value)}
+                        placeholder={`Ex : 90 00 00 00`}
+                        className={inputCls()}
+                        autoComplete="tel"
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Vous recevrez une notification sur ce numéro pour confirmer le paiement de{" "}
+                        <span className="font-semibold">{formatPrice(grandTotal)}</span>.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-green-50 border border-green-100">
+                      <Wifi className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                      <p className="text-xs text-green-800 leading-relaxed">
+                        Un push USSD sera envoyé sur votre téléphone. Entrez votre PIN pour valider — le paiement est instantané.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {mmError && (
+                  <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{mmError}</p>
+                )}
+              </div>
 
             {/* ── Summary ── */}
             <div className="lg:col-span-1">

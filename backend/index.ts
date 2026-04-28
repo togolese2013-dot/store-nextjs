@@ -28,6 +28,7 @@ import livreurRoutes        from "./routes/livreur";
 import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
+import mobileMoneyRoutes    from "./routes/mobile-money";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -80,6 +81,7 @@ app.use(livreurRoutes);
 app.use(publicRoutes);
 app.use(accountRoutes);
 app.use(ordersRoutes);
+app.use(mobileMoneyRoutes);
 
 app.listen(PORT, () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);
