@@ -101,31 +101,11 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
     const cleanPhone = phone.replace(/\D/g, "").replace(/^228/, "");
     const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://store.togolese.fr";
 
-    /* ── Étape 1 : Créer le client ── */
-    const custRes = await fetch(`${FEDAPAY_BASE}/customers`, {
-      method:  "POST",
-      headers: fedapayHeaders(),
-      body: JSON.stringify({
-        firstname:    nom || "Client",
-        lastname:     "",
-        phone_number: { number: cleanPhone, country: "tg" },
-      }),
-    });
+    /* ── Étape 1 : Créer la transaction avec customer inline ── */
+    const parts = (nom || "Client").trim().split(/\s+/);
+    const firstname = parts[0];
+    const lastname  = parts.length > 1 ? parts.slice(1).join(" ") : parts[0];
 
-    const custData = await custRes.json() as {
-      "v1/customer"?: { id: number };
-      message?: string;
-      errors?: unknown;
-    };
-
-    const customerId = custData?.["v1/customer"]?.id;
-
-    if (!customerId) {
-      console.error("[fedapay] create customer failed:", JSON.stringify(custData));
-      return res.status(502).json({ error: "Impossible de créer le client FedaPay." });
-    }
-
-    /* ── Étape 2 : Créer la transaction ── */
     const txRes = await fetch(`${FEDAPAY_BASE}/transactions`, {
       method:  "POST",
       headers: fedapayHeaders(),
@@ -135,7 +115,11 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
         currency:     { iso: "XOF" },
         callback_url: `${process.env.BACKEND_URL || ""}/api/webhooks/fedapay`,
         return_url:   `${siteUrl}/account/commandes`,
-        customer:     { id: customerId },
+        customer: {
+          firstname,
+          lastname,
+          phone_number: { number: cleanPhone, country: "tg" },
+        },
       }),
     });
 
@@ -145,11 +129,15 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
       errors?: unknown;
     };
 
+    console.error("[fedapay] create transaction response:", JSON.stringify(txData));
+
     const txId = txData?.["v1/transaction"]?.id;
 
     if (!txId) {
-      console.error("[fedapay] create transaction failed:", JSON.stringify(txData));
-      return res.status(502).json({ error: "Impossible de créer la transaction FedaPay." });
+      return res.status(502).json({
+        error: "Impossible de créer la transaction FedaPay.",
+        detail: txData,
+      });
     }
 
     /* ── Étape 3 : Générer le token de paiement ── */
