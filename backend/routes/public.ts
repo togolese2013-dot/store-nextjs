@@ -145,4 +145,62 @@ router.get("/api/settings/public", async (_req, res) => {
   }
 });
 
+// ── Order tracking (public — no auth) ────────────────────────────────────────
+router.get("/api/orders/track", async (req, res) => {
+  try {
+    const q = ((req.query.q as string) ?? "").trim();
+    if (!q || q.length < 3) {
+      return res.status(400).json({ error: "Veuillez saisir au moins 3 caractères." });
+    }
+
+    const pool = db as import("mysql2/promise").Pool;
+
+    // Search by phone OR reference (case-insensitive)
+    const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT id, reference, nom, telephone, zone_livraison, delivery_fee,
+              subtotal, total, status, statut_paiement, payment_mode,
+              items, created_at
+       FROM orders
+       WHERE telephone = ? OR reference = ?
+       ORDER BY created_at DESC
+       LIMIT 5`,
+      [q, q]
+    );
+
+    if (!rows.length) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const data = rows.map((r) => {
+      let itemCount = 0;
+      let itemNames: string[] = [];
+      try {
+        const parsed = typeof r.items === "string" ? JSON.parse(r.items) : r.items;
+        if (Array.isArray(parsed)) {
+          itemCount = parsed.reduce((s: number, i: { qty?: number }) => s + (i.qty ?? 1), 0);
+          itemNames = parsed.slice(0, 3).map((i: { nom?: string }) => i.nom ?? "");
+        }
+      } catch { /* ignore */ }
+
+      return {
+        id:              r.id,
+        reference:       r.reference,
+        nom:             r.nom,
+        zone_livraison:  r.zone_livraison,
+        total:           r.total,
+        status:          r.status,
+        statut_paiement: r.statut_paiement ?? null,
+        payment_mode:    r.payment_mode    ?? null,
+        created_at:      r.created_at,
+        item_count:      itemCount,
+        item_names:      itemNames,
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+
 export default router;

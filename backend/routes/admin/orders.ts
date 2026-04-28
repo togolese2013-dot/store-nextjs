@@ -87,7 +87,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
   /* ── Confirm Mobile Money direct payment ── */
   if (req.body.field === "confirm_mm") {
     await ensurePaymentColumn();
-    await updateOrderFields(id, { statut_paiement: "paye", status: "confirmée" });
+    await updateOrderFields(id, { statut_paiement: "paye" });
     await addOrderEvent(id, "confirmée", "Paiement Mobile Money vérifié et confirmé", session.nom);
     return res.json({ ok: true });
   }

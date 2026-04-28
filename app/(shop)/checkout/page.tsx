@@ -8,7 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
-  User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2, ShieldCheck,
+  User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2, ShieldCheck, Package,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -286,7 +286,7 @@ export default function CheckoutPage() {
           <Link href="/fidelite" className="text-xs text-brand-600 hover:underline ml-1">En savoir plus →</Link>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
           <Link href="/"
             className="px-6 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-brand-300 transition-colors"
           >
@@ -298,6 +298,18 @@ export default function CheckoutPage() {
             Continuer les achats
           </Link>
         </div>
+
+        {orderRef && (
+          <div className="mb-8">
+            <Link
+              href={`/suivi-commande?ref=${encodeURIComponent(orderRef)}`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold text-sm hover:bg-emerald-100 transition-colors"
+            >
+              <Package className="w-4 h-4" />
+              Suivre ma commande
+            </Link>
+          </div>
+        )}
 
         {orderedItems.length > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-left">
