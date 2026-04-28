@@ -21,6 +21,7 @@ interface CartCtx {
   items:        CartItem[];
   count:        number;
   total:        number;
+  isHydrated:   boolean;
   addItem:      (p: Product, qty?: number, variant?: SelectedVariant) => void;
   removeItem:   (cartKey: string) => void;
   updateQty:    (cartKey: string, qty: number) => void;
@@ -60,9 +61,10 @@ function load(): CartItem[] {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items,       setItems]       = useState<CartItem[]>([]);
+  const [isHydrated,  setIsHydrated]  = useState(false);
 
-  useEffect(() => { setItems(load()); }, []);
+  useEffect(() => { setItems(load()); setIsHydrated(true); }, []);
 
   const save = useCallback((next: CartItem[]) => {
     setItems(next);
@@ -116,7 +118,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const total = items.reduce((s, i) => s + calcPrice(i) * i.qty, 0);
 
   return (
-    <Ctx.Provider value={{ items, count, total, addItem, removeItem, updateQty, clearCart }}>
+    <Ctx.Provider value={{ items, count, total, isHydrated, addItem, removeItem, updateQty, clearCart }}>
       {children}
     </Ctx.Provider>
   );
