@@ -44,6 +44,76 @@ interface Form {
   lien_localisation: string;
 }
 
+/* ── Frais de retrait Moov Money (max de plage) ── */
+function moovFees(amount: number): number {
+  if (amount <= 500)     return 50;
+  if (amount <= 1000)    return 75;
+  if (amount <= 5000)    return 100;
+  if (amount <= 15000)   return 280;
+  if (amount <= 20000)   return 320;
+  if (amount <= 50000)   return 600;
+  if (amount <= 100000)  return 1000;
+  if (amount <= 200000)  return 3356;
+  if (amount <= 300000)  return 4195;
+  if (amount <= 500000)  return 4381;
+  if (amount <= 850000)  return 4568;
+  if (amount <= 1000000) return 5407;
+  if (amount <= 1500000) return 8110;
+  return 9788;
+}
+
+/* ── Frais de retrait Mixx by Yas ── */
+function yasFees(amount: number): number {
+  if (amount <= 500)     return 50;
+  if (amount <= 5000)    return 100;
+  if (amount <= 20000)   return 300;
+  if (amount <= 50000)   return 600;
+  if (amount <= 100000)  return 1000;
+  if (amount <= 200000)  return 3100;
+  if (amount <= 300000)  return 3700;
+  if (amount <= 500000)  return 4200;
+  if (amount <= 850000)  return 4400;
+  if (amount <= 900000)  return 4600;
+  if (amount <= 950000)  return 4900;
+  if (amount <= 1000000) return 5100;
+  if (amount <= 1100000) return 5400;
+  if (amount <= 1150000) return 5900;
+  if (amount <= 1200000) return 6200;
+  if (amount <= 1250000) return 6500;
+  if (amount <= 1300000) return 6800;
+  if (amount <= 1350000) return 7000;
+  if (amount <= 1400000) return 7300;
+  if (amount <= 1450000) return 7600;
+  if (amount <= 1500000) return 7800;
+  return 9700;
+}
+
+const MOOV_FEES_TABLE = [
+  { tranche: "1 – 500 F",              tarif: "50 F" },
+  { tranche: "501 – 1 000 F",          tarif: "75 F" },
+  { tranche: "1 001 – 5 000 F",        tarif: "100 F" },
+  { tranche: "5 001 – 15 000 F",       tarif: "280 F" },
+  { tranche: "15 001 – 20 000 F",      tarif: "320 F" },
+  { tranche: "20 001 – 50 000 F",      tarif: "600 F" },
+  { tranche: "50 001 – 100 000 F",     tarif: "1 000 F" },
+  { tranche: "100 001 – 200 000 F",    tarif: "3 356 F" },
+  { tranche: "200 001 – 500 000 F",    tarif: "4 381 F" },
+  { tranche: "500 001 – 1 000 000 F",  tarif: "5 407 F" },
+  { tranche: "> 1 000 000 F",          tarif: "9 788 F" },
+];
+
+const YAS_FEES_TABLE = [
+  { tranche: "1 – 500 F",              tarif: "50 F" },
+  { tranche: "501 – 5 000 F",          tarif: "100 F" },
+  { tranche: "5 001 – 20 000 F",       tarif: "300 F" },
+  { tranche: "20 001 – 50 000 F",      tarif: "600 F" },
+  { tranche: "50 001 – 100 000 F",     tarif: "1 000 F" },
+  { tranche: "100 001 – 200 000 F",    tarif: "3 100 F" },
+  { tranche: "200 001 – 500 000 F",    tarif: "4 200 F" },
+  { tranche: "500 001 – 1 000 000 F",  tarif: "5 100 F" },
+  { tranche: "> 1 000 000 F",          tarif: "9 700 F" },
+];
+
 export default function CheckoutPage() {
   const { items, clearCart } = useCart();
 
@@ -545,60 +615,93 @@ export default function CheckoutPage() {
                     )}
 
                     {(payMode === "flooz" || payMode === "yas") && (() => {
-                      const merchantNum = payMode === "flooz" ? "98165380" : "90226491";
-                      const merchantDisplay = payMode === "flooz" ? "+228 98 16 53 80" : "+228 90 22 64 91";
-                      const ussdLink = `tel:*155*${merchantNum}*${Math.round(grandTotal)}%23`;
-                      const copyText = (text: string) => navigator.clipboard?.writeText(text).catch(() => {});
+                      const isMoov        = payMode === "flooz";
+                      const merchantNum   = isMoov ? "98165380" : "90226491";
+                      const merchantDisp  = isMoov ? "+228 98 16 53 80" : "+228 90 22 64 91";
+                      const fees          = isMoov ? moovFees(grandTotal) : yasFees(grandTotal);
+                      const totalToSend   = Math.round(grandTotal + fees);
+                      const ussdLink      = isMoov
+                        ? `tel:*155*1*1*${merchantNum}*${merchantNum}*${totalToSend}*2%23`
+                        : `tel:*145*1*${totalToSend}*${merchantNum}*2%23`;
+                      const copyText      = (t: string) => navigator.clipboard?.writeText(t).catch(() => {});
+                      const feesTable     = isMoov ? MOOV_FEES_TABLE : YAS_FEES_TABLE;
+                      const refPlaceholder = isMoov ? "Txn Id: 040584378298" : "Ref: 16974415751";
+
                       return (
                         <div className="space-y-4">
-                          {/* Montant + numéro à copier */}
+                          {/* Montant total à envoyer + numéro */}
                           <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
                             <div className="flex items-center justify-between px-4 py-3">
                               <div>
                                 <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Montant à envoyer</p>
-                                <p className="text-lg font-bold text-slate-900">{formatPrice(grandTotal)}</p>
+                                <p className="text-lg font-bold text-slate-900">{formatPrice(totalToSend)}</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                  {formatPrice(grandTotal)} + {formatPrice(fees)} frais de retrait
+                                </p>
                               </div>
-                              <button type="button" onClick={() => copyText(String(Math.round(grandTotal)))}
-                                className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                              <button type="button" onClick={() => copyText(String(totalToSend))}
+                                className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors shrink-0">
                                 Copier
                               </button>
                             </div>
                             <div className="flex items-center justify-between px-4 py-3">
                               <div>
                                 <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Numéro marchand</p>
-                                <p className="text-lg font-bold text-slate-900">{merchantDisplay}</p>
+                                <p className="text-lg font-bold text-slate-900">{merchantDisp}</p>
                               </div>
                               <button type="button" onClick={() => copyText(merchantNum)}
-                                className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                                className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors shrink-0">
                                 Copier
                               </button>
                             </div>
                           </div>
 
-                          {/* Bouton USSD 1 tap */}
+                          {/* Bouton USSD */}
                           <a href={ussdLink}
                             className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-colors">
                             <Phone className="w-4 h-4" />
-                            Payer maintenant — 1 tap (Android)
+                            Valider mon paiement
                           </a>
                           <p className="text-[11px] text-slate-400 text-center -mt-2">
-                            iPhone : ouvrez votre app Moov Money et transférez manuellement au numéro ci-dessus.
+                            Sur iPhone : ouvrez votre app {isMoov ? "Moov Money" : "Mixx by Yas"} et transférez manuellement.
                           </p>
+
+                          {/* Grille tarifaire — desktop uniquement */}
+                          <details className="hidden lg:block group">
+                            <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 font-medium select-none list-none flex items-center gap-1">
+                              <span className="group-open:rotate-90 inline-block transition-transform">▶</span>
+                              Voir la grille tarifaire des frais de retrait
+                            </summary>
+                            <div className="mt-2 rounded-xl border border-slate-100 overflow-hidden text-xs">
+                              <div className="grid grid-cols-2 bg-slate-100 px-3 py-1.5 font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+                                <span>Tranche</span><span className="text-right">Frais retrait</span>
+                              </div>
+                              {feesTable.map((row, i) => (
+                                <div key={i} className={`grid grid-cols-2 px-3 py-1.5 ${i % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                                  <span className="text-slate-600">{row.tranche}</span>
+                                  <span className="text-right font-semibold text-slate-800">{row.tarif}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
 
                           {/* Référence transaction */}
                           <div className="pt-2 border-t border-slate-100">
                             <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                              ID de transaction reçu par SMS <span className="text-slate-400 font-normal">(optionnel mais recommandé)</span>
+                              Référence de transaction reçue par SMS{" "}
+                              <span className="text-slate-400 font-normal">(optionnel mais recommandé)</span>
                             </label>
                             <input
                               type="text"
                               value={mmRef}
                               onChange={e => setMmRef(e.target.value)}
-                              placeholder="Ex : TG20240428XXXX"
+                              placeholder={refPlaceholder}
                               className={inputCls()}
                               autoComplete="off"
                             />
-                            <p className="text-[11px] text-slate-400 mt-1">Après avoir payé, entrez l'ID reçu par SMS pour faciliter la vérification.</p>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              Entrez la référence reçue après paiement pour accélérer la vérification.
+                            </p>
                           </div>
                         </div>
                       );
