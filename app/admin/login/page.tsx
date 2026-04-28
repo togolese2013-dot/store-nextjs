@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, User } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email,    setEmail]    = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
   const [loading,  setLoading]  = useState(false);
@@ -22,7 +22,7 @@ export default function AdminLoginPage() {
       const res  = await fetch("/api/admin/auth/login", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, password }),
+        body:    JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Identifiants incorrects"); return; }
@@ -40,16 +40,13 @@ export default function AdminLoginPage() {
 
       {/* ── Left — Brand panel ── */}
       <div className="hidden lg:flex w-[45%] xl:w-[42%] bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 flex-col justify-between p-12 relative overflow-hidden">
-
-        {/* Decorative circles */}
         <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-accent-500/10 -translate-x-1/2 translate-y-1/2 pointer-events-none" />
 
-        {/* Top */}
         <div className="relative z-10">
           <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/80 text-xs font-semibold mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse" />
-            Panneau d'administration
+            Panneau d&apos;administration
           </span>
           <h2 className="font-display font-800 text-3xl xl:text-4xl text-white leading-tight mb-4">
             Gérez votre boutique<br />
@@ -60,7 +57,6 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Bottom spacer */}
         <div className="relative z-10 h-2" />
       </div>
 
@@ -68,13 +64,12 @@ export default function AdminLoginPage() {
       <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-12 bg-white">
         <div className="w-full max-w-md mx-auto">
 
-          {/* Header design */}
           <div className="mb-10">
             <h1 className="font-display font-800 text-4xl text-slate-900 leading-tight mb-2">
               Bienvenue
             </h1>
             <p className="text-slate-400 text-sm">
-              Connectez-vous pour accéder à l'administration
+              Connectez-vous pour accéder à l&apos;administration
             </p>
           </div>
 
@@ -88,13 +83,16 @@ export default function AdminLoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
-                Adresse email
+                Nom d&apos;utilisateur
               </label>
-              <input
-                type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="admin@togolese.net" required autoFocus
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans placeholder:text-slate-400"
-              />
+              <div className="relative">
+                <input
+                  type="text" value={username} onChange={e => setUsername(e.target.value)}
+                  placeholder="ex : admin" required autoFocus autoComplete="username"
+                  className="w-full px-4 py-3 pl-11 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans placeholder:text-slate-400"
+                />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
@@ -105,7 +103,7 @@ export default function AdminLoginPage() {
                 <input
                   type={showPw ? "text" : "password"}
                   value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••" required
+                  placeholder="••••••••" required autoComplete="current-password"
                   className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-slate-200 focus:border-brand-600 bg-slate-50 focus:bg-white outline-none text-sm transition-all font-sans"
                 />
                 <button

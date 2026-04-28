@@ -235,14 +235,45 @@ export async function getStockMovements(opts: {
 
 /* ─── Admin Users ─── */
 export interface AdminUser {
-  id:           number;
-  nom:          string;
-  email:        string;
+  id:            number;
+  nom:           string;
+  username:      string;
+  email:         string | null;
+  telephone:     string | null;
+  poste:         string | null;
   password_hash: string;
-  role:         string;
-  actif:        boolean;
-  created_at:   string;
-  last_login:   string | null;
+  role:          string;
+  actif:         boolean;
+  permissions:   string | null; // JSON string
+  created_at:    string;
+  last_login:    string | null;
+}
+
+export async function ensureAdminUsersCols() {
+  const [cols] = await db.execute<mysql.RowDataPacket[]>("SHOW COLUMNS FROM admin_users");
+  const names = new Set((cols as mysql.RowDataPacket[]).map((c) => c.Field as string));
+
+  const addCol = async (sql: string, col: string) => {
+    if (names.has(col)) return;
+    try {
+      await db.execute(sql);
+      names.add(col);
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code !== "ER_DUP_FIELDNAME" && !String(err?.message).includes("Duplicate column")) throw e;
+      names.add(col);
+    }
+  };
+
+  await addCol("ALTER TABLE admin_users ADD COLUMN username VARCHAR(50) NULL AFTER nom", "username");
+  await addCol("ALTER TABLE admin_users ADD COLUMN telephone VARCHAR(30) NULL", "telephone");
+  await addCol("ALTER TABLE admin_users ADD COLUMN poste VARCHAR(50) NULL DEFAULT 'staff'", "poste");
+  await addCol("ALTER TABLE admin_users ADD COLUMN permissions TEXT NULL", "permissions");
+
+  // Populate username for existing rows that have none
+  await db.execute(
+    "UPDATE admin_users SET username = CONCAT(LOWER(REPLACE(TRIM(nom), ' ', '_')), '_', id) WHERE username IS NULL OR username = ''"
+  );
 }
 
 export async function getAdminByEmail(email: string): Promise<AdminUser | null> {
@@ -250,7 +281,15 @@ export async function getAdminByEmail(email: string): Promise<AdminUser | null> 
     "SELECT * FROM admin_users WHERE email = ? AND actif = 1 LIMIT 1",
     [email]
   );
-  return rows[0] as AdminUser ?? null;
+  return (rows[0] as AdminUser) ?? null;
+}
+
+export async function getAdminByUsername(username: string): Promise<AdminUser | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM admin_users WHERE username = ? AND actif = 1 LIMIT 1",
+    [username]
+  );
+  return (rows[0] as AdminUser) ?? null;
 }
 
 export async function getAdminById(id: number): Promise<AdminUser | null> {
@@ -258,22 +297,24 @@ export async function getAdminById(id: number): Promise<AdminUser | null> {
     "SELECT * FROM admin_users WHERE id = ? LIMIT 1",
     [id]
   );
-  return rows[0] as AdminUser ?? null;
+  return (rows[0] as AdminUser) ?? null;
 }
 
 export async function listAdminUsers(): Promise<AdminUser[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, email, role, actif, created_at, last_login FROM admin_users ORDER BY id ASC"
+    "SELECT id, nom, username, email, telephone, poste, role, actif, permissions, created_at, last_login FROM admin_users ORDER BY id ASC"
   );
   return rows as AdminUser[];
 }
 
 export async function createAdminUser(data: {
-  nom: string; email: string; password_hash: string; role: string;
+  nom: string; username: string; email?: string | null;
+  telephone?: string | null; poste?: string | null;
+  password_hash: string; role: string;
 }) {
   await db.execute(
-    "INSERT INTO admin_users (nom, email, password_hash, role) VALUES (?,?,?,?)",
-    [data.nom, data.email, data.password_hash, data.role]
+    "INSERT INTO admin_users (nom, username, email, telephone, poste, password_hash, role) VALUES (?,?,?,?,?,?,?)",
+    [data.nom, data.username, data.email ?? null, data.telephone ?? null, data.poste ?? "staff", data.password_hash, data.role]
   );
 }
 
@@ -284,10 +325,14 @@ export async function updateAdminLastLogin(id: number) {
 export async function updateAdminUser(id: number, data: Partial<Omit<AdminUser, "id" | "password_hash">>) {
   const sets: string[] = [];
   const vals: unknown[] = [];
-  if (data.nom   !== undefined) { sets.push("nom = ?");   vals.push(data.nom); }
-  if (data.email !== undefined) { sets.push("email = ?"); vals.push(data.email); }
-  if (data.role  !== undefined) { sets.push("role = ?");  vals.push(data.role); }
-  if (data.actif !== undefined) { sets.push("actif = ?"); vals.push(data.actif ? 1 : 0); }
+  if (data.nom       !== undefined) { sets.push("nom = ?");       vals.push(data.nom); }
+  if (data.username  !== undefined) { sets.push("username = ?");  vals.push(data.username); }
+  if (data.email     !== undefined) { sets.push("email = ?");     vals.push(data.email); }
+  if (data.telephone !== undefined) { sets.push("telephone = ?"); vals.push(data.telephone); }
+  if (data.poste     !== undefined) { sets.push("poste = ?");     vals.push(data.poste); }
+  if (data.role      !== undefined) { sets.push("role = ?");      vals.push(data.role); }
+  if (data.actif     !== undefined) { sets.push("actif = ?");     vals.push(data.actif ? 1 : 0); }
+  if (data.permissions !== undefined) { sets.push("permissions = ?"); vals.push(data.permissions); }
   if (!sets.length) return;
   vals.push(id);
   await db.execute(`UPDATE admin_users SET ${sets.join(", ")} WHERE id = ?`, vals as mysql.ExecuteValues);
@@ -295,6 +340,10 @@ export async function updateAdminUser(id: number, data: Partial<Omit<AdminUser, 
 
 export async function updateAdminPassword(id: number, password_hash: string) {
   await db.execute("UPDATE admin_users SET password_hash = ? WHERE id = ?", [password_hash, id]);
+}
+
+export async function deleteAdminUser(id: number) {
+  await db.execute("DELETE FROM admin_users WHERE id = ?", [id]);
 }
 
 // ─── Utilisateurs métier ───────────────────────────────────────────────────────

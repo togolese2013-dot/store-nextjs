@@ -2,28 +2,57 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import { getSession } from "../../lib/auth";
 import {
-  listAdminUsers, createAdminUser, updateAdminUser, updateAdminPassword,
+  listAdminUsers, createAdminUser, updateAdminUser,
+  updateAdminPassword, deleteAdminUser, getAdminByUsername,
+  listUtilisateurs, createUtilisateur, updateUtilisateur, deleteUtilisateur,
+  getUtilisateurPermissions, listPermissions,
 } from "@/lib/admin-db";
 
 const router = express.Router();
 
-router.get("/api/admin/users", async (req, res) => {
+// ── Helper: super_admin only ──────────────────────────────────────────────────
+
+async function requireSuperAdmin(req: express.Request, res: express.Response) {
   const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  if (!session) { res.status(401).json({ error: "Non autorisé." }); return null; }
+  if (session.role !== "super_admin") { res.status(403).json({ error: "Accès réservé au super admin." }); return null; }
+  return session;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ADMIN ACCOUNTS — /api/admin/users  (table admin_users)
+// ═════════════════════════════════════════════════════════════════════════════
+
+router.get("/api/admin/users", async (req, res) => {
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
   const users = await listAdminUsers();
   res.json({ users });
 });
 
 router.post("/api/admin/users", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
   try {
-    const { nom, email, password, role } = req.body;
-    if (!nom || !email || !password) return res.status(400).json({ error: "Champs manquants." });
+    const { nom, username, email, telephone, poste, password, role } = req.body as Record<string, string>;
+    if (!nom || !username || !password) {
+      return res.status(400).json({ error: "Nom, nom d'utilisateur et mot de passe requis." });
+    }
+
+    // Check username uniqueness
+    const existing = await getAdminByUsername(username.trim().toLowerCase());
+    if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est déjà utilisé." });
+
     const hash = await bcrypt.hash(password, 12);
-    await createAdminUser({ nom, email: email.toLowerCase(), password_hash: hash, role: role || "staff" });
+    await createAdminUser({
+      nom,
+      username:      username.trim().toLowerCase(),
+      email:         email || null,
+      telephone:     telephone || null,
+      poste:         poste || "staff",
+      password_hash: hash,
+      role:          role === "super_admin" ? "super_admin" : "staff",
+    });
     res.status(201).json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -33,34 +62,147 @@ router.post("/api/admin/users", async (req, res) => {
 router.patch("/api/admin/users/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (session.role !== "super_admin" && session.id !== Number(req.params.id)) {
-    return res.status(403).json({ error: "Accès refusé." });
-  }
+
+  const targetId = Number(req.params.id);
+  const isSelf   = session.id === targetId;
+  const isSuperAdmin = session.role === "super_admin";
+
+  if (!isSuperAdmin && !isSelf) return res.status(403).json({ error: "Accès refusé." });
+
   try {
-    const { password, ...rest } = req.body;
+    const { password, permissions, ...rest } = req.body as Record<string, unknown>;
+
     if (password) {
-      const hash = await bcrypt.hash(password, 12);
-      await updateAdminPassword(Number(req.params.id), hash);
+      const hash = await bcrypt.hash(String(password), 12);
+      await updateAdminPassword(targetId, hash);
     }
-    if (Object.keys(rest).length) {
-      await updateAdminUser(Number(req.params.id), rest);
+
+    // Non-super_admin can only change their own password
+    if (isSuperAdmin) {
+      const updateData: Parameters<typeof updateAdminUser>[1] = {};
+      if (rest.nom       !== undefined) updateData.nom       = String(rest.nom);
+      if (rest.username  !== undefined) updateData.username  = String(rest.username).trim().toLowerCase();
+      if (rest.email     !== undefined) updateData.email     = rest.email ? String(rest.email) : null;
+      if (rest.telephone !== undefined) updateData.telephone = rest.telephone ? String(rest.telephone) : null;
+      if (rest.poste     !== undefined) updateData.poste     = String(rest.poste);
+      if (rest.role      !== undefined) updateData.role      = String(rest.role);
+      if (rest.actif     !== undefined) updateData.actif     = Boolean(rest.actif);
+      if (permissions    !== undefined) updateData.permissions = permissions ? JSON.stringify(permissions) : null;
+
+      if (Object.keys(updateData).length) await updateAdminUser(targetId, updateData);
     }
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
 
-router.get("/api/admin/users/:id/permissions", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  res.json({ permissions: [] });
+router.delete("/api/admin/users/:id", async (req, res) => {
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
+
+  const targetId = Number(req.params.id);
+  if (targetId === session.id) return res.status(400).json({ error: "Impossible de se supprimer soi-même." });
+
+  try {
+    await deleteAdminUser(targetId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
 });
 
-router.patch("/api/admin/users/:id/permissions", async (req, res) => {
+// Permissions routes for admin_users
+router.get("/api/admin/users/:id/permissions", async (req, res) => {
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
+  const { listAdminUsers: list } = await import("@/lib/admin-db");
+  const users = await list();
+  const user = users.find(u => u.id === Number(req.params.id));
+  if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+  let perms = null;
+  if (user.permissions) { try { perms = JSON.parse(user.permissions); } catch { /* ignore */ } }
+  res.json({ permissions: perms });
+});
+
+router.put("/api/admin/users/:id/permissions", async (req, res) => {
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
+  try {
+    const { permissions } = req.body as { permissions: unknown };
+    await updateAdminUser(Number(req.params.id), {
+      permissions: permissions ? JSON.stringify(permissions) : null,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TEAM MEMBERS — /api/admin/team  (table utilisateurs)
+// ═════════════════════════════════════════════════════════════════════════════
+
+router.get("/api/admin/team", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  res.json({ ok: true });
+  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  const [utilisateurs, permissions] = await Promise.all([listUtilisateurs(), listPermissions()]);
+  res.json({ utilisateurs, permissions });
+});
+
+router.post("/api/admin/team", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  try {
+    const { nom, poste, email, telephone, motDePasse } = req.body as Record<string, string>;
+    if (!nom || !poste || !motDePasse) return res.status(400).json({ error: "Champs manquants." });
+    const id = await createUtilisateur({ nom, poste, email, telephone, motDePasse });
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.patch("/api/admin/team/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  try {
+    const { motDePasse, ...rest } = req.body as Record<string, unknown>;
+    const data: Parameters<typeof updateUtilisateur>[1] = {};
+    if (rest.nom       !== undefined) data.nom       = String(rest.nom);
+    if (rest.email     !== undefined) data.email     = rest.email ? String(rest.email) : undefined;
+    if (rest.telephone !== undefined) data.telephone = rest.telephone ? String(rest.telephone) : undefined;
+    if (rest.poste     !== undefined) data.poste     = String(rest.poste);
+    if (rest.actif     !== undefined) data.actif     = Number(rest.actif);
+    if (motDePasse)                   data.motDePasse = String(motDePasse);
+    await updateUtilisateur(Number(req.params.id), data);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.delete("/api/admin/team/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  try {
+    await deleteUtilisateur(Number(req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.get("/api/admin/team/:id/permissions", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const ids = await getUtilisateurPermissions(Number(req.params.id));
+  res.json(ids);
 });
 
 export default router;

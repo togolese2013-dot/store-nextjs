@@ -11,6 +11,8 @@ import {
   Truck, Building2, PieChart, FileText, BarChart2,
   Gift, Mail, UserCheck, Home, LogOut, Globe, ShieldCheck,
 } from "lucide-react";
+import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
+import { hasPageAccess } from "@/lib/admin-permissions";
 
 type NavItem = { label: string; href: string; icon: React.ElementType };
 
@@ -54,14 +56,14 @@ const MODULES: Record<string, {
     ring:   "border-emerald-500",
     dot:    "bg-emerald-400",
     items: [
-      { label: "Dashboard",          href: "/admin/store",             icon: BarChart2 },
-      { label: "Commandes",          href: "/admin/orders",            icon: ShoppingCart },
-      { label: "Coupons",            href: "/admin/coupons",           icon: Tag },
-      { label: "Avis clients",        href: "/admin/reviews",           icon: Star },
-      { label: "Paiements échelonnés", href: "/admin/paiements",       icon: CreditCard },
-      { label: "Vérifications KYC",   href: "/admin/verifications",    icon: ShieldCheck },
-      { label: "Zones de livraison", href: "/admin/settings/delivery", icon: MapPin },
-      { label: "Paiements config",   href: "/admin/settings/payment",  icon: CreditCard },
+      { label: "Dashboard",             href: "/admin/store",             icon: BarChart2 },
+      { label: "Commandes",             href: "/admin/orders",            icon: ShoppingCart },
+      { label: "Coupons",               href: "/admin/coupons",           icon: Tag },
+      { label: "Avis clients",          href: "/admin/reviews",           icon: Star },
+      { label: "Paiements échelonnés",  href: "/admin/paiements",         icon: CreditCard },
+      { label: "Vérifications KYC",     href: "/admin/verifications",     icon: ShieldCheck },
+      { label: "Zones de livraison",    href: "/admin/settings/delivery", icon: MapPin },
+      { label: "Paiements config",      href: "/admin/settings/payment",  icon: CreditCard },
     ],
   },
   crm: {
@@ -115,10 +117,13 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/coupons",               "store"],
   ["/admin/reviews",               "store"],
   ["/admin/verifications",         "store"],
+  ["/admin/paiements",             "store"],
   ["/admin/settings/delivery",     "store"],
   ["/admin/settings/payment",      "store"],
   ["/admin/settings",              "admin"],
   ["/admin/users",                 "admin"],
+  ["/admin/rapports",              "admin"],
+  ["/admin/tendances",             "admin"],
   ["/admin/crm",                   "crm"],
   ["/admin/messages",              "crm"],
   ["/admin/whatsapp",              "crm"],
@@ -126,8 +131,6 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/parrainage",            "crm"],
   ["/admin/newsletter",            "crm"],
   ["/admin/comptes-clients",       "crm"],
-  ["/admin/rapports",              "admin"],
-  ["/admin/tendances",             "admin"],
 ];
 
 function getActiveModule(pathname: string): string | null {
@@ -137,18 +140,31 @@ function getActiveModule(pathname: string): string | null {
   return null;
 }
 
+// Extract the page ID from an href: "/admin/settings/delivery" → "settings/delivery"
+function hrefToPageId(href: string): string {
+  return href.replace(/^\/admin\//, "");
+}
+
 interface Props {
   nom:           string;
   role:          string;
+  permissions:   AdminPermissions | null;
   mobileOpen:    boolean;
   setMobileOpen: (v: boolean) => void;
 }
 
-export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: Props) {
+export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMobileOpen }: Props) {
   const pathname     = usePathname();
   const router       = useRouter();
   const moduleKey    = getActiveModule(pathname);
   const activeModule = moduleKey ? MODULES[moduleKey] : null;
+
+  // Filter items by permissions (super_admin sees everything)
+  const visibleItems = activeModule
+    ? activeModule.items.filter(item =>
+        hasPageAccess(role, permissions, moduleKey as ModuleKey, hrefToPageId(item.href))
+      )
+    : [];
 
   function isActive(href: string) {
     if (href === "/admin") return pathname === "/admin";
@@ -195,9 +211,9 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
 
       {/* Nav items */}
       <nav className="flex-1 overflow-y-auto px-3 py-2">
-        {activeModule ? (
+        {visibleItems.length > 0 ? (
           <div className="space-y-0.5">
-            {activeModule.items.map(item => (
+            {visibleItems.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -222,7 +238,9 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
               <Home className="w-5 h-5 text-white/20" />
             </div>
             <p className="text-xs text-white/40 leading-relaxed">
-              Sélectionnez un module depuis l&apos;accueil
+              {activeModule
+                ? "Aucune page accessible dans ce module"
+                : "Sélectionnez un module depuis l'accueil"}
             </p>
             <Link
               href="/admin"
@@ -234,7 +252,7 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
         )}
       </nav>
 
-      {/* Footer — home + logout */}
+      {/* Footer */}
       <div className="px-3 pb-4 pt-2 border-t border-white/10 space-y-0.5">
         <Link
           href="/" target="_blank"
@@ -266,7 +284,7 @@ export default function AdminSidebar({ nom, role, mobileOpen, setMobileOpen }: P
 
   return (
     <>
-      {/* Desktop sidebar — full height, no top offset */}
+      {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col fixed left-0 top-0 h-screen z-40 shadow-xl">
         {SidebarContent}
       </aside>

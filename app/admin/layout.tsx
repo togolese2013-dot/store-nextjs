@@ -6,13 +6,16 @@ export const metadata = { title: { template: "%s — Admin", default: "Admin —
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getAdminSession();
 
-  /* No session = login page */
   if (!session) {
     return <>{children}</>;
   }
 
   return (
-    <AdminShell nom={session.nom} role={session.role}>
+    <AdminShell
+      nom={session.nom}
+      role={session.role}
+      permissions={session.permissions ?? null}
+    >
       {children}
     </AdminShell>
   );

@@ -1,5 +1,8 @@
 import { jwtVerify, SignJWT } from "jose";
 import type { Request, Response } from "express";
+import type { AdminPermissions } from "@/lib/admin-permissions";
+
+export type { AdminPermissions };
 
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "togolese-shop-secret-change-in-production-2024"
@@ -9,10 +12,12 @@ export const COOKIE_NAME = "ts_admin_token";
 const TTL = 60 * 60 * 8; // 8 hours
 
 export interface AdminPayload {
-  id:    number;
-  email: string;
-  nom:   string;
-  role:  string;
+  id:          number;
+  username:    string;
+  email:       string | null;
+  nom:         string;
+  role:        string;
+  permissions: AdminPermissions | null;
 }
 
 export async function signToken(payload: AdminPayload): Promise<string> {

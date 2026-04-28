@@ -29,6 +29,7 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
+import { ensureAdminUsersCols } from "@/lib/admin-db";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -83,8 +84,14 @@ app.use(accountRoutes);
 app.use(ordersRoutes);
 app.use(mobileMoneyRoutes);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);
+  try {
+    await ensureAdminUsersCols();
+    console.log("[backend] admin_users schema OK");
+  } catch (e) {
+    console.error("[backend] ensureAdminUsersCols failed:", e);
+  }
 });
 
 export default app;

@@ -7,14 +7,17 @@ import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
 
+import type { AdminPermissions } from "@/lib/admin-permissions";
+
 interface Props {
-  nom:      string;
-  role:     string;
-  children: React.ReactNode;
+  nom:         string;
+  role:        string;
+  permissions: AdminPermissions | null;
+  children:    React.ReactNode;
 }
 
 /* ── Inner shell — consumes SSE context ─────────────────────────────────── */
-function AdminShellContent({ nom, role, children }: Props) {
+function AdminShellContent({ nom, role, permissions, children }: Props) {
   const pathname = usePathname();
   const router   = useRouter();
 
@@ -52,6 +55,7 @@ function AdminShellContent({ nom, role, children }: Props) {
       <AdminSidebar
         nom={nom}
         role={role}
+        permissions={permissions}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
@@ -101,3 +105,4 @@ export default function AdminShell(props: Props) {
     </AdminSSEProvider>
   );
 }
+
