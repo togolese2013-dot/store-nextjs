@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Orange diamond background -->
+  <rect x="0" y="0" width="200" height="200" fill="white"/>
+  <polygon points="100,8 192,100 100,192 8,100" fill="#F47920"/>
+  <!-- MOOV text (blue) -->
+  <text x="100" y="90" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="30" fill="#1A4F9F" letter-spacing="2">MOOV</text>
+  <!-- Money text (white) -->
+  <text x="100" y="122" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="26" fill="white" letter-spacing="1">Money</text>
+</svg>

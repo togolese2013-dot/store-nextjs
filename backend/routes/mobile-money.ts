@@ -112,27 +112,21 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
 
 /* ──────────────────────────────────────────────
    GET /api/orders/pay/status/:txId
-   Polling côté client pour savoir si le paiement est confirmé
+   Polling côté client — vérifie uniquement notre DB
+   (seul le webhook FedaPay peut passer payment_status à 'paye')
 ────────────────────────────────────────────── */
 router.get("/api/orders/pay/status/:txId", async (req, res) => {
   try {
     const txId = Number(req.params.txId);
-    const fedRes = await fetch(`${FEDAPAY_BASE}/transactions/${txId}`, {
-      headers: fedapayHeaders(),
-    });
-    const data = await fedRes.json() as { v1?: { transaction?: { status: string } } };
-    const status = data?.v1?.transaction?.status ?? "pending";
+    const pool = db as mysql.Pool;
 
-    /* Si approuvé → mettre à jour la commande */
-    if (status === "approved") {
-      const pool = db as mysql.Pool;
-      await pool.execute(
-        "UPDATE orders SET payment_status = 'paye', status = 'confirmée' WHERE fedapay_tx_id = ? AND payment_status != 'paye'",
-        [txId]
-      );
-    }
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT payment_status FROM orders WHERE fedapay_tx_id = ? LIMIT 1",
+      [txId]
+    );
 
-    return res.json({ status });
+    const paymentStatus = rows[0]?.payment_status as string | undefined;
+    return res.json({ status: paymentStatus === "paye" ? "approved" : "pending" });
   } catch (err) {
     console.error("[mobile-money status]", err);
     return res.status(500).json({ error: "Erreur statut." });

@@ -212,9 +212,7 @@ export default function CheckoutPage() {
         });
         const payData = await payRes.json() as { ok?: boolean; transactionId?: number; error?: string };
         if (!payRes.ok || !payData.transactionId) {
-          setSubmitError(payData.error || "Commande créée mais paiement mobile non initié. Contactez-nous.");
-          setSubmitted(true);
-          clearCart();
+          setSubmitError(payData.error || "Erreur lors de l'initiation du paiement Mobile Money. Veuillez réessayer ou choisir un autre mode de paiement.");
           return;
         }
         setMmTxId(payData.transactionId);
@@ -532,136 +530,177 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Mode de paiement — liste style Amazon */}
+              {/* Mode de paiement — 4 cartes horizontales */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
                 <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">3</div>
                   Mode de paiement
                 </h2>
 
-                <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100">
+                {/* Cards row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                   {([
-                    { id: "livraison",  label: "À la livraison",    sub: "Espèces ou Mobile Money à la réception", locked: false },
-                    { id: "flooz",      label: "Flooz",              sub: "Moov Africa Togo",                       locked: false },
-                    { id: "yas",        label: "Mix by Yas",         sub: "Yas / Moov Togo",                        locked: false },
-                    { id: "echelonne",  label: "Paiement échelonné", sub: isVerifie ? "2× / 3× / 4× hebdomadaire" : "Réservé aux comptes vérifiés", locked: isVerifie === false },
-                  ] as { id: string; label: string; sub: string; locked: boolean }[]).map(opt => {
+                    {
+                      id: "livraison",
+                      label: "À la livraison",
+                      sub: "Espèces / MM",
+                      locked: false,
+                      logo: (
+                        <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
+                          <Truck className="w-5 h-5 text-brand-700" />
+                        </div>
+                      ),
+                    },
+                    {
+                      id: "flooz",
+                      label: "Moov Money",
+                      sub: "Moov Africa Togo",
+                      locked: false,
+                      logo: (
+                        <img src="/logo-moov-money.svg" alt="Moov Money" className="w-12 h-12 object-contain" />
+                      ),
+                    },
+                    {
+                      id: "yas",
+                      label: "Mixx by Yas",
+                      sub: "Moov Africa Togo",
+                      locked: false,
+                      logo: (
+                        <img src="/logo-mixx-by-yas.svg" alt="Mixx by Yas" className="w-14 h-8 object-contain" />
+                      ),
+                    },
+                    {
+                      id: "echelonne",
+                      label: "Échelonné",
+                      sub: isVerifie ? "2× / 3× / 4×" : "Compte vérifié",
+                      locked: isVerifie === false,
+                      logo: (
+                        <div className={clsx("w-10 h-10 rounded-xl flex items-center justify-center", isVerifie === false ? "bg-slate-100" : "bg-amber-50")}>
+                          <ShieldCheck className={clsx("w-5 h-5", isVerifie === false ? "text-slate-300" : "text-amber-600")} />
+                        </div>
+                      ),
+                    },
+                  ] as { id: string; label: string; sub: string; locked: boolean; logo: React.ReactNode }[]).map(opt => {
                     const selected = payMode === opt.id;
                     return (
-                      <div key={opt.id} className={clsx("transition-colors", selected ? "bg-blue-50" : opt.locked ? "opacity-50 bg-slate-50" : "bg-white hover:bg-slate-50")}>
-                        <button
-                          type="button"
-                          disabled={opt.locked}
-                          onClick={() => {
-                            if (opt.locked) return;
-                            setPayMode(opt.id as typeof payMode);
-                            if (opt.id === "echelonne" && nbTranches === 0) setNbTranches(2);
-                          }}
-                          className="w-full flex items-center gap-4 px-5 py-4 text-left"
-                        >
-                          <div className={clsx(
-                            "w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all",
-                            selected ? "border-blue-600 bg-blue-600" : "border-slate-300"
-                          )}>
-                            {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={clsx("font-semibold text-sm", selected ? "text-blue-900" : "text-slate-800")}>
-                              {opt.label}
-                              {opt.locked && <span className="ml-2 text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">🔒</span>}
-                            </p>
-                            <p className="text-xs text-slate-400 mt-0.5">{opt.sub}</p>
-                          </div>
-                          {opt.id === "flooz" && <Smartphone className="w-4 h-4 text-slate-300 shrink-0" />}
-                          {opt.id === "yas"   && <Smartphone className="w-4 h-4 text-slate-300 shrink-0" />}
-                        </button>
-
-                        {selected && (
-                          <div className="px-5 pb-5 pt-1">
-                            {/* À la livraison */}
-                            {opt.id === "livraison" && (
-                              <div className="flex items-start gap-3 p-3 rounded-xl bg-brand-50 border border-brand-100">
-                                <Check className="w-4 h-4 text-brand-700 shrink-0 mt-0.5" />
-                                <p className="text-xs text-brand-800 leading-relaxed">
-                                  Payez en espèces ou via Mobile Money (Flooz / T-Money) directement à la réception. Aucune info bancaire requise.
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Flooz / Mix by Yas */}
-                            {(opt.id === "flooz" || opt.id === "yas") && (
-                              <div className="space-y-3">
-                                <div>
-                                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                                    <Phone className="w-3.5 h-3.5 inline mr-1" />
-                                    Numéro {opt.id === "flooz" ? "Flooz" : "Mix by Yas"} *
-                                  </label>
-                                  <input
-                                    type="tel"
-                                    value={mmPhone}
-                                    onChange={e => setMmPhone(e.target.value)}
-                                    placeholder="90 00 00 00"
-                                    className={inputCls()}
-                                    autoComplete="tel"
-                                  />
-                                </div>
-                                <div className="flex items-start gap-2 p-3 rounded-xl bg-green-50 border border-green-100">
-                                  <Wifi className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                                  <p className="text-xs text-green-800 leading-relaxed">
-                                    Un push USSD sera envoyé sur ce numéro. Entrez votre PIN pour valider{" "}
-                                    <span className="font-semibold">{formatPrice(grandTotal)}</span> — paiement instantané.
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Échelonné */}
-                            {opt.id === "echelonne" && (
-                              <div className="space-y-3">
-                                <div className="flex gap-2">
-                                  {([2, 3, 4] as const).map(n => (
-                                    <button
-                                      key={n}
-                                      type="button"
-                                      onClick={() => setNbTranches(n)}
-                                      className={clsx(
-                                        "flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition-all",
-                                        nbTranches === n
-                                          ? "border-blue-600 bg-blue-50 text-blue-900"
-                                          : "border-slate-200 text-slate-600 hover:border-blue-300"
-                                      )}
-                                    >
-                                      {n}×
-                                      <span className="block text-[10px] font-normal text-slate-400">
-                                        {formatPrice(Math.round(grandTotal / n))} / sem.
-                                      </span>
-                                    </button>
-                                  ))}
-                                </div>
-                                {nbTranches > 0 && (
-                                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-                                    {Array.from({ length: nbTranches }, (_, i) => (
-                                      <div key={i} className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-2">
-                                          <div className={clsx("w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold",
-                                            i === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-700"
-                                          )}>{i + 1}</div>
-                                          <span className="text-slate-600">{i === 0 ? "Aujourd'hui" : trancheDate(i)}</span>
-                                        </div>
-                                        <span className="font-bold text-slate-900">{formatPrice(Math.round(grandTotal / nbTranches))}</span>
-                                      </div>
-                                    ))}
-                                    <p className="text-[11px] text-amber-700 pt-1">⚠️ Livraison après confirmation du dernier versement.</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                      <button
+                        key={opt.id}
+                        type="button"
+                        disabled={opt.locked}
+                        onClick={() => {
+                          if (opt.locked) return;
+                          setPayMode(opt.id as typeof payMode);
+                          if (opt.id === "echelonne" && nbTranches === 0) setNbTranches(2);
+                        }}
+                        className={clsx(
+                          "relative flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all text-center",
+                          selected
+                            ? "border-blue-500 bg-blue-50 shadow-sm"
+                            : opt.locked
+                            ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
+                            : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm"
                         )}
-                      </div>
+                      >
+                        {selected && (
+                          <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                          </span>
+                        )}
+                        {opt.locked && (
+                          <span className="absolute top-2 right-2 text-[11px]">🔒</span>
+                        )}
+                        <div className="flex items-center justify-center h-12">
+                          {opt.logo}
+                        </div>
+                        <div>
+                          <p className={clsx("text-xs font-bold leading-tight", selected ? "text-blue-900" : "text-slate-800")}>{opt.label}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{opt.sub}</p>
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
+
+                {/* Expanded panel */}
+                {payMode && (
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    {payMode === "livraison" && (
+                      <div className="flex items-start gap-3">
+                        <Check className="w-4 h-4 text-brand-700 shrink-0 mt-0.5" />
+                        <p className="text-xs text-brand-800 leading-relaxed">
+                          Payez en espèces ou via Mobile Money directement à la réception. Aucune info bancaire requise.
+                        </p>
+                      </div>
+                    )}
+
+                    {(payMode === "flooz" || payMode === "yas") && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                            <Phone className="w-3.5 h-3.5 inline mr-1" />
+                            Numéro {payMode === "flooz" ? "Moov Money" : "Mixx by Yas"} *
+                          </label>
+                          <input
+                            type="tel"
+                            value={mmPhone}
+                            onChange={e => setMmPhone(e.target.value)}
+                            placeholder="90 00 00 00"
+                            className={inputCls()}
+                            autoComplete="tel"
+                          />
+                        </div>
+                        <div className="flex items-start gap-2 p-3 rounded-xl bg-green-50 border border-green-100">
+                          <Wifi className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                          <p className="text-xs text-green-800 leading-relaxed">
+                            Un push USSD sera envoyé sur ce numéro. Entrez votre PIN pour valider{" "}
+                            <span className="font-semibold">{formatPrice(grandTotal)}</span> — paiement instantané.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {payMode === "echelonne" && (
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          {([2, 3, 4] as const).map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setNbTranches(n)}
+                              className={clsx(
+                                "flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition-all",
+                                nbTranches === n
+                                  ? "border-blue-600 bg-blue-50 text-blue-900"
+                                  : "border-slate-200 text-slate-600 hover:border-blue-300"
+                              )}
+                            >
+                              {n}×
+                              <span className="block text-[10px] font-normal text-slate-400">
+                                {formatPrice(Math.round(grandTotal / n))} / sem.
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                        {nbTranches > 0 && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+                            {Array.from({ length: nbTranches }, (_, i) => (
+                              <div key={i} className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2">
+                                  <div className={clsx("w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold",
+                                    i === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-700"
+                                  )}>{i + 1}</div>
+                                  <span className="text-slate-600">{i === 0 ? "Aujourd'hui" : trancheDate(i)}</span>
+                                </div>
+                                <span className="font-bold text-slate-900">{formatPrice(Math.round(grandTotal / nbTranches))}</span>
+                              </div>
+                            ))}
+                            <p className="text-[11px] text-amber-700 pt-1">⚠️ Livraison après confirmation du dernier versement.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {isVerifie === false && (
                   <p className="text-xs text-amber-700 mt-3 flex items-center gap-1.5">
