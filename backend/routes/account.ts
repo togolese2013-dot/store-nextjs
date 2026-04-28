@@ -363,4 +363,108 @@ router.get("/api/account/orders/:ref", async (req, res) => {
   }
 });
 
+/* ─── Verification table setup ─── */
+let verifTableReady = false;
+async function ensureVerifTable() {
+  if (verifTableReady) return;
+  const pool = db as import("mysql2/promise").Pool;
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS account_verifications (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      user_id     INT NOT NULL,
+      id_card_url TEXT NOT NULL,
+      selfie_url  TEXT NOT NULL,
+      statut      ENUM('en_attente','verifie','rejete') DEFAULT 'en_attente',
+      note_admin  TEXT NULL,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  try {
+    await pool.execute("ALTER TABLE client_users ADD COLUMN verifie TINYINT NOT NULL DEFAULT 0");
+  } catch { /* column already exists */ }
+  verifTableReady = true;
+}
+
+/* ──────────────────────────────────────────────
+   GET /api/account/verification
+────────────────────────────────────────────── */
+router.get("/api/account/verification", async (req, res) => {
+  try {
+    const session = await getClientSession(req);
+    if (!session) return res.status(401).json({ error: "Non connecté." });
+    await ensureVerifTable();
+    const pool = db as import("mysql2/promise").Pool;
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT statut, note_admin FROM account_verifications WHERE user_id = ? LIMIT 1",
+      [session.id]
+    );
+    if (!rows[0]) return res.json({ statut: null });
+    return res.json({ statut: rows[0].statut as string, note_admin: rows[0].note_admin ?? null });
+  } catch (err) {
+    console.error("[account/verification GET]", err);
+    return res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ──────────────────────────────────────────────
+   POST /api/account/verification
+────────────────────────────────────────────── */
+router.post("/api/account/verification", async (req, res) => {
+  try {
+    const session = await getClientSession(req);
+    if (!session) return res.status(401).json({ error: "Non connecté." });
+    await ensureVerifTable();
+
+    const { id_card, selfie } = req.body as {
+      id_card?: { data: string; type: string };
+      selfie?:  { data: string; type: string };
+    };
+    if (!id_card?.data || !selfie?.data) {
+      return res.status(400).json({ error: "Les deux photos sont requises." });
+    }
+
+    const { v2: cloudinary } = await import("cloudinary");
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key:    process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    async function uploadImg(b64: string): Promise<string> {
+      const buffer = Buffer.from(b64.replace(/^data:[^;]+;base64,/, ""), "base64");
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "togolese-shop/verifications", resource_type: "image" },
+          (err, result) => (err || !result ? reject(err) : resolve(result.secure_url))
+        );
+        stream.end(buffer);
+      });
+    }
+
+    const [idCardUrl, selfieUrl] = await Promise.all([
+      uploadImg(id_card.data),
+      uploadImg(selfie.data),
+    ]);
+
+    const pool = db as import("mysql2/promise").Pool;
+    await pool.execute(
+      `INSERT INTO account_verifications (user_id, id_card_url, selfie_url, statut)
+       VALUES (?, ?, ?, 'en_attente')
+       ON DUPLICATE KEY UPDATE
+         id_card_url = VALUES(id_card_url),
+         selfie_url  = VALUES(selfie_url),
+         statut      = 'en_attente',
+         note_admin  = NULL`,
+      [session.id, idCardUrl, selfieUrl]
+    );
+
+    return res.json({ ok: true, statut: "en_attente" });
+  } catch (err) {
+    console.error("[account/verification POST]", err);
+    return res.status(500).json({ error: "Erreur lors de l'envoi des documents." });
+  }
+});
+
 export default router;

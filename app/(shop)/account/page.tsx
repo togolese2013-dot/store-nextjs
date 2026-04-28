@@ -6,7 +6,7 @@ import Image from "next/image";
 import {
   User, Package, Heart, Settings, MapPin,
   CreditCard, Bell, Star, Users, ChevronRight, LogOut, Clock,
-  Loader2, Eye, EyeOff, Mail, Phone,
+  Loader2, Eye, EyeOff, Mail, Phone, ShieldCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -91,6 +91,14 @@ const MENU = [
     color: "bg-teal-50 text-teal-600",
     border: "hover:border-teal-200",
   },
+  {
+    label: "Vérification",
+    desc:  "Compte & paiement échelonné",
+    href:  "/account/verification",
+    icon:  ShieldCheck,
+    color: "bg-green-50 text-green-700",
+    border: "hover:border-green-200",
+  },
 ];
 
 const SETTINGS = [
@@ -118,6 +126,7 @@ export default function AccountPage() {
   const [showPwd,     setShowPwd]     = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [error,       setError]       = useState("");
+  const [verifStatut, setVerifStatut] = useState<"en_attente" | "verifie" | "rejete" | null>(null);
 
   // Check session on mount
   useEffect(() => {
@@ -127,6 +136,10 @@ export default function AccountPage() {
         if (data.user) {
           syncLocalStorage(data.user);
           setStatus("logged");
+          fetch("/api/account/verification", { credentials: "include" })
+            .then(r => r.json())
+            .then(v => setVerifStatut(v.statut ?? null))
+            .catch(() => {});
         } else {
           setStatus("guest");
         }
@@ -424,21 +437,31 @@ export default function AccountPage() {
 
         {/* Card grid — 2 columns */}
         <div className="grid grid-cols-2 gap-3">
-          {MENU.map(item => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`bg-white rounded-2xl border border-slate-100 ${item.border} p-4 flex flex-col gap-3 hover:shadow-md transition-all duration-200 group`}
-            >
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
-                <item.icon className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-slate-900 leading-tight">{item.label}</p>
-                <p className="text-xs text-slate-400 mt-0.5 leading-tight">{item.desc}</p>
-              </div>
-            </Link>
-          ))}
+          {MENU.map(item => {
+            const isVerif = item.href === "/account/verification";
+            const badge = isVerif ? (
+              verifStatut === "verifie"    ? <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Vérifié</span>
+            : verifStatut === "en_attente" ? <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">En attente</span>
+            : verifStatut === "rejete"     ? <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">Refusé</span>
+            : <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Non vérifié</span>
+            ) : null;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`bg-white rounded-2xl border border-slate-100 ${item.border} p-4 flex flex-col gap-3 hover:shadow-md transition-all duration-200 group`}
+              >
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
+                  <item.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-slate-900 leading-tight">{item.label}</p>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-tight">{item.desc}</p>
+                  {badge && <div className="mt-1.5">{badge}</div>}
+                </div>
+              </Link>
+            );
+          })}
         </div>
 
         {/* Settings row */}

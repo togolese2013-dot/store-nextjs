@@ -8,7 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
-  User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2,
+  User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2, ShieldCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -78,6 +78,14 @@ export default function CheckoutPage() {
   const [orderRef,     setOrderRef]     = useState("");
   const [refCode,      setRefCode]      = useState<string | null>(null);
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
+  const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null); // null = loading
+
+  useEffect(() => {
+    fetch("/api/account/verification", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setIsVerifie(d.statut === "verifie"))
+      .catch(() => setIsVerifie(false));
+  }, []);
 
   useEffect(() => {
     const match = document.cookie?.match?.(/ts_ref=([^;]+)/);
@@ -438,27 +446,51 @@ export default function CheckoutPage() {
                 {/* Options */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                   {([
-                    { v: 0, label: "Comptant",  sub: "En une fois" },
-                    { v: 2, label: "2 fois",    sub: `${formatPrice(Math.round(grandTotal / 2 * 100) / 100)} / sem.` },
-                    { v: 3, label: "3 fois",    sub: `${formatPrice(Math.round(grandTotal / 3 * 100) / 100)} / sem.` },
-                    { v: 4, label: "4 fois",    sub: `${formatPrice(Math.round(grandTotal / 4 * 100) / 100)} / sem.` },
-                  ] as { v: 0|2|3|4; label: string; sub: string }[]).map(opt => (
-                    <button
-                      key={opt.v}
-                      type="button"
-                      onClick={() => setNbTranches(opt.v)}
-                      className={clsx(
-                        "flex flex-col items-center gap-0.5 px-3 py-3 rounded-2xl border-2 text-center transition-all",
-                        nbTranches === opt.v
-                          ? "border-brand-600 bg-brand-50 text-brand-900"
-                          : "border-slate-200 text-slate-600 hover:border-brand-300"
-                      )}
-                    >
-                      <span className="font-bold text-sm">{opt.label}</span>
-                      <span className="text-[10px] text-slate-400">{opt.sub}</span>
-                    </button>
-                  ))}
+                    { v: 0, label: "Comptant",  sub: "En une fois",                                                         echelonne: false },
+                    { v: 2, label: "2 fois",    sub: `${formatPrice(Math.round(grandTotal / 2 * 100) / 100)} / sem.`,       echelonne: true  },
+                    { v: 3, label: "3 fois",    sub: `${formatPrice(Math.round(grandTotal / 3 * 100) / 100)} / sem.`,       echelonne: true  },
+                    { v: 4, label: "4 fois",    sub: `${formatPrice(Math.round(grandTotal / 4 * 100) / 100)} / sem.`,       echelonne: true  },
+                  ] as { v: 0|2|3|4; label: string; sub: string; echelonne: boolean }[]).map(opt => {
+                    const locked = opt.echelonne && isVerifie === false;
+                    return (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => !locked && setNbTranches(opt.v)}
+                        disabled={locked}
+                        title={locked ? "Réservé aux comptes vérifiés" : undefined}
+                        className={clsx(
+                          "relative flex flex-col items-center gap-0.5 px-3 py-3 rounded-2xl border-2 text-center transition-all",
+                          locked
+                            ? "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed"
+                            : nbTranches === opt.v
+                              ? "border-brand-600 bg-brand-50 text-brand-900"
+                              : "border-slate-200 text-slate-600 hover:border-brand-300"
+                        )}
+                      >
+                        <span className="font-bold text-sm">{opt.label}</span>
+                        <span className="text-[10px] text-slate-400">{locked ? "Compte vérifié requis" : opt.sub}</span>
+                        {locked && (
+                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-300 rounded-full flex items-center justify-center text-white text-[8px]">🔒</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+
+                {/* Message compte non vérifié */}
+                {isVerifie === false && (
+                  <div className="mb-4 flex items-start gap-3 p-3 rounded-2xl bg-amber-50 border border-amber-200">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800">
+                      Le paiement échelonné est réservé aux{" "}
+                      <span className="font-semibold">comptes vérifiés</span>.{" "}
+                      <Link href="/account/verification" className="underline font-semibold hover:text-amber-900">
+                        Vérifier mon compte →
+                      </Link>
+                    </p>
+                  </div>
+                )}
 
                 {/* Comptant info */}
                 {nbTranches === 0 && (

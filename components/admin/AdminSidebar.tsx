@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, LogOut, Globe,
+  Gift, Mail, UserCheck, Home, LogOut, Globe, ShieldCheck,
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; icon: React.ElementType };
@@ -59,6 +59,7 @@ const MODULES: Record<string, {
       { label: "Coupons",            href: "/admin/coupons",           icon: Tag },
       { label: "Avis clients",        href: "/admin/reviews",           icon: Star },
       { label: "Paiements échelonnés", href: "/admin/paiements",       icon: CreditCard },
+      { label: "Vérifications KYC",   href: "/admin/verifications",    icon: ShieldCheck },
       { label: "Zones de livraison", href: "/admin/settings/delivery", icon: MapPin },
       { label: "Paiements config",   href: "/admin/settings/payment",  icon: CreditCard },
     ],
@@ -113,6 +114,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/orders",                "store"],
   ["/admin/coupons",               "store"],
   ["/admin/reviews",               "store"],
+  ["/admin/verifications",         "store"],
   ["/admin/settings/delivery",     "store"],
   ["/admin/settings/payment",      "store"],
   ["/admin/settings",              "admin"],
