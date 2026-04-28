@@ -32,11 +32,16 @@ async function ensurePaymentTables() {
       date_echeance  DATE NOT NULL,
       date_paiement  DATETIME NULL,
       statut         ENUM('en_attente','payee','en_retard') DEFAULT 'en_attente',
+      mode_paiement  VARCHAR(30) NULL,
       note           VARCHAR(255) NULL,
       created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (plan_id) REFERENCES payment_plans(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  // Add mode_paiement column if table already existed without it
+  try {
+    await pool.execute(`ALTER TABLE payment_tranches ADD COLUMN mode_paiement VARCHAR(30) NULL`);
+  } catch (e: any) { if (e?.code !== "ER_DUP_FIELDNAME") throw e; }
 }
 
 // List all payment plans
@@ -71,9 +76,9 @@ router.patch("/api/admin/payment-tranches/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé" });
   try {
-    const { paid, note } = req.body;
+    const { paid, note, mode_paiement } = req.body;
     if (paid) {
-      await markTranchePaid(Number(req.params.id), note);
+      await markTranchePaid(Number(req.params.id), note, mode_paiement);
     } else {
       await markTrancheUnpaid(Number(req.params.id));
     }

@@ -7,6 +7,13 @@ import { Search, Package, CheckCircle2, Truck, Clock, XCircle, CreditCard, Arrow
 import { formatPrice } from "@/lib/utils";
 import { clsx } from "clsx";
 
+interface Tranche {
+  numero:        number;
+  montant:       number;
+  statut:        "en_attente" | "payee" | "en_retard";
+  date_echeance: string;
+}
+
 interface TrackedOrder {
   id:              number;
   reference:       string;
@@ -19,6 +26,7 @@ interface TrackedOrder {
   created_at:      string;
   item_count:      number;
   item_names:      string[];
+  tranches:        Tranche[] | null;
 }
 
 /* ── Status display config ──────────────────────────────────────────────── */
@@ -130,6 +138,46 @@ function OrderCard({ order }: { order: TrackedOrder }) {
             <span className="font-semibold text-slate-700">{order.item_count} article{order.item_count > 1 ? "s" : ""}</span> :{" "}
             {order.item_names.join(", ")}{order.item_names.length < order.item_count ? "…" : ""}
           </p>
+        </div>
+      )}
+
+      {/* Tranches (plan de paiement) */}
+      {order.tranches && order.tranches.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+            Plan de paiement — {order.tranches.filter(t => t.statut === "payee").length}/{order.tranches.length} tranches réglées
+          </p>
+          {order.tranches.map(t => (
+            <div key={t.numero} className={clsx(
+              "flex items-center justify-between rounded-xl px-3 py-2 text-xs",
+              t.statut === "payee"
+                ? "bg-green-50 border border-green-200"
+                : "bg-slate-50 border border-slate-200"
+            )}>
+              <div className="flex items-center gap-2">
+                <div className={clsx(
+                  "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0",
+                  t.statut === "payee" ? "bg-green-500 text-white" : "bg-slate-300 text-slate-600"
+                )}>
+                  {t.statut === "payee" ? <CheckCircle2 className="w-3 h-3" /> : t.numero}
+                </div>
+                <span className={t.statut === "payee" ? "text-green-700 font-semibold" : "text-slate-600"}>
+                  Tranche {t.numero}
+                  {t.statut !== "payee" && (
+                    <span className="text-slate-400 font-normal ml-1">
+                      · {new Date(t.date_echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-900">{formatPrice(t.montant)}</span>
+                {t.statut === "payee" && (
+                  <span className="text-green-600 font-bold">✓</span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

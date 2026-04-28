@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import {
   Edit2, Trash2, X, Check, Loader2, AlertTriangle,
-  Plus, Minus, Search, Link2, Smartphone,
+  Plus, Minus, Search, Link2, Smartphone, CreditCard,
 } from "lucide-react";
 
 interface OrderItem {
@@ -386,6 +386,176 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
   );
 }
 
+/* ── Payment plan block ── */
+interface Tranche {
+  id: number; numero: number; montant: number;
+  date_echeance: string; date_paiement: string | null;
+  statut: "en_attente" | "payee" | "en_retard";
+  mode_paiement: string | null; note: string | null;
+}
+interface Plan {
+  id: number; nb_tranches: number; montant_total: number;
+  montant_tranche: number; statut: string; tranches: Tranche[];
+}
+
+const MODE_OPTIONS = [
+  { value: "especes", label: "💵 Espèces" },
+  { value: "moov",    label: "🟠 Moov Money" },
+  { value: "yas",     label: "🔵 Mixx by Yas" },
+];
+
+function PaymentPlanBlock({ orderId, orderStatus }: { orderId: number; orderStatus: string }) {
+  const router = useRouter();
+  const [plan,    setPlan]    = useState<Plan | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving,  setSaving]  = useState<number | null>(null); // tranche id being saved
+  const [modes,   setModes]   = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (orderStatus !== "plan_paiement") return;
+    fetch(`/api/admin/payment-plans/order/${orderId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.plan) setPlan(d.plan); })
+      .catch(() => {});
+  }, [orderId, orderStatus]);
+
+  if (orderStatus !== "plan_paiement" || !plan) return null;
+
+  const paid  = plan.tranches.filter(t => t.statut === "payee").length;
+  const total = plan.tranches.length;
+
+  async function markPaid(tranche: Tranche) {
+    const mode = modes[tranche.id] ?? "especes";
+    setSaving(tranche.id);
+    try {
+      await fetch(`/api/admin/payment-tranches/${tranche.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ paid: true, mode_paiement: mode }),
+      });
+      setPlan(p => p ? {
+        ...p,
+        tranches: p.tranches.map(t =>
+          t.id === tranche.id
+            ? { ...t, statut: "payee", date_paiement: new Date().toISOString(), mode_paiement: mode }
+            : t
+        ),
+      } : p);
+      router.refresh();
+    } finally { setSaving(null); }
+  }
+
+  async function markUnpaid(tranche: Tranche) {
+    setSaving(tranche.id);
+    try {
+      await fetch(`/api/admin/payment-tranches/${tranche.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ paid: false }),
+      });
+      setPlan(p => p ? {
+        ...p,
+        tranches: p.tranches.map(t =>
+          t.id === tranche.id
+            ? { ...t, statut: "en_attente", date_paiement: null, mode_paiement: null }
+            : t
+        ),
+      } : p);
+      router.refresh();
+    } finally { setSaving(null); }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CreditCard className="w-4 h-4 text-violet-600" />
+          <h2 className="font-bold text-slate-700">Plan de paiement</h2>
+        </div>
+        <span className="text-xs font-bold text-violet-700 bg-violet-100 px-2.5 py-1 rounded-full">
+          {paid}/{total} tranches
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-violet-500 rounded-full transition-all"
+          style={{ width: `${total > 0 ? (paid / total) * 100 : 0}%` }}
+        />
+      </div>
+
+      {/* Tranches */}
+      <div className="space-y-3">
+        {plan.tranches.map(t => (
+          <div key={t.id} className={`rounded-xl border p-3 space-y-2 ${
+            t.statut === "payee" ? "border-green-200 bg-green-50" : "border-slate-200 bg-slate-50"
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                  t.statut === "payee" ? "bg-green-500 text-white" : "bg-slate-300 text-slate-600"
+                }`}>
+                  {t.statut === "payee" ? <Check className="w-3 h-3" /> : t.numero}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{formatPrice(t.montant)}</p>
+                  <p className="text-[10px] text-slate-400">
+                    Échéance : {new Date(t.date_echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+              </div>
+              {t.statut === "payee" ? (
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-green-600 uppercase">Payée</p>
+                  <p className="text-[10px] text-slate-400">
+                    {t.mode_paiement ? MODE_OPTIONS.find(m => m.value === t.mode_paiement)?.label ?? t.mode_paiement : ""}
+                  </p>
+                  <button
+                    onClick={() => markUnpaid(t)}
+                    disabled={saving === t.id}
+                    className="text-[10px] text-slate-400 hover:text-red-500 underline mt-0.5"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={modes[t.id] ?? "especes"}
+                    onChange={e => setModes(m => ({ ...m, [t.id]: e.target.value }))}
+                    className="text-xs rounded-lg border border-slate-200 bg-white px-2 py-1 focus:outline-none focus:border-violet-400"
+                  >
+                    {MODE_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => markPaid(t)}
+                    disabled={saving === t.id}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-xs font-bold transition-colors"
+                  >
+                    {saving === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                    Marquer payée
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {plan.statut === "solde" && (
+        <div className="flex items-center gap-2 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+          <Check className="w-4 h-4" /> Plan soldé — commande confirmée automatiquement
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Confirm MM payment button ── */
 function ConfirmMMPayment({ order }: { order: Order }) {
   const router = useRouter();
@@ -444,6 +614,9 @@ export default function OrderDetailActions({ order }: { order: Order }) {
 
   return (
     <>
+      {/* Payment plan tranches */}
+      <PaymentPlanBlock orderId={order.id} orderStatus={order.status} />
+
       {/* Confirm MM payment */}
       <ConfirmMMPayment order={order} />
 

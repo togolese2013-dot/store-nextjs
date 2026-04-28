@@ -1640,10 +1640,10 @@ export async function getPaymentPlanByOrderId(
   return { ...plan, tranches: tranches as PaymentTranche[] };
 }
 
-export async function markTranchePaid(trancheId: number, note?: string): Promise<void> {
+export async function markTranchePaid(trancheId: number, note?: string, mode_paiement?: string): Promise<void> {
   await db.execute(
-    `UPDATE payment_tranches SET statut='payee', date_paiement=NOW(), note=? WHERE id=?`,
-    [note ?? null, trancheId]
+    `UPDATE payment_tranches SET statut='payee', date_paiement=NOW(), note=?, mode_paiement=? WHERE id=?`,
+    [note ?? null, mode_paiement ?? null, trancheId]
   );
   const [tRow] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT plan_id FROM payment_tranches WHERE id=? LIMIT 1`, [trancheId]
@@ -1659,8 +1659,9 @@ export async function markTranchePaid(trancheId: number, note?: string): Promise
       `SELECT order_id FROM payment_plans WHERE id=? LIMIT 1`, [planId]
     );
     if (pRow[0]?.order_id) {
-      await db.execute(`UPDATE orders SET status='confirmée' WHERE id=?`, [pRow[0].order_id]);
-      await addOrderEvent(pRow[0].order_id as number, "confirmée", "Paiement échelonné soldé — commande confirmée");
+      // Use 'confirmed' (valid ENUM value)
+      await db.execute(`UPDATE orders SET status='confirmed' WHERE id=?`, [pRow[0].order_id]);
+      await addOrderEvent(pRow[0].order_id as number, "confirmed", "Paiement échelonné soldé — commande confirmée");
     }
   }
 }

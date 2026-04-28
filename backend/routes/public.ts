@@ -171,6 +171,33 @@ router.get("/api/orders/track", async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
+    // Fetch payment plan tranches for plan_paiement orders
+    const orderIds = rows.map(r => r.id as number);
+    const plansMap: Record<number, { montant_tranche: number; tranches: { numero: number; montant: number; statut: string; date_echeance: string }[] }> = {};
+    if (orderIds.length > 0) {
+      try {
+        const placeholders = orderIds.map(() => "?").join(",");
+        const [planRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+          `SELECT pp.order_id, pp.montant_tranche, pt.numero, pt.montant, pt.statut, pt.date_echeance
+           FROM payment_plans pp
+           JOIN payment_tranches pt ON pt.plan_id = pp.id
+           WHERE pp.order_id IN (${placeholders})
+           ORDER BY pp.order_id, pt.numero`,
+          orderIds
+        );
+        for (const pr of planRows) {
+          const oid = pr.order_id as number;
+          if (!plansMap[oid]) plansMap[oid] = { montant_tranche: pr.montant_tranche, tranches: [] };
+          plansMap[oid].tranches.push({
+            numero:        pr.numero,
+            montant:       pr.montant,
+            statut:        pr.statut,
+            date_echeance: pr.date_echeance,
+          });
+        }
+      } catch { /* payment_tranches table may not exist yet */ }
+    }
+
     const data = rows.map((r) => {
       let itemCount = 0;
       let itemNames: string[] = [];
@@ -194,6 +221,7 @@ router.get("/api/orders/track", async (req, res) => {
         created_at:      r.created_at,
         item_count:      itemCount,
         item_names:      itemNames,
+        tranches:        plansMap[r.id as number]?.tranches ?? null,
       };
     });
 
