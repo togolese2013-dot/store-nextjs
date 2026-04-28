@@ -1,13 +1,15 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useCart } from "@/context/CartContext";
 import { calcPrice } from "@/context/CartContext";
 import { formatPrice } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ShoppingBag, Trash2, Plus, Minus, ArrowRight,
-  Truck, ShieldCheck, RefreshCw, Tag,
+  Truck, ShieldCheck, RefreshCw, Check,
 } from "lucide-react";
 import { clsx } from "clsx";
 import CartSuggestions from "@/components/CartSuggestions";
@@ -20,6 +22,44 @@ const WaIcon = () => (
 
 export default function CartPage() {
   const { items, count, total, removeItem, updateQty, clearCart } = useCart();
+  const router = useRouter();
+
+  // All items selected by default
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
+    () => new Set(items.map(i => i.cartKey))
+  );
+
+  const selectedItems = useMemo(
+    () => items.filter(i => selectedKeys.has(i.cartKey)),
+    [items, selectedKeys]
+  );
+
+  const selectedTotal = useMemo(
+    () => selectedItems.reduce((s, i) => s + calcPrice(i) * i.qty, 0),
+    [selectedItems]
+  );
+
+  const allSelected = items.length > 0 && selectedKeys.size === items.length;
+
+  function toggle(cartKey: string) {
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(cartKey)) next.delete(cartKey);
+      else next.add(cartKey);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (allSelected) setSelectedKeys(new Set());
+    else setSelectedKeys(new Set(items.map(i => i.cartKey)));
+  }
+
+  function goToCheckout() {
+    // Store selected keys in sessionStorage so checkout can filter
+    sessionStorage.setItem("cart_selected", JSON.stringify([...selectedKeys]));
+    router.push("/checkout");
+  }
 
   /* Empty state */
   if (items.length === 0) {
@@ -41,12 +81,12 @@ export default function CartPage() {
     );
   }
 
-  /* WhatsApp order summary */
-  const waLines = items.map(i =>
+  /* WhatsApp summary — selected items only */
+  const waLines = selectedItems.map(i =>
     `• ${i.nom} × ${i.qty} = ${formatPrice(calcPrice(i) * i.qty)}`
   ).join("\n");
   const waText = encodeURIComponent(
-    `Bonjour, je voudrais passer la commande suivante :\n\n${waLines}\n\n💰 *Total : ${formatPrice(total)}*\n\nPouvez-vous confirmer la disponibilité et les frais de livraison ?`
+    `Bonjour, je voudrais passer la commande suivante :\n\n${waLines}\n\n💰 *Total : ${formatPrice(selectedTotal)}*\n\nPouvez-vous confirmer la disponibilité et les frais de livraison ?`
   );
 
   return (
@@ -63,27 +103,61 @@ export default function CartPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="font-display text-2xl font-800 text-slate-900 mb-7">
-          Mon panier <span className="text-slate-400 font-500 text-lg">({count} article{count > 1 ? "s" : ""})</span>
-        </h1>
+        <div className="flex items-center justify-between mb-7 flex-wrap gap-3">
+          <h1 className="font-display text-2xl font-800 text-slate-900">
+            Mon panier <span className="text-slate-400 font-500 text-lg">({count} article{count > 1 ? "s" : ""})</span>
+          </h1>
+          {/* Select all */}
+          <button
+            onClick={toggleAll}
+            className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-brand-700 transition-colors"
+          >
+            <span className={clsx(
+              "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0",
+              allSelected ? "bg-brand-900 border-brand-900" : "border-slate-300 bg-white"
+            )}>
+              {allSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+            </span>
+            {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+          </button>
+        </div>
 
         <div className="grid lg:grid-cols-3 gap-8 items-start">
 
           {/* ── Items list ── */}
           <div className="lg:col-span-2 space-y-4">
             {items.map(item => {
-              const itemPrice  = calcPrice(item);
-              const isPromo    = item.remise > 0;
-              const imgSrc     = item.image_url
+              const itemPrice = calcPrice(item);
+              const isPromo   = item.remise > 0;
+              const isChecked = selectedKeys.has(item.cartKey);
+              const imgSrc    = item.image_url
                 ? item.image_url.startsWith("http")
                   ? item.image_url
                   : `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/uploads/${item.image_url}`
                 : null;
 
               return (
-                <div key={item.cartKey}
-                  className="bg-white rounded-3xl border border-slate-100 p-4 sm:p-5 flex gap-4"
+                <div
+                  key={item.cartKey}
+                  className={clsx(
+                    "bg-white rounded-3xl border p-4 sm:p-5 flex gap-3 transition-all",
+                    isChecked ? "border-brand-200 shadow-sm" : "border-slate-100 opacity-60"
+                  )}
                 >
+                  {/* Checkbox */}
+                  <button
+                    onClick={() => toggle(item.cartKey)}
+                    aria-label={isChecked ? "Désélectionner" : "Sélectionner"}
+                    className="shrink-0 mt-1 self-start"
+                  >
+                    <span className={clsx(
+                      "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+                      isChecked ? "bg-brand-900 border-brand-900" : "border-slate-300 bg-white hover:border-brand-400"
+                    )}>
+                      {isChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                    </span>
+                  </button>
+
                   {/* Thumbnail */}
                   <Link href={`/products/${item.reference}`}
                     className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-50 overflow-hidden shrink-0 relative"
@@ -148,7 +222,14 @@ export default function CartPage() {
                           {formatPrice(itemPrice * item.qty)}
                         </span>
                         <button
-                          onClick={() => removeItem(item.cartKey)}
+                          onClick={() => {
+                            removeItem(item.cartKey);
+                            setSelectedKeys(prev => {
+                              const next = new Set(prev);
+                              next.delete(item.cartKey);
+                              return next;
+                            });
+                          }}
                           className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
                           aria-label="Supprimer"
                         >
@@ -178,11 +259,19 @@ export default function CartPage() {
           {/* ── Order summary ── */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-3xl border border-slate-100 p-6 sticky top-24">
-              <h2 className="font-display font-800 text-slate-900 text-lg mb-5">Récapitulatif</h2>
+              <h2 className="font-display font-800 text-slate-900 text-lg mb-1">Récapitulatif</h2>
+              {selectedItems.length < items.length && (
+                <p className="text-xs text-brand-600 font-semibold mb-4">
+                  {selectedItems.length} article{selectedItems.length > 1 ? "s" : ""} sélectionné{selectedItems.length > 1 ? "s" : ""} sur {items.length}
+                </p>
+              )}
+              {selectedItems.length === items.length && <div className="mb-4" />}
 
-              {/* Lines */}
+              {/* Lines — selected only */}
               <div className="space-y-3 mb-5">
-                {items.map(i => (
+                {selectedItems.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-2">Aucun article sélectionné</p>
+                ) : selectedItems.map(i => (
                   <div key={i.cartKey} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-slate-600 line-clamp-1 flex-1">{i.nom}{i.variantNom ? ` · ${i.variantNom}` : ""} × {i.qty}</span>
                     <span className="font-semibold text-slate-800 shrink-0">{formatPrice(calcPrice(i) * i.qty)}</span>
@@ -193,7 +282,7 @@ export default function CartPage() {
               <div className="border-t border-slate-100 pt-4 mb-5 space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Sous-total</span>
-                  <span className="font-semibold text-slate-800">{formatPrice(total)}</span>
+                  <span className="font-semibold text-slate-800">{formatPrice(selectedTotal)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Livraison</span>
@@ -203,16 +292,29 @@ export default function CartPage() {
 
               <div className="flex items-center justify-between mb-6 bg-slate-50 rounded-2xl px-4 py-3">
                 <span className="font-display font-800 text-slate-900">Total</span>
-                <span className="font-display font-800 text-2xl text-brand-900">{formatPrice(total)}</span>
+                <span className="font-display font-800 text-2xl text-brand-900">{formatPrice(selectedTotal)}</span>
               </div>
 
               {/* CTA buttons */}
               <div className="flex flex-col gap-3">
-                <Link href="/checkout"
-                  className="flex items-center justify-center w-full py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-all hover:shadow-brand"
+                <button
+                  onClick={goToCheckout}
+                  disabled={selectedItems.length === 0}
+                  className="flex items-center justify-center w-full py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-all hover:shadow-brand disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Commander maintenant
-                </Link>
+                  Commander ({selectedItems.length})
+                </button>
+
+                {selectedItems.length > 0 && (
+                  <a
+                    href={`https://wa.me/22890527912?text=${waText}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-[#25D366] text-white font-bold text-sm hover:bg-[#1fba58] transition-all"
+                  >
+                    <WaIcon /> Commander sur WhatsApp
+                  </a>
+                )}
 
                 <Link href="/products"
                   className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-semibold text-sm hover:border-brand-300 hover:text-brand-700 transition-all"
@@ -224,7 +326,7 @@ export default function CartPage() {
               {/* Trust */}
               <div className="mt-5 pt-5 border-t border-slate-100 flex flex-col gap-2">
                 {[
-                  { icon: Truck,       text: "Livraison rapide à Lomé" },
+                  { icon: Truck,       text: "Livraison le jour même à Lomé" },
                   { icon: ShieldCheck, text: "Paiement à la livraison" },
                   { icon: RefreshCw,   text: "Retours acceptés — 7 jours" },
                 ].map(({ icon: Icon, text }) => (

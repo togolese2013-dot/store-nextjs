@@ -45,7 +45,24 @@ interface Form {
 }
 
 export default function CheckoutPage() {
-  const { items, total, clearCart } = useCart();
+  const { items, clearCart } = useCart();
+
+  const [selectedItems, setSelectedItems] = useState<typeof items>(items);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("cart_selected");
+    if (stored) {
+      const keys = new Set<string>(JSON.parse(stored) as string[]);
+      const filtered = items.filter(i => keys.has(i.cartKey));
+      setSelectedItems(filtered.length > 0 ? filtered : items);
+      sessionStorage.removeItem("cart_selected");
+    } else {
+      setSelectedItems(items);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const selectedTotal = selectedItems.reduce((sum, i) => sum + calcPrice(i) * i.qty, 0);
 
   const [form, setForm] = useState<Form>({
     nom: "", adresse: "", zone: "", note: "", lien_localisation: "",
@@ -69,7 +86,7 @@ export default function CheckoutPage() {
 
   const selectedZone   = ZONES.find(z => z.label === form.zone);
   const deliveryFee    = selectedZone?.fee ?? 0;
-  const grandTotal     = total + deliveryFee;
+  const grandTotal     = selectedTotal + deliveryFee;
   const montantTranche = nbTranches > 0
     ? Math.round((grandTotal / nbTranches) * 100) / 100
     : grandTotal;
@@ -99,12 +116,12 @@ export default function CheckoutPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
-    if (items.length === 0) return;
+    if (selectedItems.length === 0) return;
     setLoading(true);
     setSubmitError("");
     try {
       const telephone = `${phonePrefix} ${phoneNumber.trim()}`;
-      const orderItems = items.map(i => ({
+      const orderItems = selectedItems.map(i => ({
         id:           i.id,
         nom:          i.nom,
         reference:    i.reference,
@@ -124,7 +141,7 @@ export default function CheckoutPage() {
           note:              form.note,
           lien_localisation: form.lien_localisation || null,
           items:             orderItems,
-          subtotal:          total,
+          subtotal:          selectedTotal,
           total:             grandTotal,
           ref_code:          refCode ?? undefined,
           payment_mode:      nbTranches > 0 ? `${nbTranches}x` : "comptant",
@@ -133,7 +150,7 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (!res.ok) { setSubmitError(data.error || "Erreur lors de la commande."); return; }
-      setOrderedItems([...items]);
+      setOrderedItems([...selectedItems]);
       setOrderedTotal(grandTotal);
       setOrderRef(data.reference ?? "");
       setSubmitted(true);
@@ -146,7 +163,7 @@ export default function CheckoutPage() {
   }
 
   /* Empty cart guard */
-  if (items.length === 0 && !submitted) {
+  if (selectedItems.length === 0 && !submitted) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
         <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-5">
@@ -498,7 +515,7 @@ export default function CheckoutPage() {
 
                 {/* Items */}
                 <div className="space-y-3 mb-5 max-h-60 overflow-y-auto pr-1">
-                  {items.map(item => {
+                  {selectedItems.map(item => {
                     const imgSrc = item.image_url
                       ? item.image_url.startsWith("http")
                         ? item.image_url
@@ -530,7 +547,7 @@ export default function CheckoutPage() {
                 <div className="border-t border-slate-100 pt-4 space-y-2 mb-5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Sous-total</span>
-                    <span className="font-semibold">{formatPrice(total)}</span>
+                    <span className="font-semibold">{formatPrice(selectedTotal)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Livraison</span>
