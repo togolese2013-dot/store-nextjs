@@ -114,11 +114,30 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
     const cleanPhone = phone.replace(/\D/g, "").replace(/^228/, "");
     const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://store.togolese.fr";
 
-    /* ── Étape 1 : Créer la transaction avec customer inline ── */
+    /* ── Étape 1 : Créer le client ── */
     const parts = (nom || "Client").trim().split(/\s+/);
     const firstname = parts[0];
     const lastname  = parts.length > 1 ? parts.slice(1).join(" ") : parts[0];
 
+    const custRes = await fetch(`${FEDAPAY_BASE}/customers`, {
+      method:  "POST",
+      headers: fedapayHeaders(),
+      body: JSON.stringify({
+        firstname,
+        lastname,
+        phone_number: { number: cleanPhone, country: "tg" },
+      }),
+    });
+
+    const custData = await custRes.json() as { "v1/customer"?: { id: number }; message?: string };
+    const customerId = custData?.["v1/customer"]?.id;
+
+    if (!customerId) {
+      console.error("[fedapay] create customer failed:", JSON.stringify(custData));
+      return res.status(502).json({ error: "Impossible de créer le client FedaPay." });
+    }
+
+    /* ── Étape 2 : Créer la transaction (le payment_token est déjà inclus) ── */
     const txRes = await fetch(`${FEDAPAY_BASE}/transactions`, {
       method:  "POST",
       headers: fedapayHeaders(),
@@ -128,50 +147,29 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
         currency:     { iso: "XOF" },
         callback_url: `${process.env.BACKEND_URL || ""}/api/webhooks/fedapay`,
         return_url:   `${siteUrl}/account/commandes`,
-        customer: {
-          firstname,
-          lastname,
-          phone_number: { number: cleanPhone, country: "tg" },
-        },
+        customer:     { id: customerId },
       }),
     });
 
     const txData = await txRes.json() as {
-      "v1/transaction"?: { id: number };
+      "v1/transaction"?: { id: number; payment_token?: string };
       message?: string;
-      errors?: unknown;
     };
 
-    console.error("[fedapay] create transaction response:", JSON.stringify(txData));
+    const tx      = txData?.["v1/transaction"];
+    const txId    = tx?.id;
+    const token   = tx?.payment_token;
 
-    const txId = txData?.["v1/transaction"]?.id;
-
-    if (!txId) {
-      return res.status(502).json({
-        error: "Impossible de créer la transaction FedaPay.",
-        detail: txData,
-      });
+    if (!txId || !token) {
+      console.error("[fedapay] create transaction failed:", JSON.stringify(txData));
+      return res.status(502).json({ error: "Impossible de créer la transaction FedaPay." });
     }
 
-    /* ── Étape 3 : Générer le token de paiement ── */
-    const tokenRes = await fetch(`${FEDAPAY_BASE}/transactions/${txId}/token`, {
-      method:  "POST",
-      headers: fedapayHeaders(),
-      body:    JSON.stringify({}),
-    });
-
-    const tokenData = await tokenRes.json() as { token?: string; message?: string };
-
-    if (!tokenRes.ok || !tokenData.token) {
-      console.error("[fedapay] generate token failed:", JSON.stringify(tokenData));
-      return res.status(502).json({ error: "Impossible de générer le token de paiement." });
-    }
-
-    /* ── Étape 4 : Envoyer le push USSD ── */
+    /* ── Étape 3 : Envoyer le push USSD ── */
     const pushRes = await fetch(`${FEDAPAY_BASE}/${mode}`, {
       method:  "POST",
       headers: fedapayHeaders(),
-      body:    JSON.stringify({ token: tokenData.token }),
+      body:    JSON.stringify({ token }),
     });
 
     const pushData = await pushRes.json() as { message?: string };
