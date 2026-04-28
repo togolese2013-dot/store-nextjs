@@ -629,8 +629,8 @@ export default function CheckoutPage() {
 
                       return (
                         <div className="space-y-4">
-                          {/* Montant total à envoyer + numéro */}
-                          <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+                          {/* Montant total à envoyer + numéro — desktop uniquement */}
+                          <div className="hidden lg:block rounded-xl border border-slate-200 divide-y divide-slate-100">
                             <div className="flex items-center justify-between px-4 py-3">
                               <div>
                                 <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Montant à envoyer</p>
