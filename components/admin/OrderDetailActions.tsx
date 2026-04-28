@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import {
   Edit2, Trash2, X, Check, Loader2, AlertTriangle,
-  Plus, Minus, Search, Link2,
+  Plus, Minus, Search, Link2, Smartphone,
 } from "lucide-react";
 
 interface OrderItem {
@@ -21,20 +21,22 @@ interface Product {
 }
 
 interface Order {
-  id:                 number;
-  reference:          string;
-  nom:                string;
-  telephone:          string;
-  adresse:            string;
-  zone_livraison:     string;
-  delivery_fee:       number;
-  note:               string;
-  subtotal:           number;
-  total:              number;
-  status:             string;
-  statut_paiement:    string | null;
-  lien_localisation:  string;
-  items:              OrderItem[];
+  id:                  number;
+  reference:           string;
+  nom:                 string;
+  telephone:           string;
+  adresse:             string;
+  zone_livraison:      string;
+  delivery_fee:        number;
+  note:                string;
+  subtotal:            number;
+  total:               number;
+  status:              string;
+  statut_paiement:     string | null;
+  lien_localisation:   string;
+  items:               OrderItem[];
+  payment_mode?:       string | null;
+  mm_transaction_ref?: string | null;
 }
 
 /* ── Payment status options ── */
@@ -384,12 +386,67 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
   );
 }
 
+/* ── Confirm MM payment button ── */
+function ConfirmMMPayment({ order }: { order: Order }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [done,    setDone]    = useState(false);
+
+  const isMmDirect = order.payment_mode === "moov_direct" || order.payment_mode === "yas_direct";
+  const alreadyPaid = order.statut_paiement === "paye";
+  if (!isMmDirect || alreadyPaid) return null;
+
+  const label = order.payment_mode === "moov_direct" ? "Moov Money" : "Mixx by Yas";
+
+  async function confirm() {
+    setLoading(true);
+    await fetch(`/api/admin/orders/${order.id}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ field: "confirm_mm" }),
+      credentials: "include",
+    });
+    setLoading(false);
+    setDone(true);
+    router.refresh();
+  }
+
+  return (
+    <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <Smartphone className="w-4 h-4 text-orange-600 shrink-0" />
+        <h2 className="font-bold text-orange-800">Paiement {label} à vérifier</h2>
+      </div>
+      {order.mm_transaction_ref && (
+        <div className="bg-white border border-orange-100 rounded-xl px-3 py-2">
+          <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">ID transaction client</p>
+          <p className="font-mono text-sm font-bold text-slate-800">{order.mm_transaction_ref}</p>
+        </div>
+      )}
+      <p className="text-xs text-orange-700 leading-relaxed">
+        Vérifiez le paiement sur votre téléphone {label}, puis confirmez.
+      </p>
+      <button
+        onClick={confirm}
+        disabled={loading || done}
+        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white text-sm font-bold transition-colors"
+      >
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+        {done ? "Paiement confirmé ✓" : "Confirmer le paiement reçu"}
+      </button>
+    </div>
+  );
+}
+
 /* ── Main export ── */
 export default function OrderDetailActions({ order }: { order: Order }) {
   const [editOpen, setEditOpen] = useState(false);
 
   return (
     <>
+      {/* Confirm MM payment */}
+      <ConfirmMMPayment order={order} />
+
       {/* Statut paiement */}
       <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
         <h2 className="font-bold text-slate-700">Statut du paiement</h2>

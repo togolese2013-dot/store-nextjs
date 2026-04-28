@@ -51,6 +51,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
     status:             order.status,
     statut_paiement:    order.statut_paiement ?? null,
     lien_localisation:  (order as unknown as { lien_localisation?: string }).lien_localisation ?? "",
+    payment_mode:       (order as unknown as { payment_mode?: string }).payment_mode ?? null,
+    mm_transaction_ref: (order as unknown as { mm_transaction_ref?: string }).mm_transaction_ref ?? null,
     items,
   };
 

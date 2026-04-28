@@ -13,6 +13,8 @@ async function ensureOrderCols() {
   for (const ddl of [
     "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
+    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
+    "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
   ]) {
     try { await pool.execute(ddl); } catch (e: any) {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
@@ -29,7 +31,7 @@ router.post("/api/orders", async (req, res) => {
     const {
       nom, telephone, adresse, zone_livraison, delivery_fee,
       note, lien_localisation, items, subtotal, total,
-      payment_mode, nb_tranches,
+      payment_mode, nb_tranches, mm_transaction_ref,
     } = req.body;
 
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
@@ -63,11 +65,23 @@ router.post("/api/orders", async (req, res) => {
       );
     }
 
-    if (lien_localisation) {
+    // Save extra fields
+    const extraUpdates: string[] = [];
+    const extraValues: unknown[] = [];
+    if (lien_localisation)    { extraUpdates.push("lien_localisation = ?");    extraValues.push(lien_localisation); }
+    if (payment_mode)         { extraUpdates.push("payment_mode = ?");         extraValues.push(payment_mode); }
+    if (mm_transaction_ref)   { extraUpdates.push("mm_transaction_ref = ?");   extraValues.push(mm_transaction_ref); }
+    if (extraUpdates.length > 0) {
       await pool.execute(
-        "UPDATE orders SET lien_localisation = ? WHERE id = ?",
-        [lien_localisation, id]
+        `UPDATE orders SET ${extraUpdates.join(", ")} WHERE id = ?`,
+        [...extraValues, id]
       );
+    }
+
+    // Mobile money direct → en attente de vérification
+    const isMmDirect = payment_mode === "moov_direct" || payment_mode === "yas_direct";
+    if (isMmDirect) {
+      await pool.execute("UPDATE orders SET status = 'en_attente_verification' WHERE id = ?", [id]);
     }
 
     // Payment plan: put order in "plan_paiement" status and create tranches

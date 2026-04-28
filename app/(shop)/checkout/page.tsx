@@ -81,10 +81,7 @@ export default function CheckoutPage() {
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
   const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
   const [payMode,      setPayMode]      = useState<"livraison" | "flooz" | "yas" | "echelonne">("livraison");
-  const [mmPhone,      setMmPhone]      = useState("");
-  const [mmWaiting,    setMmWaiting]    = useState(false);
-  const [mmTxId,       setMmTxId]       = useState<number | null>(null);
-  const [mmError,      setMmError]      = useState("");
+  const [mmRef,        setMmRef]        = useState("");
 
   useEffect(() => {
     fetch("/api/account/verification", { credentials: "include" })
@@ -93,32 +90,6 @@ export default function CheckoutPage() {
       .catch(() => setIsVerifie(false));
   }, []);
 
-  /* Polling USSD — vérifie statut FedaPay toutes les 5s */
-  useEffect(() => {
-    if (!mmWaiting || !mmTxId) return;
-    const interval = setInterval(async () => {
-      try {
-        const r = await fetch(`/api/orders/pay/status/${mmTxId}`);
-        const d = await r.json() as { status: string };
-        if (d.status === "approved") {
-          clearInterval(interval);
-          setMmWaiting(false);
-          setSubmitted(true);
-          clearCart();
-        } else if (["declined", "canceled", "failed"].includes(d.status)) {
-          clearInterval(interval);
-          setMmWaiting(false);
-          setMmError("Paiement refusé ou annulé. Votre commande est enregistrée — contactez-nous si nécessaire.");
-        }
-      } catch { /* retry next tick */ }
-    }, 5000);
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      setMmWaiting(false);
-      setMmError("Délai dépassé. Votre commande est enregistrée — contactez-nous si le paiement a été effectué.");
-    }, 180_000);
-    return () => { clearInterval(interval); clearTimeout(timeout); };
-  }, [mmWaiting, mmTxId, clearCart]);
 
   useEffect(() => {
     const match = document.cookie?.match?.(/ts_ref=([^;]+)/);
@@ -185,8 +156,9 @@ export default function CheckoutPage() {
           subtotal:          selectedTotal,
           total:             grandTotal,
           ref_code:          refCode ?? undefined,
-          payment_mode:      (payMode === "flooz" || payMode === "yas") ? "mobile_money" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
+          payment_mode:      payMode === "flooz" ? "moov_direct" : payMode === "yas" ? "yas_direct" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
+          mm_transaction_ref: (payMode === "flooz" || payMode === "yas") ? mmRef.trim() || null : null,
         }),
       });
       const data = await res.json();
@@ -195,31 +167,6 @@ export default function CheckoutPage() {
       setOrderedItems([...selectedItems]);
       setOrderedTotal(grandTotal);
       setOrderRef(data.reference ?? "");
-
-      /* Paiement Mobile Money → initier le push USSD */
-      if (payMode === "flooz" || payMode === "yas") {
-        const payRes = await fetch("/api/orders/pay/mobile-money", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({
-            orderId:  data.id,
-            orderRef: data.reference,
-            operator: payMode,
-            phone:    mmPhone || `${phonePrefix} ${phoneNumber}`,
-            total:    grandTotal,
-            nom:      form.nom,
-          }),
-        });
-        const payData = await payRes.json() as { ok?: boolean; transactionId?: number; error?: string };
-        if (!payRes.ok || !payData.transactionId) {
-          setSubmitError(payData.error || "Erreur lors de l'initiation du paiement Mobile Money. Veuillez réessayer ou choisir un autre mode de paiement.");
-          return;
-        }
-        setMmTxId(payData.transactionId);
-        setMmWaiting(true);
-        return;
-      }
-
       setSubmitted(true);
       clearCart();
     } catch {
@@ -227,41 +174,6 @@ export default function CheckoutPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  /* Mobile Money — écran attente USSD */
-  if (mmWaiting) {
-    const opLabel = payMode === "flooz" ? "Flooz" : "Mix by Yas";
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-        <div className="max-w-sm w-full text-center">
-          <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6 relative">
-            <Smartphone className="w-10 h-10 text-green-600" />
-            <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center animate-pulse">
-              <Wifi className="w-3.5 h-3.5 text-white" />
-            </span>
-          </div>
-          <h2 className="font-display font-bold text-2xl text-slate-900 mb-3">
-            Confirmez sur votre téléphone
-          </h2>
-          <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-            Une notification <span className="font-semibold text-slate-800">{opLabel}</span> a été envoyée
-            au <span className="font-semibold text-slate-800">{mmPhone || phonePrefix + " " + phoneNumber}</span>.
-            Entrez votre PIN pour confirmer le paiement de{" "}
-            <span className="font-semibold text-slate-800">{formatPrice(grandTotal)}</span>.
-          </p>
-          <div className="flex justify-center gap-1.5 mb-6">
-            {[0, 1, 2].map(i => (
-              <div key={i} className="w-2.5 h-2.5 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-            ))}
-          </div>
-          <p className="text-xs text-slate-400">Vérification automatique en cours…</p>
-          {mmError && (
-            <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">{mmError}</p>
-          )}
-        </div>
-      </div>
-    );
   }
 
   /* Empty cart guard */
@@ -633,31 +545,65 @@ export default function CheckoutPage() {
                       </div>
                     )}
 
-                    {(payMode === "flooz" || payMode === "yas") && (
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                            <Phone className="w-3.5 h-3.5 inline mr-1" />
-                            Numéro {payMode === "flooz" ? "Moov Money" : "Mixx by Yas"} *
-                          </label>
-                          <input
-                            type="tel"
-                            value={mmPhone}
-                            onChange={e => setMmPhone(e.target.value)}
-                            placeholder="90 00 00 00"
-                            className={inputCls()}
-                            autoComplete="tel"
-                          />
-                        </div>
-                        <div className="flex items-start gap-2 p-3 rounded-xl bg-green-50 border border-green-100">
-                          <Wifi className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                          <p className="text-xs text-green-800 leading-relaxed">
-                            Un push USSD sera envoyé sur ce numéro. Entrez votre PIN pour valider{" "}
-                            <span className="font-semibold">{formatPrice(grandTotal)}</span> — paiement instantané.
+                    {(payMode === "flooz" || payMode === "yas") && (() => {
+                      const merchantNum = payMode === "flooz" ? "98165380" : "90226491";
+                      const merchantDisplay = payMode === "flooz" ? "+228 98 16 53 80" : "+228 90 22 64 91";
+                      const ussdLink = `tel:*155*${merchantNum}*${Math.round(grandTotal)}%23`;
+                      const copyText = (text: string) => navigator.clipboard?.writeText(text).catch(() => {});
+                      return (
+                        <div className="space-y-4">
+                          {/* Montant + numéro à copier */}
+                          <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Montant à envoyer</p>
+                                <p className="text-lg font-bold text-slate-900">{formatPrice(grandTotal)}</p>
+                              </div>
+                              <button type="button" onClick={() => copyText(String(Math.round(grandTotal)))}
+                                className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                                Copier
+                              </button>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Numéro marchand</p>
+                                <p className="text-lg font-bold text-slate-900">{merchantDisplay}</p>
+                              </div>
+                              <button type="button" onClick={() => copyText(merchantNum)}
+                                className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                                Copier
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Bouton USSD 1 tap */}
+                          <a href={ussdLink}
+                            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-colors">
+                            <Phone className="w-4 h-4" />
+                            Payer maintenant — 1 tap (Android)
+                          </a>
+                          <p className="text-[11px] text-slate-400 text-center -mt-2">
+                            iPhone : ouvrez votre app Moov Money et transférez manuellement au numéro ci-dessus.
                           </p>
+
+                          {/* Référence transaction */}
+                          <div className="pt-2 border-t border-slate-100">
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                              ID de transaction reçu par SMS <span className="text-slate-400 font-normal">(optionnel mais recommandé)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={mmRef}
+                              onChange={e => setMmRef(e.target.value)}
+                              placeholder="Ex : TG20240428XXXX"
+                              className={inputCls()}
+                              autoComplete="off"
+                            />
+                            <p className="text-[11px] text-slate-400 mt-1">Après avoir payé, entrez l'ID reçu par SMS pour faciliter la vérification.</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {payMode === "echelonne" && (
                       <div className="space-y-3">
