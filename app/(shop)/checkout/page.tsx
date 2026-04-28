@@ -804,10 +804,6 @@ export default function CheckoutPage() {
                             <Phone className="w-4 h-4" />
                             Valider mon paiement
                           </a>
-                          <p className="text-[11px] text-slate-400 text-center -mt-2">
-                            Sur iPhone : ouvrez votre app {isMoov ? "Moov Money" : "Mixx by Yas"} et transférez manuellement.
-                          </p>
-
                           {/* Grille tarifaire — desktop uniquement */}
                           <details className="hidden lg:block group">
                             <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 font-medium select-none list-none flex items-center gap-1">
