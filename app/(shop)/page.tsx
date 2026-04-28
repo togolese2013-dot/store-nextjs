@@ -209,7 +209,7 @@ export default async function HomePage() {
 
   try {
     [bestsellers, promos, newItems] = await Promise.all([
-      apiGet<{ data: Product[] }>("/api/products?limit=8").then(r => r.data),
+      apiGet<{ data: Product[] }>("/api/products/bestsellers?limit=8").then(r => r.data),
       apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
       apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
     ]);
