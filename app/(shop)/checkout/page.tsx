@@ -152,11 +152,36 @@ export default function CheckoutPage() {
   const [payMode,      setPayMode]      = useState<"livraison" | "flooz" | "yas" | "echelonne">("livraison");
   const [mmRef,        setMmRef]        = useState("");
 
+  /* ── Saved addresses ── */
+  interface SavedAddress { id: number; nom: string; telephone: string; adresse: string; zone_livraison: string; is_default: number }
+  const [savedAddresses,   setSavedAddresses]   = useState<SavedAddress[]>([]);
+  const [selectedAddrId,   setSelectedAddrId]   = useState<number | "new" | null>(null);
+  const [showNewAddrForm,  setShowNewAddrForm]   = useState(false);
+  const [savingAddr,       setSavingAddr]        = useState(false);
+
   useEffect(() => {
     fetch("/api/account/verification", { credentials: "include" })
       .then(r => r.json())
       .then(d => setIsVerifie(d.statut === "verifie"))
       .catch(() => setIsVerifie(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/account/addresses", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d?.data?.length) return;
+        setSavedAddresses(d.data);
+        // Pre-select default or first address
+        const def = d.data.find((a: SavedAddress) => a.is_default) ?? d.data[0];
+        setSelectedAddrId(def.id);
+        setForm(f => ({ ...f, nom: def.nom, adresse: def.adresse, zone: def.zone_livraison }));
+        // Pre-fill phone (strip prefix)
+        const parts = def.telephone.split(" ");
+        if (parts.length >= 2) { setPhonePrefix(parts[0]); setPhoneNumber(parts.slice(1).join("")); }
+        else setPhoneNumber(def.telephone);
+      })
+      .catch(() => {});
   }, []);
 
 
@@ -176,6 +201,28 @@ export default function CheckoutPage() {
     const d = new Date();
     d.setDate(d.getDate() + index * 7);
     return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  }
+
+  async function saveCurrentAddress() {
+    setSavingAddr(true);
+    try {
+      const telephone = `${phonePrefix} ${phoneNumber.trim()}`;
+      const res = await fetch("/api/account/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ nom: form.nom, telephone, adresse: form.adresse, zone_livraison: form.zone, is_default: savedAddresses.length === 0 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.id) {
+        const newAddr: SavedAddress = { id: data.id, nom: form.nom, telephone, adresse: form.adresse, zone_livraison: form.zone, is_default: savedAddresses.length === 0 ? 1 : 0 };
+        setSavedAddresses(prev => [newAddr, ...prev]);
+        setSelectedAddrId(data.id);
+        setShowNewAddrForm(false);
+      }
+    } catch { /* ignore */ } finally {
+      setSavingAddr(false);
+    }
   }
 
   function validate(): boolean {
@@ -380,54 +427,137 @@ export default function CheckoutPage() {
                   <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">1</div>
                   Vos coordonnées
                 </h2>
-                <div className="grid sm:grid-cols-2 gap-4">
 
-                  {/* Nom */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                      <User className="w-3.5 h-3.5 inline mr-1" />Nom complet *
-                    </label>
-                    <input
-                      type="text" name="nom" value={form.nom}
-                      onChange={handleChange} placeholder="Ex : Kossi Amavi"
-                      className={inputCls(errors.nom)}
-                      autoComplete="name"
-                    />
-                    {errors.nom && <p className="text-xs text-red-500 mt-1">{errors.nom}</p>}
+                {/* ── Saved addresses list ── */}
+                {savedAddresses.length > 0 && (
+                  <div className="mb-5 space-y-2">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+                      Adresses de livraison ({savedAddresses.length})
+                    </p>
+
+                    {savedAddresses.map(addr => (
+                      <label
+                        key={addr.id}
+                        className={clsx(
+                          "flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all",
+                          selectedAddrId === addr.id
+                            ? "border-brand-500 bg-brand-50"
+                            : "border-slate-200 bg-white hover:border-brand-300"
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="saved_address"
+                          className="mt-0.5 accent-brand-700 shrink-0"
+                          checked={selectedAddrId === addr.id}
+                          onChange={() => {
+                            setSelectedAddrId(addr.id);
+                            setShowNewAddrForm(false);
+                            setForm(f => ({ ...f, nom: addr.nom, adresse: addr.adresse, zone: addr.zone_livraison }));
+                            const parts = addr.telephone.split(" ");
+                            if (parts.length >= 2) { setPhonePrefix(parts[0]); setPhoneNumber(parts.slice(1).join("")); }
+                            else setPhoneNumber(addr.telephone);
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 text-sm">{addr.nom}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{addr.adresse}</p>
+                          <p className="text-xs text-slate-400">Numéro de téléphone : {addr.telephone}</p>
+                          <p className="text-xs text-slate-400">{addr.zone_livraison}</p>
+                        </div>
+                      </label>
+                    ))}
+
+                    {/* Add new address toggle */}
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedAddrId("new"); setShowNewAddrForm(true); setForm({ nom: "", adresse: "", zone: "", note: "", lien_localisation: "" }); setPhonePrefix("+228"); setPhoneNumber(""); }}
+                      className={clsx(
+                        "w-full flex items-center gap-2 px-4 py-3 rounded-2xl border-2 text-sm font-semibold transition-all",
+                        selectedAddrId === "new"
+                          ? "border-brand-500 bg-brand-50 text-brand-800"
+                          : "border-dashed border-slate-300 text-slate-500 hover:border-brand-400 hover:text-brand-700"
+                      )}
+                    >
+                      <span className="text-lg leading-none">+</span>
+                      Ajouter une nouvelle adresse de livraison
+                    </button>
                   </div>
+                )}
 
-                  {/* Téléphone : indicatif + numéro */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                      <Phone className="w-3.5 h-3.5 inline mr-1" />Numéro de téléphone *
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="relative shrink-0">
-                        <select
-                          value={phonePrefix}
-                          onChange={e => setPhonePrefix(e.target.value)}
-                          className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800"
-                        >
-                          {PHONE_PREFIXES.map(p => (
-                            <option key={p.code} value={p.code}>
-                              {p.flag} {p.code}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                      </div>
+                {/* ── Form fields (shown when no saved addresses OR adding new) ── */}
+                {(savedAddresses.length === 0 || showNewAddrForm) && (
+                  <div className="grid sm:grid-cols-2 gap-4">
+
+                    {/* Nom */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                        <User className="w-3.5 h-3.5 inline mr-1" />Nom complet *
+                      </label>
                       <input
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={e => { setPhoneNumber(e.target.value); setErrors(err => ({ ...err, telephone: undefined })); }}
-                        placeholder="90 00 00 00"
-                        className={clsx(inputCls(errors.telephone), "flex-1 min-w-0")}
-                        autoComplete="tel-national"
+                        type="text" name="nom" value={form.nom}
+                        onChange={handleChange} placeholder="Ex : Kossi Amavi"
+                        className={inputCls(errors.nom)}
+                        autoComplete="name"
                       />
+                      {errors.nom && <p className="text-xs text-red-500 mt-1">{errors.nom}</p>}
                     </div>
-                    {errors.telephone && <p className="text-xs text-red-500 mt-1">{errors.telephone}</p>}
+
+                    {/* Téléphone : indicatif + numéro */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                        <Phone className="w-3.5 h-3.5 inline mr-1" />Numéro de téléphone *
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="relative shrink-0">
+                          <select
+                            value={phonePrefix}
+                            onChange={e => setPhonePrefix(e.target.value)}
+                            className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800"
+                          >
+                            {PHONE_PREFIXES.map(p => (
+                              <option key={p.code} value={p.code}>
+                                {p.flag} {p.code}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                        </div>
+                        <input
+                          type="tel"
+                          value={phoneNumber}
+                          onChange={e => { setPhoneNumber(e.target.value); setErrors(err => ({ ...err, telephone: undefined })); }}
+                          placeholder="90 00 00 00"
+                          className={clsx(inputCls(errors.telephone), "flex-1 min-w-0")}
+                          autoComplete="tel-national"
+                        />
+                      </div>
+                      {errors.telephone && <p className="text-xs text-red-500 mt-1">{errors.telephone}</p>}
+                    </div>
+
+                    {/* Save address button (only for logged-in users adding new address) */}
+                    {showNewAddrForm && (
+                      <div className="sm:col-span-2 flex items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={saveCurrentAddress}
+                          disabled={savingAddr || !form.nom.trim() || !phoneNumber.trim() || !form.adresse.trim() || !form.zone}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 transition-colors disabled:opacity-40"
+                        >
+                          {savingAddr ? <span className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                          Enregistrer cette adresse
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewAddrForm(false); if (savedAddresses.length > 0) { const def = savedAddresses.find(a => a.is_default) ?? savedAddresses[0]; setSelectedAddrId(def.id); } }}
+                          className="text-xs text-slate-400 hover:text-slate-600"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Delivery */}

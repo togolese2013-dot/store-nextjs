@@ -467,4 +467,99 @@ router.post("/api/account/verification", async (req, res) => {
   }
 });
 
+/* ──────────────────────────────────────────────
+   client_addresses — auto-create table
+────────────────────────────────────────────── */
+let addressTableReady = false;
+async function ensureAddressTable() {
+  if (addressTableReady) return;
+  await (db as import("mysql2/promise").Pool).execute(`
+    CREATE TABLE IF NOT EXISTS client_addresses (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      client_user_id  INT NOT NULL,
+      nom             VARCHAR(255) NOT NULL,
+      telephone       VARCHAR(50)  NOT NULL,
+      adresse         VARCHAR(500) NOT NULL,
+      zone_livraison  VARCHAR(255) NOT NULL,
+      is_default      TINYINT(1) DEFAULT 0,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (client_user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  addressTableReady = true;
+}
+
+/* ──────────────────────────────────────────────
+   GET /api/account/addresses
+────────────────────────────────────────────── */
+router.get("/api/account/addresses", async (req, res) => {
+  try {
+    const session = await getClientSession(req);
+    if (!session) return res.status(401).json({ error: "Non autorisé." });
+    await ensureAddressTable();
+    const pool = db as import("mysql2/promise").Pool;
+    const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      "SELECT * FROM client_addresses WHERE client_user_id = ? ORDER BY is_default DESC, created_at DESC LIMIT 20",
+      [session.id]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+
+/* ──────────────────────────────────────────────
+   POST /api/account/addresses
+────────────────────────────────────────────── */
+router.post("/api/account/addresses", async (req, res) => {
+  try {
+    const session = await getClientSession(req);
+    if (!session) return res.status(401).json({ error: "Non autorisé." });
+    await ensureAddressTable();
+
+    const { nom, telephone, adresse, zone_livraison, is_default } = req.body;
+    if (!nom?.trim() || !telephone?.trim() || !adresse?.trim() || !zone_livraison?.trim()) {
+      return res.status(400).json({ error: "Tous les champs sont requis." });
+    }
+
+    const pool = db as import("mysql2/promise").Pool;
+
+    // If this is set as default, unset all others
+    if (is_default) {
+      await pool.execute(
+        "UPDATE client_addresses SET is_default = 0 WHERE client_user_id = ?",
+        [session.id]
+      );
+    }
+
+    const [result] = await pool.execute<import("mysql2/promise").OkPacket>(
+      `INSERT INTO client_addresses (client_user_id, nom, telephone, adresse, zone_livraison, is_default)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [session.id, nom.trim(), telephone.trim(), adresse.trim(), zone_livraison.trim(), is_default ? 1 : 0]
+    );
+
+    res.json({ success: true, id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+
+/* ──────────────────────────────────────────────
+   DELETE /api/account/addresses/:id
+────────────────────────────────────────────── */
+router.delete("/api/account/addresses/:id", async (req, res) => {
+  try {
+    const session = await getClientSession(req);
+    if (!session) return res.status(401).json({ error: "Non autorisé." });
+    const pool = db as import("mysql2/promise").Pool;
+    await pool.execute(
+      "DELETE FROM client_addresses WHERE id = ? AND client_user_id = ?",
+      [Number(req.params.id), session.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+
 export default router;
