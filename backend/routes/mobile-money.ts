@@ -1,6 +1,6 @@
 import express from "express";
 import { db } from "@/lib/db";
-import { addOrderEvent, emitAdminEvent } from "@/lib/admin-db";
+import { addOrderEvent } from "@/lib/admin-db";
 import { emitAdminEvent as emitEvent } from "../lib/admin-events";
 import type mysql from "mysql2/promise";
 
@@ -15,10 +15,10 @@ function fedapayHeaders() {
   };
 }
 
-/* ─── Operator → FedaPay mode mapping ─── */
+/* Operator → FedaPay mode mapping */
 const OPERATOR_MODE: Record<string, string> = {
   flooz: "moov",
-  yas:   "moov", // Mix by Yas = réseau Moov Africa Togo
+  yas:   "moov",
 };
 
 /* ──────────────────────────────────────────────
@@ -44,10 +44,9 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
     if (!mode) return res.status(400).json({ error: "Opérateur non supporté." });
 
     const cleanPhone = phone.replace(/\D/g, "").replace(/^228/, "");
-
     const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://store.togolese.fr";
 
-    /* 1 — Créer la transaction FedaPay */
+    /* ── Étape 1 : Créer la transaction ── */
     const txRes = await fetch(`${FEDAPAY_BASE}/transactions`, {
       method:  "POST",
       headers: fedapayHeaders(),
@@ -58,38 +57,55 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
         callback_url: `${process.env.BACKEND_URL || ""}/api/webhooks/fedapay`,
         return_url:   `${siteUrl}/account/commandes`,
         customer: {
-          firstname: nom || "Client",
-          lastname:  "",
+          firstname:    nom || "Client",
+          lastname:     "",
           phone_number: { number: cleanPhone, country: "tg" },
         },
       }),
     });
 
-    const txData = await txRes.json() as { v1?: { transaction?: { id: number } }; message?: string };
-    const txId = txData?.v1?.transaction?.id;
+    const txData = await txRes.json() as {
+      "v1/transaction"?: { id: number };
+      message?: string;
+      errors?: unknown;
+    };
+
+    const txId = txData?.["v1/transaction"]?.id;
 
     if (!txId) {
-      console.error("[fedapay create]", txData);
+      console.error("[fedapay] create transaction failed:", JSON.stringify(txData));
       return res.status(502).json({ error: "Impossible de créer la transaction FedaPay." });
     }
 
-    /* 2 — Initialiser le paiement (envoie le push USSD) */
-    const payRes = await fetch(`${FEDAPAY_BASE}/transactions/${txId}/pay`, {
+    /* ── Étape 2 : Générer le token de paiement ── */
+    const tokenRes = await fetch(`${FEDAPAY_BASE}/transactions/${txId}/token`, {
       method:  "POST",
       headers: fedapayHeaders(),
-      body: JSON.stringify({
-        mode,
-        mobile_money: { number: cleanPhone, country: "tg" },
-      }),
+      body:    JSON.stringify({}),
     });
 
-    const payData = await payRes.json() as { message?: string };
-    if (!payRes.ok) {
-      console.error("[fedapay pay]", payData);
-      return res.status(502).json({ error: payData.message || "Erreur lors de l'envoi USSD." });
+    const tokenData = await tokenRes.json() as { token?: string; message?: string };
+
+    if (!tokenRes.ok || !tokenData.token) {
+      console.error("[fedapay] generate token failed:", JSON.stringify(tokenData));
+      return res.status(502).json({ error: "Impossible de générer le token de paiement." });
     }
 
-    /* 3 — Stocker txId sur la commande */
+    /* ── Étape 3 : Envoyer le push USSD ── */
+    const pushRes = await fetch(`${FEDAPAY_BASE}/${mode}`, {
+      method:  "POST",
+      headers: fedapayHeaders(),
+      body:    JSON.stringify({ token: tokenData.token }),
+    });
+
+    const pushData = await pushRes.json() as { message?: string };
+
+    if (!pushRes.ok) {
+      console.error("[fedapay] USSD push failed:", JSON.stringify(pushData));
+      return res.status(502).json({ error: pushData.message || "Erreur lors de l'envoi du push USSD." });
+    }
+
+    /* ── Étape 4 : Stocker txId sur la commande ── */
     const pool = db as mysql.Pool;
     try {
       await pool.execute("ALTER TABLE orders ADD COLUMN fedapay_tx_id INT NULL", []);
@@ -148,7 +164,7 @@ router.post("/api/webhooks/fedapay", async (req, res) => {
       return res.json({ received: true });
     }
 
-    const txId  = event.entity?.id;
+    const txId   = event.entity?.id;
     const amount = event.entity?.amount;
     if (!txId) return res.json({ received: true });
 
