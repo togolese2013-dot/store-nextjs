@@ -9,7 +9,7 @@ export default function VerificationsPage() {
       <PageHeader
         title="Vérifications d'identité"
         subtitle="Approuvez ou refusez les demandes de vérification KYC"
-        accent="green"
+        accent="emerald"
       />
       <VerificationsManager />
     </div>
