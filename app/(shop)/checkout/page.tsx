@@ -80,7 +80,7 @@ export default function CheckoutPage() {
   const [refCode,      setRefCode]      = useState<string | null>(null);
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
   const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
-  const [mmOperator,   setMmOperator]   = useState<"flooz" | "yas" | null>(null);
+  const [payMode,      setPayMode]      = useState<"livraison" | "flooz" | "yas" | "echelonne">("livraison");
   const [mmPhone,      setMmPhone]      = useState("");
   const [mmWaiting,    setMmWaiting]    = useState(false);
   const [mmTxId,       setMmTxId]       = useState<number | null>(null);
@@ -185,7 +185,7 @@ export default function CheckoutPage() {
           subtotal:          selectedTotal,
           total:             grandTotal,
           ref_code:          refCode ?? undefined,
-          payment_mode:      mmOperator ? "mobile_money" : nbTranches > 0 ? `${nbTranches}x` : "comptant",
+          payment_mode:      (payMode === "flooz" || payMode === "yas") ? "mobile_money" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
         }),
       });
@@ -197,14 +197,14 @@ export default function CheckoutPage() {
       setOrderRef(data.reference ?? "");
 
       /* Paiement Mobile Money → initier le push USSD */
-      if (mmOperator) {
+      if (payMode === "flooz" || payMode === "yas") {
         const payRes = await fetch("/api/orders/pay/mobile-money", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
             orderId:  data.id,
             orderRef: data.reference,
-            operator: mmOperator,
+            operator: payMode,
             phone:    mmPhone || `${phonePrefix} ${phoneNumber}`,
             total:    grandTotal,
             nom:      form.nom,
@@ -233,7 +233,7 @@ export default function CheckoutPage() {
 
   /* Mobile Money — écran attente USSD */
   if (mmWaiting) {
-    const opLabel = mmOperator === "flooz" ? "Flooz" : "Mix by Yas";
+    const opLabel = payMode === "flooz" ? "Flooz" : "Mix by Yas";
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="max-w-sm w-full text-center">
@@ -532,174 +532,148 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Mode de paiement */}
+              {/* Mode de paiement — liste style Amazon */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
-                <h2 className="font-display font-800 text-slate-900 text-base mb-5 flex items-center gap-2">
+                <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">3</div>
                   Mode de paiement
                 </h2>
 
-                {/* Options */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100">
                   {([
-                    { v: 0, label: "Comptant",  sub: "En une fois",                                                         echelonne: false },
-                    { v: 2, label: "2 fois",    sub: `${formatPrice(Math.round(grandTotal / 2 * 100) / 100)} / sem.`,       echelonne: true  },
-                    { v: 3, label: "3 fois",    sub: `${formatPrice(Math.round(grandTotal / 3 * 100) / 100)} / sem.`,       echelonne: true  },
-                    { v: 4, label: "4 fois",    sub: `${formatPrice(Math.round(grandTotal / 4 * 100) / 100)} / sem.`,       echelonne: true  },
-                  ] as { v: 0|2|3|4; label: string; sub: string; echelonne: boolean }[]).map(opt => {
-                    const locked = opt.echelonne && isVerifie === false;
+                    { id: "livraison",  label: "À la livraison",    sub: "Espèces ou Mobile Money à la réception", locked: false },
+                    { id: "flooz",      label: "Flooz",              sub: "Moov Africa Togo",                       locked: false },
+                    { id: "yas",        label: "Mix by Yas",         sub: "Yas / Moov Togo",                        locked: false },
+                    { id: "echelonne",  label: "Paiement échelonné", sub: isVerifie ? "2× / 3× / 4× hebdomadaire" : "Réservé aux comptes vérifiés", locked: isVerifie === false },
+                  ] as { id: string; label: string; sub: string; locked: boolean }[]).map(opt => {
+                    const selected = payMode === opt.id;
                     return (
-                      <button
-                        key={opt.v}
-                        type="button"
-                        onClick={() => !locked && setNbTranches(opt.v)}
-                        disabled={locked}
-                        title={locked ? "Réservé aux comptes vérifiés" : undefined}
-                        className={clsx(
-                          "relative flex flex-col items-center gap-0.5 px-3 py-3 rounded-2xl border-2 text-center transition-all",
-                          locked
-                            ? "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed"
-                            : nbTranches === opt.v
-                              ? "border-brand-600 bg-brand-50 text-brand-900"
-                              : "border-slate-200 text-slate-600 hover:border-brand-300"
+                      <div key={opt.id} className={clsx("transition-colors", selected ? "bg-blue-50" : opt.locked ? "opacity-50 bg-slate-50" : "bg-white hover:bg-slate-50")}>
+                        <button
+                          type="button"
+                          disabled={opt.locked}
+                          onClick={() => {
+                            if (opt.locked) return;
+                            setPayMode(opt.id as typeof payMode);
+                            if (opt.id === "echelonne" && nbTranches === 0) setNbTranches(2);
+                          }}
+                          className="w-full flex items-center gap-4 px-5 py-4 text-left"
+                        >
+                          <div className={clsx(
+                            "w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all",
+                            selected ? "border-blue-600 bg-blue-600" : "border-slate-300"
+                          )}>
+                            {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={clsx("font-semibold text-sm", selected ? "text-blue-900" : "text-slate-800")}>
+                              {opt.label}
+                              {opt.locked && <span className="ml-2 text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">🔒</span>}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5">{opt.sub}</p>
+                          </div>
+                          {opt.id === "flooz" && <Smartphone className="w-4 h-4 text-slate-300 shrink-0" />}
+                          {opt.id === "yas"   && <Smartphone className="w-4 h-4 text-slate-300 shrink-0" />}
+                        </button>
+
+                        {selected && (
+                          <div className="px-5 pb-5 pt-1">
+                            {/* À la livraison */}
+                            {opt.id === "livraison" && (
+                              <div className="flex items-start gap-3 p-3 rounded-xl bg-brand-50 border border-brand-100">
+                                <Check className="w-4 h-4 text-brand-700 shrink-0 mt-0.5" />
+                                <p className="text-xs text-brand-800 leading-relaxed">
+                                  Payez en espèces ou via Mobile Money (Flooz / T-Money) directement à la réception. Aucune info bancaire requise.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Flooz / Mix by Yas */}
+                            {(opt.id === "flooz" || opt.id === "yas") && (
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                                    <Phone className="w-3.5 h-3.5 inline mr-1" />
+                                    Numéro {opt.id === "flooz" ? "Flooz" : "Mix by Yas"} *
+                                  </label>
+                                  <input
+                                    type="tel"
+                                    value={mmPhone}
+                                    onChange={e => setMmPhone(e.target.value)}
+                                    placeholder="90 00 00 00"
+                                    className={inputCls()}
+                                    autoComplete="tel"
+                                  />
+                                </div>
+                                <div className="flex items-start gap-2 p-3 rounded-xl bg-green-50 border border-green-100">
+                                  <Wifi className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                                  <p className="text-xs text-green-800 leading-relaxed">
+                                    Un push USSD sera envoyé sur ce numéro. Entrez votre PIN pour valider{" "}
+                                    <span className="font-semibold">{formatPrice(grandTotal)}</span> — paiement instantané.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Échelonné */}
+                            {opt.id === "echelonne" && (
+                              <div className="space-y-3">
+                                <div className="flex gap-2">
+                                  {([2, 3, 4] as const).map(n => (
+                                    <button
+                                      key={n}
+                                      type="button"
+                                      onClick={() => setNbTranches(n)}
+                                      className={clsx(
+                                        "flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition-all",
+                                        nbTranches === n
+                                          ? "border-blue-600 bg-blue-50 text-blue-900"
+                                          : "border-slate-200 text-slate-600 hover:border-blue-300"
+                                      )}
+                                    >
+                                      {n}×
+                                      <span className="block text-[10px] font-normal text-slate-400">
+                                        {formatPrice(Math.round(grandTotal / n))} / sem.
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                                {nbTranches > 0 && (
+                                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+                                    {Array.from({ length: nbTranches }, (_, i) => (
+                                      <div key={i} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                          <div className={clsx("w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold",
+                                            i === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-700"
+                                          )}>{i + 1}</div>
+                                          <span className="text-slate-600">{i === 0 ? "Aujourd'hui" : trancheDate(i)}</span>
+                                        </div>
+                                        <span className="font-bold text-slate-900">{formatPrice(Math.round(grandTotal / nbTranches))}</span>
+                                      </div>
+                                    ))}
+                                    <p className="text-[11px] text-amber-700 pt-1">⚠️ Livraison après confirmation du dernier versement.</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
-                      >
-                        <span className="font-bold text-sm">{opt.label}</span>
-                        <span className="text-[10px] text-slate-400">{locked ? "Compte vérifié requis" : opt.sub}</span>
-                        {locked && (
-                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-300 rounded-full flex items-center justify-center text-white text-[8px]">🔒</span>
-                        )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
 
-                {/* Message compte non vérifié */}
                 {isVerifie === false && (
-                  <div className="mb-4 flex items-start gap-3 p-3 rounded-2xl bg-amber-50 border border-amber-200">
-                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-800">
-                      Le paiement échelonné est réservé aux{" "}
-                      <span className="font-semibold">comptes vérifiés</span>.{" "}
-                      <Link href="/account/verification" className="underline font-semibold hover:text-amber-900">
-                        Vérifier mon compte →
-                      </Link>
-                    </p>
-                  </div>
+                  <p className="text-xs text-amber-700 mt-3 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>Le paiement échelonné nécessite un <Link href="/account/verification" className="underline font-semibold">compte vérifié →</Link></span>
+                  </p>
                 )}
-
-                {/* Comptant info */}
-                {nbTranches === 0 && (
-                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-brand-50 border border-brand-100">
-                    <div className="w-8 h-8 rounded-xl bg-brand-900 flex items-center justify-center shrink-0">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-brand-900 text-sm">Paiement à la livraison</p>
-                      <p className="text-brand-700 text-xs mt-0.5 leading-relaxed">
-                        Espèces ou Mobile Money (Flooz / T-Money) à la réception. Aucune info bancaire requise.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Échéancier */}
-                {nbTranches > 0 && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-3">
-                      Votre échéancier — {nbTranches} versements hebdomadaires
-                    </p>
-                    <div className="space-y-2">
-                      {Array.from({ length: nbTranches }, (_, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={clsx(
-                              "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-                              i === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-700"
-                            )}>
-                              {i + 1}
-                            </div>
-                            <span className="text-xs text-slate-600">
-                              {i === 0 ? "Aujourd'hui" : trancheDate(i)}
-                              {i === 0 && <span className="ml-1 text-amber-600 font-semibold">← à payer pour confirmer</span>}
-                            </span>
-                          </div>
-                          <span className="text-sm font-bold text-slate-900">{formatPrice(montantTranche)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-amber-700 mt-3 leading-snug">
-                      ⚠️ Le produit sera livré après le dernier versement confirmé par notre équipe.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-              {/* ── Étape 4 : Payer maintenant via Mobile Money ── */}
-              <div className="bg-white rounded-3xl border border-slate-100 p-6">
-                <h2 className="font-display font-800 text-slate-900 text-base mb-5 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">4</div>
-                  Payer maintenant (optionnel)
-                </h2>
-
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {([
-                    { v: null,   label: "À la livraison", sub: "Espèces / Mobile Money" },
-                    { v: "flooz", label: "Flooz",          sub: "Moov Africa Togo" },
-                    { v: "yas",   label: "Mix by Yas",     sub: "Yas / Moov Togo" },
-                  ] as { v: "flooz" | "yas" | null; label: string; sub: string }[]).map(opt => (
-                    <button
-                      key={String(opt.v)}
-                      type="button"
-                      onClick={() => setMmOperator(opt.v)}
-                      className={clsx(
-                        "flex flex-col items-center gap-0.5 px-2 py-3 rounded-2xl border-2 text-center transition-all",
-                        mmOperator === opt.v
-                          ? "border-green-500 bg-green-50 text-green-900"
-                          : "border-slate-200 text-slate-600 hover:border-green-300"
-                      )}
-                    >
-                      {opt.v ? <Smartphone className="w-4 h-4 mb-0.5" /> : <Check className="w-4 h-4 mb-0.5" />}
-                      <span className="font-bold text-xs">{opt.label}</span>
-                      <span className="text-[10px] text-slate-400 leading-tight">{opt.sub}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {mmOperator && (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                        <Phone className="w-3.5 h-3.5 inline mr-1" />
-                        Numéro {mmOperator === "flooz" ? "Flooz" : "Mix by Yas"} *
-                      </label>
-                      <input
-                        type="tel"
-                        value={mmPhone}
-                        onChange={e => setMmPhone(e.target.value)}
-                        placeholder={`Ex : 90 00 00 00`}
-                        className={inputCls()}
-                        autoComplete="tel"
-                      />
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Vous recevrez une notification sur ce numéro pour confirmer le paiement de{" "}
-                        <span className="font-semibold">{formatPrice(grandTotal)}</span>.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-2 p-3 rounded-xl bg-green-50 border border-green-100">
-                      <Wifi className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                      <p className="text-xs text-green-800 leading-relaxed">
-                        Un push USSD sera envoyé sur votre téléphone. Entrez votre PIN pour valider — le paiement est instantané.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 {mmError && (
                   <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{mmError}</p>
                 )}
               </div>
+            </div>
 
             {/* ── Summary ── */}
             <div className="lg:col-span-1">
