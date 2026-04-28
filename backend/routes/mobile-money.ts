@@ -67,11 +67,24 @@ router.get("/api/debug/fedapay-test", async (req, res) => {
       headers: fedapayHeaders(),
       body: JSON.stringify({}),
     });
-    const tokenData = await tokenRes.json();
+    const tokenData = await tokenRes.json() as { token?: string };
     log.step3_status = tokenRes.status;
     log.step3_token = tokenData;
 
-    return res.json({ ok: true, log });
+    const token = tokenData.token;
+    if (!token) return res.json({ ok: false, error: "no token", log });
+
+    /* Test 4: push USSD moov */
+    const pushRes = await fetch(`${FEDAPAY_BASE}/moov`, {
+      method: "POST",
+      headers: fedapayHeaders(),
+      body: JSON.stringify({ token }),
+    });
+    const pushData = await pushRes.json();
+    log.step4_status = pushRes.status;
+    log.step4_push = pushData;
+
+    return res.json({ ok: pushRes.ok, log });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err), log });
   }
