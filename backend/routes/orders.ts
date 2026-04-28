@@ -78,11 +78,7 @@ router.post("/api/orders", async (req, res) => {
       );
     }
 
-    // Mobile money direct → en attente de vérification
-    const isMmDirect = payment_mode === "moov_direct" || payment_mode === "yas_direct";
-    if (isMmDirect) {
-      await pool.execute("UPDATE orders SET status = 'en_attente_verification' WHERE id = ?", [id]);
-    }
+    // Mobile money direct — statut reste 'pending', payment_mode indique la vérification nécessaire
 
     // Payment plan: put order in "plan_paiement" status and create tranches
     if (isEchelonne && tranches) {
