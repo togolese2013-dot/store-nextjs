@@ -565,11 +565,11 @@ export default function CheckoutPage() {
                     {
                       id: "echelonne",
                       label: "Échelonné",
-                      sub: isVerifie ? "2× / 3× / 4×" : "Compte vérifié",
-                      locked: isVerifie === false,
+                      sub: "2× / 3× / 4×",
+                      locked: false,
                       logo: (
-                        <div className={clsx("w-10 h-10 rounded-xl flex items-center justify-center", isVerifie === false ? "bg-slate-100" : "bg-amber-50")}>
-                          <ShieldCheck className={clsx("w-5 h-5", isVerifie === false ? "text-slate-300" : "text-amber-600")} />
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-50">
+                          <ShieldCheck className="w-5 h-5 text-amber-600" />
                         </div>
                       ),
                     },
@@ -721,53 +721,50 @@ export default function CheckoutPage() {
 
                     {payMode === "echelonne" && (
                       <div className="space-y-3">
+                        {/* x2 / x3 / x4 — always grayed out (verified account required) */}
                         <div className="flex gap-2">
                           {([2, 3, 4] as const).map(n => (
-                            <button
+                            <div
                               key={n}
-                              type="button"
-                              onClick={() => setNbTranches(n)}
-                              className={clsx(
-                                "flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition-all",
-                                nbTranches === n
-                                  ? "border-blue-600 bg-blue-50 text-blue-900"
-                                  : "border-slate-200 text-slate-600 hover:border-blue-300"
-                              )}
+                              className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-bold text-center opacity-50 select-none"
                             >
                               {n}×
                               <span className="block text-[10px] font-normal text-slate-400">
                                 {formatPrice(Math.round(grandTotal / n))} / sem.
                               </span>
-                            </button>
+                            </div>
                           ))}
                         </div>
-                        {nbTranches > 0 && (
-                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-                            {Array.from({ length: nbTranches }, (_, i) => (
-                              <div key={i} className="flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-2">
-                                  <div className={clsx("w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold",
-                                    i === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-700"
-                                  )}>{i + 1}</div>
-                                  <span className="text-slate-600">{i === 0 ? "Aujourd'hui" : trancheDate(i)}</span>
-                                </div>
-                                <span className="font-bold text-slate-900">{formatPrice(Math.round(grandTotal / nbTranches))}</span>
+
+                        {/* Schedule preview (read-only, shown for n=2 as example) */}
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2 opacity-60 select-none">
+                          {Array.from({ length: 2 }, (_, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className={clsx("w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold",
+                                  i === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-700"
+                                )}>{i + 1}</div>
+                                <span className="text-slate-600">{i === 0 ? "Aujourd'hui" : trancheDate(i)}</span>
                               </div>
-                            ))}
-                            <p className="text-[11px] text-amber-700 pt-1">⚠️ Livraison après confirmation du dernier versement.</p>
-                          </div>
-                        )}
+                              <span className="font-bold text-slate-900">{formatPrice(Math.round(grandTotal / 2))}</span>
+                            </div>
+                          ))}
+                          <p className="text-[11px] text-amber-700 pt-1">⚠️ Livraison après confirmation du dernier versement.</p>
+                        </div>
+
+                        {/* Lock message */}
+                        <p className="text-xs text-amber-700 flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                          <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                          Le paiement échelonné nécessite un{" "}
+                          <Link href="/account/verification" className="underline font-semibold">
+                            compte vérifié →
+                          </Link>
+                        </p>
                       </div>
                     )}
                   </div>
                 )}
 
-                {isVerifie === false && (
-                  <p className="text-xs text-amber-700 mt-3 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                    <span>Le paiement échelonné nécessite un <Link href="/account/verification" className="underline font-semibold">compte vérifié →</Link></span>
-                  </p>
-                )}
               </div>
             </div>
 
