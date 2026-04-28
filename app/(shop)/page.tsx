@@ -207,15 +207,17 @@ export default async function HomePage() {
   let promos:      Product[] = [];
   let newItems:    Product[] = [];
 
-  try {
-    [bestsellers, promos, newItems] = await Promise.all([
-      apiGet<{ data: Product[] }>("/api/products/bestsellers?limit=8").then(r => r.data),
-      apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
-      apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
-    ]);
-  } catch (err) {
-    console.error("[HomePage] API fetch failed:", err);
-  }
+  const [bsRes, promoRes, newRes] = await Promise.allSettled([
+    apiGet<{ data: Product[] }>("/api/products/bestsellers?limit=8").then(r => r.data),
+    apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
+    apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
+  ]);
+  if (bsRes.status    === "fulfilled") bestsellers = bsRes.value;
+  if (promoRes.status === "fulfilled") promos      = promoRes.value;
+  if (newRes.status   === "fulfilled") newItems    = newRes.value;
+  if (bsRes.status    === "rejected")  console.error("[HomePage] bestsellers:", bsRes.reason);
+  if (promoRes.status === "rejected")  console.error("[HomePage] promos:",      promoRes.reason);
+  if (newRes.status   === "rejected")  console.error("[HomePage] new:",         newRes.reason);
 
   return (
     <>

@@ -179,8 +179,8 @@ router.get("/api/products/bestsellers", async (req, res) => {
       const [prodRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
         `SELECT p.*,
                 c.nom AS category_nom
-         FROM products p
-         LEFT JOIN categories c ON c.id = p.category_id
+         FROM produits p
+         LEFT JOIN categories c ON c.id = p.categorie_id
          WHERE p.reference IN (${placeholders})
            AND p.stock > 0
          LIMIT 20`,
@@ -207,8 +207,8 @@ router.get("/api/products/bestsellers", async (req, res) => {
       const needed   = limit - products.length;
       const [fallback] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
         `SELECT p.*, c.nom AS category_nom
-         FROM products p
-         LEFT JOIN categories c ON c.id = p.category_id
+         FROM produits p
+         LEFT JOIN categories c ON c.id = p.categorie_id
          WHERE p.stock > 0
          ORDER BY RAND()
          LIMIT ?`,
