@@ -9,7 +9,6 @@ import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
   User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2, ShieldCheck,
-  Smartphone, Wifi,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -653,9 +652,6 @@ export default function CheckoutPage() {
                     <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                     <span>Le paiement échelonné nécessite un <Link href="/account/verification" className="underline font-semibold">compte vérifié →</Link></span>
                   </p>
-                )}
-                {mmError && (
-                  <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{mmError}</p>
                 )}
               </div>
             </div>
