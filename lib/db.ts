@@ -22,7 +22,7 @@ function createPool() {
     return mysql.createPool({
       uri:                url,
       waitForConnections: true,
-      connectionLimit:    8,
+      connectionLimit:    3,
       charset:            "utf8mb4",
       timezone:           "+00:00",
       ssl: isProduction ? { rejectUnauthorized: false } : undefined,
@@ -35,7 +35,7 @@ function createPool() {
     password:           process.env.DB_PASSWORD || "",
     database:           process.env.DB_NAME     || "togol2600657",
     waitForConnections: true,
-    connectionLimit:    8,
+    connectionLimit:    3,
     charset:            "utf8mb4",
     timezone:           "+00:00",
   });
