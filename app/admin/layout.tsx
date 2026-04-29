@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (role === "livreur") redirect("/livreur");
 
   // Force password change on first login
-  if (session.must_change_password) redirect("/admin/change-password");
+  if (session.must_change_password) redirect("/change-password");
 
   if (role === "staff") {
     // Team member from utilisateurs — always resolve permissions from DB (JWT may be stale)
