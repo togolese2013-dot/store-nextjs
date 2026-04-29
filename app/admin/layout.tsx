@@ -1,5 +1,5 @@
 import { getAdminSession } from "@/lib/auth";
-import { getAdminById } from "@/lib/admin-db";
+import { getAdminById, getUtilisateurById } from "@/lib/admin-db";
 import AdminShell from "@/components/admin/AdminShell";
 import type { AdminPermissions } from "@/lib/admin-permissions";
 
@@ -15,9 +15,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   let role        = session.role;
   let permissions: AdminPermissions | null = session.permissions ?? null;
 
-  // For staff (team members from utilisateurs): trust JWT permissions as-is.
-  // For other non-super_admin roles: JWT may be stale — resolve from admin_users DB.
-  if (role !== "super_admin" && role !== "staff") {
+  if (role === "staff") {
+    // Team member from utilisateurs — always resolve permissions from DB (JWT may be stale)
+    try {
+      const dbMember = await getUtilisateurById(Number(session.id));
+      if (dbMember?.permissions) {
+        try { permissions = JSON.parse(dbMember.permissions) as AdminPermissions; } catch { /* ignore */ }
+      } else {
+        permissions = null;
+      }
+    } catch { /* ignore */ }
+  } else if (role !== "super_admin") {
+    // Admin user — JWT role may be stale, resolve from admin_users DB
     try {
       const dbUser = await getAdminById(Number(session.id));
       if (dbUser) {
@@ -26,7 +35,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           try { permissions = JSON.parse(dbUser.permissions) as AdminPermissions; } catch { /* ignore */ }
         }
       } else {
-        // Old admin JWT not found in DB — grant full access (backward compat)
         role = "super_admin";
       }
     } catch {

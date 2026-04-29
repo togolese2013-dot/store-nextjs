@@ -1,5 +1,5 @@
 import { getAdminSession } from "@/lib/auth";
-import { getAdminById } from "@/lib/admin-db";
+import { getAdminById, getUtilisateurById } from "@/lib/admin-db";
 import type { AdminPermissions } from "@/lib/admin-permissions";
 import { getAccessibleModules } from "@/lib/admin-permissions";
 import Link from "next/link";
@@ -66,9 +66,18 @@ export default async function AdminHomePage() {
   let role        = session?.role ?? "";
   let permissions: AdminPermissions | null = session?.permissions ?? null;
 
-  // For staff (team members from utilisateurs): trust JWT permissions as-is.
-  // For other non-super_admin roles: JWT may be stale — resolve from admin_users DB.
-  if (session && role !== "super_admin" && role !== "staff") {
+  if (session && role === "staff") {
+    // Team member — always resolve permissions from DB (JWT may be stale)
+    try {
+      const dbMember = await getUtilisateurById(Number(session.id));
+      if (dbMember?.permissions) {
+        try { permissions = JSON.parse(dbMember.permissions) as AdminPermissions; } catch { /* ignore */ }
+      } else {
+        permissions = null;
+      }
+    } catch { /* ignore */ }
+  } else if (session && role !== "super_admin") {
+    // Admin user — JWT role may be stale, resolve from admin_users DB
     try {
       const dbUser = await getAdminById(Number(session.id));
       if (dbUser) {
