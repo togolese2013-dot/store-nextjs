@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/utils";
 import {
-  SlidersHorizontal, Search, Tag, Sparkles, X, Check, Package,
+  SlidersHorizontal, Search, Tag, Sparkles, X, Package,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -221,25 +221,21 @@ function FilterPanel({
 
       {/* Categories */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Catégorie</p>
-        <div className="flex flex-col">
-          {[{ id: undefined, nom: "Toutes" }, ...categories].map(cat => (
-            <button
-              key={cat.id ?? "all"}
-              onClick={() => setCatId(cat.id === catId ? undefined : cat.id)}
-              className={clsx(
-                "flex items-center justify-between px-2 py-1.5 rounded-lg text-sm transition-colors text-left",
-                catId === cat.id || (cat.id === undefined && !catId)
-                  ? "text-brand-700 font-semibold"
-                  : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-              )}
-            >
-              {cat.nom}
-              {(catId === cat.id || (cat.id === undefined && !catId)) && (
-                <Check className="w-3 h-3 text-brand-500 shrink-0" />
-              )}
-            </button>
-          ))}
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Catégorie</p>
+        <div className="relative">
+          <select
+            value={catId ?? ""}
+            onChange={e => setCatId(e.target.value ? Number(e.target.value) : undefined)}
+            className="w-full appearance-none px-3 py-2 pr-8 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:border-brand-400 focus:bg-white outline-none transition-all text-slate-700 font-medium cursor-pointer"
+          >
+            <option value="">Toutes les catégories</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.nom}</option>
+            ))}
+          </select>
+          <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </div>
 
