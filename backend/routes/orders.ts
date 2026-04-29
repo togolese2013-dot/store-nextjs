@@ -1,6 +1,7 @@
 import express from "express";
 import { emitAdminEvent } from "../lib/admin-events";
 import { createOrder, addOrderEvent, createPaymentPlan } from "@/lib/admin-db";
+import { sendOrderNotifications } from "../lib/whatsapp";
 import { db } from "@/lib/db";
 import { getClientSession } from "../lib/client-auth";
 import { ensurePaymentTables } from "./admin/payment-plans";
@@ -109,6 +110,16 @@ router.post("/api/orders", async (req, res) => {
       total:      Number(total ?? 0),
       created_at: String(rows[0]?.created_at ?? new Date().toISOString().slice(0, 19).replace("T", " ")),
     });
+
+    // WhatsApp notifications — non-blocking
+    sendOrderNotifications({
+      id,
+      reference,
+      nom:       nom ?? "",
+      telephone: telephone.trim(),
+      items:     items ?? [],
+      total:     Number(total ?? 0),
+    }).catch(console.error);
 
     return res.json({ success: true, id, reference, payment_mode: payment_mode ?? "comptant" });
   } catch (err) {
