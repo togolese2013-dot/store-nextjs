@@ -44,7 +44,7 @@ export default function ChangePasswordPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur lors du changement."); return; }
       setSuccess(true);
-      setTimeout(() => router.refresh(), 1000);
+      setTimeout(() => router.push("/admin"), 1200);
     } catch {
       setError("Impossible de se connecter au serveur.");
     } finally {
