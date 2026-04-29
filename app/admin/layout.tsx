@@ -15,8 +15,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   let role        = session.role;
   let permissions: AdminPermissions | null = session.permissions ?? null;
 
-  // JWT role may be stale (old backend) — resolve from DB
-  if (role !== "super_admin") {
+  // For staff (team members from utilisateurs): trust JWT permissions as-is.
+  // For other non-super_admin roles: JWT may be stale — resolve from admin_users DB.
+  if (role !== "super_admin" && role !== "staff") {
     try {
       const dbUser = await getAdminById(Number(session.id));
       if (dbUser) {
@@ -25,11 +26,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           try { permissions = JSON.parse(dbUser.permissions) as AdminPermissions; } catch { /* ignore */ }
         }
       } else {
-        // User not found in DB but JWT is valid — grant full access
+        // Old admin JWT not found in DB — grant full access (backward compat)
         role = "super_admin";
       }
     } catch {
-      // DB unreachable — JWT is valid so grant full access
       role = "super_admin";
     }
   }

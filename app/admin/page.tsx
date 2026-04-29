@@ -66,7 +66,9 @@ export default async function AdminHomePage() {
   let role        = session?.role ?? "";
   let permissions: AdminPermissions | null = session?.permissions ?? null;
 
-  if (session && role !== "super_admin") {
+  // For staff (team members from utilisateurs): trust JWT permissions as-is.
+  // For other non-super_admin roles: JWT may be stale — resolve from admin_users DB.
+  if (session && role !== "super_admin" && role !== "staff") {
     try {
       const dbUser = await getAdminById(Number(session.id));
       if (dbUser) {
