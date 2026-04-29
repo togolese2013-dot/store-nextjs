@@ -391,7 +391,7 @@ export interface Permission {
 
 export async function listUtilisateurs(): Promise<Utilisateur[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, email, telephone, poste, actif, date_creation FROM utilisateurs ORDER BY date_creation DESC"
+    "SELECT id, nom, email, telephone, poste, actif, date_creation FROM utilisateurs WHERE actif = 1 ORDER BY date_creation DESC"
   );
   return rows as Utilisateur[];
 }
@@ -444,6 +444,23 @@ export async function listPermissions(): Promise<Permission[]> {
     "SELECT id, nom, description, module FROM permissions ORDER BY module, id ASC"
   );
   return rows as Permission[];
+}
+
+/** Returns a map of utilisateur_id → distinct modules they have access to */
+export async function listAllUtilisateurModules(): Promise<Record<number, string[]>> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT up.utilisateur_id, p.module
+     FROM utilisateur_permissions up
+     JOIN permissions p ON p.id = up.permission_id
+     GROUP BY up.utilisateur_id, p.module`
+  );
+  const map: Record<number, string[]> = {};
+  for (const r of rows as mysql.RowDataPacket[]) {
+    const uid = Number(r.utilisateur_id);
+    if (!map[uid]) map[uid] = [];
+    if (!map[uid].includes(r.module as string)) map[uid].push(r.module as string);
+  }
+  return map;
 }
 
 export async function getUtilisateurPermissions(utilisateurId: number): Promise<number[]> {

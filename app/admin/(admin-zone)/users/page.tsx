@@ -1,4 +1,4 @@
-import { listAdminUsers, listUtilisateurs, listPermissions } from "@/lib/admin-db";
+import { listAdminUsers, listUtilisateurs, listPermissions, listAllUtilisateurModules } from "@/lib/admin-db";
 import type { AdminUser, Utilisateur, Permission } from "@/lib/admin-db";
 import UsersManager from "@/components/admin/UsersManager";
 
@@ -6,16 +6,18 @@ export const dynamic  = "force-dynamic";
 export const metadata = { title: "Utilisateurs" };
 
 export default async function UsersPage() {
-  let adminUsers:   AdminUser[]   = [];
-  let utilisateurs: Utilisateur[] = [];
-  let permissions:  Permission[]  = [];
+  let adminUsers:      AdminUser[]            = [];
+  let utilisateurs:    Utilisateur[]          = [];
+  let permissions:     Permission[]           = [];
+  let teamModules:     Record<number, string[]> = {};
   let errMsg = "";
 
   try {
-    [adminUsers, utilisateurs, permissions] = await Promise.all([
+    [adminUsers, utilisateurs, permissions, teamModules] = await Promise.all([
       listAdminUsers(),
       listUtilisateurs(),
       listPermissions(),
+      listAllUtilisateurModules(),
     ]);
   } catch (err) {
     errMsg = err instanceof Error ? err.message : String(err);
@@ -39,6 +41,7 @@ export default async function UsersPage() {
         adminUsers={adminUsers}
         initialUtilisateurs={utilisateurs}
         allPermissions={permissions}
+        teamModules={teamModules}
       />
     </div>
   );

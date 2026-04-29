@@ -676,16 +676,56 @@ function PermChips({ permissions }: { permissions: string | null }) {
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
+// ── Team module badges ────────────────────────────────────────────────────────
+
+const MODULE_LABEL: Record<string, string> = {
+  magasin:  "Magasin",
+  boutique: "Boutique",
+  store:    "Store",
+  crm:      "CRM",
+  admin:    "Admin",
+};
+
+const MODULE_BADGE_COLOR: Record<string, string> = {
+  magasin:  "bg-brand-50 text-brand-700 border-brand-200",
+  boutique: "bg-amber-50 text-amber-700 border-amber-200",
+  store:    "bg-emerald-50 text-emerald-700 border-emerald-200",
+  crm:      "bg-indigo-50 text-indigo-700 border-indigo-200",
+  admin:    "bg-violet-50 text-violet-700 border-violet-200",
+};
+
+function TeamModuleBadges({ modules }: { modules: string[] }) {
+  if (!modules.length) return <span className="text-xs text-slate-400 italic">Aucun accès</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {modules.map(mod => (
+        <span
+          key={mod}
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+            MODULE_BADGE_COLOR[mod] ?? "bg-slate-50 text-slate-600 border-slate-200"
+          }`}
+        >
+          {MODULE_LABEL[mod] ?? mod}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 type Tab = "admin-accounts" | "team";
 
 export default function UsersManager({
   adminUsers,
   initialUtilisateurs,
   allPermissions,
+  teamModules,
 }: {
   adminUsers:           AdminUser[];
   initialUtilisateurs:  Utilisateur[];
   allPermissions:       Permission[];
+  teamModules:          Record<number, string[]>;
 }) {
   const router = useRouter();
   const [tab,        setTab]        = useState<Tab>("admin-accounts");
@@ -703,7 +743,6 @@ export default function UsersManager({
   const [deleteTeam,  setDeleteTeam]  = useState<Utilisateur | null>(null);
   const [togglingT,   setTogglingT]   = useState<number | null>(null);
 
-  // Unused allPermissions kept for future utilisateurs permissions
   void allPermissions;
 
   async function toggleAdminActif(u: AdminUser) {
@@ -879,12 +918,12 @@ export default function UsersManager({
       {/* ══════════ TAB : Équipe Opérationnelle ══════════ */}
       {tab === "team" && (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          <div className="grid grid-cols-[44px_1fr_160px_110px_120px_120px] gap-3 px-5 py-3 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+          <div className="grid grid-cols-[44px_1fr_140px_100px_1fr_100px] gap-3 px-5 py-3 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
             <span />
             <span>Membre</span>
             <span>Poste</span>
             <span>Statut</span>
-            <span>Depuis</span>
+            <span>Accès</span>
             <span className="text-right">Actions</span>
           </div>
 
@@ -896,7 +935,7 @@ export default function UsersManager({
             )}
             {initialUtilisateurs.map(u => (
               <div key={u.id}
-                className="grid grid-cols-[44px_1fr_160px_110px_120px_120px] gap-3 px-5 py-4 items-center hover:bg-slate-50/60 transition-colors"
+                className="grid grid-cols-[44px_1fr_140px_100px_1fr_100px] gap-3 px-5 py-4 items-center hover:bg-slate-50/60 transition-colors"
               >
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${avatarBg(u.poste)}`}>
                   {u.nom.charAt(0).toUpperCase()}
@@ -927,7 +966,8 @@ export default function UsersManager({
                   )}
                 </button>
 
-                <span className="text-xs text-slate-400">{formatDate(u.date_creation)}</span>
+                {/* Access badges */}
+                <TeamModuleBadges modules={teamModules[u.id] ?? []} />
 
                 <div className="flex items-center justify-end gap-1.5">
                   <button onClick={() => setEditTeam(u)}
