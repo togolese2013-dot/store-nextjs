@@ -182,7 +182,7 @@ router.get("/api/products/bestsellers", async (req, res) => {
          FROM produits p
          LEFT JOIN categories c ON c.id = p.categorie_id
          WHERE p.reference IN (${placeholders})
-           AND p.stock > 0
+           AND COALESCE(p.stock_boutique, 0) > 0
          LIMIT 20`,
         refs
       );
@@ -209,7 +209,7 @@ router.get("/api/products/bestsellers", async (req, res) => {
         `SELECT p.*, c.nom AS category_nom
          FROM produits p
          LEFT JOIN categories c ON c.id = p.categorie_id
-         WHERE p.stock > 0
+         WHERE COALESCE(p.stock_boutique, 0) > 0
          ORDER BY RAND()
          LIMIT ?`,
         [needed + 5]
