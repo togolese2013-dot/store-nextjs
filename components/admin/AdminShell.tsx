@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import AdminSidebar from "./AdminSidebar";
+import AdminTopBar from "./AdminTopBar";
 import OrderNotifier from "./OrderNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
 
@@ -27,7 +28,6 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
 
   const { subscribe } = useAdminSSE();
 
-  // Debounced update banner: group any burst of events into a single notification
   useEffect(() => {
     return subscribe((event) => {
       if (event.type === "connected" || event.type === "heartbeat") return;
@@ -48,10 +48,20 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
     !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
   );
 
-  if (isAdminZone) return <>{children}</>;
+  // Fullscreen pages (cards, config, users…) — header only, no sidebar
+  if (isAdminZone) {
+    return (
+      <>
+        <AdminTopBar nom={nom} role={role} />
+        <div className="pt-14">{children}</div>
+      </>
+    );
+  }
 
+  // Sidebar pages
   return (
     <div className="min-h-screen bg-slate-50">
+      <AdminTopBar nom={nom} role={role} onMobileMenuToggle={() => setMobileOpen(true)} />
       <AdminSidebar
         nom={nom}
         role={role}
@@ -59,22 +69,8 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
-      <div className="lg:pl-60 xl:pl-64">
+      <div className="lg:pl-60 xl:pl-64 pt-14">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="lg:hidden mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-900 text-white text-sm font-semibold"
-          >
-            <span className="flex flex-col gap-1">
-              <span className="w-4 h-0.5 bg-white rounded" />
-              <span className="w-4 h-0.5 bg-white rounded" />
-              <span className="w-4 h-0.5 bg-white rounded" />
-            </span>
-            Menu
-          </button>
-
-          {/* Update banner — appears after debounce, dismissed on refresh */}
           {hasUpdates && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl animate-fade-up">
               <span className="text-sm text-emerald-800 font-medium">
@@ -88,7 +84,6 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
               </button>
             </div>
           )}
-
           {children}
         </main>
       </div>

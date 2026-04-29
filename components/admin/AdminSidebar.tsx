@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import {
   Package, ShoppingBag, Settings, Users, MessageCircle, Send, Star, Tag,
@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, LogOut, Globe, ShieldCheck,
+  Gift, Mail, UserCheck, Home, Globe, ShieldCheck,
 } from "lucide-react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
 import { hasPageAccess } from "@/lib/admin-permissions";
@@ -155,7 +155,6 @@ interface Props {
 
 export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMobileOpen }: Props) {
   const pathname     = usePathname();
-  const router       = useRouter();
   const moduleKey    = getActiveModule(pathname);
   const activeModule = moduleKey ? MODULES[moduleKey] : null;
 
@@ -171,27 +170,23 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
     return pathname.startsWith(href);
   }
 
-  async function logout() {
-    await fetch("/api/admin/auth/logout", { method: "POST" });
-    router.push("/admin/login");
-    router.refresh();
-  }
-
-  const SidebarContent = (
+  function buildContent(showHeader: boolean) { return (
     <div className="flex flex-col h-full bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800">
 
-      {/* Header */}
-      <div className="px-4 pt-5 pb-4 border-b border-white/10">
-        <Link href="/admin" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
-            <img src="/logo-togolese-shop-white.svg" alt="" className="h-4 w-auto" />
-          </div>
-          <div>
-            <p className="font-display font-800 text-white text-sm leading-none">Togolese Shop</p>
-            <p className="text-white/40 text-[10px] uppercase tracking-widest mt-0.5">Administration</p>
-          </div>
-        </Link>
-      </div>
+      {/* Header — mobile only (desktop header is AdminTopBar) */}
+      {showHeader && (
+        <div className="px-4 pt-5 pb-4 border-b border-white/10">
+          <Link href="/admin" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+              <img src="/logo-togolese-shop-white.svg" alt="" className="h-4 w-auto" />
+            </div>
+            <div>
+              <p className="font-display font-800 text-white text-sm leading-none">Togolese Shop</p>
+              <p className="text-white/40 text-[10px] uppercase tracking-widest mt-0.5">Administration</p>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Module badge */}
       <div className="px-3 pt-4 pb-2">
@@ -270,26 +265,18 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
           <Home className="w-4 h-4 shrink-0 opacity-80" />
           Accueil admin
         </Link>
-        <button
-          onClick={logout}
-          style={{ color: "#fca5a5" }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-500/15 transition-colors"
-        >
-          <LogOut className="w-4 h-4 shrink-0" />
-          Déconnexion — {nom}
-        </button>
       </div>
     </div>
-  );
+  ); }
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col fixed left-0 top-0 h-screen z-40 shadow-xl">
-        {SidebarContent}
+      {/* Desktop sidebar — starts below AdminTopBar */}
+      <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col fixed left-0 top-14 h-[calc(100vh-56px)] z-40 shadow-xl">
+        {buildContent(false)}
       </aside>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer — full height, includes branding header */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
@@ -300,7 +287,7 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
             >
               <X className="w-4 h-4" />
             </button>
-            {SidebarContent}
+            {buildContent(true)}
           </div>
         </div>
       )}
