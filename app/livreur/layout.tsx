@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAdminSession } from "@/lib/auth";
-import { getUtilisateurById } from "@/lib/admin-db";
+import { getUtilisateurById, getAdminById } from "@/lib/admin-db";
 
 export const metadata = { title: "Espace Livreur — Togolese Shop" };
 
@@ -9,9 +9,19 @@ export default async function LivreurLayout({ children }: { children: React.Reac
 
   if (!session) redirect("/admin/login?redirect=/livreur");
 
-  // Verify this is actually a livreur (fresh DB check)
-  const member = await getUtilisateurById(Number(session.id));
-  if (!member || member.poste !== "Livreur") redirect("/admin");
+  // Accept livreurs from utilisateurs (role staff) OR admin_users (role livreur)
+  let nomLivreur = session.nom;
+  if (session.role === "staff") {
+    const member = await getUtilisateurById(Number(session.id));
+    if (!member || member.poste !== "Livreur") redirect("/admin");
+    nomLivreur = member.nom;
+  } else if (session.role === "livreur") {
+    const admin = await getAdminById(Number(session.id));
+    if (!admin || admin.poste !== "Livreur") redirect("/admin");
+    nomLivreur = admin.nom;
+  } else {
+    redirect("/admin");
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -26,7 +36,7 @@ export default async function LivreurLayout({ children }: { children: React.Reac
             </div>
             <div>
               <p className="text-sm font-bold text-slate-900 leading-none">Espace Livreur</p>
-              <p className="text-xs text-slate-400 leading-none mt-0.5">{member.nom}</p>
+              <p className="text-xs text-slate-400 leading-none mt-0.5">{nomLivreur}</p>
             </div>
           </div>
           <a

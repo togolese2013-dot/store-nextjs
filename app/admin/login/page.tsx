@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Identifiants incorrects"); return; }
-      if (data.role === "staff" && data.poste === "Livreur") {
+      if ((data.role === "staff" && data.poste === "Livreur") || data.role === "livreur") {
         router.push("/livreur");
       } else {
         router.push(redirect);

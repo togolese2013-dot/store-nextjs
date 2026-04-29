@@ -9,12 +9,30 @@ const router = express.Router();
 async function requireLivreur(req: express.Request, res: express.Response) {
   const session = await getSession(req);
   if (!session) { res.status(401).json({ error: "Non autorisé." }); return null; }
-  const member = await getUtilisateurById(Number(session.id));
-  if (!member || member.poste !== "Livreur") {
-    res.status(403).json({ error: "Accès réservé aux livreurs." });
-    return null;
+
+  // Livreur from utilisateurs (role staff + poste Livreur)
+  if (session.role === "staff") {
+    const member = await getUtilisateurById(Number(session.id));
+    if (!member || member.poste !== "Livreur") {
+      res.status(403).json({ error: "Accès réservé aux livreurs." });
+      return null;
+    }
+    return { session, member: { id: member.id, nom: member.nom } };
   }
-  return { session, member };
+
+  // Livreur from admin_users (role livreur)
+  if (session.role === "livreur") {
+    const { getAdminById } = await import("@/lib/admin-db");
+    const admin = await getAdminById(Number(session.id));
+    if (!admin || admin.poste !== "Livreur") {
+      res.status(403).json({ error: "Accès réservé aux livreurs." });
+      return null;
+    }
+    return { session, member: { id: admin.id, nom: admin.nom } };
+  }
+
+  res.status(403).json({ error: "Accès réservé aux livreurs." });
+  return null;
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────

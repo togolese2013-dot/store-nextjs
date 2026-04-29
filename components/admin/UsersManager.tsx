@@ -874,7 +874,7 @@ export default function UsersManager({
 
                 {/* Actions */}
                 <div className="flex items-center justify-end gap-1.5">
-                  {u.role !== "super_admin" && (
+                  {u.role !== "super_admin" && u.poste !== "Livreur" && (
                     <button
                       onClick={() => setPermsAdmin(u)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition-colors"
