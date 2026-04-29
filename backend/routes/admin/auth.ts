@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import {
   getAdminByUsername, getAdminByEmail,
   updateAdminLastLogin, createAdminUser,
+  getUtilisateurByUsername,
 } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 import { signToken, getSession, setAuthCookie, clearAuthCookie } from "../../lib/auth";
@@ -42,7 +43,31 @@ router.post("/api/admin/auth/login", async (req, res) => {
       }
     }
 
-    if (!user) return res.status(401).json({ error: "Identifiants incorrects." });
+    // Fallback: check utilisateurs (operational team) by username
+    if (!user) {
+      const teamMember = await getUtilisateurByUsername(slug);
+      if (teamMember) {
+        const validTeam = await bcrypt.compare(password, teamMember.mot_de_passe);
+        if (!validTeam) return res.status(401).json({ error: "Identifiants incorrects." });
+
+        let permissions: AdminPermissions | null = null;
+        if (teamMember.permissions) {
+          try { permissions = JSON.parse(teamMember.permissions) as AdminPermissions; } catch { /* ignore */ }
+        }
+
+        const token = await signToken({
+          id:          teamMember.id,
+          username:    teamMember.username ?? slug,
+          email:       teamMember.email,
+          nom:         teamMember.nom,
+          role:        "staff",
+          permissions,
+        });
+        setAuthCookie(res, token);
+        return res.json({ ok: true, nom: teamMember.nom, role: "staff" });
+      }
+      return res.status(401).json({ error: "Identifiants incorrects." });
+    }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: "Identifiants incorrects." });

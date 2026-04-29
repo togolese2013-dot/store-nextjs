@@ -98,18 +98,28 @@ function CheckBox({ checked, onChange }: { checked: boolean; onChange: () => voi
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ADMIN ACCOUNTS — Permissions modal
+// Generic permissions modal — works for both admin users and team members
 // ════════════════════════════════════════════════════════════════════════════
 
-function AdminPermissionsModal({
-  user,
+function PermissionsModal({
+  userId,
+  userNom,
+  userIdentifier,
+  isSuperAdmin,
+  initialPermissions,
+  endpointUrl,
   onClose,
 }: {
-  user:    AdminUser;
-  onClose: () => void;
+  userId:             number;
+  userNom:            string;
+  userIdentifier?:    string;
+  isSuperAdmin?:      boolean;
+  initialPermissions: string | null;
+  endpointUrl:        string;
+  onClose:            () => void;
 }) {
   const router = useRouter();
-  const [perms,   setPerms]   = useState<AdminPermissions>(() => parsePermissions(user.permissions));
+  const [perms,   setPerms]   = useState<AdminPermissions>(() => parsePermissions(initialPermissions));
   const [saving,  setSaving]  = useState(false);
   const [msg,     setMsg]     = useState("");
   const [open,    setOpen]    = useState<Record<string, boolean>>(() => {
@@ -125,11 +135,7 @@ function AdminPermissionsModal({
   function toggleModule(mk: ModuleKey) {
     setPerms(prev => {
       const next = { ...prev };
-      if (mk in next) {
-        delete next[mk];
-      } else {
-        next[mk] = "all";
-      }
+      if (mk in next) { delete next[mk]; } else { next[mk] = "all"; }
       return next;
     });
   }
@@ -153,44 +159,32 @@ function AdminPermissionsModal({
       const next = { ...prev };
       const allPageIds = ADMIN_MODULES[mk].pages.map(pg => pg.id);
       let current = getModulePages(mk);
-
       if (current.includes(pageId)) {
         current = current.filter(p => p !== pageId);
       } else {
         current = [...current, pageId];
       }
-
-      if (current.length === 0) {
-        delete next[mk];
-      } else if (current.length === allPageIds.length) {
-        next[mk] = "all";
-      } else {
-        next[mk] = current;
-      }
+      if (current.length === 0) { delete next[mk]; }
+      else if (current.length === allPageIds.length) { next[mk] = "all"; }
+      else { next[mk] = current; }
       return next;
     });
   }
 
   function toggleAllPages(mk: ModuleKey) {
-    const allPages = ADMIN_MODULES[mk].pages.map(pg => pg.id);
-    const current  = getModulePages(mk);
+    const allPages   = ADMIN_MODULES[mk].pages.map(pg => pg.id);
+    const current    = getModulePages(mk);
     const allChecked = current.length === allPages.length;
-
     setPerms(prev => {
       const next = { ...prev };
-      if (allChecked) {
-        // Désactiver le module entier
-        delete next[mk];
-      } else {
-        next[mk] = "all";
-      }
+      if (allChecked) { delete next[mk]; } else { next[mk] = "all"; }
       return next;
     });
   }
 
   async function save() {
     setSaving(true); setMsg("");
-    const res = await fetch(`/api/admin/users/${user.id}/permissions`, {
+    const res = await fetch(`${endpointUrl}/${userId}/permissions`, {
       method:  "PUT",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ permissions: Object.keys(perms).length ? perms : null }),
@@ -210,8 +204,11 @@ function AdminPermissionsModal({
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
           <div>
             <p className="text-xs text-slate-400 font-medium mb-0.5">Permissions d&apos;accès</p>
-            <h2 className="font-bold text-lg text-slate-900">{user.nom}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">@{user.username} · {enabledCount} carte{enabledCount > 1 ? "s" : ""} activée{enabledCount > 1 ? "s" : ""}</p>
+            <h2 className="font-bold text-lg text-slate-900">{userNom}</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {userIdentifier && <span>{userIdentifier} · </span>}
+              {enabledCount} carte{enabledCount > 1 ? "s" : ""} activée{enabledCount > 1 ? "s" : ""}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
             <X className="w-5 h-5" />
@@ -219,7 +216,7 @@ function AdminPermissionsModal({
         </div>
 
         {/* Note super_admin */}
-        {user.role === "super_admin" && (
+        {isSuperAdmin && (
           <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
             <Crown className="w-4 h-4 shrink-0" />
             Super Admin — accès total à toutes les cartes, quelles que soient les permissions.
@@ -245,16 +242,14 @@ function AdminPermissionsModal({
                   enabled ? `${colors.ring} ${colors.bg}` : "border-slate-200 bg-white"
                 }`}
               >
-                {/* Module header */}
                 <div className="flex items-center gap-3 px-4 py-3">
-                  {/* Enable/disable toggle */}
                   <button
                     type="button"
                     onClick={() => toggleModule(mk)}
                     className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
                       enabled ? "bg-brand-600" : "bg-slate-200"
                     }`}
-                    disabled={user.role === "super_admin"}
+                    disabled={isSuperAdmin}
                     title={enabled ? "Désactiver ce module" : "Activer ce module"}
                   >
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -267,12 +262,8 @@ function AdminPermissionsModal({
                   </div>
 
                   <div className="flex-1">
-                    <p className={`font-bold text-sm ${enabled ? colors.text : "text-slate-400"}`}>
-                      {mod.label}
-                    </p>
-                    {enabled && (
-                      <p className="text-xs text-slate-400">{checked.length}/{pages.length} pages</p>
-                    )}
+                    <p className={`font-bold text-sm ${enabled ? colors.text : "text-slate-400"}`}>{mod.label}</p>
+                    {enabled && <p className="text-xs text-slate-400">{checked.length}/{pages.length} pages</p>}
                   </div>
 
                   {enabled && (
@@ -286,19 +277,14 @@ function AdminPermissionsModal({
                   )}
                 </div>
 
-                {/* Pages list */}
                 {enabled && isOpen && (
                   <div className="px-4 pb-4 border-t border-white/60 pt-3">
-                    {/* Toggle all */}
                     <button
                       type="button"
                       onClick={() => toggleAllPages(mk)}
                       className="flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-700 mb-3 transition-colors"
                     >
-                      <CheckBox
-                        checked={allCheck}
-                        onChange={() => toggleAllPages(mk)}
-                      />
+                      <CheckBox checked={allCheck} onChange={() => toggleAllPages(mk)} />
                       Tout sélectionner
                     </button>
 
@@ -310,10 +296,7 @@ function AdminPermissionsModal({
                           onClick={() => togglePage(mk, pg.id)}
                           className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-left transition-colors"
                         >
-                          <CheckBox
-                            checked={isPageChecked(mk, pg.id)}
-                            onChange={() => togglePage(mk, pg.id)}
-                          />
+                          <CheckBox checked={isPageChecked(mk, pg.id)} onChange={() => togglePage(mk, pg.id)} />
                           <span className="text-sm text-slate-700 font-medium">{pg.label}</span>
                         </button>
                       ))}
@@ -344,6 +327,20 @@ function AdminPermissionsModal({
         </div>
       </div>
     </Overlay>
+  );
+}
+
+function AdminPermissionsModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+  return (
+    <PermissionsModal
+      userId={user.id}
+      userNom={user.nom}
+      userIdentifier={`@${user.username}`}
+      isSuperAdmin={user.role === "super_admin"}
+      initialPermissions={user.permissions}
+      endpointUrl="/api/admin/users"
+      onClose={onClose}
+    />
   );
 }
 
@@ -494,6 +491,7 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
   const router   = useRouter();
   const isEdit   = !!user;
   const [nom,       setNom]       = useState(user?.nom       ?? "");
+  const [username,  setUsername]  = useState(user?.username  ?? "");
   const [email,     setEmail]     = useState(user?.email     ?? "");
   const [telephone, setTelephone] = useState(user?.telephone ?? "");
   const [poste,     setPoste]     = useState<string>(user?.poste ?? "Commercial");
@@ -502,12 +500,22 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
   const [loading,   setLoading]   = useState(false);
   const [msg,       setMsg]       = useState("");
 
+  // Auto-suggest username from nom
+  function handleNomChange(v: string) {
+    setNom(v);
+    if (!isEdit && !username) {
+      setUsername(v.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "").slice(0, 30));
+    }
+  }
+
   async function submit() {
     if (!nom || !poste) { setMsg("Nom et poste requis."); return; }
     if (!isEdit && !password) { setMsg("Mot de passe requis."); return; }
+    if (!isEdit && !username) { setMsg("Nom d'utilisateur requis."); return; }
     setLoading(true); setMsg("");
 
     const body: Record<string, string> = { nom, poste };
+    if (username)  body.username  = username;
     if (email)     body.email     = email;
     if (telephone) body.telephone = telephone;
     if (password)  body.motDePasse = password;
@@ -538,17 +546,30 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
 
           <div>
             <label className={labelCls}>Nom complet *</label>
-            <input type="text" value={nom} onChange={e => setNom(e.target.value)} className={inputCls} placeholder="Prénom Nom" />
+            <input type="text" value={nom} onChange={e => handleNomChange(e.target.value)}
+              autoComplete="off" className={inputCls} placeholder="Prénom Nom" />
+          </div>
+
+          <div>
+            <label className={labelCls}>Nom d&apos;utilisateur * (pour la connexion)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">@</span>
+              <input type="text" value={username}
+                onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                autoComplete="off" className={inputCls + " pl-7"} placeholder="nom_utilisateur" />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} placeholder="email@ex.com" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                autoComplete="off" className={inputCls} placeholder="email@ex.com" />
             </div>
             <div>
               <label className={labelCls}>Téléphone</label>
-              <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} className={inputCls} placeholder="+228 90 00 00 00" />
+              <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value)}
+                className={inputCls} placeholder="+228 90 00 00 00" />
             </div>
           </div>
 
@@ -564,6 +585,7 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
             <div className="relative">
               <input type={showPw ? "text" : "password"} value={password}
                 onChange={e => setPassword(e.target.value)}
+                autoComplete="new-password"
                 className={inputCls + " pr-10"}
                 placeholder={isEdit ? "Laisser vide = inchangé" : "••••••••"}
               />
@@ -676,42 +698,6 @@ function PermChips({ permissions }: { permissions: string | null }) {
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-// ── Team module badges ────────────────────────────────────────────────────────
-
-const MODULE_LABEL: Record<string, string> = {
-  magasin:  "Magasin",
-  boutique: "Boutique",
-  store:    "Store",
-  crm:      "CRM",
-  admin:    "Admin",
-};
-
-const MODULE_BADGE_COLOR: Record<string, string> = {
-  magasin:  "bg-brand-50 text-brand-700 border-brand-200",
-  boutique: "bg-amber-50 text-amber-700 border-amber-200",
-  store:    "bg-emerald-50 text-emerald-700 border-emerald-200",
-  crm:      "bg-indigo-50 text-indigo-700 border-indigo-200",
-  admin:    "bg-violet-50 text-violet-700 border-violet-200",
-};
-
-function TeamModuleBadges({ modules }: { modules: string[] }) {
-  if (!modules.length) return <span className="text-xs text-slate-400 italic">Aucun accès</span>;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {modules.map(mod => (
-        <span
-          key={mod}
-          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-            MODULE_BADGE_COLOR[mod] ?? "bg-slate-50 text-slate-600 border-slate-200"
-          }`}
-        >
-          {MODULE_LABEL[mod] ?? mod}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Tab = "admin-accounts" | "team";
@@ -741,9 +727,10 @@ export default function UsersManager({
   const [showCreateT, setShowCreateT] = useState(false);
   const [editTeam,    setEditTeam]    = useState<Utilisateur | null>(null);
   const [deleteTeam,  setDeleteTeam]  = useState<Utilisateur | null>(null);
+  const [permsTeam,   setPermsTeam]   = useState<Utilisateur | null>(null);
   const [togglingT,   setTogglingT]   = useState<number | null>(null);
 
-  void allPermissions;
+  void allPermissions; void teamModules;
 
   async function toggleAdminActif(u: AdminUser) {
     setTogglingA(u.id);
@@ -918,12 +905,12 @@ export default function UsersManager({
       {/* ══════════ TAB : Équipe Opérationnelle ══════════ */}
       {tab === "team" && (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          <div className="grid grid-cols-[44px_1fr_140px_100px_1fr_100px] gap-3 px-5 py-3 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+          <div className="grid grid-cols-[44px_1fr_140px_100px_1fr_160px] gap-3 px-5 py-3 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
             <span />
             <span>Membre</span>
             <span>Poste</span>
             <span>Statut</span>
-            <span>Accès</span>
+            <span>Cartes accessibles</span>
             <span className="text-right">Actions</span>
           </div>
 
@@ -935,7 +922,7 @@ export default function UsersManager({
             )}
             {initialUtilisateurs.map(u => (
               <div key={u.id}
-                className="grid grid-cols-[44px_1fr_140px_100px_1fr_100px] gap-3 px-5 py-4 items-center hover:bg-slate-50/60 transition-colors"
+                className="grid grid-cols-[44px_1fr_140px_100px_1fr_160px] gap-3 px-5 py-4 items-center hover:bg-slate-50/60 transition-colors"
               >
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${avatarBg(u.poste)}`}>
                   {u.nom.charAt(0).toUpperCase()}
@@ -943,7 +930,9 @@ export default function UsersManager({
 
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-900 text-sm truncate">{u.nom}</p>
-                  <p className="text-xs text-slate-400 truncate">{u.email || u.telephone || "—"}</p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {u.username ? `@${u.username}` : u.email || u.telephone || "—"}
+                  </p>
                 </div>
 
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold w-fit ${posteColor(u.poste)}`}>
@@ -966,10 +955,16 @@ export default function UsersManager({
                   )}
                 </button>
 
-                {/* Access badges */}
-                <TeamModuleBadges modules={teamModules[u.id] ?? []} />
+                <PermChips permissions={u.permissions} />
 
                 <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    onClick={() => setPermsTeam(u)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition-colors"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Accès
+                  </button>
                   <button onClick={() => setEditTeam(u)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Modifier">
                     <Pencil className="w-4 h-4" />
@@ -999,6 +994,16 @@ export default function UsersManager({
 
       {showCreateT && <TeamFormModal user={null}      onClose={() => setShowCreateT(false)} />}
       {editTeam    && <TeamFormModal user={editTeam}  onClose={() => setEditTeam(null)} />}
+      {permsTeam   && (
+        <PermissionsModal
+          userId={permsTeam.id}
+          userNom={permsTeam.nom}
+          userIdentifier={permsTeam.poste}
+          initialPermissions={permsTeam.permissions}
+          endpointUrl="/api/admin/team"
+          onClose={() => setPermsTeam(null)}
+        />
+      )}
       {deleteTeam  && (
         <DeleteModal
           nom={deleteTeam.nom}

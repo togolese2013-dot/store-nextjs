@@ -375,11 +375,13 @@ export async function deleteAdminUser(id: number) {
 export interface Utilisateur {
   id:             number;
   nom:            string;
+  username:       string | null;
   email:          string | null;
   telephone:      string | null;
   poste:          "Administrateur" | "Commercial" | "Responsable" | "Livreur";
   actif:          number;
   date_creation:  string;
+  permissions:    string | null; // JSON, same format as admin_users.permissions
 }
 
 export interface Permission {
@@ -389,44 +391,59 @@ export interface Permission {
   module:      string | null;
 }
 
+export async function ensureUtilisateursCols() {
+  try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN username VARCHAR(50) NULL AFTER nom"); } catch { /* already exists */ }
+  try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN permissions TEXT NULL"); } catch { /* already exists */ }
+}
+
 export async function listUtilisateurs(): Promise<Utilisateur[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, email, telephone, poste, actif, date_creation FROM utilisateurs WHERE actif = 1 ORDER BY date_creation DESC"
+    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions FROM utilisateurs WHERE actif = 1 ORDER BY date_creation DESC"
   );
   return rows as Utilisateur[];
 }
 
 export async function getUtilisateurById(id: number): Promise<Utilisateur | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, email, telephone, poste, actif, date_creation FROM utilisateurs WHERE id = ? LIMIT 1",
+    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions FROM utilisateurs WHERE id = ? LIMIT 1",
     [id]
   );
   return (rows[0] as Utilisateur) ?? null;
 }
 
+export async function getUtilisateurByUsername(username: string): Promise<(Utilisateur & { mot_de_passe: string }) | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions, mot_de_passe FROM utilisateurs WHERE username = ? AND actif = 1 LIMIT 1",
+    [username]
+  );
+  return (rows[0] as (Utilisateur & { mot_de_passe: string })) ?? null;
+}
+
 export async function createUtilisateur(data: {
-  nom: string; email?: string; telephone?: string;
+  nom: string; username?: string; email?: string; telephone?: string;
   poste: string; motDePasse: string;
 }): Promise<number> {
   const [res] = await db.execute<mysql.ResultSetHeader>(
-    "INSERT INTO utilisateurs (nom, email, telephone, poste, mot_de_passe) VALUES (?,?,?,?,?)",
-    [data.nom, data.email ?? null, data.telephone ?? null, data.poste, data.motDePasse]
+    "INSERT INTO utilisateurs (nom, username, email, telephone, poste, mot_de_passe) VALUES (?,?,?,?,?,?)",
+    [data.nom, data.username ?? null, data.email ?? null, data.telephone ?? null, data.poste, data.motDePasse]
   );
   return res.insertId;
 }
 
 export async function updateUtilisateur(id: number, data: {
-  nom?: string; email?: string; telephone?: string;
-  poste?: string; actif?: number; motDePasse?: string;
+  nom?: string; username?: string; email?: string; telephone?: string;
+  poste?: string; actif?: number; motDePasse?: string; permissions?: string | null;
 }) {
   const fields: string[] = [];
   const values: (string | number | boolean | null | Buffer)[] = [];
-  if (data.nom       !== undefined) { fields.push("nom = ?");         values.push(data.nom); }
-  if (data.email     !== undefined) { fields.push("email = ?");       values.push(data.email); }
-  if (data.telephone !== undefined) { fields.push("telephone = ?");   values.push(data.telephone); }
-  if (data.poste     !== undefined) { fields.push("poste = ?");       values.push(data.poste); }
-  if (data.actif     !== undefined) { fields.push("actif = ?");       values.push(data.actif); }
-  if (data.motDePasse !== undefined){ fields.push("mot_de_passe = ?");values.push(data.motDePasse); }
+  if (data.nom         !== undefined) { fields.push("nom = ?");         values.push(data.nom); }
+  if (data.username    !== undefined) { fields.push("username = ?");    values.push(data.username ?? null); }
+  if (data.email       !== undefined) { fields.push("email = ?");       values.push(data.email); }
+  if (data.telephone   !== undefined) { fields.push("telephone = ?");   values.push(data.telephone); }
+  if (data.poste       !== undefined) { fields.push("poste = ?");       values.push(data.poste); }
+  if (data.permissions !== undefined) { fields.push("permissions = ?"); values.push(data.permissions ?? null); }
+  if (data.actif       !== undefined) { fields.push("actif = ?");       values.push(data.actif); }
+  if (data.motDePasse  !== undefined) { fields.push("mot_de_passe = ?"); values.push(data.motDePasse); }
   if (fields.length === 0) return;
   values.push(id);
   await db.execute(`UPDATE utilisateurs SET ${fields.join(", ")} WHERE id = ?`, values);
@@ -446,19 +463,17 @@ export async function listPermissions(): Promise<Permission[]> {
   return rows as Permission[];
 }
 
-/** Returns a map of utilisateur_id → distinct modules they have access to */
+/** Returns a map of utilisateur_id → distinct module keys from JSON permissions */
 export async function listAllUtilisateurModules(): Promise<Record<number, string[]>> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT up.utilisateur_id, p.module
-     FROM utilisateur_permissions up
-     JOIN permissions p ON p.id = up.permission_id
-     GROUP BY up.utilisateur_id, p.module`
+    "SELECT id, permissions FROM utilisateurs WHERE actif = 1 AND permissions IS NOT NULL"
   );
   const map: Record<number, string[]> = {};
   for (const r of rows as mysql.RowDataPacket[]) {
-    const uid = Number(r.utilisateur_id);
-    if (!map[uid]) map[uid] = [];
-    if (!map[uid].includes(r.module as string)) map[uid].push(r.module as string);
+    try {
+      const perms = JSON.parse(r.permissions as string);
+      map[Number(r.id)] = Object.keys(perms);
+    } catch { /* ignore malformed JSON */ }
   }
   return map;
 }

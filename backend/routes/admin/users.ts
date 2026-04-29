@@ -5,7 +5,7 @@ import {
   listAdminUsers, createAdminUser, updateAdminUser,
   updateAdminPassword, deleteAdminUser, getAdminByUsername, getAdminById,
   listUtilisateurs, createUtilisateur, updateUtilisateur, deleteUtilisateur,
-  getUtilisateurPermissions, listPermissions,
+  getUtilisateurById, listPermissions,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -171,9 +171,10 @@ router.post("/api/admin/team", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   try {
-    const { nom, poste, email, telephone, motDePasse } = req.body as Record<string, string>;
+    const { nom, poste, email, telephone, username, motDePasse } = req.body as Record<string, string>;
     if (!nom || !poste || !motDePasse) return res.status(400).json({ error: "Champs manquants." });
-    const id = await createUtilisateur({ nom, poste, email, telephone, motDePasse });
+    const hash = await bcrypt.hash(motDePasse, 12);
+    const id = await createUtilisateur({ nom, poste, email, telephone, username: username?.trim().toLowerCase() || undefined, motDePasse: hash });
     res.status(201).json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -187,11 +188,12 @@ router.patch("/api/admin/team/:id", async (req, res) => {
     const { motDePasse, ...rest } = req.body as Record<string, unknown>;
     const data: Parameters<typeof updateUtilisateur>[1] = {};
     if (rest.nom       !== undefined) data.nom       = String(rest.nom);
+    if (rest.username  !== undefined) data.username  = rest.username ? String(rest.username).trim().toLowerCase() : undefined;
     if (rest.email     !== undefined) data.email     = rest.email ? String(rest.email) : undefined;
     if (rest.telephone !== undefined) data.telephone = rest.telephone ? String(rest.telephone) : undefined;
     if (rest.poste     !== undefined) data.poste     = String(rest.poste);
     if (rest.actif     !== undefined) data.actif     = Number(rest.actif);
-    if (motDePasse)                   data.motDePasse = String(motDePasse);
+    if (motDePasse)                   data.motDePasse = await bcrypt.hash(String(motDePasse), 12);
     await updateUtilisateur(Number(req.params.id), data);
     res.json({ ok: true });
   } catch (err) {
@@ -213,8 +215,25 @@ router.delete("/api/admin/team/:id", async (req, res) => {
 router.get("/api/admin/team/:id/permissions", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
-  const ids = await getUtilisateurPermissions(Number(req.params.id));
-  res.json(ids);
+  const user = await getUtilisateurById(Number(req.params.id));
+  if (!user) return res.status(404).json({ error: "Introuvable." });
+  let perms = null;
+  if (user.permissions) { try { perms = JSON.parse(user.permissions); } catch { /* ignore */ } }
+  res.json({ permissions: perms });
+});
+
+router.put("/api/admin/team/:id/permissions", async (req, res) => {
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
+  try {
+    const { permissions } = req.body as { permissions: unknown };
+    await updateUtilisateur(Number(req.params.id), {
+      permissions: permissions ? JSON.stringify(permissions) : null,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
 });
 
 export default router;
