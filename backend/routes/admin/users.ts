@@ -67,7 +67,7 @@ router.post("/api/admin/users", async (req, res) => {
       telephone:     telephone || null,
       poste:         poste || "staff",
       password_hash: hash,
-      role:          role === "super_admin" ? "super_admin" : "staff",
+      role:          role === "super_admin" ? "super_admin" : poste === "Livreur" ? "livreur" : "admin",
     });
     res.status(201).json({ ok: true });
   } catch (err) {
