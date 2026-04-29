@@ -100,7 +100,7 @@ export default async function AdminHomePage() {
   const MODULES = ALL_MODULES.filter(m => accessible.has(m.key));
 
   return (
-    <div className="fixed inset-0 bg-slate-50 overflow-y-auto flex flex-col">
+    <div className="fixed inset-x-0 bottom-0 top-14 bg-slate-50 overflow-y-auto flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-3xl">
 

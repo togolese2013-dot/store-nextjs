@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import AdminSidebar from "./AdminSidebar";
-import AdminFloatingUI from "./AdminFloatingUI";
+import AdminTopNav from "./AdminTopNav";
 import OrderNotifier from "./OrderNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
 
@@ -22,8 +21,7 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
   const pathname = usePathname();
   const router   = useRouter();
 
-  const [mobileOpen,  setMobileOpen]  = useState(false);
-  const [hasUpdates,  setHasUpdates]  = useState(false);
+  const [hasUpdates, setHasUpdates] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { subscribe } = useAdminSSE();
@@ -48,28 +46,21 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
     !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
   );
 
-  // Fullscreen pages (cards, config, users…) — floating chip only, no sidebar
+  // Cards page — full screen below the nav
   if (isAdminZone) {
     return (
       <>
-        <AdminFloatingUI nom={nom} role={role} />
-        {children}
+        <AdminTopNav nom={nom} role={role} permissions={permissions} />
+        <div className="pt-14">{children}</div>
       </>
     );
   }
 
-  // Sidebar pages
+  // Content pages — full width, no sidebar
   return (
     <div className="min-h-screen bg-slate-50">
-      <AdminFloatingUI nom={nom} role={role} onMobileMenuToggle={() => setMobileOpen(true)} />
-      <AdminSidebar
-        nom={nom}
-        role={role}
-        permissions={permissions}
-        mobileOpen={mobileOpen}
-        setMobileOpen={setMobileOpen}
-      />
-      <div className="lg:pl-60 xl:pl-64">
+      <AdminTopNav nom={nom} role={role} permissions={permissions} />
+      <div className="pt-14">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
           {hasUpdates && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl animate-fade-up">
@@ -100,4 +91,3 @@ export default function AdminShell(props: Props) {
     </AdminSSEProvider>
   );
 }
-
