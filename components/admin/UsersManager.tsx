@@ -958,13 +958,15 @@ export default function UsersManager({
                 <PermChips permissions={u.permissions} />
 
                 <div className="flex items-center justify-end gap-1.5">
-                  <button
-                    onClick={() => setPermsTeam(u)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition-colors"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Accès
-                  </button>
+                  {u.poste !== "Livreur" && (
+                    <button
+                      onClick={() => setPermsTeam(u)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition-colors"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Accès
+                    </button>
+                  )}
                   <button onClick={() => setEditTeam(u)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Modifier">
                     <Pencil className="w-4 h-4" />

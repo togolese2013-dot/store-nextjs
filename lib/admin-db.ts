@@ -396,6 +396,12 @@ export async function ensureUtilisateursCols() {
   try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN permissions TEXT NULL"); } catch { /* already exists */ }
 }
 
+export async function ensureOrderLivreurCols() {
+  try { await db.execute("ALTER TABLE orders ADD COLUMN livreur_id INT NULL"); } catch { /* already exists */ }
+  try { await db.execute("ALTER TABLE orders ADD COLUMN livraison_note TEXT NULL"); } catch { /* already exists */ }
+  try { await db.execute("ALTER TABLE orders ADD COLUMN livraison_statut VARCHAR(20) NULL"); } catch { /* already exists */ }
+}
+
 export async function listUtilisateurs(): Promise<Utilisateur[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions FROM utilisateurs WHERE actif = 1 ORDER BY date_creation DESC"

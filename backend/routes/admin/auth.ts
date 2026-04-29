@@ -61,10 +61,11 @@ router.post("/api/admin/auth/login", async (req, res) => {
           email:       teamMember.email,
           nom:         teamMember.nom,
           role:        "staff",
+          poste:       teamMember.poste,
           permissions,
         });
         setAuthCookie(res, token);
-        return res.json({ ok: true, nom: teamMember.nom, role: "staff" });
+        return res.json({ ok: true, nom: teamMember.nom, role: "staff", poste: teamMember.poste });
       }
       return res.status(401).json({ error: "Identifiants incorrects." });
     }

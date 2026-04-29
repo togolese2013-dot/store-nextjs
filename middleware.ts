@@ -10,10 +10,10 @@ const COOKIE_NAME = "ts_admin_token";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  /* Only protect /admin/* routes (except /admin/login) */
-  if (!pathname.startsWith("/admin") || pathname.startsWith("/admin/login")) {
-    return NextResponse.next();
-  }
+  const isAdminRoute   = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
+  const isLivreurRoute = pathname.startsWith("/livreur");
+
+  if (!isAdminRoute && !isLivreurRoute) return NextResponse.next();
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
@@ -36,5 +36,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/livreur/:path*"],
 };

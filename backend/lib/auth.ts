@@ -17,6 +17,7 @@ export interface AdminPayload {
   email:       string | null;
   nom:         string;
   role:        string;
+  poste?:      string;
   permissions: AdminPermissions | null;
 }
 
