@@ -375,10 +375,6 @@ export async function updateAdminUser(id: number, data: Partial<Omit<AdminUser, 
   await db.execute(`UPDATE admin_users SET ${sets.join(", ")} WHERE id = ?`, vals as mysql.ExecuteValues);
 }
 
-export async function updateAdminPassword(id: number, password_hash: string) {
-  await db.execute("UPDATE admin_users SET password_hash = ? WHERE id = ?", [password_hash, id]);
-}
-
 export async function deleteAdminUser(id: number) {
   await db.execute("DELETE FROM admin_users WHERE id = ?", [id]);
 }
