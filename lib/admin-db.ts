@@ -402,6 +402,27 @@ export async function ensureOrderLivreurCols() {
   try { await db.execute("ALTER TABLE orders ADD COLUMN livraison_statut VARCHAR(20) NULL"); } catch { /* already exists */ }
 }
 
+// Migrate livreurs from admin_users to utilisateurs (one-time, idempotent)
+export async function migrateAdminLivreursToTeam() {
+  const [livreurs] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, username, email, telephone, password_hash FROM admin_users WHERE poste = 'Livreur' AND actif = 1"
+  );
+  for (const l of livreurs as mysql.RowDataPacket[]) {
+    // Skip if username already exists in utilisateurs
+    const [existing] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT id FROM utilisateurs WHERE username = ? LIMIT 1", [l.username]
+    );
+    if ((existing as mysql.RowDataPacket[]).length === 0) {
+      await db.execute(
+        "INSERT INTO utilisateurs (nom, username, email, telephone, poste, mot_de_passe, actif) VALUES (?,?,?,?,?,?,1)",
+        [l.nom, l.username, l.email ?? null, l.telephone ?? null, "Livreur", l.password_hash]
+      );
+    }
+    // Deactivate from admin_users
+    await db.execute("UPDATE admin_users SET actif = 0 WHERE id = ?", [l.id]);
+  }
+}
+
 export async function listUtilisateurs(): Promise<Utilisateur[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions FROM utilisateurs WHERE actif = 1 ORDER BY date_creation DESC"

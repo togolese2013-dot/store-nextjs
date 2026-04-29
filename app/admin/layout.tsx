@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getAdminSession } from "@/lib/auth";
 import { getAdminById, getUtilisateurById } from "@/lib/admin-db";
 import AdminShell from "@/components/admin/AdminShell";
@@ -15,10 +16,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   let role        = session.role;
   let permissions: AdminPermissions | null = session.permissions ?? null;
 
+  // Redirect livreurs to their dedicated platform
+  if (role === "livreur") redirect("/livreur");
+
   if (role === "staff") {
     // Team member from utilisateurs — always resolve permissions from DB (JWT may be stale)
     try {
       const dbMember = await getUtilisateurById(Number(session.id));
+      if (dbMember?.poste === "Livreur") redirect("/livreur");
       if (dbMember?.permissions) {
         try { permissions = JSON.parse(dbMember.permissions) as AdminPermissions; } catch { /* ignore */ }
       } else {
