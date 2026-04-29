@@ -269,6 +269,7 @@ export async function ensureAdminUsersCols() {
   await addCol("ALTER TABLE admin_users ADD COLUMN telephone VARCHAR(30) NULL", "telephone");
   await addCol("ALTER TABLE admin_users ADD COLUMN poste VARCHAR(50) NULL DEFAULT 'staff'", "poste");
   await addCol("ALTER TABLE admin_users ADD COLUMN permissions TEXT NULL", "permissions");
+  await addCol("ALTER TABLE admin_users ADD COLUMN must_change_password TINYINT NOT NULL DEFAULT 0", "must_change_password");
 
   // Populate username for existing rows that have none
   await db.execute(
@@ -334,16 +335,28 @@ export async function listAdminUsers(): Promise<AdminUser[]> {
 export async function createAdminUser(data: {
   nom: string; username: string; email?: string | null;
   telephone?: string | null; poste?: string | null;
-  password_hash: string; role: string;
+  password_hash: string; role: string; must_change_password?: boolean;
 }) {
   await db.execute(
-    "INSERT INTO admin_users (nom, username, email, telephone, poste, password_hash, role) VALUES (?,?,?,?,?,?,?)",
-    [data.nom, data.username, data.email ?? null, data.telephone ?? null, data.poste ?? "staff", data.password_hash, data.role]
+    "INSERT INTO admin_users (nom, username, email, telephone, poste, password_hash, role, must_change_password) VALUES (?,?,?,?,?,?,?,?)",
+    [data.nom, data.username, data.email ?? null, data.telephone ?? null, data.poste ?? "staff", data.password_hash, data.role, data.must_change_password ? 1 : 0]
   );
 }
 
 export async function updateAdminLastLogin(id: number) {
   await db.execute("UPDATE admin_users SET last_login = NOW() WHERE id = ?", [id]);
+}
+
+export async function updateAdminPassword(id: number, hash: string, clearFlag = false) {
+  const extra = clearFlag ? ", must_change_password = 0" : "";
+  await db.execute(`UPDATE admin_users SET password_hash = ?${extra} WHERE id = ?`, [hash, id]);
+}
+
+export async function updateUtilisateurPassword(id: number, hash: string) {
+  await db.execute(
+    "UPDATE utilisateurs SET mot_de_passe = ?, must_change_password = 0 WHERE id = ?",
+    [hash, id]
+  );
 }
 
 export async function updateAdminUser(id: number, data: Partial<Omit<AdminUser, "id" | "password_hash">>) {
@@ -394,6 +407,7 @@ export interface Permission {
 export async function ensureUtilisateursCols() {
   try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN username VARCHAR(50) NULL AFTER nom"); } catch { /* already exists */ }
   try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN permissions TEXT NULL"); } catch { /* already exists */ }
+  try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN must_change_password TINYINT NOT NULL DEFAULT 0"); } catch { /* already exists */ }
 }
 
 export async function ensureOrderLivreurCols() {
@@ -448,11 +462,11 @@ export async function getUtilisateurByUsername(username: string): Promise<(Utili
 
 export async function createUtilisateur(data: {
   nom: string; username?: string; email?: string; telephone?: string;
-  poste: string; motDePasse: string;
+  poste: string; motDePasse: string; mustChangePassword?: boolean;
 }): Promise<number> {
   const [res] = await db.execute<mysql.ResultSetHeader>(
-    "INSERT INTO utilisateurs (nom, username, email, telephone, poste, mot_de_passe) VALUES (?,?,?,?,?,?)",
-    [data.nom, data.username ?? null, data.email ?? null, data.telephone ?? null, data.poste, data.motDePasse]
+    "INSERT INTO utilisateurs (nom, username, email, telephone, poste, mot_de_passe, must_change_password) VALUES (?,?,?,?,?,?,?)",
+    [data.nom, data.username ?? null, data.email ?? null, data.telephone ?? null, data.poste, data.motDePasse, data.mustChangePassword ? 1 : 0]
   );
   return res.insertId;
 }

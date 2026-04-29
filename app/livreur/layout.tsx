@@ -9,6 +9,9 @@ export default async function LivreurLayout({ children }: { children: React.Reac
 
   if (!session) redirect("/admin/login?redirect=/livreur");
 
+  // Force password change on first login
+  if (session.must_change_password) redirect("/admin/change-password");
+
   // Accept livreurs from utilisateurs (role staff) OR admin_users (role livreur)
   let nomLivreur = session.nom;
   if (session.role === "staff") {

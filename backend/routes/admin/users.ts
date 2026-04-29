@@ -62,12 +62,13 @@ router.post("/api/admin/users", async (req, res) => {
     const hash = await bcrypt.hash(password, 12);
     await createAdminUser({
       nom,
-      username:      username.trim().toLowerCase(),
-      email:         email || null,
-      telephone:     telephone || null,
-      poste:         poste || "staff",
-      password_hash: hash,
-      role:          role === "super_admin" ? "super_admin" : poste === "Livreur" ? "livreur" : "admin",
+      username:             username.trim().toLowerCase(),
+      email:                email || null,
+      telephone:            telephone || null,
+      poste:                poste || "staff",
+      password_hash:        hash,
+      role:                 role === "super_admin" ? "super_admin" : poste === "Livreur" ? "livreur" : "admin",
+      must_change_password: true,
     });
     res.status(201).json({ ok: true });
   } catch (err) {
@@ -174,7 +175,7 @@ router.post("/api/admin/team", async (req, res) => {
     const { nom, poste, email, telephone, username, motDePasse } = req.body as Record<string, string>;
     if (!nom || !poste || !motDePasse) return res.status(400).json({ error: "Champs manquants." });
     const hash = await bcrypt.hash(motDePasse, 12);
-    const id = await createUtilisateur({ nom, poste, email, telephone, username: username?.trim().toLowerCase() || undefined, motDePasse: hash });
+    const id = await createUtilisateur({ nom, poste, email, telephone, username: username?.trim().toLowerCase() || undefined, motDePasse: hash, mustChangePassword: true });
     res.status(201).json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

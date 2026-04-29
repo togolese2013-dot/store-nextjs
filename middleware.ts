@@ -10,7 +10,7 @@ const COOKIE_NAME = "ts_admin_token";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isAdminRoute   = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
+  const isAdminRoute   = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login") && !pathname.startsWith("/admin/change-password");
   const isLivreurRoute = pathname.startsWith("/livreur");
 
   if (!isAdminRoute && !isLivreurRoute) return NextResponse.next();

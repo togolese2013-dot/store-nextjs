@@ -4,6 +4,7 @@ import {
   getAdminByUsername, getAdminByEmail,
   updateAdminLastLogin, createAdminUser,
   getUtilisateurByUsername,
+  updateAdminPassword, updateUtilisateurPassword,
 } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 import { signToken, getSession, setAuthCookie, clearAuthCookie } from "../../lib/auth";
@@ -55,17 +56,19 @@ router.post("/api/admin/auth/login", async (req, res) => {
           try { permissions = JSON.parse(teamMember.permissions) as AdminPermissions; } catch { /* ignore */ }
         }
 
+        const mustChange = Boolean((teamMember as unknown as Record<string, unknown>).must_change_password);
         const token = await signToken({
-          id:          teamMember.id,
-          username:    teamMember.username ?? slug,
-          email:       teamMember.email,
-          nom:         teamMember.nom,
-          role:        "staff",
-          poste:       teamMember.poste,
+          id:                  teamMember.id,
+          username:            teamMember.username ?? slug,
+          email:               teamMember.email,
+          nom:                 teamMember.nom,
+          role:                "staff",
+          poste:               teamMember.poste,
           permissions,
+          must_change_password: mustChange,
         });
         setAuthCookie(res, token);
-        return res.json({ ok: true, nom: teamMember.nom, role: "staff", poste: teamMember.poste });
+        return res.json({ ok: true, nom: teamMember.nom, role: "staff", poste: teamMember.poste, must_change_password: mustChange });
       }
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
@@ -78,17 +81,20 @@ router.post("/api/admin/auth/login", async (req, res) => {
       try { permissions = JSON.parse(user.permissions) as AdminPermissions; } catch { /* ignore */ }
     }
 
+    const mustChange = Boolean((user as unknown as Record<string, unknown>).must_change_password);
     const token = await signToken({
-      id:          user.id,
-      username:    user.username,
-      email:       user.email,
-      nom:         user.nom,
-      role:        user.role,
+      id:                  user.id,
+      username:            user.username,
+      email:               user.email,
+      nom:                 user.nom,
+      role:                user.role,
+      poste:               user.poste ?? undefined,
       permissions,
+      must_change_password: mustChange,
     });
     await updateAdminLastLogin(user.id);
     setAuthCookie(res, token);
-    return res.json({ ok: true, nom: user.nom, role: user.role });
+    return res.json({ ok: true, nom: user.nom, role: user.role, must_change_password: mustChange });
   } catch (err) {
     console.error("[admin login]", err);
     return res.status(500).json({ error: "Erreur serveur." });
@@ -128,6 +134,64 @@ router.post("/api/admin/auth/bootstrap-kent", async (req, res) => {
     return res.json({ ok: true, action: "created", user: (newRow as import("mysql2/promise").RowDataPacket[])[0] });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.patch("/api/admin/auth/change-password", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+
+  const { currentPassword, newPassword } = req.body as Record<string, string>;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Ancien et nouveau mot de passe requis." });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caractères." });
+  }
+
+  try {
+    const pool = db as import("mysql2/promise").Pool;
+
+    if (session.role === "staff") {
+      // utilisateurs table
+      const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+        "SELECT mot_de_passe FROM utilisateurs WHERE id = ? AND actif = 1 LIMIT 1", [session.id]
+      );
+      const row = (rows as import("mysql2/promise").RowDataPacket[])[0];
+      if (!row) return res.status(404).json({ error: "Compte introuvable." });
+      const valid = await bcrypt.compare(currentPassword, row.mot_de_passe);
+      if (!valid) return res.status(401).json({ error: "Ancien mot de passe incorrect." });
+      const hash = await bcrypt.hash(newPassword, 12);
+      await updateUtilisateurPassword(Number(session.id), hash);
+    } else {
+      // admin_users table
+      const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+        "SELECT password_hash FROM admin_users WHERE id = ? AND actif = 1 LIMIT 1", [session.id]
+      );
+      const row = (rows as import("mysql2/promise").RowDataPacket[])[0];
+      if (!row) return res.status(404).json({ error: "Compte introuvable." });
+      const valid = await bcrypt.compare(currentPassword, row.password_hash);
+      if (!valid) return res.status(401).json({ error: "Ancien mot de passe incorrect." });
+      const hash = await bcrypt.hash(newPassword, 12);
+      await updateAdminPassword(Number(session.id), hash, true);
+    }
+
+    // Re-issue JWT with must_change_password: false
+    let permissions = session.permissions ?? null;
+    const newToken = await signToken({
+      id:                  session.id,
+      username:            session.username,
+      email:               session.email,
+      nom:                 session.nom,
+      role:                session.role,
+      poste:               session.poste,
+      permissions,
+      must_change_password: false,
+    });
+    setAuthCookie(res, newToken);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
 
