@@ -443,7 +443,7 @@ function AdminUserFormModal({
           <div>
             <label className={labelCls}>Poste</label>
             <select value={poste} onChange={e => setPoste(e.target.value)} className={inputCls}>
-              {POSTES.map(p => <option key={p} value={p}>{p}</option>)}
+              {POSTES.filter(p => p !== "Livreur").map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
 
