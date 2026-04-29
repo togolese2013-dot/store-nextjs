@@ -3,7 +3,6 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { RequestCookies } from "next/dist/compiled/@edge-runtime/cookies";
 import type { AdminPermissions } from "./admin-permissions";
-import { getAdminById } from "./admin-db";
 
 export type { AdminPermissions };
 
@@ -59,26 +58,3 @@ export async function getSessionFromCookies(
 
 export function cookieName() { return COOKIE_NAME; }
 export function cookieTTL()  { return TTL; }
-
-/**
- * Like getAdminSession but falls back to the DB when the JWT role/permissions
- * are stale (token issued by older backend code that didn't store these fields).
- */
-export async function getAdminSessionFull(): Promise<AdminPayload | null> {
-  const session = await getAdminSession();
-  if (!session) return null;
-  if (session.role === "super_admin") return session;
-
-  // JWT role is missing or not super_admin — re-verify from DB
-  try {
-    const dbUser = await getAdminById(session.id);
-    if (!dbUser) return null;
-    let permissions: AdminPermissions | null = null;
-    if (dbUser.permissions) {
-      try { permissions = JSON.parse(dbUser.permissions) as AdminPermissions; } catch { /* ignore */ }
-    }
-    return { ...session, role: dbUser.role, permissions };
-  } catch {
-    return session;
-  }
-}

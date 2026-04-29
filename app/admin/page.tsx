@@ -1,4 +1,6 @@
-import { getAdminSessionFull } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import { getAdminById } from "@/lib/admin-db";
+import type { AdminPermissions } from "@/lib/admin-permissions";
 import { getAccessibleModules } from "@/lib/admin-permissions";
 import Link from "next/link";
 import { Package, ShoppingBag, Settings, Users, ArrowRight, BarChart2 } from "lucide-react";
@@ -59,9 +61,29 @@ const ALL_MODULES = [
 ];
 
 export default async function AdminHomePage() {
-  const session = await getAdminSessionFull();
+  const session = await getAdminSession();
+
+  let role        = session?.role ?? "";
+  let permissions: AdminPermissions | null = session?.permissions ?? null;
+
+  if (session && role !== "super_admin") {
+    try {
+      const dbUser = await getAdminById(Number(session.id));
+      if (dbUser) {
+        role = dbUser.role;
+        if (dbUser.permissions) {
+          try { permissions = JSON.parse(dbUser.permissions) as AdminPermissions; } catch { /* ignore */ }
+        }
+      } else {
+        role = "super_admin";
+      }
+    } catch {
+      role = "super_admin";
+    }
+  }
+
   const accessible = session
-    ? new Set(getAccessibleModules(session.role, session.permissions))
+    ? new Set(getAccessibleModules(role, permissions))
     : new Set<string>();
 
   const MODULES = ALL_MODULES.filter(m => accessible.has(m.key));
