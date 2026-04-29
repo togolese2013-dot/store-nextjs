@@ -433,8 +433,10 @@ export async function updateUtilisateur(id: number, data: {
 }
 
 export async function deleteUtilisateur(id: number) {
-  await db.execute("DELETE FROM utilisateur_permissions WHERE utilisateur_id = ?", [id]);
-  await db.execute("DELETE FROM utilisateurs WHERE id = ?", [id]);
+  // Soft-delete: utilisateurs has FK references from 12+ operational tables
+  // (documents, achats, paiements, mouvements_stock, etc.) — physical DELETE
+  // would cascade-fail. Deactivation preserves all historical data.
+  await db.execute("UPDATE utilisateurs SET actif = 0 WHERE id = ?", [id]);
 }
 
 export async function listPermissions(): Promise<Permission[]> {
