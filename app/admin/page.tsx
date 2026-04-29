@@ -1,4 +1,4 @@
-import { getAdminSession } from "@/lib/auth";
+import { getAdminSessionFull } from "@/lib/auth";
 import { getAccessibleModules } from "@/lib/admin-permissions";
 import Link from "next/link";
 import { Package, ShoppingBag, Settings, Users, ArrowRight, BarChart2 } from "lucide-react";
@@ -59,7 +59,7 @@ const ALL_MODULES = [
 ];
 
 export default async function AdminHomePage() {
-  const session = await getAdminSession();
+  const session = await getAdminSessionFull();
   const accessible = session
     ? new Set(getAccessibleModules(session.role, session.permissions))
     : new Set<string>();
