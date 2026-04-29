@@ -597,10 +597,17 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
 function DeleteModal({ nom, url, onClose }: { nom: string; url: string; onClose: () => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [err,     setErr]     = useState("");
 
   async function confirm() {
-    setLoading(true);
-    await fetch(url, { method: "DELETE" });
+    setLoading(true); setErr("");
+    const res = await fetch(url, { method: "DELETE" });
+    setLoading(false);
+    if (!res.ok) {
+      try { const d = await res.json(); setErr(d.error || "Erreur lors de la suppression."); }
+      catch { setErr("Erreur lors de la suppression."); }
+      return;
+    }
     router.refresh();
     onClose();
   }
@@ -613,9 +620,12 @@ function DeleteModal({ nom, url, onClose }: { nom: string; url: string; onClose:
             <Trash2 className="w-6 h-6 text-red-600" />
           </div>
           <h3 className="font-bold text-lg text-slate-900 mb-2">Supprimer ?</h3>
-          <p className="text-sm text-slate-500 mb-6">
+          <p className="text-sm text-slate-500 mb-4">
             <strong>{nom}</strong> et tous ses accès seront définitivement supprimés.
           </p>
+          {err && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-xl mb-4">{err}</p>
+          )}
           <div className="flex gap-3">
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50"

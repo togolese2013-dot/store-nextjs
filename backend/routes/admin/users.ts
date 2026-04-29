@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { getSession } from "../../lib/auth";
 import {
   listAdminUsers, createAdminUser, updateAdminUser,
-  updateAdminPassword, deleteAdminUser, getAdminByUsername,
+  updateAdminPassword, deleteAdminUser, getAdminByUsername, getAdminById,
   listUtilisateurs, createUtilisateur, updateUtilisateur, deleteUtilisateur,
   getUtilisateurPermissions, listPermissions,
 } from "@/lib/admin-db";
@@ -11,11 +11,27 @@ import {
 const router = express.Router();
 
 // ── Helper: super_admin only ──────────────────────────────────────────────────
+// Falls back to a DB role check in case the JWT was issued by older code
+// that stored a different role field name or value.
 
 async function requireSuperAdmin(req: express.Request, res: express.Response) {
   const session = await getSession(req);
   if (!session) { res.status(401).json({ error: "Non autorisé." }); return null; }
-  if (session.role !== "super_admin") { res.status(403).json({ error: "Accès réservé au super admin." }); return null; }
+
+  if (session.role !== "super_admin") {
+    // JWT role may be stale — verify against DB
+    try {
+      const dbUser = await getAdminById(session.id);
+      if (!dbUser || dbUser.role !== "super_admin") {
+        res.status(403).json({ error: "Accès réservé au super admin." });
+        return null;
+      }
+    } catch {
+      res.status(403).json({ error: "Accès réservé au super admin." });
+      return null;
+    }
+  }
+
   return session;
 }
 
@@ -145,17 +161,15 @@ router.put("/api/admin/users/:id/permissions", async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 router.get("/api/admin/team", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
   const [utilisateurs, permissions] = await Promise.all([listUtilisateurs(), listPermissions()]);
   res.json({ utilisateurs, permissions });
 });
 
 router.post("/api/admin/team", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
   try {
     const { nom, poste, email, telephone, motDePasse } = req.body as Record<string, string>;
     if (!nom || !poste || !motDePasse) return res.status(400).json({ error: "Champs manquants." });
@@ -167,9 +181,8 @@ router.post("/api/admin/team", async (req, res) => {
 });
 
 router.patch("/api/admin/team/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
   try {
     const { motDePasse, ...rest } = req.body as Record<string, unknown>;
     const data: Parameters<typeof updateUtilisateur>[1] = {};
@@ -187,9 +200,8 @@ router.patch("/api/admin/team/:id", async (req, res) => {
 });
 
 router.delete("/api/admin/team/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (session.role !== "super_admin") return res.status(403).json({ error: "Accès refusé." });
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
   try {
     await deleteUtilisateur(Number(req.params.id));
     res.json({ ok: true });
@@ -199,8 +211,8 @@ router.delete("/api/admin/team/:id", async (req, res) => {
 });
 
 router.get("/api/admin/team/:id/permissions", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const session = await requireSuperAdmin(req, res);
+  if (!session) return;
   const ids = await getUtilisateurPermissions(Number(req.params.id));
   res.json(ids);
 });
