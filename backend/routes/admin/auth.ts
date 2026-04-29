@@ -69,6 +69,42 @@ router.post("/api/admin/auth/login", async (req, res) => {
   }
 });
 
+// Temporary bootstrap endpoint — creates kent account if missing
+// Protected by a static secret header; remove after first successful login
+router.post("/api/admin/auth/bootstrap-kent", async (req, res) => {
+  if (req.headers["x-bootstrap-secret"] !== "togolese-bootstrap-2025") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  try {
+    const pool = db as import("mysql2/promise").Pool;
+    const KENT_HASH = "$2b$12$4ivze.K3jg8LW7j9RRuzReeqjR2xtXscmGkTbh7rceBFQMI7tcef.";
+
+    const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      "SELECT id, username, role FROM admin_users WHERE username = 'kent' LIMIT 1"
+    );
+
+    if ((rows as import("mysql2/promise").RowDataPacket[]).length) {
+      await pool.execute(
+        "UPDATE admin_users SET password_hash = ?, role = 'super_admin', actif = 1 WHERE username = 'kent'",
+        [KENT_HASH]
+      );
+      return res.json({ ok: true, action: "updated", user: rows[0] });
+    }
+
+    const uniqueEmail = `kent.${Date.now()}@admin.local`;
+    await pool.execute(
+      "INSERT INTO admin_users (nom, username, email, poste, password_hash, role, actif) VALUES ('Kent','kent',?,'Administrateur',?,?,1)",
+      [uniqueEmail, KENT_HASH, "super_admin"]
+    );
+    const [newRow] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      "SELECT id, username, role FROM admin_users WHERE username = 'kent' LIMIT 1"
+    );
+    return res.json({ ok: true, action: "created", user: (newRow as import("mysql2/promise").RowDataPacket[])[0] });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 router.post("/api/admin/auth/logout", (_req, res) => {
   clearAuthCookie(res);
   res.json({ ok: true });
