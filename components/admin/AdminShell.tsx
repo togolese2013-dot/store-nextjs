@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Menu } from "lucide-react";
 import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
@@ -62,6 +62,14 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
+      {/* Mobile hamburger — visible uniquement sous lg */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-3 left-3 z-50 w-9 h-9 rounded-full bg-brand-900 shadow-md flex items-center justify-center text-white"
+        aria-label="Ouvrir le menu"
+      >
+        <Menu className="w-4 h-4" />
+      </button>
       <div className="lg:pl-60 xl:pl-64">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
           {hasUpdates && (
