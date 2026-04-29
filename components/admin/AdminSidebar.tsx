@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import {
   Package, ShoppingBag, Settings, Users, MessageCircle, Send, Star, Tag,
@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, Globe, ShieldCheck,
+  Gift, Mail, UserCheck, Home, LogOut, Globe, ShieldCheck,
 } from "lucide-react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
 import { hasPageAccess } from "@/lib/admin-permissions";
@@ -155,6 +155,7 @@ interface Props {
 
 export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMobileOpen }: Props) {
   const pathname     = usePathname();
+  const router       = useRouter();
   const moduleKey    = getActiveModule(pathname);
   const activeModule = moduleKey ? MODULES[moduleKey] : null;
 
@@ -168,6 +169,12 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
   function isActive(href: string) {
     if (href === "/admin") return pathname === "/admin";
     return pathname.startsWith(href);
+  }
+
+  async function logout() {
+    await fetch("/api/admin/auth/logout", { method: "POST" });
+    router.push("/admin/login");
+    router.refresh();
   }
 
   function buildContent(showHeader: boolean) { return (
@@ -265,6 +272,14 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
           <Home className="w-4 h-4 shrink-0 opacity-80" />
           Accueil admin
         </Link>
+        <button
+          onClick={logout}
+          style={{ color: "#fca5a5" }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-500/15 transition-colors"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          Déconnexion — {nom}
+        </button>
       </div>
     </div>
   ); }
@@ -273,7 +288,7 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col fixed left-0 top-0 h-screen z-40 shadow-xl">
-        {buildContent(false)}
+        {buildContent(true)}
       </aside>
 
       {/* Mobile drawer — full height, includes branding header */}

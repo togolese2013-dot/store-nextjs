@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import AdminTopNav from "./AdminTopNav";
+import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
 
@@ -21,7 +21,8 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
   const pathname = usePathname();
   const router   = useRouter();
 
-  const [hasUpdates, setHasUpdates] = useState(false);
+  const [mobileOpen,  setMobileOpen]  = useState(false);
+  const [hasUpdates,  setHasUpdates]  = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { subscribe } = useAdminSSE();
@@ -46,21 +47,22 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
     !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
   );
 
-  // Cards page — full screen below the nav
+  // Fullscreen pages (cards, config, users…) — no sidebar
   if (isAdminZone) {
-    return (
-      <>
-        <AdminTopNav nom={nom} role={role} permissions={permissions} />
-        <div className="pt-14">{children}</div>
-      </>
-    );
+    return <>{children}</>;
   }
 
-  // Content pages — full width, no sidebar
+  // Sidebar pages
   return (
     <div className="min-h-screen bg-slate-50">
-      <AdminTopNav nom={nom} role={role} permissions={permissions} />
-      <div className="pt-14">
+      <AdminSidebar
+        nom={nom}
+        role={role}
+        permissions={permissions}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
+      <div className="lg:pl-60 xl:pl-64">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
           {hasUpdates && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl animate-fade-up">
