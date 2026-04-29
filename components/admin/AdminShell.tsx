@@ -62,16 +62,18 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
-      {/* Mobile hamburger — visible uniquement sous lg */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-50 w-9 h-9 rounded-full bg-brand-900 shadow-md flex items-center justify-center text-white"
-        aria-label="Ouvrir le menu"
-      >
-        <Menu className="w-4 h-4" />
-      </button>
       <div className="lg:pl-60 xl:pl-64">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+          {/* Bouton Menu mobile — au-dessus du titre */}
+          <div className="lg:hidden mb-4">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-brand-700 text-brand-700 text-sm font-semibold"
+            >
+              <Menu className="w-4 h-4" />
+              Menu
+            </button>
+          </div>
           {hasUpdates && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl animate-fade-up">
               <span className="text-sm text-emerald-800 font-medium">
