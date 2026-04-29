@@ -271,8 +271,8 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
 
   return (
     <>
-      {/* Desktop sidebar — starts below AdminTopBar */}
-      <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col fixed left-0 top-14 h-[calc(100vh-56px)] z-40 shadow-xl">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col fixed left-0 top-0 h-screen z-40 shadow-xl">
         {buildContent(false)}
       </aside>
 

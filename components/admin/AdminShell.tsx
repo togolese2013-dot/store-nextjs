@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import AdminSidebar from "./AdminSidebar";
-import AdminTopBar from "./AdminTopBar";
+import AdminFloatingUI from "./AdminFloatingUI";
 import OrderNotifier from "./OrderNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
 
@@ -48,12 +48,12 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
     !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
   );
 
-  // Fullscreen pages (cards, config, users…) — header only, no sidebar
+  // Fullscreen pages (cards, config, users…) — floating chip only, no sidebar
   if (isAdminZone) {
     return (
       <>
-        <AdminTopBar nom={nom} role={role} />
-        <div className="pt-14">{children}</div>
+        <AdminFloatingUI nom={nom} role={role} />
+        {children}
       </>
     );
   }
@@ -61,7 +61,7 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
   // Sidebar pages
   return (
     <div className="min-h-screen bg-slate-50">
-      <AdminTopBar nom={nom} role={role} onMobileMenuToggle={() => setMobileOpen(true)} />
+      <AdminFloatingUI nom={nom} role={role} onMobileMenuToggle={() => setMobileOpen(true)} />
       <AdminSidebar
         nom={nom}
         role={role}
@@ -69,7 +69,7 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
-      <div className="lg:pl-60 xl:pl-64 pt-14">
+      <div className="lg:pl-60 xl:pl-64">
         <main className="min-h-screen p-4 sm:p-6 lg:p-8">
           {hasUpdates && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl animate-fade-up">
