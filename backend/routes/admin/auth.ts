@@ -56,7 +56,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
           try { permissions = JSON.parse(teamMember.permissions) as AdminPermissions; } catch { /* ignore */ }
         }
 
-        const mustChange = Boolean((teamMember as unknown as Record<string, unknown>).must_change_password);
+        const mustChange = Boolean((teamMember as unknown as { must_change_password?: number }).must_change_password);
         const token = await signToken({
           id:                  teamMember.id,
           username:            teamMember.username ?? slug,
@@ -81,7 +81,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
       try { permissions = JSON.parse(user.permissions) as AdminPermissions; } catch { /* ignore */ }
     }
 
-    const mustChange = Boolean((user as unknown as Record<string, unknown>).must_change_password);
+    const mustChange = Boolean(user.must_change_password);
     const token = await signToken({
       id:                  user.id,
       username:            user.username,

@@ -235,18 +235,19 @@ export async function getStockMovements(opts: {
 
 /* ─── Admin Users ─── */
 export interface AdminUser {
-  id:            number;
-  nom:           string;
-  username:      string;
-  email:         string | null;
-  telephone:     string | null;
-  poste:         string | null;
-  password_hash: string;
-  role:          string;
-  actif:         boolean;
-  permissions:   string | null; // JSON string
-  created_at:    string;
-  last_login:    string | null;
+  id:                   number;
+  nom:                  string;
+  username:             string;
+  email:                string | null;
+  telephone:            string | null;
+  poste:                string | null;
+  password_hash:        string;
+  role:                 string;
+  actif:                boolean;
+  permissions:          string | null;
+  created_at:           string;
+  last_login:           string | null;
+  must_change_password: number;
 }
 
 export async function ensureAdminUsersCols() {
@@ -450,7 +451,7 @@ export async function getUtilisateurById(id: number): Promise<Utilisateur | null
 
 export async function getUtilisateurByUsername(username: string): Promise<(Utilisateur & { mot_de_passe: string }) | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions, mot_de_passe FROM utilisateurs WHERE username = ? AND actif = 1 LIMIT 1",
+    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions, mot_de_passe, must_change_password FROM utilisateurs WHERE username = ? AND actif = 1 LIMIT 1",
     [username]
   );
   return (rows[0] as (Utilisateur & { mot_de_passe: string })) ?? null;
