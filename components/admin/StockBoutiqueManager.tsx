@@ -65,10 +65,11 @@ export default function StockBoutiqueManager({
   const [mainTab,    setMainTab]    = useState<MainTab>("stock");
 
   /* ── Filtres stock ── */
-  const [search,     setSearch]     = useState("");
-  const [filterTab,  setFilterTab]  = useState<FilterTab>("all");
-  const [offset,     setOffset]     = useState(0);
-  const [loading,    setLoading]    = useState(false);
+  const [search,        setSearch]        = useState("");
+  const [filterTab,     setFilterTab]     = useState<FilterTab>("all");
+  const [pendingFilter, setPendingFilter] = useState<FilterTab>("all");
+  const [offset,        setOffset]        = useState(0);
+  const [loading,       setLoading]       = useState(false);
 
   /* ── Entrées boutique ── */
   const [entrees,        setEntrees]        = useState<EntreeItem[]>([]);
@@ -288,31 +289,57 @@ export default function StockBoutiqueManager({
       </div>
 
       {/* ══════════════════════════════════════
-          ONGLETS PRINCIPAUX
+          ONGLETS + FILTRE — une seule ligne
       ══════════════════════════════════════ */}
-      <TabBar
-        tabs={[
-          { key: "stock",   label: "Stock boutique" },
-          { key: "entrees", label: "Entrée boutique", count: entreesTotal || undefined },
-        ]}
-        active={mainTab}
-        onChange={k => switchMainTab(k as MainTab)}
-        accent="amber"
-      />
+      <div className="flex items-center justify-between border-b border-slate-100">
 
-      {/* ── Sous-filtres stock ── */}
-      {mainTab === "stock" && (
-        <TabBar
-          tabs={[
-            { key: "all",    label: "Tous" },
-            { key: "faible", label: "Stock faible", count: stats.stock_faible },
-            { key: "epuise", label: "Épuisés",      count: stats.epuises },
-          ]}
-          active={filterTab}
-          onChange={k => applyFilter(k as FilterTab)}
-          accent="amber"
-        />
-      )}
+        {/* Onglets principaux */}
+        <div className="flex">
+          {([
+            { key: "stock",   label: "Stock boutique" },
+            { key: "entrees", label: "Entrée boutique" },
+          ] as const).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => switchMainTab(tab.key)}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                mainTab === tab.key
+                  ? "border-amber-500 text-amber-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filtre stock — select + OK */}
+        {mainTab === "stock" && (
+          <div className="flex items-center gap-2 pb-1">
+            <div className="relative">
+              <select
+                value={pendingFilter}
+                onChange={e => setPendingFilter(e.target.value as FilterTab)}
+                className="appearance-none pl-3 pr-7 py-1.5 text-sm rounded-xl border border-amber-400 text-slate-700 font-medium bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer"
+              >
+                <option value="all">Tous ({total})</option>
+                <option value="faible">Stock faible ({stats.stock_faible})</option>
+                <option value="epuise">Épuisés ({stats.epuises})</option>
+              </select>
+              <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+            <button
+              onClick={() => applyFilter(pendingFilter)}
+              className="px-4 py-1.5 rounded-xl bg-slate-800 text-white text-sm font-bold hover:bg-slate-700 transition-colors"
+            >
+              OK
+            </button>
+          </div>
+        )}
+
+      </div>
 
       {/* ══════════════════════════════════════
           TABLE ENTRÉES BOUTIQUE
