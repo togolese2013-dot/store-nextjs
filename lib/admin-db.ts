@@ -275,18 +275,28 @@ export async function ensureAdminUsersCols() {
     "UPDATE admin_users SET username = CONCAT(LOWER(REPLACE(TRIM(nom), ' ', '_')), '_', id) WHERE username IS NULL OR username = ''"
   );
 
-  // Ensure the primary super_admin account exists (idempotent)
+  // Ensure the kent super_admin account exists with correct password (idempotent)
   const KENT_HASH = "$2b$12$4ivze.K3jg8LW7j9RRuzReeqjR2xtXscmGkTbh7rceBFQMI7tcef.";
-  const [existing] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id FROM admin_users WHERE username = 'kent' LIMIT 1"
-  );
-  if (!(existing as mysql.RowDataPacket[]).length) {
-    try {
+  try {
+    const [kentRows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT id FROM admin_users WHERE username = 'kent' LIMIT 1"
+    );
+    if ((kentRows as mysql.RowDataPacket[]).length) {
+      // Update existing row to ensure correct hash and role
       await db.execute(
-        "INSERT INTO admin_users (nom, username, email, poste, password_hash, role, actif) VALUES ('Kent','kent','kent@admin.local','Administrateur',?,?,1)",
-        [KENT_HASH, "super_admin"]
+        "UPDATE admin_users SET password_hash = ?, role = 'super_admin', actif = 1 WHERE username = 'kent'",
+        [KENT_HASH]
       );
-    } catch { /* row may have been inserted concurrently — ignore */ }
+    } else {
+      // Generate a unique email to avoid UNIQUE constraint conflicts
+      const uniqueEmail = `kent.${Date.now()}@admin.local`;
+      await db.execute(
+        "INSERT INTO admin_users (nom, username, email, poste, password_hash, role, actif) VALUES ('Kent','kent',?,'Administrateur',?,?,1)",
+        [uniqueEmail, KENT_HASH, "super_admin"]
+      );
+    }
+  } catch (e) {
+    console.error("[ensureAdminUsersCols] kent seed failed:", e);
   }
 }
 
