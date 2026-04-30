@@ -2,8 +2,32 @@ import express from "express";
 import { getSession } from "../../lib/auth";
 import { getSetting, saveIncomingMessage } from "@/lib/admin-db";
 import { sendWaText } from "../../lib/whatsapp";
+import { db } from "@/lib/db";
+import type mysql from "mysql2/promise";
 
 const router = express.Router();
+const pool   = db as import("mysql2/promise").Pool;
+
+/* ── Migration — créée au démarrage du backend ───────────────────────────── */
+export async function ensureWhatsappMessagesTable() {
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS whatsapp_messages (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      wa_message_id VARCHAR(255) NOT NULL,
+      from_number   VARCHAR(30)  NOT NULL,
+      to_number     VARCHAR(30)  NOT NULL DEFAULT '',
+      contact_name  VARCHAR(100) NOT NULL DEFAULT '',
+      direction     ENUM('in','out') NOT NULL DEFAULT 'in',
+      type          VARCHAR(30)  NOT NULL DEFAULT 'text',
+      content       TEXT         NOT NULL,
+      media_url     VARCHAR(500) NULL,
+      status        VARCHAR(30)  NOT NULL DEFAULT 'received',
+      read_at       DATETIME     NULL,
+      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_wa_msg (wa_message_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
 
 /* ── GET /api/admin/whatsapp/webhook — Meta verification ─────────────────── */
 router.get("/api/admin/whatsapp/webhook", async (req, res) => {

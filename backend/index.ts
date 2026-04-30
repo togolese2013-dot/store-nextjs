@@ -1,3 +1,8 @@
+import { config } from "dotenv";
+import { resolve } from "path";
+config({ path: resolve(__dirname, "../.env.local") });
+config({ path: resolve(__dirname, "../.env") });
+
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -24,7 +29,9 @@ import adminUsersRoutes     from "./routes/admin/users";
 import adminReviewsRoutes       from "./routes/admin/reviews";
 import adminPaymentPlansRoutes  from "./routes/admin/payment-plans";
 import adminVerificationsRoutes from "./routes/admin/verifications";
-import adminWhatsappRoutes      from "./routes/admin/whatsapp";
+import adminWhatsappRoutes, { ensureWhatsappMessagesTable } from "./routes/admin/whatsapp";
+import adminCommerciauxRoutes  from "./routes/admin/commerciaux";
+import { ensureCommerciauxTables } from "./routes/admin/commerciaux";
 import livreurRoutes        from "./routes/livreur";
 import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
@@ -43,11 +50,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
-      cb(null, true);
-    } else {
-      cb(new Error(`CORS: origine non autorisée — ${origin}`));
-    }
+    if (!origin) return cb(null, true);
+    // Allow any local network IP (192.168.x.x, 10.x.x.x) on any port — for mobile dev
+    if (/^http:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(origin)) return cb(null, true);
+    if (allowedOrigins.some(o => origin.startsWith(o))) return cb(null, true);
+    cb(new Error(`CORS: origine non autorisée — ${origin}`));
   },
   credentials: true,
 }));
@@ -80,6 +87,7 @@ app.use(adminReviewsRoutes);
 app.use(adminPaymentPlansRoutes);
 app.use(adminVerificationsRoutes);
 app.use(adminWhatsappRoutes);
+app.use(adminCommerciauxRoutes);
 app.use(livreurRoutes);
 app.use(publicRoutes);
 app.use(accountRoutes);
@@ -111,6 +119,18 @@ app.listen(PORT, async () => {
     console.log("[backend] livreurs migration OK");
   } catch (e) {
     console.error("[backend] migrateAdminLivreursToTeam failed:", e);
+  }
+  try {
+    await ensureCommerciauxTables();
+    console.log("[backend] commerciaux tables OK");
+  } catch (e) {
+    console.error("[backend] ensureCommerciauxTables failed:", e);
+  }
+  try {
+    await ensureWhatsappMessagesTable();
+    console.log("[backend] whatsapp_messages table OK");
+  } catch (e) {
+    console.error("[backend] ensureWhatsappMessagesTable failed:", e);
   }
 });
 
