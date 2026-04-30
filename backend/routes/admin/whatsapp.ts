@@ -15,7 +15,7 @@ export async function ensureWhatsappMessagesTable() {
     CREATE TABLE IF NOT EXISTS whatsapp_messages (
       id            INT AUTO_INCREMENT PRIMARY KEY,
       from_number   VARCHAR(30)  NOT NULL,
-      content       TEXT         NOT NULL,
+      content       TEXT         NULL,
       created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
@@ -28,7 +28,7 @@ export async function ensureWhatsappMessagesTable() {
     ["contact_name",  "ALTER TABLE whatsapp_messages ADD COLUMN contact_name VARCHAR(100) NOT NULL DEFAULT ''"],
     ["direction",     "ALTER TABLE whatsapp_messages ADD COLUMN direction ENUM('in','out') NOT NULL DEFAULT 'in'"],
     ["type",          "ALTER TABLE whatsapp_messages ADD COLUMN type VARCHAR(30) NOT NULL DEFAULT 'text'"],
-    ["content",       "ALTER TABLE whatsapp_messages ADD COLUMN content TEXT NOT NULL DEFAULT ''"],
+    ["content",       "ALTER TABLE whatsapp_messages ADD COLUMN content TEXT NULL"],
     ["media_url",     "ALTER TABLE whatsapp_messages ADD COLUMN media_url VARCHAR(500) NULL"],
     ["status",        "ALTER TABLE whatsapp_messages ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'received'"],
     ["read_at",       "ALTER TABLE whatsapp_messages ADD COLUMN read_at DATETIME NULL"],
