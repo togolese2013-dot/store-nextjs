@@ -865,9 +865,20 @@ export interface WaMessage {
 }
 
 export async function listWaMessages(limit = 100): Promise<WaMessage[]> {
-  const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`
-  ).catch(() => [[] as mysql.RowDataPacket[], [] as mysql.FieldPacket[]]);
+  // Try modern schema first; fall back to legacy schema (body instead of content)
+  const modern = `SELECT id, wa_message_id, from_number, to_number, contact_name, direction, type,
+                         content, COALESCE(media_url,'') as media_url, status, read_at, created_at
+                  FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`;
+  const legacy = `SELECT id, COALESCE(wa_message_id,'') as wa_message_id, from_number,
+                         COALESCE(to_number,'') as to_number, COALESCE(contact_name,'') as contact_name,
+                         COALESCE(direction,'in') as direction, COALESCE(type,'text') as type,
+                         COALESCE(body,'') as content, '' as media_url, COALESCE(status,'received') as status,
+                         read_at, created_at
+                  FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`;
+
+  const [rows] = await db.query<mysql.RowDataPacket[]>(modern)
+    .catch(() => db.query<mysql.RowDataPacket[]>(legacy))
+    .catch(() => [[] as mysql.RowDataPacket[], [] as mysql.FieldPacket[]]);
   return rows as WaMessage[];
 }
 

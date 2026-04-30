@@ -21,15 +21,17 @@ export async function ensureWhatsappMessagesTable() {
   `);
 
   // Add missing columns individually (safe to run on existing table)
+  // NOTE: old table had 'body' instead of 'content', and 'wa_id' instead of 'wa_message_id'
   const alterations: [string, string][] = [
-    ["wa_message_id", "ALTER TABLE whatsapp_messages ADD COLUMN wa_message_id VARCHAR(255) NOT NULL DEFAULT '' AFTER id"],
-    ["to_number",     "ALTER TABLE whatsapp_messages ADD COLUMN to_number VARCHAR(30) NOT NULL DEFAULT '' AFTER from_number"],
-    ["contact_name",  "ALTER TABLE whatsapp_messages ADD COLUMN contact_name VARCHAR(100) NOT NULL DEFAULT '' AFTER to_number"],
-    ["direction",     "ALTER TABLE whatsapp_messages ADD COLUMN direction ENUM('in','out') NOT NULL DEFAULT 'in' AFTER contact_name"],
-    ["type",          "ALTER TABLE whatsapp_messages ADD COLUMN type VARCHAR(30) NOT NULL DEFAULT 'text' AFTER direction"],
-    ["media_url",     "ALTER TABLE whatsapp_messages ADD COLUMN media_url VARCHAR(500) NULL AFTER content"],
-    ["status",        "ALTER TABLE whatsapp_messages ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'received' AFTER media_url"],
-    ["read_at",       "ALTER TABLE whatsapp_messages ADD COLUMN read_at DATETIME NULL AFTER status"],
+    ["wa_message_id", "ALTER TABLE whatsapp_messages ADD COLUMN wa_message_id VARCHAR(255) NOT NULL DEFAULT ''"],
+    ["to_number",     "ALTER TABLE whatsapp_messages ADD COLUMN to_number VARCHAR(30) NOT NULL DEFAULT ''"],
+    ["contact_name",  "ALTER TABLE whatsapp_messages ADD COLUMN contact_name VARCHAR(100) NOT NULL DEFAULT ''"],
+    ["direction",     "ALTER TABLE whatsapp_messages ADD COLUMN direction ENUM('in','out') NOT NULL DEFAULT 'in'"],
+    ["type",          "ALTER TABLE whatsapp_messages ADD COLUMN type VARCHAR(30) NOT NULL DEFAULT 'text'"],
+    ["content",       "ALTER TABLE whatsapp_messages ADD COLUMN content TEXT NOT NULL DEFAULT ''"],
+    ["media_url",     "ALTER TABLE whatsapp_messages ADD COLUMN media_url VARCHAR(500) NULL"],
+    ["status",        "ALTER TABLE whatsapp_messages ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'received'"],
+    ["read_at",       "ALTER TABLE whatsapp_messages ADD COLUMN read_at DATETIME NULL"],
   ];
 
   const [cols] = await pool.execute<mysql.RowDataPacket[]>(
