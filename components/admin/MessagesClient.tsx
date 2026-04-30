@@ -221,7 +221,7 @@ export default function MessagesClient() {
                         className="h-9 max-w-[240px]" preload="none" />
                     </div>
                   ) : null}
-                  {(msg.content || (msg as any).body) ? (
+                  {(msg.content || (msg as any).body) && !["image","audio","video"].includes(msg.type) ? (
                     <p className="px-4 py-2.5">{msg.content || (msg as any).body}</p>
                   ) : (msg.type !== "image" && msg.type !== "audio") ? (
                     <p className="px-4 py-2.5 opacity-50 italic text-xs">
