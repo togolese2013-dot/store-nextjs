@@ -29,6 +29,21 @@ export async function ensureWhatsappMessagesTable() {
   `);
 }
 
+/* ── GET /api/admin/whatsapp/ping — table diagnostic (no auth) ───────────── */
+router.get("/api/admin/whatsapp/ping", async (_req, res) => {
+  try {
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) as total FROM whatsapp_messages"
+    );
+    const last = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT id, wa_message_id, from_number, content, created_at FROM whatsapp_messages ORDER BY id DESC LIMIT 3"
+    );
+    return res.json({ ok: true, total: (rows as any)[0].total, last: (last as any)[0] });
+  } catch (e: any) {
+    return res.json({ ok: false, error: e.message });
+  }
+});
+
 /* ── GET /api/admin/whatsapp/webhook — Meta verification ─────────────────── */
 router.get("/api/admin/whatsapp/webhook", async (req, res) => {
   const mode      = req.query["hub.mode"];
