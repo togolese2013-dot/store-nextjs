@@ -48,6 +48,15 @@ export async function ensureWhatsappMessagesTable() {
     }
   }
 
+  // Create debug log table (persists across restarts)
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS wa_webhook_log (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      payload    TEXT NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `).catch(() => {});
+
   // Add unique index on wa_message_id if not present
   const [idxRows] = await pool.execute<mysql.RowDataPacket[]>(
     "SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages' AND INDEX_NAME = 'uq_wa_msg'"
@@ -78,8 +87,16 @@ router.get("/api/admin/whatsapp/ping", async (_req, res) => {
 });
 
 /* ── GET /api/admin/whatsapp/rawlog — view last raw webhook payloads ─────── */
-router.get("/api/admin/whatsapp/rawlog", (_req, res) => {
-  res.json({ count: rawLog.length, log: rawLog });
+router.get("/api/admin/whatsapp/rawlog", async (_req, res) => {
+  try {
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT id, payload, created_at FROM wa_webhook_log ORDER BY id DESC LIMIT 10"
+    );
+    const dbLog = (rows as any[]).map(r => ({ ts: r.created_at, body: JSON.parse(r.payload) }));
+    res.json({ memory_count: rawLog.length, db_count: dbLog.length, memory: rawLog, db: dbLog });
+  } catch {
+    res.json({ memory_count: rawLog.length, memory: rawLog, db: [], db_error: "table not ready" });
+  }
 });
 
 /* ── GET /api/admin/whatsapp/config-check — show non-secret WA settings ──── */
@@ -117,9 +134,15 @@ router.get("/api/admin/whatsapp/webhook", async (req, res) => {
 
 /* ── POST /api/admin/whatsapp/webhook — receive incoming messages ─────────── */
 router.post("/api/admin/whatsapp/webhook", async (req, res) => {
-  // Capture raw payload for debugging
+  // Capture raw payload for debugging (memory + DB)
   rawLog.unshift({ ts: new Date().toISOString(), body: req.body });
   if (rawLog.length > 10) rawLog.pop();
+
+  // Persist to DB so log survives restarts
+  pool.execute(
+    "INSERT INTO wa_webhook_log (payload, created_at) VALUES (?, NOW())",
+    [JSON.stringify(req.body).slice(0, 4000)]
+  ).catch(() => {}); // ignore if table doesn't exist yet
 
   res.status(200).json({ status: "ok" }); // always 200 to Meta
 
