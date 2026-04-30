@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { WaMessage } from "@/lib/admin-db";
-import { MessageCircle, Send, Loader2, RefreshCw, Paperclip, X } from "lucide-react";
+import { MessageCircle, Send, Loader2, RefreshCw, Paperclip, X, Mic, Square } from "lucide-react";
 import { clsx } from "clsx";
 
 export default function MessagesClient() {
@@ -12,10 +12,15 @@ export default function MessagesClient() {
   const [reply,      setReply]      = useState("");
   const [sending,    setSending]    = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [imageFile,  setImageFile]  = useState<File | null>(null);
+  const [imageFile,    setImageFile]    = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const bottomRef    = useRef<HTMLDivElement>(null);
+  const [recording,    setRecording]    = useState(false);
+  const [recSeconds,   setRecSeconds]   = useState(0);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+  const bottomRef      = useRef<HTMLDivElement>(null);
+  const mediaRecRef    = useRef<MediaRecorder | null>(null);
+  const recChunksRef   = useRef<BlobPart[]>([]);
+  const recTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async (silent = true) => {
     if (!silent) setRefreshing(true);
@@ -60,6 +65,66 @@ export default function MessagesClient() {
 
   // For display: oldest → newest (ASC) per thread
   const threadAsc = (key: string) => [...(threads[key] ?? [])].reverse();
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const rec = new MediaRecorder(stream, { mimeType });
+      recChunksRef.current = [];
+      rec.ondataavailable = e => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
+      rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); };
+      rec.start(100);
+      mediaRecRef.current = rec;
+      setRecording(true);
+      setRecSeconds(0);
+      recTimerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000);
+    } catch {
+      alert("Impossible d'accéder au microphone.");
+    }
+  }
+
+  function stopRecording(send: boolean) {
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+    const rec = mediaRecRef.current;
+    if (!rec) return;
+    if (send) {
+      rec.addEventListener("stop", async () => {
+        const blob = new Blob(recChunksRef.current, { type: rec.mimeType });
+        await uploadAndSendAudio(blob, rec.mimeType);
+      }, { once: true });
+    }
+    rec.stop();
+    mediaRecRef.current = null;
+    setRecording(false);
+    setRecSeconds(0);
+  }
+
+  async function uploadAndSendAudio(blob: Blob, mimeType: string) {
+    if (!selected) return;
+    setSending(true);
+    try {
+      const ext  = mimeType.includes("ogg") ? "ogg" : "webm";
+      const file = new File([blob], `vocal_${Date.now()}.${ext}`, { type: mimeType });
+      const form = new FormData();
+      form.append("file", file);
+      const upRes  = await fetch("/api/admin/whatsapp/upload-media", { method: "POST", body: form });
+      const upData = await upRes.json() as { mediaId?: string; error?: string };
+      if (upData.mediaId) {
+        const to = selected.direction === "in" ? selected.from_number : selected.to_number;
+        await fetch("/api/admin/whatsapp/send", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ to, mediaId: upData.mediaId, mediaType: "audio", message: "" }),
+        });
+        await refresh(false);
+      }
+    } finally {
+      setSending(false);
+    }
+  }
 
   function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -257,27 +322,53 @@ export default function MessagesClient() {
                 </div>
               </div>
             )}
-            <div className="px-4 py-3 flex gap-2">
-              <input ref={fileInputRef} type="file" accept="image/*,audio/*" className="hidden" onChange={pickImage} />
-              <button onClick={() => fileInputRef.current?.click()} disabled={sending}
-                className="w-10 h-10 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-400 transition-colors disabled:opacity-50 shrink-0"
-                title="Envoyer une image"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-              <input
-                type="text" value={reply}
-                onChange={e => setReply(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendReply()}
-                placeholder={imageFile ? "Légende (optionnel)…" : "Écrire un message…"}
-                className="flex-1 px-4 py-2.5 text-sm bg-slate-50 rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none transition-all font-sans"
-              />
-              <button onClick={sendReply} disabled={sending || (!reply.trim() && !imageFile)}
-                className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#25D366] text-white hover:bg-[#1da851] transition-colors disabled:opacity-50 shrink-0"
-              >
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
-            </div>
+            {recording ? (
+              <div className="px-4 py-3 flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                <span className="text-sm font-mono text-slate-700 tabular-nums w-10">
+                  {Math.floor(recSeconds / 60)}:{String(recSeconds % 60).padStart(2, "0")}
+                </span>
+                <span className="flex-1 text-sm text-slate-400 italic">Enregistrement en cours…</span>
+                <button onClick={() => stopRecording(false)} title="Annuler"
+                  className="w-10 h-10 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-300 transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <button onClick={() => stopRecording(true)} disabled={sending} title="Arrêter et envoyer"
+                  className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#25D366] text-white hover:bg-[#1da851] transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4 fill-white" />}
+                </button>
+              </div>
+            ) : (
+              <div className="px-4 py-3 flex gap-2">
+                <input ref={fileInputRef} type="file" accept="image/*,audio/*" className="hidden" onChange={pickImage} />
+                <button onClick={() => fileInputRef.current?.click()} disabled={sending}
+                  className="w-10 h-10 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-400 transition-colors disabled:opacity-50 shrink-0"
+                  title="Joindre un fichier"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <button onClick={startRecording} disabled={sending}
+                  className="w-10 h-10 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-300 transition-colors disabled:opacity-50 shrink-0"
+                  title="Enregistrer un vocal"
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
+                <input
+                  type="text" value={reply}
+                  onChange={e => setReply(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendReply()}
+                  placeholder={imageFile ? "Légende (optionnel)…" : "Écrire un message…"}
+                  className="flex-1 px-4 py-2.5 text-sm bg-slate-50 rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none transition-all font-sans"
+                />
+                <button onClick={sendReply} disabled={sending || (!reply.trim() && !imageFile)}
+                  className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#25D366] text-white hover:bg-[#1da851] transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
