@@ -8,6 +8,9 @@ import type mysql from "mysql2/promise";
 const router = express.Router();
 const pool   = db as import("mysql2/promise").Pool;
 
+// In-memory log of last 10 raw webhook payloads (for debugging)
+const rawLog: Array<{ ts: string; body: unknown }> = [];
+
 /* ── Migration — créée au démarrage du backend ───────────────────────────── */
 export async function ensureWhatsappMessagesTable() {
   // Create table with minimal required columns if it doesn't exist
@@ -74,6 +77,11 @@ router.get("/api/admin/whatsapp/ping", async (_req, res) => {
   }
 });
 
+/* ── GET /api/admin/whatsapp/rawlog — view last raw webhook payloads ─────── */
+router.get("/api/admin/whatsapp/rawlog", (_req, res) => {
+  res.json({ count: rawLog.length, log: rawLog });
+});
+
 /* ── GET /api/admin/whatsapp/webhook — Meta verification ─────────────────── */
 router.get("/api/admin/whatsapp/webhook", async (req, res) => {
   const mode      = req.query["hub.mode"];
@@ -90,6 +98,10 @@ router.get("/api/admin/whatsapp/webhook", async (req, res) => {
 
 /* ── POST /api/admin/whatsapp/webhook — receive incoming messages ─────────── */
 router.post("/api/admin/whatsapp/webhook", async (req, res) => {
+  // Capture raw payload for debugging
+  rawLog.unshift({ ts: new Date().toISOString(), body: req.body });
+  if (rawLog.length > 10) rawLog.pop();
+
   res.status(200).json({ status: "ok" }); // always 200 to Meta
 
   try {
