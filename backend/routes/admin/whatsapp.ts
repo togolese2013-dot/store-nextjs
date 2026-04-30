@@ -10,35 +10,60 @@ const pool   = db as import("mysql2/promise").Pool;
 
 /* ── Migration — créée au démarrage du backend ───────────────────────────── */
 export async function ensureWhatsappMessagesTable() {
+  // Create table with minimal required columns if it doesn't exist
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS whatsapp_messages (
       id            INT AUTO_INCREMENT PRIMARY KEY,
-      wa_message_id VARCHAR(255) NOT NULL,
       from_number   VARCHAR(30)  NOT NULL,
-      to_number     VARCHAR(30)  NOT NULL DEFAULT '',
-      contact_name  VARCHAR(100) NOT NULL DEFAULT '',
-      direction     ENUM('in','out') NOT NULL DEFAULT 'in',
-      type          VARCHAR(30)  NOT NULL DEFAULT 'text',
       content       TEXT         NOT NULL,
-      media_url     VARCHAR(500) NULL,
-      status        VARCHAR(30)  NOT NULL DEFAULT 'received',
-      read_at       DATETIME     NULL,
-      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uq_wa_msg (wa_message_id)
+      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+
+  // Add missing columns individually (safe to run on existing table)
+  const alterations: [string, string][] = [
+    ["wa_message_id", "ALTER TABLE whatsapp_messages ADD COLUMN wa_message_id VARCHAR(255) NOT NULL DEFAULT '' AFTER id"],
+    ["to_number",     "ALTER TABLE whatsapp_messages ADD COLUMN to_number VARCHAR(30) NOT NULL DEFAULT '' AFTER from_number"],
+    ["contact_name",  "ALTER TABLE whatsapp_messages ADD COLUMN contact_name VARCHAR(100) NOT NULL DEFAULT '' AFTER to_number"],
+    ["direction",     "ALTER TABLE whatsapp_messages ADD COLUMN direction ENUM('in','out') NOT NULL DEFAULT 'in' AFTER contact_name"],
+    ["type",          "ALTER TABLE whatsapp_messages ADD COLUMN type VARCHAR(30) NOT NULL DEFAULT 'text' AFTER direction"],
+    ["media_url",     "ALTER TABLE whatsapp_messages ADD COLUMN media_url VARCHAR(500) NULL AFTER content"],
+    ["status",        "ALTER TABLE whatsapp_messages ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'received' AFTER media_url"],
+    ["read_at",       "ALTER TABLE whatsapp_messages ADD COLUMN read_at DATETIME NULL AFTER status"],
+  ];
+
+  const [cols] = await pool.execute<mysql.RowDataPacket[]>(
+    "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages'"
+  );
+  const existing = new Set((cols as any[]).map((c: any) => c.COLUMN_NAME));
+
+  for (const [col, sql] of alterations) {
+    if (!existing.has(col)) {
+      await pool.execute(sql).catch((e: any) => console.warn(`[WA migration] ${col}:`, e.message));
+    }
+  }
+
+  // Add unique index on wa_message_id if not present
+  const [idxRows] = await pool.execute<mysql.RowDataPacket[]>(
+    "SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages' AND INDEX_NAME = 'uq_wa_msg'"
+  );
+  if (!(idxRows as any[]).length) {
+    await pool.execute(
+      "ALTER TABLE whatsapp_messages ADD UNIQUE KEY uq_wa_msg (wa_message_id(191))"
+    ).catch((e: any) => console.warn("[WA migration] uq_wa_msg:", e.message));
+  }
 }
 
 /* ── GET /api/admin/whatsapp/ping — table diagnostic (no auth) ───────────── */
 router.get("/api/admin/whatsapp/ping", async (_req, res) => {
   try {
-    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
-      "SELECT COUNT(*) as total FROM whatsapp_messages"
+    const [cols] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages'"
     );
-    const last = await pool.execute<mysql.RowDataPacket[]>(
-      "SELECT id, wa_message_id, from_number, content, created_at FROM whatsapp_messages ORDER BY id DESC LIMIT 3"
-    );
-    return res.json({ ok: true, total: (rows as any)[0].total, last: (last as any)[0] });
+    const columns = (cols as any[]).map((c: any) => c.COLUMN_NAME);
+    const [rows]  = await pool.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) as total FROM whatsapp_messages");
+    const [last]  = await pool.execute<mysql.RowDataPacket[]>("SELECT * FROM whatsapp_messages ORDER BY id DESC LIMIT 3");
+    return res.json({ ok: true, columns, total: (rows as any)[0].total, last });
   } catch (e: any) {
     return res.json({ ok: false, error: e.message });
   }
