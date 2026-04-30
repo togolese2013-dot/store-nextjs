@@ -21,6 +21,7 @@ export default function MessagesClient() {
   const mediaRecRef    = useRef<MediaRecorder | null>(null);
   const recChunksRef   = useRef<BlobPart[]>([]);
   const recTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamRef      = useRef<MediaStream | null>(null);
 
   const refresh = useCallback(async (silent = true) => {
     if (!silent) setRefreshing(true);
@@ -69,13 +70,16 @@ export default function MessagesClient() {
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
+      streamRef.current = stream;
+      // Meta supports: audio/ogg;codecs=opus, audio/mp4, audio/mpeg, audio/aac, audio/amr
+      const mimeType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+        ? "audio/ogg;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
         : "audio/webm";
       const rec = new MediaRecorder(stream, { mimeType });
       recChunksRef.current = [];
       rec.ondataavailable = e => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
-      rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); };
       rec.start(100);
       mediaRecRef.current = rec;
       setRecording(true);
@@ -90,12 +94,15 @@ export default function MessagesClient() {
     if (recTimerRef.current) clearInterval(recTimerRef.current);
     const rec = mediaRecRef.current;
     if (!rec) return;
-    if (send) {
-      rec.addEventListener("stop", async () => {
+    // Single onstop handler: stop tracks then optionally send
+    rec.onstop = () => {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      if (send) {
         const blob = new Blob(recChunksRef.current, { type: rec.mimeType });
-        await uploadAndSendAudio(blob, rec.mimeType);
-      }, { once: true });
-    }
+        uploadAndSendAudio(blob, rec.mimeType);
+      }
+    };
     rec.stop();
     mediaRecRef.current = null;
     setRecording(false);
@@ -106,21 +113,30 @@ export default function MessagesClient() {
     if (!selected) return;
     setSending(true);
     try {
-      const ext  = mimeType.includes("ogg") ? "ogg" : "webm";
+      const ext  = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "mp4" : "webm";
       const file = new File([blob], `vocal_${Date.now()}.${ext}`, { type: mimeType });
       const form = new FormData();
       form.append("file", file);
       const upRes  = await fetch("/api/admin/whatsapp/upload-media", { method: "POST", body: form });
       const upData = await upRes.json() as { mediaId?: string; error?: string };
-      if (upData.mediaId) {
-        const to = selected.direction === "in" ? selected.from_number : selected.to_number;
-        await fetch("/api/admin/whatsapp/send", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ to, mediaId: upData.mediaId, mediaType: "audio", message: "" }),
-        });
-        await refresh(false);
+      if (!upData.mediaId) {
+        alert(`Échec upload audio : ${upData.error ?? "format non supporté par Meta"}`);
+        return;
       }
+      const to = selected.direction === "in" ? selected.from_number : selected.to_number;
+      const sendRes = await fetch("/api/admin/whatsapp/send", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ to, mediaId: upData.mediaId, mediaType: "audio", message: "" }),
+      });
+      if (!sendRes.ok) {
+        const err = await sendRes.json().catch(() => ({})) as { error?: string };
+        alert(`Échec envoi : ${err.error ?? "erreur inconnue"}`);
+        return;
+      }
+      await refresh(false);
+    } catch {
+      alert("Erreur lors de l'envoi audio.");
     } finally {
       setSending(false);
     }
