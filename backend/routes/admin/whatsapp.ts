@@ -56,9 +56,12 @@ export async function ensureWhatsappMessagesTable() {
   }
 }
 
-/* ── GET /api/admin/whatsapp/ping — table diagnostic (no auth) ───────────── */
+/* ── GET /api/admin/whatsapp/ping — table diagnostic + force migration ───── */
 router.get("/api/admin/whatsapp/ping", async (_req, res) => {
   try {
+    // Force migration on every ping call (idempotent)
+    await ensureWhatsappMessagesTable();
+
     const [cols] = await pool.execute<mysql.RowDataPacket[]>(
       "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages'"
     );
