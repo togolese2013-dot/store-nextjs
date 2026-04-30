@@ -82,6 +82,25 @@ router.get("/api/admin/whatsapp/rawlog", (_req, res) => {
   res.json({ count: rawLog.length, log: rawLog });
 });
 
+/* ── GET /api/admin/whatsapp/config-check — show non-secret WA settings ──── */
+router.get("/api/admin/whatsapp/config-check", async (_req, res) => {
+  try {
+    const phoneId    = await getSetting("wa_phone_number_id").catch(() => "");
+    const verifyTok  = await getSetting("wa_webhook_verify_token").catch(() => "");
+    const bizId      = await getSetting("wa_business_account_id").catch(() => "");
+    const hasToken   = !!(await getSetting("wa_access_token").catch(() => ""));
+    return res.json({
+      wa_phone_number_id:      phoneId     || "(vide)",
+      wa_webhook_verify_token: verifyTok   || "(vide)",
+      wa_business_account_id:  bizId       || "(vide)",
+      wa_access_token_set:     hasToken,
+      webhook_url:             "https://store.togolese.fr/api/admin/whatsapp/webhook",
+    });
+  } catch (e: any) {
+    return res.json({ error: e.message });
+  }
+});
+
 /* ── GET /api/admin/whatsapp/webhook — Meta verification ─────────────────── */
 router.get("/api/admin/whatsapp/webhook", async (req, res) => {
   const mode      = req.query["hub.mode"];
