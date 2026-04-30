@@ -168,6 +168,7 @@ router.post("/api/admin/whatsapp/send", async (req, res) => {
     direction:     "out",
     type:          "text",
     content:       message,
+    media_url:     "",
     status:        "sent",
   }).catch(console.error);
 

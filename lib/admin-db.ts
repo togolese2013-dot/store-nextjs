@@ -867,7 +867,8 @@ export interface WaMessage {
 export async function listWaMessages(limit = 100): Promise<WaMessage[]> {
   // Try modern schema first; fall back to legacy schema (body instead of content)
   const modern = `SELECT id, wa_message_id, from_number, to_number, contact_name, direction, type,
-                         content, COALESCE(media_url,'') as media_url, status, read_at, created_at
+                         COALESCE(content, body, '') as content, COALESCE(media_url,'') as media_url,
+                         status, read_at, created_at
                   FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`;
   const legacy = `SELECT id, COALESCE(wa_message_id,'') as wa_message_id, from_number,
                          COALESCE(to_number,'') as to_number, COALESCE(contact_name,'') as contact_name,
