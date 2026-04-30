@@ -48,6 +48,11 @@ export async function ensureWhatsappMessagesTable() {
     }
   }
 
+  // Drop legacy unique index on wa_id if it exists (causes INSERT conflicts)
+  await pool.execute(
+    "ALTER TABLE whatsapp_messages DROP INDEX wa_id"
+  ).catch(() => {}); // ignore if index doesn't exist
+
   // Create debug log table (persists across restarts)
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS wa_webhook_log (
@@ -78,9 +83,12 @@ router.get("/api/admin/whatsapp/ping", async (_req, res) => {
       "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages'"
     );
     const columns = (cols as any[]).map((c: any) => c.COLUMN_NAME);
-    const [rows]  = await pool.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) as total FROM whatsapp_messages");
-    const [last]  = await pool.execute<mysql.RowDataPacket[]>("SELECT * FROM whatsapp_messages ORDER BY id DESC LIMIT 3");
-    return res.json({ ok: true, columns, total: (rows as any)[0].total, last });
+    const [idxs] = await pool.execute<mysql.RowDataPacket[]>(
+      "SELECT INDEX_NAME, COLUMN_NAME, NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages'"
+    );
+    const [rows] = await pool.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) as total FROM whatsapp_messages");
+    const [last] = await pool.execute<mysql.RowDataPacket[]>("SELECT * FROM whatsapp_messages ORDER BY id DESC LIMIT 3");
+    return res.json({ ok: true, columns, indexes: idxs, total: (rows as any)[0].total, last });
   } catch (e: any) {
     return res.json({ ok: false, error: e.message });
   }
