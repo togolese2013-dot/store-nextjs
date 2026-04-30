@@ -1,17 +1,21 @@
 import { getSettings } from "@/lib/admin-db";
 import GeneralSettingsForm from "@/components/admin/GeneralSettingsForm";
+import AdminZonePage from "@/components/admin/AdminZonePage";
+import { Settings } from "lucide-react";
 
 export const metadata = { title: "Réglages généraux" };
 
 export default async function SettingsPage() {
   const settings = await getSettings();
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="font-display font-800 text-2xl text-slate-900">Réglages généraux</h1>
-        <p className="text-slate-500 text-sm mt-1">Nom du site, barre d'annonce, contacts WhatsApp flottants.</p>
-      </div>
+    <AdminZonePage
+      title="Réglages généraux"
+      description="Nom du site, barre d'annonce et contacts WhatsApp flottants."
+      icon={Settings}
+      iconClass="bg-slate-100 text-slate-700"
+      maxWidth="3xl"
+    >
       <GeneralSettingsForm settings={settings} />
-    </div>
+    </AdminZonePage>
   );
 }

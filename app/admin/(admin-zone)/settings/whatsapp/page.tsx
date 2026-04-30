@@ -1,19 +1,21 @@
 import { getSettings } from "@/lib/admin-db";
 import WhatsAppAPISettingsForm from "@/components/admin/WhatsAppAPISettingsForm";
+import AdminZonePage from "@/components/admin/AdminZonePage";
+import { MessageCircle } from "lucide-react";
 
 export const metadata = { title: "WhatsApp Cloud API" };
 
 export default async function WhatsAppAPIPage() {
   const settings = await getSettings();
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="font-display font-800 text-2xl text-slate-900">WhatsApp Cloud API</h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Connectez votre compte Meta Business pour recevoir et envoyer des messages WhatsApp.
-        </p>
-      </div>
+    <AdminZonePage
+      title="WhatsApp Cloud API"
+      description="Connectez votre compte Meta Business pour recevoir et envoyer des messages WhatsApp."
+      icon={MessageCircle}
+      iconClass="bg-emerald-100 text-emerald-700"
+      maxWidth="3xl"
+    >
       <WhatsAppAPISettingsForm settings={settings} />
-    </div>
+    </AdminZonePage>
   );
 }

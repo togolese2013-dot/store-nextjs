@@ -48,6 +48,7 @@ const MODULES: Record<string, {
       { label: "Finance",        href: "/admin/finance",               icon: DollarSign },
       { label: "Clients",        href: "/admin/boutique-clients",      icon: Users },
       { label: "Segmentation",   href: "/admin/boutique-segmentation", icon: PieChart },
+      { label: "Commerciaux",    href: "/admin/commerciaux",           icon: UserCheck },
     ],
   },
   store: {
@@ -112,6 +113,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/factures",              "boutique"],
   ["/admin/proforma",              "boutique"],
   ["/admin/finance",               "boutique"],
+  ["/admin/commerciaux",           "boutique"],
   ["/admin/store",                 "store"],
   ["/admin/orders",                "store"],
   ["/admin/coupons",               "store"],
