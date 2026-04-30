@@ -86,10 +86,11 @@ export default function MessagesClient() {
       const upRes  = await fetch("/api/admin/whatsapp/upload-media", { method: "POST", body: form });
       const upData = await upRes.json() as { mediaId?: string; error?: string };
       if (upData.mediaId) {
+        const mediaType = imageFile.type.startsWith("audio/") ? "audio" : "image";
         await fetch("/api/admin/whatsapp/send", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ to, mediaId: upData.mediaId, message: reply }),
+          body:    JSON.stringify({ to, mediaId: upData.mediaId, mediaType, message: reply }),
         });
       }
       clearImage();
@@ -214,12 +215,17 @@ export default function MessagesClient() {
                         loading="lazy"
                       />
                     </a>
+                  ) : msg.type === "audio" && msg.media_url ? (
+                    <div className="px-3 py-2.5">
+                      <audio controls src={`/api/admin/whatsapp/media/${msg.media_url}`}
+                        className="h-9 max-w-[240px]" preload="none" />
+                    </div>
                   ) : null}
                   {(msg.content || (msg as any).body) ? (
                     <p className="px-4 py-2.5">{msg.content || (msg as any).body}</p>
-                  ) : msg.type !== "image" ? (
+                  ) : (msg.type !== "image" && msg.type !== "audio") ? (
                     <p className="px-4 py-2.5 opacity-50 italic text-xs">
-                      {msg.type === "audio" ? "🎵 Audio" : msg.type === "video" ? "🎬 Vidéo" : msg.type === "document" ? "📄 Document" : "Message"}
+                      {msg.type === "video" ? "🎬 Vidéo" : msg.type === "document" ? "📄 Document" : "Message"}
                     </p>
                   ) : null}
                 </div>
@@ -232,11 +238,17 @@ export default function MessagesClient() {
           </div>
 
           <div className="border-t border-slate-100">
-            {/* Image preview */}
-            {imagePreview && (
+            {/* File preview */}
+            {imagePreview && imageFile && (
               <div className="px-4 pt-3 flex items-start gap-2">
                 <div className="relative">
-                  <img src={imagePreview} alt="aperçu" className="h-20 w-20 object-cover rounded-xl border border-slate-200" />
+                  {imageFile.type.startsWith("audio/") ? (
+                    <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 text-sm text-slate-600">
+                      🎵 <span className="truncate max-w-[180px]">{imageFile.name}</span>
+                    </div>
+                  ) : (
+                    <img src={imagePreview} alt="aperçu" className="h-20 w-20 object-cover rounded-xl border border-slate-200" />
+                  )}
                   <button onClick={clearImage}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
                   >
@@ -246,7 +258,7 @@ export default function MessagesClient() {
               </div>
             )}
             <div className="px-4 py-3 flex gap-2">
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
+              <input ref={fileInputRef} type="file" accept="image/*,audio/*" className="hidden" onChange={pickImage} />
               <button onClick={() => fileInputRef.current?.click()} disabled={sending}
                 className="w-10 h-10 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-400 transition-colors disabled:opacity-50 shrink-0"
                 title="Envoyer une image"

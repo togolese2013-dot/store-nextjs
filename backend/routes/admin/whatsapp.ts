@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import { getSession } from "../../lib/auth";
 import { getSetting, saveIncomingMessage, listWaMessages } from "@/lib/admin-db";
-import { sendWaText, sendWaImage, uploadWaMedia, getWaMediaUrl } from "../../lib/whatsapp";
+import { sendWaText, sendWaImage, sendWaAudio, uploadWaMedia, getWaMediaUrl } from "../../lib/whatsapp";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
 
@@ -196,8 +196,11 @@ router.post("/api/admin/whatsapp/send", async (req, res) => {
   const myPhoneId   = await getSetting("wa_phone_number_id").catch(() => "");
 
   if (mediaId) {
-    // Image message
-    const result = await sendWaImage({ to, mediaId, caption: message ?? "" });
+    // Image or audio message
+    const { mediaType = "image" } = req.body as { mediaType?: string };
+    const result = mediaType === "audio"
+      ? await sendWaAudio({ to, mediaId })
+      : await sendWaImage({ to, mediaId, caption: message ?? "" });
     if (!result.success) return res.status(400).json({ error: result.error });
 
     await saveIncomingMessage({
@@ -206,7 +209,7 @@ router.post("/api/admin/whatsapp/send", async (req, res) => {
       to_number:     to.replace(/[\s+\-()]/g, ""),
       contact_name:  to,
       direction:     "out",
-      type:          "image",
+      type:          mediaType === "audio" ? "audio" : "image",
       content:       message ?? "",
       media_url:     mediaId,
       status:        "sent",

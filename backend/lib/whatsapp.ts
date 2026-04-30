@@ -177,6 +177,39 @@ export async function sendWaImage({
   }
 }
 
+/* ── Send an audio message by media_id ───────────────────────────────────── */
+export async function sendWaAudio({
+  to, mediaId,
+}: {
+  to:      string;
+  mediaId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token   = await getSetting("wa_access_token");
+    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
+
+    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        messaging_product: "whatsapp",
+        to:    cleanPhone(to),
+        type:  "audio",
+        audio: { id: mediaId },
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: (err as any)?.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+
 /* ── Order notifications ──────────────────────────────────────────────────── */
 export async function sendOrderNotifications({
   id, reference, nom, telephone, items, total,
