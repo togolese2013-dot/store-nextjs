@@ -130,7 +130,7 @@ export default function MessagesClient() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 truncate">{last.content || last.body || ""}</p>
+                    <p className="text-xs text-slate-500 truncate">{last.content || (last as any).body || ""}</p>
                   </div>
                 </div>
               </button>
