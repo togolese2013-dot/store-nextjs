@@ -8,12 +8,8 @@ import type mysql from "mysql2/promise";
 const router = express.Router();
 const pool   = db as import("mysql2/promise").Pool;
 
-// In-memory log of last 10 raw webhook payloads (for debugging)
-const rawLog: Array<{ ts: string; body: unknown }> = [];
-
 /* ── Migration — créée au démarrage du backend ───────────────────────────── */
 export async function ensureWhatsappMessagesTable() {
-  // Create table with minimal required columns if it doesn't exist
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS whatsapp_messages (
       id            INT AUTO_INCREMENT PRIMARY KEY,
@@ -23,8 +19,7 @@ export async function ensureWhatsappMessagesTable() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
-  // Add missing columns individually (safe to run on existing table)
-  // NOTE: old table had 'body' instead of 'content', and 'wa_id' instead of 'wa_message_id'
+  // Add missing columns (safe on existing table — old schema had 'body'/'wa_id')
   const alterations: [string, string][] = [
     ["wa_message_id", "ALTER TABLE whatsapp_messages ADD COLUMN wa_message_id VARCHAR(255) NOT NULL DEFAULT ''"],
     ["to_number",     "ALTER TABLE whatsapp_messages ADD COLUMN to_number VARCHAR(30) NOT NULL DEFAULT ''"],
@@ -48,19 +43,8 @@ export async function ensureWhatsappMessagesTable() {
     }
   }
 
-  // Drop legacy unique index on wa_id if it exists (causes INSERT conflicts)
-  await pool.execute(
-    "ALTER TABLE whatsapp_messages DROP INDEX wa_id"
-  ).catch(() => {}); // ignore if index doesn't exist
-
-  // Create debug log table (persists across restarts)
-  await pool.execute(`
-    CREATE TABLE IF NOT EXISTS wa_webhook_log (
-      id         INT AUTO_INCREMENT PRIMARY KEY,
-      payload    TEXT NOT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  `).catch(() => {});
+  // Drop legacy unique index on wa_id (caused silent INSERT failures)
+  await pool.execute("ALTER TABLE whatsapp_messages DROP INDEX wa_id").catch(() => {});
 
   // Add unique index on wa_message_id if not present
   const [idxRows] = await pool.execute<mysql.RowDataPacket[]>(
@@ -72,99 +56,6 @@ export async function ensureWhatsappMessagesTable() {
     ).catch((e: any) => console.warn("[WA migration] uq_wa_msg:", e.message));
   }
 }
-
-/* ── GET /api/admin/whatsapp/ping — table diagnostic + force migration ───── */
-router.get("/api/admin/whatsapp/ping", async (_req, res) => {
-  try {
-    // Force migration on every ping call (idempotent)
-    await ensureWhatsappMessagesTable();
-
-    const [cols] = await pool.execute<mysql.RowDataPacket[]>(
-      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages'"
-    );
-    const columns = (cols as any[]).map((c: any) => c.COLUMN_NAME);
-    const [idxs] = await pool.execute<mysql.RowDataPacket[]>(
-      "SELECT INDEX_NAME, COLUMN_NAME, NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages'"
-    );
-    const [rows] = await pool.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) as total FROM whatsapp_messages");
-    const [last] = await pool.execute<mysql.RowDataPacket[]>("SELECT * FROM whatsapp_messages ORDER BY id DESC LIMIT 3");
-    return res.json({ ok: true, columns, indexes: idxs, total: (rows as any)[0].total, last });
-  } catch (e: any) {
-    return res.json({ ok: false, error: e.message });
-  }
-});
-
-/* ── GET /api/admin/whatsapp/rawlog — view last raw webhook payloads ─────── */
-router.get("/api/admin/whatsapp/rawlog", async (_req, res) => {
-  try {
-    const [rows] = await pool.execute<mysql.RowDataPacket[]>(
-      "SELECT id, payload, created_at FROM wa_webhook_log ORDER BY id DESC LIMIT 10"
-    );
-    const dbLog = (rows as any[]).map(r => ({ ts: r.created_at, body: JSON.parse(r.payload) }));
-    res.json({ memory_count: rawLog.length, db_count: dbLog.length, memory: rawLog, db: dbLog });
-  } catch {
-    res.json({ memory_count: rawLog.length, memory: rawLog, db: [], db_error: "table not ready" });
-  }
-});
-
-/* ── POST /api/admin/whatsapp/subscribe-waba — subscribe app to WABA ─────── */
-router.post("/api/admin/whatsapp/subscribe-waba", async (_req, res) => {
-  try {
-    const token  = await getSetting("wa_access_token").catch(() => "");
-    const bizId  = await getSetting("wa_business_account_id").catch(() => "");
-    const phoneId = await getSetting("wa_phone_number_id").catch(() => "");
-
-    const results: Record<string, unknown> = {};
-
-    // 1. Subscribe app to WABA
-    if (bizId) {
-      const r1 = await fetch(`https://graph.facebook.com/v19.0/${bizId}/subscribed_apps`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      results.waba_subscribe = await r1.json();
-    }
-
-    // 2. Get phone number info to verify it's linked correctly
-    if (phoneId) {
-      const r2 = await fetch(`https://graph.facebook.com/v19.0/${phoneId}?fields=display_phone_number,verified_name,status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      results.phone_info = await r2.json();
-    }
-
-    // 3. Check current WABA subscriptions
-    if (bizId) {
-      const r3 = await fetch(`https://graph.facebook.com/v19.0/${bizId}/subscribed_apps`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      results.current_subscriptions = await r3.json();
-    }
-
-    return res.json(results);
-  } catch (e: any) {
-    return res.json({ error: e.message });
-  }
-});
-
-/* ── GET /api/admin/whatsapp/config-check — show non-secret WA settings ──── */
-router.get("/api/admin/whatsapp/config-check", async (_req, res) => {
-  try {
-    const phoneId    = await getSetting("wa_phone_number_id").catch(() => "");
-    const verifyTok  = await getSetting("wa_webhook_verify_token").catch(() => "");
-    const bizId      = await getSetting("wa_business_account_id").catch(() => "");
-    const hasToken   = !!(await getSetting("wa_access_token").catch(() => ""));
-    return res.json({
-      wa_phone_number_id:      phoneId     || "(vide)",
-      wa_webhook_verify_token: verifyTok   || "(vide)",
-      wa_business_account_id:  bizId       || "(vide)",
-      wa_access_token_set:     hasToken,
-      webhook_url:             "https://store.togolese.fr/api/admin/whatsapp/webhook",
-    });
-  } catch (e: any) {
-    return res.json({ error: e.message });
-  }
-});
 
 /* ── GET /api/admin/whatsapp/webhook — Meta verification ─────────────────── */
 router.get("/api/admin/whatsapp/webhook", async (req, res) => {
@@ -182,16 +73,6 @@ router.get("/api/admin/whatsapp/webhook", async (req, res) => {
 
 /* ── POST /api/admin/whatsapp/webhook — receive incoming messages ─────────── */
 router.post("/api/admin/whatsapp/webhook", async (req, res) => {
-  // Capture raw payload for debugging (memory + DB)
-  rawLog.unshift({ ts: new Date().toISOString(), body: req.body });
-  if (rawLog.length > 10) rawLog.pop();
-
-  // Persist to DB so log survives restarts
-  pool.execute(
-    "INSERT INTO wa_webhook_log (payload, created_at) VALUES (?, NOW())",
-    [JSON.stringify(req.body).slice(0, 4000)]
-  ).catch(() => {}); // ignore if table doesn't exist yet
-
   res.status(200).json({ status: "ok" }); // always 200 to Meta
 
   try {
@@ -233,7 +114,7 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
   }
 });
 
-/* ── GET /api/admin/whatsapp/messages — list messages (polling + diagnostic) ─ */
+/* ── GET /api/admin/whatsapp/messages — list messages (polling) ───────────── */
 router.get("/api/admin/whatsapp/messages", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
