@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { WaMessage } from "@/lib/admin-db";
 import { MessageCircle, Send, Loader2, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
@@ -12,6 +12,7 @@ export default function MessagesClient() {
   const [reply,      setReply]      = useState("");
   const [sending,    setSending]    = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async (silent = true) => {
     if (!silent) setRefreshing(true);
@@ -36,7 +37,12 @@ export default function MessagesClient() {
     return () => clearInterval(t);
   }, [refresh]);
 
-  /* Group by contact number */
+  // Scroll to bottom when selected thread changes or new messages arrive
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selected, messages]);
+
+  /* Group by contact number — messages come DESC from API, reverse for chronological display */
   const threads = messages.reduce<Record<string, WaMessage[]>>((acc, m) => {
     const key = m.direction === "in" ? m.from_number : m.to_number;
     if (!acc[key]) acc[key] = [];
@@ -44,9 +50,13 @@ export default function MessagesClient() {
     return acc;
   }, {});
 
+  // Sort contacts by most recent message first (messages[0] = most recent, from DESC query)
   const contacts = Object.entries(threads).sort(
     ([, a], [, b]) => new Date(b[0].created_at).getTime() - new Date(a[0].created_at).getTime()
   );
+
+  // For display: oldest → newest (ASC) per thread
+  const threadAsc = (key: string) => [...(threads[key] ?? [])].reverse();
 
   async function sendReply() {
     if (!selected || !reply.trim()) return;
@@ -89,7 +99,7 @@ export default function MessagesClient() {
   const selectedNumber = selected
     ? (selected.direction === "in" ? selected.from_number : selected.to_number)
     : null;
-  const selectedThread = selectedNumber ? (threads[selectedNumber] ?? []) : [];
+  const selectedThread = selectedNumber ? threadAsc(selectedNumber) : [];
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden flex" style={{ height: "70vh" }}>
@@ -152,8 +162,8 @@ export default function MessagesClient() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 flex flex-col-reverse">
-            {[...selectedThread].reverse().map(msg => (
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 flex flex-col">
+            {[...selectedThread].map(msg => (
               <div key={msg.id} className={clsx("max-w-[70%]", msg.direction === "out" ? "ml-auto" : "mr-auto")}>
                 <div className={clsx(
                   "px-4 py-2.5 rounded-2xl text-sm",
@@ -168,6 +178,7 @@ export default function MessagesClient() {
                 </p>
               </div>
             ))}
+            <div ref={bottomRef} />
           </div>
 
           <div className="px-4 py-3 border-t border-slate-100 flex gap-2">
