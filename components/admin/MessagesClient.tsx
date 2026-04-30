@@ -1,16 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import type { WaMessage } from "@/lib/admin-db";
-import { MessageCircle, Send, Loader2 } from "lucide-react";
+import { MessageCircle, Send, Loader2, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
 
-export default function MessagesClient({ messages }: { messages: WaMessage[] }) {
-  const router = useRouter();
-  const [selected, setSelected] = useState<WaMessage | null>(null);
-  const [reply,    setReply]    = useState("");
-  const [sending,  setSending]  = useState(false);
+export default function MessagesClient({ messages: initialMessages }: { messages: WaMessage[] }) {
+  const [messages,  setMessages]  = useState<WaMessage[]>(initialMessages);
+  const [selected,  setSelected]  = useState<WaMessage | null>(null);
+  const [reply,     setReply]     = useState("");
+  const [sending,   setSending]   = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = useCallback(async (silent = true) => {
+    if (!silent) setRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/whatsapp/messages");
+      if (res.ok) {
+        const data = await res.json() as { messages: WaMessage[] };
+        setMessages(data.messages);
+      }
+    } finally {
+      if (!silent) setRefreshing(false);
+    }
+  }, []);
+
+  // Auto-poll every 15 s
+  useEffect(() => {
+    const t = setInterval(() => refresh(true), 15_000);
+    return () => clearInterval(t);
+  }, [refresh]);
 
   /* Group by sender */
   const threads = messages.reduce<Record<string, WaMessage[]>>((acc, m) => {
@@ -34,7 +53,7 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
       body: JSON.stringify({ to, message: reply }),
     });
     setReply(""); setSending(false);
-    router.refresh();
+    await refresh(false);
   }
 
   if (messages.length === 0) {
@@ -43,6 +62,12 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
         <MessageCircle className="w-14 h-14 mb-4 opacity-20" />
         <p className="font-semibold">Aucun message reçu</p>
         <p className="text-sm mt-1">Les messages arriveront ici une fois le webhook configuré.</p>
+        <button onClick={() => refresh(false)} disabled={refreshing}
+          className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={clsx("w-4 h-4", refreshing && "animate-spin")} />
+          Vérifier maintenant
+        </button>
       </div>
     );
   }
@@ -56,6 +81,11 @@ export default function MessagesClient({ messages }: { messages: WaMessage[] }) 
       <div className="w-72 shrink-0 border-r border-slate-100 flex flex-col">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <span className="font-bold text-sm text-slate-700">{contacts.length} conversation{contacts.length > 1 ? "s" : ""}</span>
+          <button onClick={() => refresh(false)} disabled={refreshing} title="Rafraîchir"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={clsx("w-4 h-4", refreshing && "animate-spin")} />
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {contacts.map(([number, msgs]) => {

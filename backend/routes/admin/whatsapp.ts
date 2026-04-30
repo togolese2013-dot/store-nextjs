@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
-import { getSetting, saveIncomingMessage } from "@/lib/admin-db";
+import { getSetting, saveIncomingMessage, listWaMessages } from "@/lib/admin-db";
 import { sendWaText } from "../../lib/whatsapp";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
@@ -83,6 +83,19 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
     }
   } catch (e) {
     console.error("[WA webhook]", e);
+  }
+});
+
+/* ── GET /api/admin/whatsapp/messages — list messages (polling + diagnostic) ─ */
+router.get("/api/admin/whatsapp/messages", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const messages = await listWaMessages(200);
+    return res.json({ messages });
+  } catch (e) {
+    console.error("[WA messages GET]", e);
+    return res.status(500).json({ error: "Erreur base de données" });
   }
 });
 

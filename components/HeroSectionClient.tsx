@@ -59,6 +59,8 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
               src={slide.image_mobile || slide.image}
               alt={slide.nom ?? ""}
               loading="eager"
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-auto block"
             />
           ) : (
@@ -88,13 +90,15 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
               s.href ? "cursor-pointer" : ""
             )}
           >
-            {/* Gradient always present — hidden behind image when loaded */}
-            <div className={clsx("absolute inset-0 bg-gradient-to-br", s.gradient)} />
+            {/* Neutral dark fallback — no color flash before image loads */}
+            <div className="absolute inset-0 bg-slate-900" />
             {s.image && (
               <img
                 src={s.image}
                 alt={s.nom ?? ""}
                 loading={i === 0 ? "eager" : "lazy"}
+                fetchPriority={i === 0 ? "high" : "low"}
+                decoding="async"
                 className="absolute inset-0 w-full h-full object-cover"
               />
             )}

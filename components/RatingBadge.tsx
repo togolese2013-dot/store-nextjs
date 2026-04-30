@@ -118,9 +118,11 @@ export default function RatingBadge({
       <span className={`font-semibold text-slate-700 ${size === "md" ? "text-sm" : "text-[11px]"}`}>
         {rating.avg.toFixed(1)}
       </span>
-      <span className={`text-slate-400 ${size === "md" ? "text-xs" : "text-[10px]"}`}>
-        ({rating.count})
-      </span>
+      {rating.count > 0 && (
+        <span className={`text-slate-400 ${size === "md" ? "text-xs" : "text-[10px]"}`}>
+          ({rating.count})
+        </span>
+      )}
     </div>
   );
 }
