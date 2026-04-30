@@ -99,6 +99,46 @@ router.get("/api/admin/whatsapp/rawlog", async (_req, res) => {
   }
 });
 
+/* ── POST /api/admin/whatsapp/subscribe-waba — subscribe app to WABA ─────── */
+router.post("/api/admin/whatsapp/subscribe-waba", async (_req, res) => {
+  try {
+    const token  = await getSetting("wa_access_token").catch(() => "");
+    const bizId  = await getSetting("wa_business_account_id").catch(() => "");
+    const phoneId = await getSetting("wa_phone_number_id").catch(() => "");
+
+    const results: Record<string, unknown> = {};
+
+    // 1. Subscribe app to WABA
+    if (bizId) {
+      const r1 = await fetch(`https://graph.facebook.com/v19.0/${bizId}/subscribed_apps`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      results.waba_subscribe = await r1.json();
+    }
+
+    // 2. Get phone number info to verify it's linked correctly
+    if (phoneId) {
+      const r2 = await fetch(`https://graph.facebook.com/v19.0/${phoneId}?fields=display_phone_number,verified_name,status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      results.phone_info = await r2.json();
+    }
+
+    // 3. Check current WABA subscriptions
+    if (bizId) {
+      const r3 = await fetch(`https://graph.facebook.com/v19.0/${bizId}/subscribed_apps`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      results.current_subscriptions = await r3.json();
+    }
+
+    return res.json(results);
+  } catch (e: any) {
+    return res.json({ error: e.message });
+  }
+});
+
 /* ── GET /api/admin/whatsapp/config-check — show non-secret WA settings ──── */
 router.get("/api/admin/whatsapp/config-check", async (_req, res) => {
   try {
