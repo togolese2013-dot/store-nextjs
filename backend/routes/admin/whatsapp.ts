@@ -1,9 +1,12 @@
 import express from "express";
+import multer from "multer";
 import { getSession } from "../../lib/auth";
 import { getSetting, saveIncomingMessage, listWaMessages } from "@/lib/admin-db";
-import { sendWaText } from "../../lib/whatsapp";
+import { sendWaText, sendWaImage, uploadWaMedia, getWaMediaUrl } from "../../lib/whatsapp";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
 
 const router = express.Router();
 const pool   = db as import("mysql2/promise").Pool;
@@ -114,6 +117,44 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
   }
 });
 
+/* ── GET /api/admin/whatsapp/media/:mediaId — proxy image from Meta ──────── */
+router.get("/api/admin/whatsapp/media/:mediaId", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).end();
+
+  const url = await getWaMediaUrl(req.params.mediaId);
+  if (!url) return res.status(404).json({ error: "Média introuvable" });
+
+  // Fetch the image from Meta and stream it to the client
+  try {
+    const token   = await getSetting("wa_access_token").catch(() => "");
+    const imgRes  = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const ct      = imgRes.headers.get("content-type") ?? "image/jpeg";
+    res.setHeader("Content-Type", ct);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    const buf = Buffer.from(await imgRes.arrayBuffer());
+    return res.send(buf);
+  } catch {
+    return res.status(502).json({ error: "Erreur récupération image" });
+  }
+});
+
+/* ── POST /api/admin/whatsapp/upload-media — upload image to Meta ─────────── */
+router.post("/api/admin/whatsapp/upload-media",
+  (req, res, next) => { upload.single("file")(req, res, next); },
+  async (req, res) => {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non autorisé." });
+
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) return res.status(400).json({ error: "Aucun fichier" });
+
+    const result = await uploadWaMedia(file.buffer, file.mimetype, file.originalname);
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ mediaId: result.mediaId });
+  }
+);
+
 /* ── GET /api/admin/whatsapp/messages — list messages (polling) ───────────── */
 router.get("/api/admin/whatsapp/messages", async (req, res) => {
   const session = await getSession(req);
@@ -149,28 +190,45 @@ router.post("/api/admin/whatsapp/send", async (req, res) => {
   }
 
   // Single message
-  if (!to || !message) {
-    return res.status(400).json({ error: "to et message requis" });
-  }
+  if (!to) return res.status(400).json({ error: "to requis" });
 
-  const result = await sendWaText({ to, body: message });
-  if (!result.success) {
-    return res.status(400).json({ error: result.error });
-  }
+  const { mediaId } = req.body as { mediaId?: string };
+  const myPhoneId   = await getSetting("wa_phone_number_id").catch(() => "");
 
-  // Save outgoing message for history
-  const myPhoneId = await getSetting("wa_phone_number_id").catch(() => "");
-  await saveIncomingMessage({
-    wa_message_id: `out_${Date.now()}_${to.replace(/\D/g, "")}`,
-    from_number:   myPhoneId,
-    to_number:     to.replace(/[\s+\-()]/g, ""),
-    contact_name:  to,
-    direction:     "out",
-    type:          "text",
-    content:       message,
-    media_url:     "",
-    status:        "sent",
-  }).catch(console.error);
+  if (mediaId) {
+    // Image message
+    const result = await sendWaImage({ to, mediaId, caption: message ?? "" });
+    if (!result.success) return res.status(400).json({ error: result.error });
+
+    await saveIncomingMessage({
+      wa_message_id: `out_${Date.now()}_${to.replace(/\D/g, "")}`,
+      from_number:   myPhoneId,
+      to_number:     to.replace(/[\s+\-()]/g, ""),
+      contact_name:  to,
+      direction:     "out",
+      type:          "image",
+      content:       message ?? "",
+      media_url:     mediaId,
+      status:        "sent",
+    }).catch(console.error);
+  } else {
+    // Text message
+    if (!message) return res.status(400).json({ error: "message requis" });
+    const result = await sendWaText({ to, body: message });
+    if (!result.success) return res.status(400).json({ error: result.error });
+
+    await saveIncomingMessage({
+      wa_message_id: `out_${Date.now()}_${to.replace(/\D/g, "")}`,
+      from_number:   myPhoneId,
+      to_number:     to.replace(/[\s+\-()]/g, ""),
+      contact_name:  to,
+      direction:     "out",
+      type:          "text",
+      content:       message,
+      media_url:     "",
+      status:        "sent",
+    }).catch(console.error);
+  }
 
   return res.json({ success: true });
 });

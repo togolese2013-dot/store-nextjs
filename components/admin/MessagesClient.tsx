@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { WaMessage } from "@/lib/admin-db";
-import { MessageCircle, Send, Loader2, RefreshCw } from "lucide-react";
+import { MessageCircle, Send, Loader2, RefreshCw, Paperclip, X } from "lucide-react";
 import { clsx } from "clsx";
 
 export default function MessagesClient() {
@@ -12,7 +12,10 @@ export default function MessagesClient() {
   const [reply,      setReply]      = useState("");
   const [sending,    setSending]    = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [imageFile,  setImageFile]  = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const bottomRef    = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async (silent = true) => {
     if (!silent) setRefreshing(true);
@@ -58,15 +61,46 @@ export default function MessagesClient() {
   // For display: oldest → newest (ASC) per thread
   const threadAsc = (key: string) => [...(threads[key] ?? [])].reverse();
 
+  function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function clearImage() {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function sendReply() {
-    if (!selected || !reply.trim()) return;
+    if (!selected || (!reply.trim() && !imageFile)) return;
     setSending(true);
     const to = selected.direction === "in" ? selected.from_number : selected.to_number;
-    await fetch("/api/admin/whatsapp/send", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ to, message: reply }),
-    });
+
+    if (imageFile) {
+      // Upload image then send
+      const form = new FormData();
+      form.append("file", imageFile);
+      const upRes  = await fetch("/api/admin/whatsapp/upload-media", { method: "POST", body: form });
+      const upData = await upRes.json() as { mediaId?: string; error?: string };
+      if (upData.mediaId) {
+        await fetch("/api/admin/whatsapp/send", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ to, mediaId: upData.mediaId, message: reply }),
+        });
+      }
+      clearImage();
+    } else {
+      await fetch("/api/admin/whatsapp/send", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ to, message: reply }),
+      });
+    }
+
     setReply(""); setSending(false);
     await refresh(false);
   }
@@ -166,12 +200,28 @@ export default function MessagesClient() {
             {[...selectedThread].map(msg => (
               <div key={msg.id} className={clsx("max-w-[70%]", msg.direction === "out" ? "ml-auto" : "mr-auto")}>
                 <div className={clsx(
-                  "px-4 py-2.5 rounded-2xl text-sm",
+                  "rounded-2xl text-sm overflow-hidden",
                   msg.direction === "out"
                     ? "bg-indigo-700 text-white rounded-br-md"
                     : "bg-slate-100 text-slate-900 rounded-bl-md"
                 )}>
-                  {msg.content || (msg as any).body || ""}
+                  {msg.type === "image" && msg.media_url ? (
+                    <a href={`/api/admin/whatsapp/media/${msg.media_url}`} target="_blank" rel="noreferrer">
+                      <img
+                        src={`/api/admin/whatsapp/media/${msg.media_url}`}
+                        alt="image"
+                        className="max-w-[240px] max-h-[240px] object-cover block"
+                        loading="lazy"
+                      />
+                    </a>
+                  ) : null}
+                  {(msg.content || (msg as any).body) ? (
+                    <p className="px-4 py-2.5">{msg.content || (msg as any).body}</p>
+                  ) : msg.type !== "image" ? (
+                    <p className="px-4 py-2.5 opacity-50 italic text-xs">
+                      {msg.type === "audio" ? "🎵 Audio" : msg.type === "video" ? "🎬 Vidéo" : msg.type === "document" ? "📄 Document" : "Message"}
+                    </p>
+                  ) : null}
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1 px-1">
                   {new Date(msg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
@@ -181,19 +231,41 @@ export default function MessagesClient() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="px-4 py-3 border-t border-slate-100 flex gap-2">
-            <input
-              type="text" value={reply}
-              onChange={e => setReply(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendReply()}
-              placeholder="Écrire un message…"
-              className="flex-1 px-4 py-2.5 text-sm bg-slate-50 rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none transition-all font-sans"
-            />
-            <button onClick={sendReply} disabled={sending || !reply.trim()}
-              className="w-11 h-11 flex items-center justify-center rounded-2xl bg-[#25D366] text-white hover:bg-[#1da851] transition-colors disabled:opacity-50"
-            >
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
+          <div className="border-t border-slate-100">
+            {/* Image preview */}
+            {imagePreview && (
+              <div className="px-4 pt-3 flex items-start gap-2">
+                <div className="relative">
+                  <img src={imagePreview} alt="aperçu" className="h-20 w-20 object-cover rounded-xl border border-slate-200" />
+                  <button onClick={clearImage}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="px-4 py-3 flex gap-2">
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
+              <button onClick={() => fileInputRef.current?.click()} disabled={sending}
+                className="w-10 h-10 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-400 transition-colors disabled:opacity-50 shrink-0"
+                title="Envoyer une image"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+              <input
+                type="text" value={reply}
+                onChange={e => setReply(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendReply()}
+                placeholder={imageFile ? "Légende (optionnel)…" : "Écrire un message…"}
+                className="flex-1 px-4 py-2.5 text-sm bg-slate-50 rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none transition-all font-sans"
+              />
+              <button onClick={sendReply} disabled={sending || (!reply.trim() && !imageFile)}
+                className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#25D366] text-white hover:bg-[#1da851] transition-colors disabled:opacity-50 shrink-0"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
       ) : (

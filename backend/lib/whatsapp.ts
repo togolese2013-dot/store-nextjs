@@ -95,6 +95,88 @@ export async function sendWaText({
   }
 }
 
+/* ── Get temporary download URL for a media ID ───────────────────────────── */
+export async function getWaMediaUrl(mediaId: string): Promise<string | null> {
+  try {
+    const token = await getSetting("wa_access_token");
+    const res   = await fetch(`${WA_API}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { url?: string };
+    return data.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/* ── Upload media to Meta and return the media_id ────────────────────────── */
+export async function uploadWaMedia(
+  buffer: Buffer,
+  mimeType: string,
+  filename: string,
+): Promise<{ success: boolean; mediaId?: string; error?: string }> {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token   = await getSetting("wa_access_token");
+    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
+
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", mimeType);
+    form.append("file", new Blob([buffer], { type: mimeType }), filename);
+
+    const res = await fetch(`${WA_API}/${phoneId}/media`, {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body:    form,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: (err as any)?.error?.message ?? `HTTP ${res.status}` };
+    }
+    const data = await res.json() as { id?: string };
+    return { success: true, mediaId: data.id };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+
+/* ── Send an image message by media_id ───────────────────────────────────── */
+export async function sendWaImage({
+  to, mediaId, caption = "",
+}: {
+  to:      string;
+  mediaId: string;
+  caption?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token   = await getSetting("wa_access_token");
+    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
+
+    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        messaging_product: "whatsapp",
+        to:    cleanPhone(to),
+        type:  "image",
+        image: { id: mediaId, caption },
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: (err as any)?.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+
 /* ── Order notifications ──────────────────────────────────────────────────── */
 export async function sendOrderNotifications({
   id, reference, nom, telephone, items, total,
