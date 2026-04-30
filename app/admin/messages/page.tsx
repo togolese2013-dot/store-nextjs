@@ -1,10 +1,8 @@
-import { listWaMessages } from "@/lib/admin-db";
 import MessagesClient from "@/components/admin/MessagesClient";
 
 export const metadata = { title: "Messages WhatsApp" };
 
-export default async function MessagesPage() {
-  const messages = await listWaMessages(200);
+export default function MessagesPage() {
   return (
     <div className="space-y-6">
       <div>
@@ -13,7 +11,7 @@ export default async function MessagesPage() {
           Messages reçus via WhatsApp Cloud API. Configurez d'abord le webhook dans Réglages → WhatsApp API.
         </p>
       </div>
-      <MessagesClient messages={messages} />
+      <MessagesClient />
     </div>
   );
 }
