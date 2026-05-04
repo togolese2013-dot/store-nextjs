@@ -3,12 +3,32 @@ import Link from "next/link";
 import { ShoppingCart, Plus } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import OrdersTableBody from "@/components/admin/OrdersTableBody";
+import { apiGet } from "@/lib/api";
 
 export const metadata = { title: "Commandes" };
 
-export default async function OrdersPage() {
+interface PageProps {
+  searchParams: Promise<{ page?: string }>;
+}
+
+export default async function OrdersPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const page = Math.max(1, Number(params.page) || 1);
   const stats = await getOrdersStats();
-  const total = stats.totalOrders;
+  const ordersRes = await apiGet<{
+    data: typeof stats.recentOrders;
+    total: number;
+    page: number;
+    limit: number;
+  }>(`/api/admin/orders?page=${page}&limit=25`).catch(() => ({
+    data: stats.recentOrders,
+    total: stats.totalOrders,
+    page,
+    limit: 25,
+  }));
+  const orders = ordersRes.data ?? [];
+  const total = ordersRes.total ?? stats.totalOrders;
+  const totalPages = Math.max(1, Math.ceil(total / ordersRes.limit));
 
   return (
     <div className="space-y-6">
@@ -33,7 +53,7 @@ export default async function OrdersPage() {
           <p className="font-bold text-slate-900 text-sm">Toutes les commandes</p>
         </div>
 
-        {stats.recentOrders.length === 0 ? (
+        {orders.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-slate-400">
             <ShoppingCart className="w-12 h-12 mb-3 opacity-30" />
             <p className="font-semibold">Aucune commande</p>
@@ -51,8 +71,27 @@ export default async function OrdersPage() {
                   <th className="text-right px-3 py-3 font-bold text-xs uppercase tracking-widest text-slate-400 hidden sm:table-cell">Date</th>
                 </tr>
               </thead>
-              <OrdersTableBody orders={stats.recentOrders} />
+              <OrdersTableBody orders={orders} />
             </table>
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-100">
+            <Link
+              href={`/admin/orders?page=${Math.max(1, page - 1)}`}
+              className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${page <= 1 ? "pointer-events-none opacity-40 border-slate-100 text-slate-400" : "border-slate-200 text-slate-600 hover:border-emerald-400"}`}
+            >
+              Précédent
+            </Link>
+            <span className="text-xs font-semibold text-slate-400">
+              Page {page} / {totalPages}
+            </span>
+            <Link
+              href={`/admin/orders?page=${Math.min(totalPages, page + 1)}`}
+              className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${page >= totalPages ? "pointer-events-none opacity-40 border-slate-100 text-slate-400" : "border-slate-200 text-slate-600 hover:border-emerald-400"}`}
+            >
+              Suivant
+            </Link>
           </div>
         )}
       </div>

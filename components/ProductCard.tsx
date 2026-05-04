@@ -36,8 +36,17 @@ export default function ProductCard({ product, className, floatingCart = false }
   }, [product.id]);
 
   const price   = finalPrice(product);
-  const isPromo = product.remise > 0;
+  const discountPercent = product.prix_unitaire > 0
+    ? Math.round((Math.min(product.remise, product.prix_unitaire) / product.prix_unitaire) * 100)
+    : 0;
+  const isPromo = product.remise > 0 && discountPercent > 0;
   const outOf   = product.stock_boutique === 0;
+  const createdAt = product.date_creation ? new Date(product.date_creation) : null;
+  const isNew = Boolean(
+    product.neuf &&
+    createdAt &&
+    Date.now() - createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000
+  );
 
   const rawUrl = product.image_url || product.images?.[0] || null;
   const imgSrc = rawUrl
@@ -78,7 +87,7 @@ export default function ProductCard({ product, className, floatingCart = false }
               src={imgSrc} alt={product.nom}
               fill sizes="(max-width:640px) 50vw,(max-width:1024px) 33vw,25vw"
               className={clsx(
-                "object-cover transition-transform duration-500 group-hover:scale-105",
+                "object-contain p-2 transition-opacity duration-300",
                 imgOk ? "opacity-100" : "opacity-0"
               )}
               onLoad={() => setImgOk(true)}
@@ -98,10 +107,10 @@ export default function ProductCard({ product, className, floatingCart = false }
           <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
             {isPromo && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-500 text-white text-[10px] font-bold shadow-sm">
-                <Zap className="w-2.5 h-2.5" /> -{Math.round((product.remise / product.prix_unitaire) * 100)}%
+                <Zap className="w-2.5 h-2.5" /> -{discountPercent}%
               </span>
             )}
-            {product.neuf && !isPromo && (
+            {isNew && !isPromo && (
               <span className="px-2 py-0.5 rounded-md bg-brand-500 text-white text-[10px] font-bold">
                 Nouveau
               </span>

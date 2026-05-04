@@ -228,7 +228,7 @@ export default async function HomePage() {
         title="Meilleures ventes"
         subtitle="Populaires"
         icon={TrendingUp}
-        viewAll={{ label: "Voir tous les produits", href: "/products" }}
+        viewAll={{ label: "Voir tout", href: "/products?best=true" }}
         bg="bg-white"
       >
         <ProductGrid products={bestsellers} />

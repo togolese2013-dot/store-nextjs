@@ -183,7 +183,7 @@ export default function ProductImageGallerySimple({ images, productName, default
             alt={`${productName} — ${idx + 1}`}
             fill
             sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-contain transition-transform duration-300 group-hover:scale-105"
+            className="object-contain"
             priority={idx === 0}
           />
 

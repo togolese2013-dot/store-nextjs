@@ -1,6 +1,6 @@
 import express from "express";
 import { emitAdminEvent } from "../lib/admin-events";
-import { createOrder, addOrderEvent, createPaymentPlan } from "@/lib/admin-db";
+import { createOrder, addOrderEvent, createPaymentPlan, ensureOrderVente } from "@/lib/admin-db";
 import { sendOrderNotifications } from "../lib/whatsapp";
 import { db } from "@/lib/db";
 import { getClientSession } from "../lib/client-auth";
@@ -8,6 +8,12 @@ import { ensurePaymentTables } from "./admin/payment-plans";
 import type mysql from "mysql2/promise";
 
 const router = express.Router();
+
+function normalizeTogoPhone(raw: string): string | null {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  const local = digits.startsWith("228") ? digits.slice(3) : digits;
+  return local.length === 8 ? `+228 ${local}` : null;
+}
 
 async function ensureOrderCols() {
   const pool = db as mysql.Pool;
@@ -38,6 +44,13 @@ router.post("/api/orders", async (req, res) => {
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Téléphone et articles requis." });
     }
+    const cleanTelephone = normalizeTogoPhone(telephone);
+    if (!cleanTelephone) {
+      return res.status(400).json({ error: "Le numéro WhatsApp doit contenir exactement 8 chiffres togolais." });
+    }
+    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !String(mm_transaction_ref ?? "").trim()) {
+      return res.status(400).json({ error: "La référence de transaction est obligatoire pour ce paiement." });
+    }
 
     // Validate installment params
     const isEchelonne = ["2x", "3x", "4x"].includes(payment_mode);
@@ -45,7 +58,7 @@ router.post("/api/orders", async (req, res) => {
 
     const id = await createOrder({
       nom:            nom          ?? "",
-      telephone:      telephone.trim(),
+      telephone:      cleanTelephone,
       adresse:        adresse      ?? "",
       zone_livraison: zone_livraison ?? "",
       delivery_fee:   Number(delivery_fee ?? 0),
@@ -98,6 +111,8 @@ router.post("/api/orders", async (req, res) => {
       await addOrderEvent(id, "pending", "Commande passée en ligne");
     }
 
+    await ensureOrderVente(id);
+
     const [rows] = await pool.execute<mysql.RowDataPacket[]>(
       "SELECT reference, created_at FROM orders WHERE id = ? LIMIT 1", [id]
     );
@@ -116,7 +131,7 @@ router.post("/api/orders", async (req, res) => {
       id,
       reference,
       nom:       nom ?? "",
-      telephone: telephone.trim(),
+      telephone: cleanTelephone,
       items:     items ?? [],
       total:     Number(total ?? 0),
     }).catch(console.error);

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/utils";
 import {
-  SlidersHorizontal, Search, Tag, Sparkles, X, Package,
+  SlidersHorizontal, Search, Tag, Sparkles, X, Package, TrendingUp,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -14,6 +14,7 @@ interface Props {
   currentSearch?:     string;
   promoOnly:          boolean;
   newOnly:            boolean;
+  bestOnly?:          boolean;
   inStock?:           boolean;
   minPrice?:          number;
   maxPrice?:          number;
@@ -61,7 +62,7 @@ function Toggle({
 /* ── Filter panel ─────────────────────────────────────────────────────────── */
 function FilterPanel({
   categories, currentCategoryId, currentSearch,
-  promoOnly, newOnly, inStock: initInStock,
+  promoOnly, newOnly, bestOnly, inStock: initInStock,
   minPrice: initMin, maxPrice: initMax,
   onClose,
 }: Omit<Props, "mobileOnly"> & { onClose?: () => void }) {
@@ -71,6 +72,7 @@ function FilterPanel({
   const [catId, setCatId] = useState<number | undefined>(currentCategoryId);
   const [promo, setPromo] = useState(promoOnly);
   const [isNew, setIsNew] = useState(newOnly);
+  const [best,  setBest]  = useState(bestOnly ?? false);
   const [stock, setStock] = useState(initInStock ?? false);
   const [minP,  setMinP]  = useState(initMin != null ? String(initMin) : "");
   const [maxP,  setMaxP]  = useState(initMax != null ? String(initMax) : "");
@@ -81,6 +83,7 @@ function FilterPanel({
     if (catId)    sp.set("category", String(catId));
     if (promo)    sp.set("promo", "true");
     if (isNew)    sp.set("new", "true");
+    if (best)     sp.set("best", "true");
     if (stock)    sp.set("inStock", "true");
     const minNum = Number(minP.replace(/\s/g, ""));
     const maxNum = Number(maxP.replace(/\s/g, ""));
@@ -93,13 +96,14 @@ function FilterPanel({
 
   function reset() {
     setQ(""); setCatId(undefined); setPromo(false);
-    setIsNew(false); setStock(false); setMinP(""); setMaxP("");
+    setIsNew(false); setBest(false); setStock(false); setMinP(""); setMaxP("");
     router.push("/products");
     onClose?.();
   }
 
   const dirty = q.trim() !== (currentSearch ?? "") ||
     catId !== currentCategoryId || promo !== promoOnly || isNew !== newOnly ||
+    best !== (bestOnly ?? false) ||
     stock !== (initInStock ?? false) ||
     minP !== (initMin != null ? String(initMin) : "") ||
     maxP !== (initMax != null ? String(initMax) : "");
@@ -162,6 +166,11 @@ function FilterPanel({
             checked={isNew} onChange={setIsNew}
             label="Nouveautés" icon={<Sparkles className="w-3.5 h-3.5" />}
             activeClass="text-brand-600"
+          />
+          <Toggle
+            checked={best} onChange={setBest}
+            label="Meilleures ventes" icon={<TrendingUp className="w-3.5 h-3.5" />}
+            activeClass="text-emerald-600"
           />
           <Toggle
             checked={stock} onChange={setStock}
@@ -256,7 +265,7 @@ export default function CatalogueFilters(props: Props) {
 
   // Count active non-default filters for badge
   const activeCount = [
-    props.promoOnly, props.newOnly, props.inStock,
+    props.promoOnly, props.newOnly, props.bestOnly, props.inStock,
     props.currentCategoryId != null,
     props.currentSearch,
     props.minPrice != null || props.maxPrice != null,

@@ -114,6 +114,11 @@ const YAS_FEES_TABLE = [
   { tranche: "> 1 000 000 F",          tarif: "9 700 F" },
 ];
 
+function normalizeLocalPhone(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return digits.startsWith("228") ? digits.slice(3, 11) : digits.slice(0, 8);
+}
+
 export default function CheckoutPage() {
   const { items, clearCart, isHydrated } = useCart();
 
@@ -142,7 +147,7 @@ export default function CheckoutPage() {
   const [phoneNumber,  setPhoneNumber]  = useState("");
   const [submitted,    setSubmitted]    = useState(false);
   const [loading,      setLoading]      = useState(false);
-  const [errors,       setErrors]       = useState<Partial<Form & { telephone: string }>>({});
+  const [errors,       setErrors]       = useState<Partial<Form & { telephone: string; reference: string }>>({});
   const [submitError,  setSubmitError]  = useState("");
   const [orderedItems, setOrderedItems] = useState<typeof items>([]);
   const [orderedTotal, setOrderedTotal] = useState(0);
@@ -207,7 +212,7 @@ export default function CheckoutPage() {
   async function saveCurrentAddress() {
     setSavingAddr(true);
     try {
-      const telephone = `${phonePrefix} ${phoneNumber.trim()}`;
+      const telephone = `${phonePrefix} ${normalizeLocalPhone(phoneNumber)}`;
       const res = await fetch("/api/account/addresses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -227,11 +232,17 @@ export default function CheckoutPage() {
   }
 
   function validate(): boolean {
-    const e: Partial<Form & { telephone: string }> = {};
+    const e: Partial<Form & { telephone: string } & { reference: string }> = {};
     if (!form.nom.trim())       e.nom       = "Votre nom est requis.";
     if (!phoneNumber.trim())    e.telephone = "Votre numéro est requis.";
+    else if (normalizeLocalPhone(phoneNumber).length !== 8) {
+      e.telephone = "Le numéro WhatsApp doit contenir exactement 8 chiffres.";
+    }
     if (!form.adresse.trim())   e.adresse   = "Votre adresse est requise.";
     if (!form.zone)             e.zone      = "Choisissez une zone de livraison.";
+    if ((payMode === "flooz" || payMode === "yas") && !mmRef.trim()) {
+      e.reference = "La référence de transaction est obligatoire.";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -249,7 +260,7 @@ export default function CheckoutPage() {
     setLoading(true);
     setSubmitError("");
     try {
-      const telephone = `${phonePrefix} ${phoneNumber.trim()}`;
+      const telephone = `${phonePrefix} ${normalizeLocalPhone(phoneNumber)}`;
       const orderItems = selectedItems.map(i => ({
         id:           i.id,
         nom:          i.nom,
@@ -275,7 +286,7 @@ export default function CheckoutPage() {
           ref_code:          refCode ?? undefined,
           payment_mode:      payMode === "flooz" ? "moov_direct" : payMode === "yas" ? "yas_direct" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
-          mm_transaction_ref: (payMode === "flooz" || payMode === "yas") ? mmRef.trim() || null : null,
+          mm_transaction_ref: (payMode === "flooz" || payMode === "yas") ? mmRef.trim() : null,
         }),
       });
       const data = await res.json();
@@ -536,10 +547,12 @@ export default function CheckoutPage() {
                         <input
                           type="tel"
                           value={phoneNumber}
-                          onChange={e => { setPhoneNumber(e.target.value); setErrors(err => ({ ...err, telephone: undefined })); }}
+                          onChange={e => { setPhoneNumber(normalizeLocalPhone(e.target.value)); setErrors(err => ({ ...err, telephone: undefined })); }}
                           placeholder="90 00 00 00"
                           className={clsx(inputCls(errors.telephone), "flex-1 min-w-0")}
                           autoComplete="tel-national"
+                          inputMode="numeric"
+                          pattern="[0-9]{8}"
                         />
                       </div>
                       {errors.telephone && <p className="text-xs text-red-500 mt-1">{errors.telephone}</p>}
@@ -837,18 +850,19 @@ export default function CheckoutPage() {
                           <div className="pt-2 border-t border-slate-100">
                             <label className="block text-xs font-bold text-slate-600 mb-1.5">
                               Référence de transaction reçue par SMS{" "}
-                              <span className="text-slate-400 font-normal">(optionnel mais recommandé)</span>
+                              <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               value={mmRef}
-                              onChange={e => setMmRef(e.target.value)}
+                              onChange={e => { setMmRef(e.target.value); setErrors(err => ({ ...err, reference: undefined })); }}
                               placeholder={refPlaceholder}
-                              className={inputCls()}
+                              className={inputCls(errors.reference)}
                               autoComplete="off"
                             />
+                            {errors.reference && <p className="text-xs text-red-500 mt-1">{errors.reference}</p>}
                             <p className="text-[11px] text-slate-400 mt-1">
-                              Entrez la référence reçue après paiement pour accélérer la vérification.
+                              Entrez la référence reçue après paiement pour valider la commande.
                             </p>
                           </div>
                         </div>

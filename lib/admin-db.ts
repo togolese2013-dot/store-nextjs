@@ -642,6 +642,24 @@ export async function countOrders(): Promise<number> {
   return Number(rows[0]?.cnt ?? 0);
 }
 
+async function ensureOrderLifecycleCols() {
+  const pool = db as mysql.Pool;
+  for (const ddl of [
+    "ALTER TABLE orders ADD COLUMN stock_boutique_deducted TINYINT(1) NOT NULL DEFAULT 0",
+    "ALTER TABLE orders ADD COLUMN finance_entry_id INT NULL",
+    "ALTER TABLE orders ADD COLUMN vente_facture_id INT NULL",
+    "ALTER TABLE factures ADD COLUMN source VARCHAR(30) NULL",
+    "ALTER TABLE factures ADD COLUMN order_id INT NULL",
+  ]) {
+    try {
+      await pool.execute(ddl);
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code !== "ER_DUP_FIELDNAME" && code !== "ER_NO_SUCH_TABLE") throw err;
+    }
+  }
+}
+
 export async function updateOrderStatus(id: number, status: string) {
   await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
 }
@@ -696,10 +714,11 @@ export async function createOrder(data: {
   zone_livraison: string;
   delivery_fee: number;
   note: string;
-  items: Array<{ id: number; nom: string; reference: string; prix: number; qty: number; total: number }>;
+  items: Array<{ id: number; nom: string; reference: string; prix_unitaire?: number; prix?: number; qty: number; total: number }>;
   subtotal: number;
   total: number;
 }): Promise<number> {
+  await ensureOrderLifecycleCols();
   // Generate reference CMD-YYYYMMDD-XXXX
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
@@ -713,6 +732,181 @@ export async function createOrder(data: {
      data.delivery_fee, data.note, JSON.stringify(data.items), data.subtotal, data.total]
   );
   return result.insertId;
+}
+
+function parseOrderItems(items: unknown): Array<{
+  id?: number; produit_id?: number; nom?: string; reference?: string;
+  qty?: number; quantite?: number; prix_unitaire?: number; prix?: number; total?: number;
+}> {
+  if (Array.isArray(items)) return items as ReturnType<typeof parseOrderItems>;
+  if (typeof items !== "string") return [];
+  try {
+    const parsed = JSON.parse(items);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function orderPaymentModeToFinanceMode(mode?: string | null): FinanceEntry["mode_paiement"] {
+  if (mode === "moov_direct" || mode === "moov_money") return "moov_money";
+  if (mode === "yas_direct" || mode === "tmoney" || mode === "mix_by_yas") return "tmoney";
+  if (mode === "virement" || mode === "virement_bancaire") return "virement_bancaire";
+  return "especes";
+}
+
+export async function ensureOrderVente(orderId: number): Promise<number | null> {
+  await ensureOrderLifecycleCols();
+  const [[order]] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM orders WHERE id = ? LIMIT 1", [orderId]
+  );
+  if (!order) return null;
+  if (order.vente_facture_id) return Number(order.vente_facture_id);
+
+  const items = parseOrderItems(order.items).map(item => {
+    const qty = Number(item.qty ?? item.quantite ?? 1);
+    const prix = Number(item.prix_unitaire ?? item.prix ?? 0);
+    return {
+      produit_id: Number(item.id ?? item.produit_id ?? 0),
+      nom: String(item.nom ?? "Produit"),
+      reference: String(item.reference ?? ""),
+      qty,
+      prix,
+      total: Number(item.total ?? prix * qty),
+    };
+  });
+
+  if (items.length === 0) return null;
+
+  const reference = generateVenteRef("VS");
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO factures
+       (reference, client_nom, client_tel, items, sous_total, remise, total,
+        avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
+        mode_paiement, statut_paiement, statut, note, source, order_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      reference,
+      String(order.nom ?? "").trim().toUpperCase(),
+      order.telephone ?? null,
+      JSON.stringify(items),
+      Number(order.subtotal ?? 0),
+      0,
+      Number(order.total ?? 0),
+      1,
+      order.adresse ?? null,
+      order.telephone ?? null,
+      order.lien_localisation ?? null,
+      orderPaymentModeToFinanceMode(order.payment_mode as string | null),
+      order.statut_paiement ?? "non_paye",
+      "valide",
+      `Commande site ${order.reference}`,
+      "site_order",
+      orderId,
+    ]
+  );
+
+  const factureId = result.insertId;
+  await db.execute("UPDATE orders SET vente_facture_id = ? WHERE id = ?", [factureId, orderId]);
+
+  if (order.nom && order.telephone) {
+    await db.execute(
+      `INSERT INTO boutique_clients (nom, telephone, type_client)
+       SELECT ?, ?, 'particulier' FROM DUAL
+       WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
+      [String(order.nom).trim(), String(order.telephone).trim(), String(order.telephone).trim()]
+    ).catch(() => {});
+  }
+
+  return factureId;
+}
+
+export async function applyOrderDeliveredEffects(orderId: number, actor?: string): Promise<void> {
+  await ensureOrderLifecycleCols();
+  await ensureBoutiqueStockPopulated();
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.execute<mysql.RowDataPacket[]>(
+      "SELECT * FROM orders WHERE id = ? FOR UPDATE", [orderId]
+    );
+    const order = rows[0];
+    if (!order || Number(order.stock_boutique_deducted ?? 0) === 1) {
+      await conn.commit();
+      return;
+    }
+
+    const items = parseOrderItems(order.items);
+    for (const item of items) {
+      const produitId = Number(item.id ?? item.produit_id ?? 0);
+      const qty = Number(item.qty ?? item.quantite ?? 1);
+      if (!produitId || qty <= 0) continue;
+
+      const [stockRows] = await conn.execute<mysql.RowDataPacket[]>(
+        "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1", [produitId]
+      );
+      const dispo = Number(stockRows[0]?.quantite ?? 0);
+      if (dispo < qty) {
+        throw new Error(`Stock boutique insuffisant pour "${item.nom ?? item.reference ?? produitId}" (dispo: ${dispo}, demandé: ${qty})`);
+      }
+    }
+
+    for (const item of items) {
+      const produitId = Number(item.id ?? item.produit_id ?? 0);
+      const qty = Number(item.qty ?? item.quantite ?? 1);
+      if (!produitId || qty <= 0) continue;
+
+      await conn.execute(
+        "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
+        [qty, produitId]
+      );
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?,?,?,?,?,NULL)`,
+        [produitId, "sortie", qty, "Commande site livrée", order.reference]
+      );
+      try {
+        await conn.execute(
+          `UPDATE produits p
+           JOIN boutique_stock bs ON bs.produit_id = p.id
+           SET p.stock_boutique = bs.quantite
+           WHERE p.id = ?`,
+          [produitId]
+        );
+      } catch { /* stock_boutique column may not exist */ }
+    }
+
+    await conn.execute("UPDATE orders SET stock_boutique_deducted = 1 WHERE id = ?", [orderId]);
+    await conn.execute(
+      "INSERT INTO order_events (order_id, status, note, created_by) VALUES (?,?,?,?)",
+      [orderId, "stock_boutique", "Stock boutique décrémenté automatiquement", actor ?? ""]
+    );
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function applyOrderPaidEffects(orderId: number, actor?: string): Promise<void> {
+  await ensureOrderLifecycleCols();
+  const [[order]] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM orders WHERE id = ? LIMIT 1", [orderId]
+  );
+  if (!order || order.finance_entry_id) return;
+
+  const entryId = await createFinanceEntry({
+    type:          "rentree",
+    mode_paiement: orderPaymentModeToFinanceMode(order.payment_mode as string | null) ?? "especes",
+    categorie:     "Commande site",
+    description:   `Commande site ${order.reference} – ${order.nom ?? order.telephone}`,
+    montant:       Number(order.total ?? 0),
+    date_entree:   new Date().toISOString().slice(0, 10),
+  });
+  await db.execute("UPDATE orders SET finance_entry_id = ? WHERE id = ?", [entryId, orderId]);
+  await addOrderEvent(orderId, "finance", "Entrée caisse créée automatiquement", actor ?? "");
 }
 
 /* ─── Order Events (timeline) ─── */
@@ -1959,7 +2153,7 @@ export async function getFinanceStats(): Promise<FinanceStats> {
   const [[totals], modes] = await Promise.all([
     db.query<mysql.RowDataPacket[]>(
       `SELECT
-         SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
+         SUM(CASE WHEN type IN ('caisse','rentree','vente') THEN montant ELSE 0 END) AS recettes,
          SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
        FROM finance_entries`
     ),
@@ -1967,7 +2161,7 @@ export async function getFinanceStats(): Promise<FinanceStats> {
       ? db.query<mysql.RowDataPacket[]>(
           `SELECT mode_paiement, SUM(montant) AS total
            FROM finance_entries
-           WHERE type IN ('caisse','rentree')
+           WHERE type IN ('caisse','rentree','vente')
            GROUP BY mode_paiement`
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),

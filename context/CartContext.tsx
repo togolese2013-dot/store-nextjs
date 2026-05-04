@@ -36,7 +36,7 @@ export const calcPrice = (p: CartItem) =>
   p.variantPrix !== undefined
     ? p.variantPrix
     : p.remise > 0
-    ? Math.round(p.prix_unitaire * (1 - p.remise / 100))
+    ? Math.max(0, p.prix_unitaire - p.remise)
     : p.prix_unitaire;
 
 function migrateItem(raw: Record<string, unknown>): CartItem {

@@ -6,6 +6,7 @@ import type mysql from "mysql2/promise";
 import {
   listOrders, countOrders, createOrder, addOrderEvent,
   updateOrderStatus, updateOrderFields, deleteOrder, getOrderById,
+  applyOrderDeliveredEffects, applyOrderPaidEffects, ensureOrderVente,
 } from "@/lib/admin-db";
 
 async function ensurePaymentColumn() {
@@ -24,7 +25,7 @@ router.get("/api/admin/orders", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   const page   = Math.max(1, Number(req.query.page ?? 1));
-  const limit  = 25;
+  const limit  = Math.min(100, Math.max(1, Number(req.query.limit ?? 25)));
   const offset = (page - 1) * limit;
   const [orders, total] = await Promise.all([listOrders(limit, offset), countOrders()]);
   res.json({ success: true, data: orders, total, page, limit });
@@ -40,6 +41,7 @@ router.post("/api/admin/orders", async (req, res) => {
   const subtotal = items.reduce((s: number, i: { total: number }) => s + i.total, 0);
   const total    = subtotal + Number(delivery_fee ?? 0);
   const id = await createOrder({ nom, telephone, adresse, zone_livraison, delivery_fee: Number(delivery_fee ?? 0), note, items, subtotal, total });
+  await ensureOrderVente(id);
   await addOrderEvent(id, "pending", "Commande créée par l'admin", session.nom);
 
   const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
@@ -73,6 +75,11 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     const { status, note } = req.body;
     await updateOrderStatus(id, status);
     await addOrderEvent(id, status, note ?? "", session.nom);
+    if (["delivered", "livree", "livrée", "livre", "livré"].includes(String(status))) {
+      await applyOrderDeliveredEffects(id, session.nom);
+      emitAdminEvent("stock");
+    }
+    emitAdminEvent("commande");
     return res.json({ ok: true });
   }
 
@@ -81,6 +88,11 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     await ensurePaymentColumn();
     const { payment_status } = req.body;
     await updateOrderFields(id, { statut_paiement: payment_status });
+    if (payment_status === "paye") {
+      await applyOrderPaidEffects(id, session.nom);
+      emitAdminEvent("finance");
+    }
+    emitAdminEvent("commande");
     return res.json({ ok: true });
   }
 
@@ -88,7 +100,10 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
   if (req.body.field === "confirm_mm") {
     await ensurePaymentColumn();
     await updateOrderFields(id, { statut_paiement: "paye" });
+    await applyOrderPaidEffects(id, session.nom);
     await addOrderEvent(id, "confirmée", "Paiement Mobile Money vérifié et confirmé", session.nom);
+    emitAdminEvent("finance");
+    emitAdminEvent("commande");
     return res.json({ ok: true });
   }
 

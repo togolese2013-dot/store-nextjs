@@ -20,6 +20,7 @@ interface PageProps {
     category?: string;
     promo?:    string;
     new?:      string;
+    best?:     string;
     page?:     string;
     sort?:     string;
     inStock?:  string;
@@ -45,6 +46,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const catId    = params.category ? Number(params.category) : undefined;
   const promoOnly = params.promo   === "true";
   const newOnly   = params.new     === "true";
+  const bestOnly  = params.best    === "true";
   const inStock   = params.inStock === "true";
   const minPrice  = params.minPrice ? Number(params.minPrice) : undefined;
   const maxPrice  = params.maxPrice ? Number(params.maxPrice) : undefined;
@@ -56,6 +58,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   if (q)        qs.set("q", q);
   if (promoOnly) qs.set("promo", "true");
   if (newOnly)   qs.set("new", "true");
+  if (bestOnly)  qs.set("best", "true");
   if (inStock)   qs.set("inStock", "true");
   if (minPrice != null) qs.set("minPrice", String(minPrice));
   if (maxPrice != null) qs.set("maxPrice", String(maxPrice));
@@ -88,6 +91,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     if (catId)     sp.set("category", String(catId));
     if (promoOnly) sp.set("promo", "true");
     if (newOnly)   sp.set("new", "true");
+    if (bestOnly)  sp.set("best", "true");
     if (inStock)   sp.set("inStock", "true");
     if (minPrice != null) sp.set("minPrice", String(minPrice));
     if (maxPrice != null) sp.set("maxPrice", String(maxPrice));
@@ -102,6 +106,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   if (activeCat) activeFilters.push({ label: activeCat.nom, clearKey: "category" });
   if (promoOnly) activeFilters.push({ label: "Promotions", clearKey: "promo" });
   if (newOnly)   activeFilters.push({ label: "Nouveautés", clearKey: "new" });
+  if (bestOnly)  activeFilters.push({ label: "Meilleures ventes", clearKey: "best" });
   if (inStock)   activeFilters.push({ label: "En stock", clearKey: "inStock" });
   if (minPrice != null || maxPrice != null) {
     const label = minPrice != null && maxPrice != null
@@ -117,6 +122,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     if (key !== "category" && catId)     sp.set("category", String(catId));
     if (key !== "promo"    && promoOnly) sp.set("promo", "true");
     if (key !== "new"      && newOnly)   sp.set("new", "true");
+    if (key !== "best"     && bestOnly)  sp.set("best", "true");
     if (key !== "inStock"  && inStock)   sp.set("inStock", "true");
     if (key !== "price") {
       if (minPrice != null) sp.set("minPrice", String(minPrice));
@@ -130,6 +136,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   let pageTitle = "Tous les produits";
   if (q)       pageTitle = `Résultats pour "${q}"`;
   else if (activeCat) pageTitle = activeCat.nom;
+  else if (bestOnly)  pageTitle = "Meilleures ventes";
   else if (promoOnly) pageTitle = "Promotions";
   else if (newOnly)   pageTitle = "Nouveaux arrivages";
 
@@ -158,6 +165,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 currentSearch={q}
                 promoOnly={promoOnly}
                 newOnly={newOnly}
+                bestOnly={bestOnly}
                 inStock={inStock}
                 minPrice={minPrice}
                 maxPrice={maxPrice}
@@ -187,6 +195,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 currentSearch={q}
                 promoOnly={promoOnly}
                 newOnly={newOnly}
+                bestOnly={bestOnly}
                 inStock={inStock}
                 minPrice={minPrice}
                 maxPrice={maxPrice}
@@ -208,7 +217,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
             )}
 
             {/* Quick filter pills (mobile-friendly) */}
-            {!promoOnly && !newOnly && !q && !catId && (
+            {!promoOnly && !newOnly && !bestOnly && !q && !catId && (
               <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none lg:hidden">
                 <Link href="/products?promo=true"
                   className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent-50 text-accent-700 text-sm font-semibold border border-accent-200 hover:bg-accent-100 transition-colors"
@@ -219,6 +228,11 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                   className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-brand-50 text-brand-700 text-sm font-semibold border border-brand-200 hover:bg-brand-100 transition-colors"
                 >
                   <Sparkles className="w-3.5 h-3.5" /> Nouveautés
+                </Link>
+                <Link href="/products?best=true"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" /> Meilleures ventes
                 </Link>
                 {categories.slice(0, 6).map(cat => (
                   <Link key={cat.id} href={`/products?category=${cat.id}`}

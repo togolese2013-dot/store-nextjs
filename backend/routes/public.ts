@@ -6,6 +6,99 @@ import {
 
 const router = express.Router();
 
+async function loadBestsellerProducts(limit: number) {
+  const pool = db as import("mysql2/promise").Pool;
+
+  const [salesRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+    `SELECT reference, SUM(total_sold) AS total_sold
+     FROM (
+       SELECT jt.reference, SUM(jt.qty) AS total_sold
+       FROM orders o,
+       JSON_TABLE(
+         o.items, '$[*]'
+         COLUMNS (
+           reference VARCHAR(100) PATH '$.reference',
+           qty       INT          PATH '$.qty'
+         )
+       ) AS jt
+       WHERE o.status NOT IN ('cancelled','annule','annulée')
+         AND jt.reference IS NOT NULL
+         AND jt.reference <> ''
+       GROUP BY jt.reference
+
+       UNION ALL
+
+       SELECT jf.reference, SUM(jf.qty) AS total_sold
+       FROM factures f,
+       JSON_TABLE(
+         f.items, '$[*]'
+         COLUMNS (
+           reference VARCHAR(100) PATH '$.reference',
+           qty       INT          PATH '$.qty'
+         )
+       ) AS jf
+       WHERE f.statut NOT IN ('annule')
+         AND jf.reference IS NOT NULL
+         AND jf.reference <> ''
+       GROUP BY jf.reference
+     ) sales
+     GROUP BY reference
+     ORDER BY total_sold DESC
+     LIMIT 50`
+  );
+
+  let products: import("mysql2/promise").RowDataPacket[] = [];
+  if (salesRows.length > 0) {
+    const refs = salesRows.map(r => r.reference as string);
+    const placeholders = refs.map(() => "?").join(",");
+    const [prodRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT p.*, c.nom AS categorie_nom
+       FROM produits p
+       LEFT JOIN categories c ON c.id = p.categorie_id
+       WHERE p.reference IN (${placeholders})
+         AND p.actif = 1
+         AND COALESCE(p.stock_boutique, 0) > 0
+       LIMIT 50`,
+      refs
+    );
+
+    const rankMap = new Map(salesRows.map((r, i) => [r.reference as string, i]));
+    prodRows.sort((a, b) => (rankMap.get(a.reference) ?? 999) - (rankMap.get(b.reference) ?? 999));
+
+    const poolSize = Math.min(prodRows.length, Math.max(limit + 8, 16));
+    const topPool = prodRows.slice(0, poolSize);
+    for (let i = topPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [topPool[i], topPool[j]] = [topPool[j], topPool[i]];
+    }
+    products = topPool.slice(0, limit);
+  }
+
+  if (products.length < limit) {
+    const existing = new Set(products.map(p => p.id as number));
+    const needed = limit - products.length;
+    const [fallback] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT p.*, c.nom AS categorie_nom
+       FROM produits p
+       LEFT JOIN categories c ON c.id = p.categorie_id
+       WHERE p.actif = 1
+         AND COALESCE(p.stock_boutique, 0) > 0
+       ORDER BY RAND()
+       LIMIT ?`,
+      [needed + 10]
+    );
+    for (const p of fallback) {
+      if (!existing.has(p.id as number)) {
+        products.push(p);
+        existing.add(p.id as number);
+      }
+      if (products.length >= limit) break;
+    }
+  }
+
+  return products;
+}
+
 // ── Health ────────────────────────────────────────────────────────────────
 router.get("/api/health", async (_req, res) => {
   let dbStatus = "untested";
@@ -37,11 +130,17 @@ router.get("/api/products", async (req, res) => {
     const referenceExact = (req.query.reference as string) || undefined;
     const promoOnly      = req.query.promo   === "true";
     const newOnly        = req.query.new     === "true";
+    const bestOnly       = req.query.best    === "true";
     const inStock        = req.query.inStock === "true";
     const minPrice       = req.query.minPrice ? Number(req.query.minPrice) : undefined;
     const maxPrice       = req.query.maxPrice ? Number(req.query.maxPrice) : undefined;
     const limit          = req.query.limit  ? Number(req.query.limit)  : 60;
     const offset         = req.query.offset ? Number(req.query.offset) : 0;
+
+    if (bestOnly) {
+      const products = await loadBestsellerProducts(limit);
+      return res.json({ success: true, data: products, total: products.length });
+    }
 
     const [products, total] = await Promise.all([
       getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset }),
@@ -149,80 +248,7 @@ router.get("/api/settings/public", async (_req, res) => {
 router.get("/api/products/bestsellers", async (req, res) => {
   try {
     const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 8)));
-    const pool  = db as import("mysql2/promise").Pool;
-
-    // Step 1 — count qty sold per product reference from real orders
-    const [salesRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
-      `SELECT jt.reference, SUM(jt.qty) AS total_sold
-       FROM orders o,
-       JSON_TABLE(
-         o.items, '$[*]'
-         COLUMNS (
-           reference VARCHAR(100) PATH '$.reference',
-           qty       INT          PATH '$.qty'
-         )
-       ) AS jt
-       WHERE o.status IN ('pending','confirmed','shipped','delivered')
-         AND jt.reference IS NOT NULL
-       GROUP BY jt.reference
-       ORDER BY total_sold DESC
-       LIMIT 20`
-    );
-
-    let products: import("mysql2/promise").RowDataPacket[] = [];
-
-    if (salesRows.length > 0) {
-      // Step 2 — fetch matching products in sales order, pick random subset from top results
-      const refs = salesRows.map(r => r.reference as string);
-      const placeholders = refs.map(() => "?").join(",");
-
-      const [prodRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
-        `SELECT p.*,
-                c.nom AS category_nom
-         FROM produits p
-         LEFT JOIN categories c ON c.id = p.categorie_id
-         WHERE p.reference IN (${placeholders})
-           AND COALESCE(p.stock_boutique, 0) > 0
-         LIMIT 20`,
-        refs
-      );
-
-      // Sort by sales rank
-      const rankMap = new Map(salesRows.map((r, i) => [r.reference as string, i]));
-      prodRows.sort((a, b) => (rankMap.get(a.reference) ?? 99) - (rankMap.get(b.reference) ?? 99));
-
-      // Shuffle top results slightly for variety (Fisher-Yates on top pool)
-      const pool_size = Math.min(prodRows.length, Math.max(limit + 4, 12));
-      const topPool = prodRows.slice(0, pool_size);
-      for (let i = topPool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [topPool[i], topPool[j]] = [topPool[j], topPool[i]];
-      }
-      products = topPool.slice(0, limit);
-    }
-
-    // Fallback — not enough sold products, fill with recent ones
-    if (products.length < limit) {
-      const existing = new Set(products.map(p => p.id as number));
-      const needed   = limit - products.length;
-      const [fallback] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
-        `SELECT p.*, c.nom AS category_nom
-         FROM produits p
-         LEFT JOIN categories c ON c.id = p.categorie_id
-         WHERE COALESCE(p.stock_boutique, 0) > 0
-         ORDER BY RAND()
-         LIMIT ?`,
-        [needed + 5]
-      );
-      for (const p of fallback) {
-        if (!existing.has(p.id as number)) {
-          products.push(p);
-          existing.add(p.id as number);
-        }
-        if (products.length >= limit) break;
-      }
-    }
-
+    const products = await loadBestsellerProducts(limit);
     res.json({ success: true, data: products });
   } catch (err) {
     // Graceful fallback on JSON_TABLE error (older MySQL)

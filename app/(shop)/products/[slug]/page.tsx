@@ -59,8 +59,17 @@ export default async function ProductPage({ params }: PageProps) {
   if (!product) notFound();
 
   const price    = finalPrice(product);
-  const isPromo  = product.remise > 0;
-  const stockDisp = product.stock_magasin > 0 ? product.stock_magasin : product.stock_boutique;
+  const discountPercent = product.prix_unitaire > 0
+    ? Math.round((Math.min(product.remise, product.prix_unitaire) / product.prix_unitaire) * 100)
+    : 0;
+  const isPromo  = product.remise > 0 && discountPercent > 0;
+  const createdAt = product.date_creation ? new Date(product.date_creation) : null;
+  const isNew = Boolean(
+    product.neuf &&
+    createdAt &&
+    Date.now() - createdAt.getTime() <= 30 * 24 * 60 * 60 * 1000
+  );
+  const stockDisp = product.stock_boutique;
   const outOf    = stockDisp === 0;
   const isLow    = stockDisp > 0 && stockDisp <= 5;
 
@@ -167,7 +176,7 @@ export default async function ProductPage({ params }: PageProps) {
           <div className="grid lg:grid-cols-2 gap-0">
 
             {/* Image column */}
-            <div className="lg:rounded-l-3xl overflow-hidden border-r border-slate-100">
+            <div className="relative lg:rounded-l-3xl overflow-hidden border-r border-slate-100">
               <ProductImageGallerySimple
                 images={allProductImages}
                 productName={product.nom}
@@ -177,10 +186,10 @@ export default async function ProductPage({ params }: PageProps) {
               <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
                 {isPromo && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent-500 text-white text-sm font-bold shadow-accent">
-                    <Zap className="w-3.5 h-3.5" /> -{Math.round((product.remise / product.prix_unitaire) * 100)}%
+                    <Zap className="w-3.5 h-3.5" /> -{discountPercent}%
                   </span>
                 )}
-                {product.neuf && !isPromo && (
+                {isNew && !isPromo && (
                   <span className="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-bold">
                     Nouveau
                   </span>
@@ -244,7 +253,7 @@ export default async function ProductPage({ params }: PageProps) {
                           {formatPrice(product.prix_unitaire)}
                         </span>
                         <span className="text-xs font-bold text-accent-500 bg-accent-50 px-2 py-0.5 rounded-full">
-                          -{Math.round((product.remise / product.prix_unitaire) * 100)}% · économisez {formatPrice(product.prix_unitaire - price)}
+                          -{discountPercent}% · économisez {formatPrice(product.prix_unitaire - price)}
                         </span>
                       </div>
                     )}
