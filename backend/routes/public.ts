@@ -78,28 +78,6 @@ async function loadBestsellerProducts(limit: number) {
     products = topPool.slice(0, limit);
   }
 
-  // Step 4: fallback to random active products if not enough results
-  if (products.length < limit) {
-    const existing = new Set(products.map(p => p.id as number));
-    const needed = limit - products.length;
-    const [fallback] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
-      `SELECT p.*, c.nom AS categorie_nom
-       FROM produits p
-       LEFT JOIN categories c ON c.id = p.categorie_id
-       WHERE p.actif = 1
-       ORDER BY RAND()
-       LIMIT ?`,
-      [needed + 10]
-    );
-    for (const p of fallback) {
-      if (!existing.has(p.id as number)) {
-        products.push(p);
-        existing.add(p.id as number);
-      }
-      if (products.length >= limit) break;
-    }
-  }
-
   return products;
 }
 
