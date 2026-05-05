@@ -250,13 +250,13 @@ export default function StockBoutiqueManager({
         {/* Total produits */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">Total produits</p>
-          <p className="text-3xl font-display font-800 text-slate-900">{stats.total_produits}</p>
+          <p className="text-2xl font-bold text-slate-900">{stats.total_produits}</p>
         </div>
 
         {/* Valeur boutique */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5">
           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">Valeur boutique</p>
-          <p className="text-3xl font-display font-800 text-slate-900">
+          <p className="text-2xl font-bold text-slate-900">
             {formatPrice(stats.valeur_boutique)}
           </p>
         </div>
@@ -269,7 +269,7 @@ export default function StockBoutiqueManager({
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Alerte</span>
             )}
           </div>
-          <p className={`text-3xl font-display font-800 ${stats.stock_faible > 0 ? "text-amber-600" : "text-slate-900"}`}>
+          <p className={`text-2xl font-bold ${stats.stock_faible > 0 ? "text-amber-600" : "text-slate-900"}`}>
             {stats.stock_faible}
           </p>
         </div>
@@ -282,7 +282,7 @@ export default function StockBoutiqueManager({
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Critique</span>
             )}
           </div>
-          <p className={`text-3xl font-display font-800 ${stats.epuises > 0 ? "text-red-600" : "text-slate-900"}`}>
+          <p className={`text-2xl font-bold ${stats.epuises > 0 ? "text-red-600" : "text-slate-900"}`}>
             {stats.epuises}
           </p>
         </div>
@@ -459,7 +459,7 @@ export default function StockBoutiqueManager({
                         {/* Produit */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden relative shrink-0">
                               {imgSrc ? (
                                 <Image src={imgSrc} alt={item.nom} fill className="object-contain p-1" sizes="40px" />
                               ) : (

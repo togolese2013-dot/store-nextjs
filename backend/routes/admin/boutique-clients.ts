@@ -3,6 +3,7 @@ import { getSession } from "../../lib/auth";
 import {
   listBoutiqueClients, countBoutiqueClients, createBoutiqueClient,
   getBoutiqueClientsStats, updateBoutiqueClient, deleteBoutiqueClient,
+  getBoutiqueClientById, getClientFacturesByNom,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -39,6 +40,19 @@ router.get("/api/admin/boutique-clients", async (req, res) => {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("doesn't exist")) return res.json({ success: true, data: [], total: 0, page, limit, _migrationNeeded: true });
     res.status(500).json({ error: msg });
+  }
+});
+
+router.get("/api/admin/boutique-clients/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const client = await getBoutiqueClientById(Number(req.params.id));
+    if (!client) return res.status(404).json({ error: "Client introuvable." });
+    const factures = await getClientFacturesByNom(client.nom, client.telephone);
+    res.json({ client, factures });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
 

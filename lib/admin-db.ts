@@ -1678,8 +1678,29 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
 }
 
 export async function getFactureById(id: number): Promise<Facture | null> {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT * FROM factures WHERE id = ? LIMIT 1", [id]);
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
+     FROM factures f
+     LEFT JOIN admin_users u ON u.id = f.admin_id
+     WHERE f.id = ? LIMIT 1`,
+    [id]
+  );
   return (rows[0] as Facture) ?? null;
+}
+
+export async function getClientFacturesByNom(nom: string, tel?: string | null): Promise<Facture[]> {
+  const conditions = ["(f.client_nom = ? OR f.client_nom LIKE ?)"];
+  const params: (string | number | null)[] = [nom, `%${nom}%`];
+  if (tel) { conditions.push("f.client_tel = ?"); params.push(tel); }
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
+     FROM factures f
+     LEFT JOIN admin_users u ON u.id = f.admin_id
+     WHERE f.client_nom = ?
+     ORDER BY f.created_at DESC LIMIT 50`,
+    [nom]
+  );
+  return rows as Facture[];
 }
 
 function generateVenteRef(prefix: string): string {

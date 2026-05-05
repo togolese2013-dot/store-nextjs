@@ -181,9 +181,6 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${STATUT_COLORS[facture.statut] ?? "bg-slate-100 text-slate-600"}`}>
-            {STATUT_LABELS[facture.statut] ?? facture.statut}
-          </span>
           <button
             onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
@@ -204,8 +201,14 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="font-bold text-slate-900 text-base">Articles</h2>
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUT_COLORS[facture.statut] ?? "bg-slate-100 text-slate-600"}`}>
-                {STATUT_LABELS[facture.statut] ?? facture.statut}
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                facture.statut === "annule" ? STATUT_COLORS.annule :
+                facture.statut_paiement === "paye_total" ? STATUT_COLORS.paye :
+                STATUT_COLORS[facture.statut] ?? "bg-slate-100 text-slate-600"
+              }`}>
+                {facture.statut === "annule" ? "Annulé" :
+                 facture.statut_paiement === "paye_total" ? "Payé" :
+                 STATUT_LABELS[facture.statut] ?? facture.statut}
               </span>
             </div>
 
@@ -377,10 +380,6 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
 
               <div className="space-y-2.5 text-sm divide-y divide-slate-50">
                 <div className="flex justify-between pt-1">
-                  <span className="text-slate-500">Type de document</span>
-                  <span className="font-semibold text-slate-900">Facture (A4)</span>
-                </div>
-                <div className="flex justify-between pt-2.5">
                   <span className="text-slate-500">Date création</span>
                   <span className="font-semibold text-slate-900">{formatDate(facture.created_at)}</span>
                 </div>

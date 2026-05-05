@@ -87,7 +87,6 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
   const [categorie,   setCategorie]   = useState(entry?.categorie   ?? "");
   const [description, setDescription] = useState(entry?.description ?? "");
   const [montant,     setMontant]     = useState(entry ? String(entry.montant) : "");
-  const [date,        setDate]        = useState(entry?.date_entree?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState("");
 
@@ -100,7 +99,7 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!montant || !date) { setError("Montant et date requis."); return; }
+    if (!montant) { setError("Montant requis."); return; }
     setSaving(true); setError("");
     try {
       const body = {
@@ -109,7 +108,7 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
         categorie:     categorie  || null,
         description:   description || null,
         montant:       Number(montant),
-        date_entree:   date,
+        date_entree:   new Date().toISOString().slice(0, 10),
       };
       const res = isEdit
         ? await fetch(`/api/admin/finance/${entry!.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
@@ -155,26 +154,18 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
 
           {/* Mode paiement */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-2">Mode de paiement</label>
-            <div className="grid grid-cols-2 gap-2">
-              {MODES.map(m => (
-                <button key={m.value} type="button" onClick={() => setModePaiement(m.value)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
-                    modePaiement === m.value
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-slate-200 text-slate-500 hover:border-slate-300"
-                  }`}>
-                  <m.icon className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{m.label}</span>
-                </button>
-              ))}
-            </div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Mode de paiement</label>
+            <select value={modePaiement} onChange={e => setModePaiement(e.target.value as ModePaiement)}
+              className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing} bg-white`}>
+              {MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
           </div>
 
-          {/* Date */}
+          {/* Montant */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Date *</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} required
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant (FCFA) *</label>
+            <input type="number" min="0" step="1" value={montant}
+              onChange={e => setMontant(e.target.value)} required placeholder="0"
               className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
           </div>
 
@@ -191,14 +182,6 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Description</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
               className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing} resize-none`} />
-          </div>
-
-          {/* Montant */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant (FCFA) *</label>
-            <input type="number" min="0" step="1" value={montant}
-              onChange={e => setMontant(e.target.value)} required placeholder="0"
-              className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
           </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
@@ -231,14 +214,13 @@ function TransfertModal({ onClose, onSaved }: TransfertModalProps) {
   const [source,      setSource]      = useState<ModePaiement>("especes");
   const [destination, setDestination] = useState<ModePaiement>("moov_money");
   const [montant,     setMontant]     = useState("");
-  const [date,        setDate]        = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState("");
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!montant || !date) { setError("Montant et date requis."); return; }
+    if (!montant) { setError("Montant requis."); return; }
     if (source === destination) { setError("Le compte source et destination doivent être différents."); return; }
     setSaving(true); setError("");
     try {
@@ -251,7 +233,7 @@ function TransfertModal({ onClose, onSaved }: TransfertModalProps) {
           compte_destination: destination,
           description:        description || `Transfert ${modeLabel(source)} → ${modeLabel(destination)}`,
           montant:            Number(montant),
-          date_entree:        date,
+          date_entree:        new Date().toISOString().slice(0, 10),
         }),
       });
       if (!res.ok) { const d = await res.json(); setError(d.error ?? "Erreur"); return; }
@@ -313,10 +295,11 @@ function TransfertModal({ onClose, onSaved }: TransfertModalProps) {
             </div>
           </div>
 
-          {/* Date */}
+          {/* Montant */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Date *</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} required
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant (FCFA) *</label>
+            <input type="number" min="0" step="1" value={montant}
+              onChange={e => setMontant(e.target.value)} required placeholder="0"
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
           </div>
 
@@ -325,14 +308,6 @@ function TransfertModal({ onClose, onSaved }: TransfertModalProps) {
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Note (optionnel)</label>
             <input value={description} onChange={e => setDescription(e.target.value)}
               placeholder={`Transfert ${modeLabel(source)} → ${modeLabel(destination)}`}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
-          </div>
-
-          {/* Montant */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant (FCFA) *</label>
-            <input type="number" min="0" step="1" value={montant}
-              onChange={e => setMontant(e.target.value)} required placeholder="0"
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
           </div>
 
@@ -515,8 +490,8 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
       {/* ── Tabs ── */}
       <TabBar
         tabs={[
-          { key: "rentree",   label: "Rentrées",   icon: TrendingUp       },
           { key: "depense",   label: "Dépenses",   icon: TrendingDown     },
+          { key: "rentree",   label: "Rentrées",   icon: TrendingUp       },
           { key: "transfert", label: "Transferts",  icon: ArrowLeftRight   },
         ]}
         active={tab}

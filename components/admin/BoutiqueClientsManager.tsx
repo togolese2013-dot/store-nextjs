@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users, Plus, Eye, Pencil, Trash2, Loader2,
   ChevronLeft, ChevronRight, X, MapPin, Phone,
@@ -127,6 +128,7 @@ function FormModal({ client, onClose, onSaved }: FormModalProps) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function BoutiqueClientsManager() {
+  const router = useRouter();
   const [clients,  setClients]  = useState<BoutiqueClient[]>([]);
   const [total,    setTotal]    = useState(0);
   const [counts,   setCounts]   = useState({ tous: 0, debiteurs: 0, dettes: 0 });
@@ -279,7 +281,7 @@ export default function BoutiqueClientsManager() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => setModal(c)}
+                      <button onClick={() => router.push(`/admin/boutique-clients/${c.id}`)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                         <Eye className="w-4 h-4" />
                       </button>
