@@ -15,7 +15,6 @@ import type { Facture, Livraison, BoutiqueStockItem } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 
 /* ─── Types ─── */
-type Tab = "ventes" | "livraisons";
 
 interface Stats {
   factures: number; livraisons: number; ca_total: number; factures_payees: number;
@@ -166,7 +165,6 @@ export default function VentesManager({
 }: Props) {
 
   /* ── State principal ── */
-  const [tab,        setTab]        = useState<Tab>("ventes");
   const [stats,      setStats]      = useState<Stats>(initialStats);
   const [factures,   setFactures]   = useState<Facture[]>(initialFactures);
   const [livraisons, setLivraisons] = useState<Livraison[]>(initialLivraisons);
@@ -325,41 +323,26 @@ export default function VentesManager({
   }
 
   /* ── Fetch tableau ── */
-  const fetchTab = useCallback(async (t: Tab, q = "", off = 0) => {
+  const fetchTab = useCallback(async (q = "", off = 0) => {
     setLoading(true);
     const params = new URLSearchParams();
     if (q)   params.set("q",      q);
     if (off) params.set("offset", String(off));
     params.set("limit", String(LIMIT));
-
-    if (t === "ventes") {
-      const res  = await fetch(`/api/admin/ventes/factures?${params}`);
-      const data = await res.json();
-      if (res.ok) { setFactures(data.items); setStats(data.stats); setTotals(p => ({ ...p, factures: data.total })); }
-    } else {
-      const res  = await fetch(`/api/admin/ventes/livraisons?${params}`);
-      const data = await res.json();
-      if (res.ok) { setLivraisons(data.items); setTotals(p => ({ ...p, livraisons: data.total })); }
-    }
+    const res  = await fetch(`/api/admin/ventes/factures?${params}`);
+    const data = await res.json();
+    if (res.ok) { setFactures(data.items); setStats(data.stats); setTotals(p => ({ ...p, factures: data.total })); }
     setLoading(false);
   }, []);
 
-  function switchTab(t: Tab) { setTab(t); setOffset(0); setSearch(""); fetchTab(t, "", 0); }
-  function applySearch(q: string) { setSearch(q); setOffset(0); fetchTab(tab, q, 0); }
-  function paginate(off: number) { setOffset(off); fetchTab(tab, search, off); }
+  function applySearch(q: string) { setSearch(q); setOffset(0); fetchTab(q, 0); }
+  function paginate(off: number)  { setOffset(off); fetchTab(search, off); }
 
   /* ── Delete ── */
-  async function handleDelete(type: Tab, id: number) {
+  async function handleDelete(id: number) {
     if (!confirm("Supprimer cet élément ?")) return;
-    const url = type === "ventes"
-      ? `/api/admin/ventes/factures/${id}`
-      : `/api/admin/ventes/livraisons/${id}`;
-    const res = await fetch(url, { method: "DELETE" });
-    if (res.ok) {
-      if (type === "livraisons") setLivraisons(p => p.filter(x => x.id !== id));
-      showFlash("Supprimé ✓");
-      fetchTab(tab, search, offset);
-    }
+    const res = await fetch(`/api/admin/ventes/factures/${id}`, { method: "DELETE" });
+    if (res.ok) { showFlash("Supprimé ✓"); fetchTab(search, offset); }
   }
 
   /* ── Créer la vente ── */
@@ -414,7 +397,7 @@ export default function VentesManager({
     if (res.ok) {
       closeModal();
       showFlash("Vente enregistrée ✓");
-      fetchTab("ventes", search, offset);
+      fetchTab(search, offset);
     } else {
       setModal(m => m ? { ...m, saving: false, error: data.error ?? "Erreur" } : m);
     }
@@ -463,10 +446,10 @@ export default function VentesManager({
   }
 
   /* ── Pagination ── */
-  const currentTotal = tab === "ventes" ? totals.factures : totals.livraisons;
+  const currentTotal = totals.factures;
   const totalPages   = Math.ceil(currentTotal / LIMIT);
   const currentPage  = Math.floor(offset / LIMIT) + 1;
-  const rows = tab === "ventes" ? factures : livraisons;
+  const rows = factures;
 
   /* ════════════════════════════════════
      RENDER
@@ -489,17 +472,17 @@ export default function VentesManager({
         onSearchChange={v => applySearch(v)}
         onSearch={e => { e.preventDefault(); applySearch(search); }}
         searchPlaceholder="Rechercher…"
-        onRefresh={() => fetchTab(tab, search, offset)}
+        onRefresh={() => fetchTab(search, offset)}
         refreshLoading={loading}
-        ctaLabel={tab === "ventes" ? "Nouvelle vente" : undefined}
-        onCtaClick={tab === "ventes" ? openModal : undefined}
+        ctaLabel="Nouvelle vente"
+        onCtaClick={openModal}
       />
 
       {/* KPI Dashboard */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Produits en stock */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-2">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Produits en stock</p>
             <Warehouse className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
@@ -513,7 +496,7 @@ export default function VentesManager({
 
         {/* Ventes aujourd'hui */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-2">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ventes aujourd'hui</p>
             <ShoppingCart className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
@@ -528,7 +511,7 @@ export default function VentesManager({
 
         {/* Revenu */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-2">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Revenu</p>
             <DollarSign className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
@@ -543,7 +526,7 @@ export default function VentesManager({
 
         {/* Rentrées */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-2">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rentrées</p>
             <ArrowDownCircle className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
@@ -557,7 +540,7 @@ export default function VentesManager({
       {/* Dépenses — ligne séparée */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-2">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dépenses</p>
             <ArrowUpCircle className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
@@ -568,15 +551,6 @@ export default function VentesManager({
         </div>
       </div>
 
-      <TabBar
-        tabs={[
-          { key: "ventes",     label: "Ventes",     icon: TrendingUp, count: stats.factures },
-          { key: "livraisons", label: "Livraisons", icon: Truck,      count: stats.livraisons },
-        ]}
-        active={tab}
-        onChange={k => switchTab(k as Tab)}
-        accent="amber"
-      />
 
       {/* ── Table ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
@@ -599,95 +573,58 @@ export default function VentesManager({
                     <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden sm:table-cell">Date</th>
                     <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Référence</th>
                     <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Client</th>
-                    {tab !== "livraisons" && (
-                      <th className="text-right px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden md:table-cell">Montant</th>
-                    )}
-                    {tab === "livraisons" && (
-                      <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden md:table-cell">Adresse</th>
-                    )}
+                    <th className="text-right px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden md:table-cell">Montant</th>
                     <th className="text-center px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Statut</th>
-                    {tab === "ventes" && (
-                      <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden lg:table-cell">Vendeur</th>
-                    )}
+                    <th className="text-center px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden sm:table-cell">Paiement</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden lg:table-cell">Vendeur</th>
                     <th className="px-5 py-3.5 text-center font-semibold text-slate-600 text-xs uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {rows.map(row => {
-                    const isVente     = tab === "ventes";
-                    const isLivraison = tab === "livraisons";
-                    const f = row as Facture;
-                    const l = row as Livraison;
-
+                  {(rows as Facture[]).map(f => {
+                    const s = getStatutDisplay(f);
                     return (
                       <tr
-                        key={row.id}
-                        className={`hover:bg-slate-50 transition-colors group ${isVente ? "cursor-pointer" : ""}`}
-                        onClick={isVente ? () => handleView(f) : undefined}
+                        key={f.id}
+                        className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                        onClick={() => handleView(f)}
                       >
-                        {/* Date + heure */}
-                        <td className="px-5 py-4 text-slate-500 text-xs hidden sm:table-cell">
-                          {formatDate(row.created_at)}
-                        </td>
-
-                        {/* Référence */}
+                        <td className="px-5 py-4 text-slate-500 text-xs hidden sm:table-cell">{formatDate(f.created_at)}</td>
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">{row.reference.replace(/-\d{4}$/, "")}</span>
-                            {isVente && f.avec_livraison === 1 && (
+                            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">{f.reference.replace(/-\d{4}$/, "")}</span>
+                            {f.avec_livraison === 1 && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full border border-indigo-100">
                                 <Truck className="w-3 h-3" /> Livraison
                               </span>
                             )}
                           </div>
                         </td>
-
-                        {/* Client */}
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-900">{row.client_nom?.toUpperCase()}</div>
+                          <div className="font-semibold text-slate-900">{f.client_nom?.toUpperCase()}</div>
                         </td>
-
-                        {/* Montant */}
-                        {isVente && (
-                          <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">
-                            {formatPrice(f.total)}
-                          </td>
-                        )}
-                        {isLivraison && (
-                          <td className="px-5 py-4 text-slate-600 hidden md:table-cell">
-                            <span className="line-clamp-1">{l.adresse ?? "—"}</span>
-                          </td>
-                        )}
-
-                        {/* Statut */}
+                        <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">{formatPrice(f.total)}</td>
                         <td className="px-5 py-4 text-center">
-                          {isVente && (() => {
-                            const s = getStatutDisplay(f);
-                            return (
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>
-                                {s.label}
-                              </span>
-                            );
-                          })()}
-                          {isLivraison && statutBadge(l.statut, LIVRAISON_STATUTS)}
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>{s.label}</span>
                         </td>
-
-                        {/* Vendeur */}
-                        {isVente && (
-                          <td className="px-5 py-4 text-slate-600 text-xs hidden lg:table-cell">
-                            {f.vendeur ?? "—"}
-                          </td>
-                        )}
-                        {isLivraison && <td className="hidden lg:table-cell" />}
-
+                        <td className="px-5 py-4 text-center hidden sm:table-cell">
+                          {f.statut_paiement === "paye_total" ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Complet</span>
+                          ) : f.statut_paiement === "acompte" && f.montant_acompte != null && f.total > 0 ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                              {Math.round((f.montant_acompte / f.total) * 100)}%
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-slate-600 text-xs hidden lg:table-cell">{f.vendeur ?? "—"}</td>
                         <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                            {isVente && <button onClick={() => handleView(f)} title="Voir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>}
-                            {isVente && <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>}
-                            {!isLivraison && (
-                              <button onClick={() => handlePrint(row.reference)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
-                            )}
-                            <button onClick={() => handleDelete(tab, row.id)} title="Supprimer" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                            <button onClick={() => handleView(f)} title="Voir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>
+                            <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={() => handlePrint(f.reference)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
+                            <button onClick={() => handleDelete(f.id)} title="Supprimer" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>
