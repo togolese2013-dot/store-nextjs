@@ -2699,7 +2699,7 @@ export interface LivraisonAdmin {
   created_at:        string;
 }
 
-async function ensureLivraisonCols(): Promise<void> {
+export async function ensureLivraisonCols(): Promise<void> {
   try {
     await db.execute(
       "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL AFTER lien_localisation"

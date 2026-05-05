@@ -37,7 +37,7 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
-import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam } from "@/lib/admin-db";
+import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam, ensureLivraisonCols } from "@/lib/admin-db";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -131,6 +131,12 @@ app.listen(PORT, async () => {
     console.log("[backend] whatsapp_messages table OK");
   } catch (e) {
     console.error("[backend] ensureWhatsappMessagesTable failed:", e);
+  }
+  try {
+    await ensureLivraisonCols();
+    console.log("[backend] livraisons_ventes FK migration OK");
+  } catch (e) {
+    console.error("[backend] ensureLivraisonCols failed:", e);
   }
 });
 
