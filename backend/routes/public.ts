@@ -35,7 +35,7 @@ async function loadBestsellerProducts(limit: number) {
        JSON_TABLE(
          o.items, '$[*]'
          COLUMNS (
-           reference VARCHAR(100) PATH '$.reference',
+           reference VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PATH '$.reference',
            qty       INT          PATH '$.qty'
          )
        ) AS jt
