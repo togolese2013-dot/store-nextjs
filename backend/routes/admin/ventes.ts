@@ -71,11 +71,11 @@ router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { statut, statut_paiement, mode_paiement } = req.body;
-    if (statut && !statut_paiement && !mode_paiement) {
+    const { statut, statut_paiement, mode_paiement, montant_acompte } = req.body;
+    if (statut && !statut_paiement && !mode_paiement && montant_acompte === undefined) {
       await updateFactureStatut(Number(req.params.id), statut);
     } else {
-      await updateFacture(Number(req.params.id), { statut, statut_paiement, mode_paiement });
+      await updateFacture(Number(req.params.id), { statut, statut_paiement, mode_paiement, montant_acompte });
     }
     res.json({ ok: true });
   } catch (err) {

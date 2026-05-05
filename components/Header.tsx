@@ -356,7 +356,7 @@ export default function Header() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 onFocus={() => { if (suggestions.length) setShowSug(true); }}
-                placeholder="Rechercher…"
+                placeholder="Rechercher un produit…"
                 className="w-full pl-9 pr-4 py-2 text-[16px] bg-[#f8fafb] rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
                 style={{ fontSize: "16px" }}
               />

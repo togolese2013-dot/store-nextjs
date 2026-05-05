@@ -1845,15 +1845,17 @@ export async function updateFactureStatut(id: number, statut: Facture["statut"])
 }
 
 export async function updateFacture(id: number, data: {
-  statut?:          Facture["statut"];
-  statut_paiement?: string;
-  mode_paiement?:   string;
+  statut?:           Facture["statut"];
+  statut_paiement?:  string;
+  mode_paiement?:    string;
+  montant_acompte?:  number | null;
 }) {
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
-  if (data.statut !== undefined)           { sets.push("statut = ?");           params.push(data.statut); }
-  if (data.statut_paiement !== undefined)  { sets.push("statut_paiement = ?");  params.push(data.statut_paiement); }
-  if (data.mode_paiement !== undefined)    { sets.push("mode_paiement = ?");    params.push(data.mode_paiement); }
+  if (data.statut !== undefined)            { sets.push("statut = ?");            params.push(data.statut); }
+  if (data.statut_paiement !== undefined)   { sets.push("statut_paiement = ?");   params.push(data.statut_paiement); }
+  if (data.mode_paiement !== undefined)     { sets.push("mode_paiement = ?");     params.push(data.mode_paiement); }
+  if (data.montant_acompte !== undefined)   { sets.push("montant_acompte = ?");   params.push(data.montant_acompte); }
   if (sets.length === 0) return;
   params.push(id);
   await db.execute(`UPDATE factures SET ${sets.join(", ")} WHERE id = ?`, params);
