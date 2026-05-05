@@ -9,43 +9,49 @@ const router = express.Router();
 async function loadBestsellerProducts(limit: number) {
   const pool = db as import("mysql2/promise").Pool;
 
-  const [salesRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
-    `SELECT reference, SUM(total_sold) AS total_sold
-     FROM (
-       SELECT jt.reference, SUM(jt.qty) AS total_sold
-       FROM orders o,
-       JSON_TABLE(
-         o.items, '$[*]'
-         COLUMNS (
-           reference VARCHAR(100) PATH '$.reference',
-           qty       INT          PATH '$.qty'
-         )
-       ) AS jt
-       WHERE o.status NOT IN ('cancelled','annule','annulée')
-         AND jt.reference IS NOT NULL
-         AND jt.reference <> ''
-       GROUP BY jt.reference
+  let salesRows: import("mysql2/promise").RowDataPacket[] = [];
+  try {
+    const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT reference, SUM(total_sold) AS total_sold
+       FROM (
+         SELECT jt.reference, SUM(jt.qty) AS total_sold
+         FROM orders o,
+         JSON_TABLE(
+           o.items, '$[*]'
+           COLUMNS (
+             reference VARCHAR(100) PATH '$.reference',
+             qty       INT          PATH '$.qty'
+           )
+         ) AS jt
+         WHERE o.status NOT IN ('cancelled','annule','annulée')
+           AND jt.reference IS NOT NULL
+           AND jt.reference <> ''
+         GROUP BY jt.reference
 
-       UNION ALL
+         UNION ALL
 
-       SELECT jf.reference, SUM(jf.qty) AS total_sold
-       FROM factures f,
-       JSON_TABLE(
-         f.items, '$[*]'
-         COLUMNS (
-           reference VARCHAR(100) PATH '$.reference',
-           qty       INT          PATH '$.qty'
-         )
-       ) AS jf
-       WHERE f.statut NOT IN ('annule')
-         AND jf.reference IS NOT NULL
-         AND jf.reference <> ''
-       GROUP BY jf.reference
-     ) sales
-     GROUP BY reference
-     ORDER BY total_sold DESC
-     LIMIT 50`
-  );
+         SELECT jf.reference, SUM(jf.qty) AS total_sold
+         FROM factures f,
+         JSON_TABLE(
+           f.items, '$[*]'
+           COLUMNS (
+             reference VARCHAR(100) PATH '$.reference',
+             qty       INT          PATH '$.qty'
+           )
+         ) AS jf
+         WHERE f.statut NOT IN ('annule')
+           AND jf.reference IS NOT NULL
+           AND jf.reference <> ''
+         GROUP BY jf.reference
+       ) sales
+       GROUP BY reference
+       ORDER BY total_sold DESC
+       LIMIT 50`
+    );
+    salesRows = rows;
+  } catch {
+    // JSON_TABLE non supporté sur cette version MySQL — on passe directement au fallback aléatoire
+  }
 
   let products: import("mysql2/promise").RowDataPacket[] = [];
   if (salesRows.length > 0) {
