@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { apiGet } from "@/lib/api";
-import type { Product, Category } from "@/lib/utils";
+import type { Product } from "@/lib/utils";
 import ProductCard from "@/components/ProductCard";
 import HeroSection from "@/components/HeroSection";
 import Newsletter from "@/components/Newsletter";
@@ -9,65 +9,45 @@ import TestimonialsSlider from "@/components/TestimonialsSlider";
 import Link from "next/link";
 import {
   ArrowRight, Star, TrendingUp, Sparkles, Tag,
-  MessageCircle, ChevronRight,
+  MessageCircle, Truck, CreditCard, RefreshCw, ShieldCheck,
 } from "lucide-react";
 
-/* ─── Category emoji map ─── */
-function getCategoryEmoji(nom: string): string {
-  const n = nom.toLowerCase();
-  if (n.includes("caméra") || n.includes("camera") || n.includes("photo")) return "📷";
-  if (n.includes("drone"))                                                    return "🚁";
-  if (n.includes("audio") || n.includes("casque") || n.includes("son"))      return "🎧";
-  if (n.includes("gaming") || n.includes("jeu") || n.includes("console"))    return "🎮";
-  if (n.includes("téléphone") || n.includes("phone") || n.includes("mobile"))return "📱";
-  if (n.includes("télé") || n.includes("tv") || n.includes("écran"))         return "📺";
-  if (n.includes("ordinateur") || n.includes("laptop") || n.includes("pc"))  return "💻";
-  if (n.includes("tablette") || n.includes("tablet"))                        return "📟";
-  if (n.includes("montre") || n.includes("watch"))                           return "⌚";
-  if (n.includes("imprimante") || n.includes("print"))                       return "🖨️";
-  if (n.includes("accessoire"))                                               return "⚡";
-  return "🛍️";
-}
-
-/* ─── Categories row ─── */
-function CategoriesRow({ categories }: { categories: Category[] }) {
-  if (!categories.length) return null;
+/* ─── Trust bar ─── */
+function TrustBar() {
+  const items = [
+    { icon: Truck,       label: "Livraison rapide",        sub: "Lomé & tout le Togo" },
+    { icon: CreditCard,  label: "Paiement à la livraison", sub: "Vous payez à la réception" },
+    { icon: RefreshCw,   label: "Retours acceptés",        sub: "7 jours après réception" },
+    { icon: ShieldCheck, label: "100% authentique",        sub: "Produits vérifiés" },
+  ];
   return (
-    <section className="bg-white py-5 border-b border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-slate-900 text-base sm:text-lg">Catégories</h2>
-          <Link
-            href="/products"
-            className="flex items-center gap-0.5 text-xs font-semibold text-brand-700 hover:text-brand-900 transition-colors"
-          >
-            Tout voir <ChevronRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-        {/* Mobile: horizontal scroll */}
-        <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 sm:grid sm:grid-cols-4 lg:grid-cols-6 sm:gap-3 sm:overflow-visible sm:pb-0">
-          {categories.slice(0, 8).map(cat => (
-            <Link
-              key={cat.id}
-              href={`/products?categorie=${encodeURIComponent(cat.nom)}`}
-              className="flex flex-col items-center gap-2 shrink-0 sm:shrink group"
-            >
-              <div className="w-16 h-16 sm:w-full sm:aspect-square rounded-2xl bg-slate-100 flex items-center justify-center text-2xl group-hover:bg-brand-50 transition-colors">
-                {getCategoryEmoji(cat.nom)}
-              </div>
-              <div className="text-center">
-                <p className="text-[11px] font-bold text-slate-800 leading-tight whitespace-nowrap sm:whitespace-normal">
-                  {cat.nom}
-                </p>
-                {cat.product_count != null && cat.product_count > 0 && (
-                  <p className="text-[10px] text-slate-400 font-medium">{cat.product_count}</p>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
+    <div className="bg-white border-b border-[rgba(20,83,45,0.07)]">
+      {/* Mobile — horizontal scroll */}
+      <div className="flex sm:hidden gap-0 overflow-x-auto scrollbar-none divide-x divide-slate-100">
+        {items.map(({ icon: Icon, label, sub }) => (
+          <div key={label} className="flex flex-col items-center gap-1.5 px-5 py-3.5 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-brand-50 flex items-center justify-center">
+              <Icon className="w-4 h-4 text-brand-700" />
+            </div>
+            <p className="text-[10px] font-bold text-slate-800 leading-tight text-center whitespace-nowrap">{label}</p>
+          </div>
+        ))}
       </div>
-    </section>
+      {/* Desktop */}
+      <div className="hidden sm:grid grid-cols-4 divide-x divide-[rgba(20,83,45,0.06)] max-w-7xl mx-auto px-6 lg:px-8">
+        {items.map(({ icon: Icon, label, sub }) => (
+          <div key={label} className="flex items-center gap-3 px-4 py-4 lg:py-5">
+            <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 lg:w-5 lg:h-5 text-brand-700" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs lg:text-sm font-bold text-slate-900 leading-tight">{label}</p>
+              <p className="text-[10px] lg:text-xs text-slate-500 leading-tight mt-0.5">{sub}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -262,21 +242,18 @@ function Testimonials() {
 
 /* ─── PAGE ─── */
 export default async function HomePage() {
-  let bestsellers: Product[]  = [];
-  let promos:      Product[]  = [];
-  let newItems:    Product[]  = [];
-  let categories:  Category[] = [];
+  let bestsellers: Product[] = [];
+  let promos:      Product[] = [];
+  let newItems:    Product[] = [];
 
-  const [bsRes, promoRes, newRes, catRes] = await Promise.allSettled([
+  const [bsRes, promoRes, newRes] = await Promise.allSettled([
     apiGet<{ data: Product[] }>("/api/products/bestsellers?limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
-    apiGet<{ data: Category[] }>("/api/categories").then(r => r.data),
   ]);
   if (bsRes.status    === "fulfilled") bestsellers = bsRes.value;
   if (promoRes.status === "fulfilled") promos      = promoRes.value;
   if (newRes.status   === "fulfilled") newItems    = newRes.value;
-  if (catRes.status   === "fulfilled") categories  = catRes.value;
   if (bsRes.status    === "rejected")  console.error("[HomePage] bestsellers:", bsRes.reason);
   if (promoRes.status === "rejected")  console.error("[HomePage] promos:",      promoRes.reason);
   if (newRes.status   === "rejected")  console.error("[HomePage] new:",         newRes.reason);
@@ -284,7 +261,7 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection />
-      <CategoriesRow categories={categories} />
+      <TrustBar />
 
       <Section
         title="Meilleures ventes"

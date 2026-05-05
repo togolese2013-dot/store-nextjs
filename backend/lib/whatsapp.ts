@@ -236,6 +236,9 @@ export async function sendOrderNotifications({
       getSetting("site_url"),
     ]);
 
+    console.log(`[WA] sendOrderNotifications — ref=${reference} tel=${telephone}`);
+    console.log(`[WA] settings: clientEnabled=${clientEnabled} adminEnabled=${adminEnabled} clientTemplate=${clientTemplate} adminTemplate=${adminTemplate} adminNumber=${adminNumber} lang=${lang}`);
+
     const languageCode = lang || "fr";
     const baseUrl      = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
 
@@ -246,34 +249,36 @@ export async function sendOrderNotifications({
       return `${qty}x ${name}`;
     }).join("\n");
 
-    const totalStr   = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
+    const totalStr    = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
     const trackingUrl = `${baseUrl}/suivi-commande?ref=${encodeURIComponent(reference)}`;
     const adminUrl    = `${baseUrl}/admin/orders`;
 
     // Client
     if (clientEnabled === "1" && clientTemplate && telephone) {
+      console.log(`[WA] Sending client notif to ${telephone} via template "${clientTemplate}"`);
       const result = await sendWaTemplate({
         to:           telephone,
         templateName: clientTemplate,
         languageCode,
         bodyParams:   [reference, nom, articlesStr, totalStr, trackingUrl],
       });
-      if (!result.success) {
-        console.error(`[WA] Client notif failed (${reference}):`, result.error);
-      }
+      console.log(`[WA] Client notif result (${reference}):`, result);
+    } else {
+      console.log(`[WA] Client notif SKIPPED — enabled=${clientEnabled} template="${clientTemplate}" tel="${telephone}"`);
     }
 
     // Admin
     if (adminEnabled === "1" && adminTemplate && adminNumber) {
+      console.log(`[WA] Sending admin notif to ${adminNumber} via template "${adminTemplate}"`);
       const result = await sendWaTemplate({
         to:           adminNumber,
         templateName: adminTemplate,
         languageCode,
         bodyParams:   [reference, nom, telephone, articlesStr, totalStr, adminUrl],
       });
-      if (!result.success) {
-        console.error(`[WA] Admin notif failed (${reference}):`, result.error);
-      }
+      console.log(`[WA] Admin notif result (${reference}):`, result);
+    } else {
+      console.log(`[WA] Admin notif SKIPPED — enabled=${adminEnabled} template="${adminTemplate}" number="${adminNumber}"`);
     }
   } catch (e) {
     console.error("[WA] sendOrderNotifications error:", e);
