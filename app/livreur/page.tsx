@@ -8,6 +8,7 @@ import {
 
 interface DeliveryOrder {
   id:               number;
+  source:           "order" | "livraison";
   reference:        string;
   nom:              string;
   telephone:        string;
@@ -54,8 +55,9 @@ function AvailableCard({ order, onAccept }: { order: DeliveryOrder; onAccept: ()
 
   async function accept() {
     setLoading(true);
+    const src = order.source === "livraison" ? "?src=livraison" : "";
     try {
-      const res = await fetch(`/api/livreur/orders/${order.id}/accept`, { method: "PATCH" });
+      const res = await fetch(`/api/livreur/orders/${order.id}/accept${src}`, { method: "PATCH" });
       if (res.ok) { setDone(true); setTimeout(onAccept, 600); }
     } finally { setLoading(false); }
   }
@@ -71,10 +73,15 @@ function AvailableCard({ order, onAccept }: { order: DeliveryOrder; onAccept: ()
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <p className="font-bold text-slate-900 text-sm">{order.nom || "Client"}</p>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <p className="font-bold text-slate-900 text-sm">{order.nom || "Client"}</p>
+              {order.source === "livraison" && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-600">Boutique</span>
+              )}
+            </div>
             <p className="text-xs text-slate-400">{order.reference} · {timeAgo(order.created_at)}</p>
           </div>
-          <span className="text-sm font-bold text-green-600">{order.delivery_fee?.toLocaleString()} FCFA</span>
+          <span className="text-sm font-bold text-green-600">{(order.delivery_fee || order.total)?.toLocaleString()} FCFA</span>
         </div>
 
         <div className="space-y-1.5 mb-4">
@@ -122,8 +129,9 @@ function ActiveCard({ order, onAction }: { order: DeliveryOrder; onAction: () =>
 
   async function deliver() {
     setLoadingDeliver(true);
+    const src = order.source === "livraison" ? "?src=livraison" : "";
     try {
-      const res = await fetch(`/api/livreur/orders/${order.id}/deliver`, { method: "PATCH" });
+      const res = await fetch(`/api/livreur/orders/${order.id}/deliver${src}`, { method: "PATCH" });
       if (res.ok) setTimeout(onAction, 400);
     } finally { setLoadingDeliver(false); }
   }
@@ -131,8 +139,9 @@ function ActiveCard({ order, onAction }: { order: DeliveryOrder; onAction: () =>
   async function fail() {
     if (!failNote.trim()) return;
     setLoadingFail(true);
+    const src = order.source === "livraison" ? "?src=livraison" : "";
     try {
-      const res = await fetch(`/api/livreur/orders/${order.id}/fail`, {
+      const res = await fetch(`/api/livreur/orders/${order.id}/fail${src}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ note: failNote }),
