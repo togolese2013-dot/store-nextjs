@@ -41,7 +41,6 @@ router.post("/api/admin/orders", async (req, res) => {
   const subtotal = items.reduce((s: number, i: { total: number }) => s + i.total, 0);
   const total    = subtotal + Number(delivery_fee ?? 0);
   const id = await createOrder({ nom, telephone, adresse, zone_livraison, delivery_fee: Number(delivery_fee ?? 0), note, items, subtotal, total });
-  await ensureOrderVente(id);
   await addOrderEvent(id, "pending", "Commande créée par l'admin", session.nom);
 
   const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
@@ -77,6 +76,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     await addOrderEvent(id, status, note ?? "", session.nom);
     if (["delivered", "livree", "livrée", "livre", "livré"].includes(String(status))) {
       await applyOrderDeliveredEffects(id, session.nom);
+      await ensureOrderVente(id);
       emitAdminEvent("stock");
     }
     emitAdminEvent("commande");
