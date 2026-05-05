@@ -2351,7 +2351,7 @@ export async function getVentesStats(): Promise<{
   rentrees_jour: number;
 }> {
   const SITE_ORDER_FILTER = "(source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))";
-  const [[f], [l], [ca], [fp], [tj], [cj], [dj], [rj]] = await Promise.all([
+  const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE ${SITE_ORDER_FILTER}`),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
     db.execute<mysql.RowDataPacket[]>(`
@@ -2370,16 +2370,23 @@ export async function getVentesStats(): Promise<{
     // Commandes en ligne livrées aujourd'hui
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(total), 0) AS montant FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
-    ),
-    // Dépenses aujourd'hui (finance_entries)
-    db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'depense' AND DATE(date_entree) = CURDATE()`
-    ),
-    // Rentrées aujourd'hui (finance_entries)
-    db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'rentree' AND DATE(date_entree) = CURDATE()`
-    ),
+    ).catch(() => [[{ montant: 0 }]] as [mysql.RowDataPacket[]]),
   ]);
+
+  // Finance queries are optional — table may not exist yet on fresh DBs
+  let depenses_jour = 0;
+  let rentrees_jour = 0;
+  try {
+    const [[dj]] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'depense' AND DATE(date_entree) = CURDATE()`
+    );
+    const [[rj]] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'rentree' AND DATE(date_entree) = CURDATE()`
+    );
+    depenses_jour = Number((dj as mysql.RowDataPacket)?.montant ?? 0);
+    rentrees_jour = Number((rj as mysql.RowDataPacket)?.montant ?? 0);
+  } catch { /* finance_entries table not yet created */ }
+
   return {
     factures:               Number((f  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     livraisons:             Number((l  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
@@ -2388,8 +2395,8 @@ export async function getVentesStats(): Promise<{
     ventes_jour_montant:    Number((tj as mysql.RowDataPacket[])[0]?.montant ?? 0),
     ventes_jour_count:      Number((tj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     commandes_livrees_jour: Number((cj as mysql.RowDataPacket[])[0]?.montant ?? 0),
-    depenses_jour:          Number((dj as mysql.RowDataPacket[])[0]?.montant ?? 0),
-    rentrees_jour:          Number((rj as mysql.RowDataPacket[])[0]?.montant ?? 0),
+    depenses_jour,
+    rentrees_jour,
   };
 }
 
