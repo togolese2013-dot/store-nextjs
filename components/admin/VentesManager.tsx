@@ -8,7 +8,7 @@ import {
   X, Check, AlertTriangle, Pencil,
   CreditCard, Banknote, Smartphone, Building2, Package,
   ShoppingCart, Minus, MapPin, UserCheck,
-  Warehouse, ArrowDownCircle, ArrowUpCircle, DollarSign,
+  Warehouse, DollarSign,
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import type { Facture, Livraison, BoutiqueStockItem } from "@/lib/admin-db";
@@ -19,6 +19,7 @@ import { formatPrice } from "@/lib/utils";
 interface Stats {
   factures: number; livraisons: number; ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
+  commandes_livrees_jour: number; depenses_jour: number; rentrees_jour: number;
   total_recettes: number; total_depenses: number; solde_net: number;
   stock_produits: number; stock_epuises: number;
 }
@@ -483,7 +484,7 @@ export default function VentesManager({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Produits en stock */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-2">
+          <div className="flex items-start justify-between mb-1">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Produits en stock</p>
             <Warehouse className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
@@ -497,7 +498,7 @@ export default function VentesManager({
 
         {/* Ventes aujourd'hui */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-2">
+          <div className="flex items-start justify-between mb-1">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ventes aujourd'hui</p>
             <ShoppingCart className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
@@ -510,45 +511,41 @@ export default function VentesManager({
           </span>
         </div>
 
-        {/* Revenu */}
+        {/* Revenu du jour */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-2">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Revenu</p>
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Revenu du jour</p>
             <DollarSign className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">
-            {new Intl.NumberFormat("fr-FR").format(stats.total_recettes)}{" "}
+          {(() => {
+            const revenu = stats.ventes_jour_montant + stats.commandes_livrees_jour + stats.rentrees_jour - stats.depenses_jour;
+            return (
+              <>
+                <p className={`text-2xl font-bold tabular-nums ${revenu >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                  {new Intl.NumberFormat("fr-FR").format(revenu)}{" "}
+                  <span className="text-sm font-semibold text-emerald-500">FCFA</span>
+                </p>
+                <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-100">
+                  Commandes : +{new Intl.NumberFormat("fr-FR").format(stats.commandes_livrees_jour)}
+                </span>
+              </>
+            );
+          })()}
+        </div>
+
+        {/* Solde total caisse */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Solde Caisse</p>
+            <TrendingUp className="w-8 h-8 text-slate-400 opacity-30" />
+          </div>
+          <p className={`text-2xl font-bold tabular-nums ${stats.solde_net >= 0 ? "text-slate-900" : "text-red-600"}`}>
+            {new Intl.NumberFormat("fr-FR").format(stats.solde_net)}{" "}
             <span className="text-sm font-semibold text-emerald-500">FCFA</span>
           </p>
-          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-100">
-            Solde : {new Intl.NumberFormat("fr-FR").format(stats.solde_net)} FCFA
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+            Toutes caisses
           </span>
-        </div>
-
-        {/* Rentrées */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-2">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rentrées</p>
-            <ArrowDownCircle className="w-8 h-8 text-slate-400 opacity-30" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">
-            {new Intl.NumberFormat("fr-FR").format(stats.total_recettes)}{" "}
-            <span className="text-sm font-semibold text-cyan-500">FCFA</span>
-          </p>
-        </div>
-      </div>
-
-      {/* Dépenses — ligne séparée */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-2">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dépenses</p>
-            <ArrowUpCircle className="w-8 h-8 text-slate-400 opacity-30" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">
-            {new Intl.NumberFormat("fr-FR").format(stats.total_depenses)}{" "}
-            <span className="text-sm font-semibold text-red-500">FCFA</span>
-          </p>
         </div>
       </div>
 

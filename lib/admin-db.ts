@@ -2341,9 +2341,12 @@ export async function getVentesStats(): Promise<{
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
+  commandes_livrees_jour: number;
+  depenses_jour: number;
+  rentrees_jour: number;
 }> {
   const SITE_ORDER_FILTER = "(source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))";
-  const [[f], [l], [ca], [fp], [tj]] = await Promise.all([
+  const [[f], [l], [ca], [fp], [tj], [cj], [dj], [rj]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE ${SITE_ORDER_FILTER}`),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
     db.execute<mysql.RowDataPacket[]>(`
@@ -2359,14 +2362,29 @@ export async function getVentesStats(): Promise<{
       SELECT COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS montant
       FROM factures
       WHERE DATE(created_at) = CURDATE() AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
+    // Commandes en ligne livrées aujourd'hui
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(total), 0) AS montant FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+    ),
+    // Dépenses aujourd'hui (finance_entries)
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'depense' AND DATE(date_entree) = CURDATE()`
+    ),
+    // Rentrées aujourd'hui (finance_entries)
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'rentree' AND DATE(date_entree) = CURDATE()`
+    ),
   ]);
   return {
-    factures:            Number((f  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
-    livraisons:          Number((l  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
-    ca_total:            Number((ca as mysql.RowDataPacket[])[0]?.total   ?? 0),
-    factures_payees:     Number((fp as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
-    ventes_jour_montant: Number((tj as mysql.RowDataPacket[])[0]?.montant ?? 0),
-    ventes_jour_count:   Number((tj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    factures:               Number((f  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    livraisons:             Number((l  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    ca_total:               Number((ca as mysql.RowDataPacket[])[0]?.total   ?? 0),
+    factures_payees:        Number((fp as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    ventes_jour_montant:    Number((tj as mysql.RowDataPacket[])[0]?.montant ?? 0),
+    ventes_jour_count:      Number((tj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    commandes_livrees_jour: Number((cj as mysql.RowDataPacket[])[0]?.montant ?? 0),
+    depenses_jour:          Number((dj as mysql.RowDataPacket[])[0]?.montant ?? 0),
+    rentrees_jour:          Number((rj as mysql.RowDataPacket[])[0]?.montant ?? 0),
   };
 }
 
