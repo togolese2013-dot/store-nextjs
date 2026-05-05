@@ -87,7 +87,7 @@ export default function ProductCard({ product, className, floatingCart = false }
     >
       {/* ── Image ── */}
       <Link href={`/products/${product.id}`} className="block relative" tabIndex={-1}>
-        <div className="relative overflow-hidden bg-[#f8fafb] aspect-[4/3]">
+        <div className="relative overflow-hidden bg-[#f8fafb] aspect-square">
 
           {/* Skeleton */}
           {!imgOk && !imgErr && (
@@ -188,40 +188,43 @@ export default function ProductCard({ product, className, floatingCart = false }
         {/* Rating */}
         <RatingBadge productId={product.id} />
 
-        {/* Prix */}
-        <div className="flex items-baseline gap-1.5 mt-1.5 mb-3">
-          <span className={clsx(
-            "font-display font-bold text-[15px] tracking-tight",
-            isPromo ? "text-accent-600" : "text-slate-900"
-          )}>
-            {formatPrice(price)}
-          </span>
-          {isPromo && (
-            <span className="text-[11px] text-slate-400 line-through">
-              {formatPrice(product.prix_unitaire)}
+        {/* Prix + bouton panier */}
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          <div className="flex flex-col min-w-0">
+            <span className={clsx(
+              "font-display font-bold text-[15px] tracking-tight leading-tight",
+              isPromo ? "text-accent-600" : "text-slate-900"
+            )}>
+              {formatPrice(price)}
             </span>
+            {isPromo && (
+              <span className="text-[10px] text-slate-400 line-through leading-tight">
+                {formatPrice(product.prix_unitaire)}
+              </span>
+            )}
+          </div>
+
+          {!floatingCart && (
+            <button
+              onClick={handleAdd}
+              disabled={outOf}
+              aria-label={outOf ? "Indisponible" : added ? "Ajouté" : "Ajouter au panier"}
+              className={clsx(
+                "shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90",
+                outOf
+                  ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                  : added
+                    ? "bg-green-500 text-white shadow-[0_4px_10px_rgba(34,197,94,0.35)]"
+                    : "bg-brand-900 text-white hover:bg-brand-800 shadow-[0_4px_10px_rgba(20,83,45,0.22)]"
+              )}
+            >
+              {added
+                ? <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 13l4 4L19 7"/></svg>
+                : <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              }
+            </button>
           )}
         </div>
-
-        {/* Bouton panier (non-floating) */}
-        {!floatingCart && (
-          <button
-            onClick={handleAdd}
-            disabled={outOf}
-            className={clsx(
-              "w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl transition-all duration-200",
-              "font-sans text-xs font-semibold",
-              outOf
-                ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                : added
-                  ? "bg-green-500 text-white"
-                  : "bg-brand-900 text-white hover:bg-brand-800 active:scale-95 shadow-[0_4px_12px_rgba(20,83,45,0.2)]"
-            )}
-          >
-            <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-            {outOf ? "Indisponible" : added ? "Ajouté ✓" : "Ajouter au panier"}
-          </button>
-        )}
       </div>
     </article>
   );

@@ -26,6 +26,7 @@ export interface Category {
   id: number;
   nom: string;
   description: string | null;
+  product_count?: number;
 }
 
 export type RelatedProductType = "similaire" | "complementaire" | "upsell";

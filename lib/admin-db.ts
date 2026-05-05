@@ -930,7 +930,7 @@ export async function addOrderEvent(
 
 export async function getOrderEvents(order_id: number): Promise<OrderEvent[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT * FROM order_events WHERE order_id = ? ORDER BY created_at ASC",
+    "SELECT * FROM order_events WHERE order_id = ? AND status NOT IN ('stock_boutique', 'finance') ORDER BY created_at ASC",
     [order_id]
   );
   return rows as OrderEvent[];

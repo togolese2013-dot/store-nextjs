@@ -452,7 +452,11 @@ export async function getProductStatusCounts(): Promise<{
 
 export async function getCategories(): Promise<Category[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, description FROM categories ORDER BY nom ASC"
+    `SELECT c.id, c.nom, c.description, COUNT(p.id) AS product_count
+     FROM categories c
+     LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
+     GROUP BY c.id, c.nom, c.description
+     ORDER BY product_count DESC`
   );
   return rows as Category[];
 }

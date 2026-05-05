@@ -256,7 +256,7 @@ export async function sendOrderNotifications({
         to:           telephone,
         templateName: clientTemplate,
         languageCode,
-        bodyParams:   [nom, reference, articlesStr, totalStr, trackingUrl],
+        bodyParams:   [reference, nom, articlesStr, totalStr, trackingUrl],
       });
       if (!result.success) {
         console.error(`[WA] Client notif failed (${reference}):`, result.error);

@@ -88,6 +88,16 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     await ensurePaymentColumn();
     const { payment_status } = req.body;
     await updateOrderFields(id, { statut_paiement: payment_status });
+    // Sync linked boutique facture
+    const [[orderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+      "SELECT vente_facture_id FROM orders WHERE id = ? LIMIT 1", [id]
+    );
+    if (orderRow?.vente_facture_id) {
+      await (db as mysql.Pool).execute(
+        "UPDATE factures SET statut_paiement = ? WHERE id = ?",
+        [payment_status, orderRow.vente_facture_id]
+      );
+    }
     if (payment_status === "paye") {
       await applyOrderPaidEffects(id, session.nom);
       emitAdminEvent("finance");
@@ -100,6 +110,16 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
   if (req.body.field === "confirm_mm") {
     await ensurePaymentColumn();
     await updateOrderFields(id, { statut_paiement: "paye" });
+    // Sync linked boutique facture
+    const [[mmOrderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+      "SELECT vente_facture_id FROM orders WHERE id = ? LIMIT 1", [id]
+    );
+    if (mmOrderRow?.vente_facture_id) {
+      await (db as mysql.Pool).execute(
+        "UPDATE factures SET statut_paiement = ? WHERE id = ?",
+        ["paye", mmOrderRow.vente_facture_id]
+      );
+    }
     await applyOrderPaidEffects(id, session.nom);
     await addOrderEvent(id, "confirmée", "Paiement Mobile Money vérifié et confirmé", session.nom);
     emitAdminEvent("finance");

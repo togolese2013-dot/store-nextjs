@@ -57,7 +57,6 @@ async function loadBestsellerProducts(limit: number) {
        LEFT JOIN categories c ON c.id = p.categorie_id
        WHERE p.reference IN (${placeholders})
          AND p.actif = 1
-         AND COALESCE(p.stock_boutique, 0) > 0
        LIMIT 50`,
       refs
     );
@@ -82,7 +81,6 @@ async function loadBestsellerProducts(limit: number) {
        FROM produits p
        LEFT JOIN categories c ON c.id = p.categorie_id
        WHERE p.actif = 1
-         AND COALESCE(p.stock_boutique, 0) > 0
        ORDER BY RAND()
        LIMIT ?`,
       [needed + 10]

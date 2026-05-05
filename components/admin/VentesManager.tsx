@@ -580,7 +580,11 @@ export default function VentesManager({
                     const l = row as Livraison;
 
                     return (
-                      <tr key={row.id} className="hover:bg-slate-50 transition-colors group">
+                      <tr
+                        key={row.id}
+                        className={`hover:bg-slate-50 transition-colors group ${isVente ? "cursor-pointer" : ""}`}
+                        onClick={isVente ? () => handleView(f) : undefined}
+                      >
                         {/* Date + heure */}
                         <td className="px-5 py-4 text-slate-500 text-xs hidden sm:table-cell">
                           {formatDate(row.created_at)}
@@ -636,7 +640,7 @@ export default function VentesManager({
                         )}
                         {isLivraison && <td className="hidden lg:table-cell" />}
 
-                        <td className="px-5 py-4">
+                        <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             {isVente && <button onClick={() => handleView(f)} title="Voir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>}
                             {isVente && <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>}
