@@ -103,18 +103,18 @@ router.get("/api/livreur/stats", async (req, res) => {
       `SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre'`, [id]
     );
 
-    const today   = Number(todayOrders[0]?.cnt ?? 0)   + Number(todayLiv[0]?.cnt ?? 0);
-    const week    = Number(weekOrders[0]?.cnt ?? 0)    + Number(weekLiv[0]?.cnt ?? 0);
-    const total   = Number(totalOrders[0]?.cnt ?? 0)   + Number(totalLiv[0]?.cnt ?? 0);
-    const enCours = Number(enCoursOrders[0]?.cnt ?? 0) + Number(enCoursLiv[0]?.cnt ?? 0);
-    const assigned = Number(totalAssignedOrders[0]?.cnt ?? 0) + Number(totalAssignedLiv[0]?.cnt ?? 0);
+    const today   = Number(todayOrders?.cnt   ?? 0) + Number(todayLiv?.cnt   ?? 0);
+    const week    = Number(weekOrders?.cnt    ?? 0) + Number(weekLiv?.cnt    ?? 0);
+    const total   = Number(totalOrders?.cnt   ?? 0) + Number(totalLiv?.cnt   ?? 0);
+    const enCours = Number(enCoursOrders?.cnt ?? 0) + Number(enCoursLiv?.cnt ?? 0);
+    const assigned = Number(totalAssignedOrders?.cnt ?? 0) + Number(totalAssignedLiv?.cnt ?? 0);
     const tauxReussite = assigned > 0 ? Math.round((total / assigned) * 100) : 0;
 
     res.json({
       today, week, total, enCours, tauxReussite,
-      gainToday: Number(gainTodayRow[0]?.gain ?? 0),
-      gainWeek:  Number(gainWeekRow[0]?.gain  ?? 0),
-      gainTotal: Number(gainTotalRow[0]?.gain  ?? 0),
+      gainToday: Number(gainTodayRow?.gain ?? 0),
+      gainWeek:  Number(gainWeekRow?.gain  ?? 0),
+      gainTotal: Number(gainTotalRow?.gain  ?? 0),
     });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -275,7 +275,8 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
   try {
     if (src === "livraison") {
       const [[row]] = await pool.execute<mysql.RowDataPacket[]>(
-        "SELECT id, livreur_id FROM livraisons_ventes WHERE id = ? LIMIT 1", [entityId]
+        "SELECT lv.id, lv.livreur_id, lv.facture_id, f.total, f.mode_paiement, f.statut_paiement FROM livraisons_ventes lv LEFT JOIN factures f ON f.id = lv.facture_id WHERE lv.id = ? LIMIT 1",
+        [entityId]
       );
       if (!row) return res.status(404).json({ error: "Livraison introuvable." });
       if (Number(row.livreur_id) !== ctx.member.id) {
@@ -285,13 +286,23 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
         "UPDATE livraisons_ventes SET statut = 'livre', livree_le = NOW() WHERE id = ?",
         [entityId]
       );
-      // Mark the linked facture as paid if not already
-      await pool.execute(
-        `UPDATE factures SET statut = 'paye', statut_paiement = 'paye_total'
-         WHERE id = (SELECT facture_id FROM livraisons_ventes WHERE id = ?)
-           AND statut != 'annule' AND statut_paiement != 'paye_total'`,
-        [entityId]
-      );
+      // Mark the linked facture as paid if not already, then record in caisse
+      if (row.facture_id && row.statut_paiement !== "paye_total") {
+        await pool.execute(
+          `UPDATE factures SET statut = 'paye', statut_paiement = 'paye_total'
+           WHERE id = ? AND statut != 'annule'`,
+          [row.facture_id]
+        );
+        const modePaiement = row.mode_paiement || "especes";
+        const montant = Number(row.total ?? 0);
+        if (montant > 0) {
+          await pool.execute(
+            `INSERT INTO finance_entries (type, montant, mode_paiement, description, date_entree)
+             VALUES ('vente', ?, ?, ?, NOW())`,
+            [montant, modePaiement, `Livraison confirmée — facture #${row.facture_id}`]
+          );
+        }
+      }
     } else {
       const [[order]] = await pool.execute<mysql.RowDataPacket[]>(
         "SELECT id, livreur_id FROM orders WHERE id = ? LIMIT 1", [entityId]
