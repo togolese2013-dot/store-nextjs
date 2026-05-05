@@ -242,12 +242,11 @@ export async function sendOrderNotifications({
     const languageCode = lang || "fr";
     const baseUrl      = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
 
-    // One product per line for readable WhatsApp templates.
     const articlesStr = items.map(item => {
       const name = item.nom || item.nom_produit || "Produit";
       const qty  = item.qty ?? item.quantite ?? 1;
       return `${qty}x ${name}`;
-    }).join("\n");
+    }).join(", ");
 
     const totalStr    = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
     const trackingUrl = `${baseUrl}/suivi-commande?ref=${encodeURIComponent(reference)}`;
