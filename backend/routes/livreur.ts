@@ -35,6 +35,24 @@ async function requireLivreur(req: express.Request, res: express.Response) {
   return null;
 }
 
+// ── Profile ───────────────────────────────────────────────────────────────────
+router.get("/api/livreur/profile", async (req, res) => {
+  const ctx = await requireLivreur(req, res);
+  if (!ctx) return;
+  try {
+    const member = await getUtilisateurById(ctx.member.id);
+    if (member) {
+      res.json({ nom: member.nom, telephone: member.telephone, numero_plaque: member.numero_plaque, poste: member.poste });
+    } else {
+      const { getAdminById } = await import("@/lib/admin-db");
+      const admin = await getAdminById(ctx.member.id);
+      res.json({ nom: admin?.nom ?? ctx.member.nom, telephone: admin?.telephone ?? null, numero_plaque: null, poste: "Livreur" });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 // ── Stats ─────────────────────────────────────────────────────────────────────
 router.get("/api/livreur/stats", async (req, res) => {
   const ctx = await requireLivreur(req, res);
@@ -74,6 +92,17 @@ router.get("/api/livreur/stats", async (req, res) => {
       `SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ?`, [id]
     );
 
+    // Gains today (delivery_fee from orders)
+    const [[gainTodayRow]] = await pool.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND DATE(updated_at) = CURDATE()`, [id]
+    );
+    const [[gainWeekRow]] = await pool.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [id]
+    );
+    const [[gainTotalRow]] = await pool.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre'`, [id]
+    );
+
     const today   = Number(todayOrders[0]?.cnt ?? 0)   + Number(todayLiv[0]?.cnt ?? 0);
     const week    = Number(weekOrders[0]?.cnt ?? 0)    + Number(weekLiv[0]?.cnt ?? 0);
     const total   = Number(totalOrders[0]?.cnt ?? 0)   + Number(totalLiv[0]?.cnt ?? 0);
@@ -81,7 +110,12 @@ router.get("/api/livreur/stats", async (req, res) => {
     const assigned = Number(totalAssignedOrders[0]?.cnt ?? 0) + Number(totalAssignedLiv[0]?.cnt ?? 0);
     const tauxReussite = assigned > 0 ? Math.round((total / assigned) * 100) : 0;
 
-    res.json({ today, week, total, enCours, tauxReussite });
+    res.json({
+      today, week, total, enCours, tauxReussite,
+      gainToday: Number(gainTodayRow[0]?.gain ?? 0),
+      gainWeek:  Number(gainWeekRow[0]?.gain  ?? 0),
+      gainTotal: Number(gainTotalRow[0]?.gain  ?? 0),
+    });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
