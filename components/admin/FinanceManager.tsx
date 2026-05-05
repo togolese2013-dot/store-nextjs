@@ -17,7 +17,8 @@ function fmtNum(n: number) {
 }
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR");
+  const dt = new Date(d);
+  return dt.toLocaleDateString("fr-FR") + " " + dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
 // ─── Mode paiement config ─────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ function StatCard({
 }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-1">
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight">{title}</p>
         <Icon className={`w-8 h-8 ${iconColor} opacity-20`} />
       </div>
@@ -84,7 +85,6 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
   const [modePaiement, setModePaiement] = useState<ModePaiement>(
     (entry?.mode_paiement as ModePaiement) ?? "especes"
   );
-  const [categorie,   setCategorie]   = useState(entry?.categorie   ?? "");
   const [description, setDescription] = useState(entry?.description ?? "");
   const [montant,     setMontant]     = useState(entry ? String(entry.montant) : "");
   const [saving,      setSaving]      = useState(false);
@@ -105,7 +105,6 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
       const body = {
         type:          modalType,
         mode_paiement: modePaiement,
-        categorie:     categorie  || null,
         description:   description || null,
         montant:       Number(montant),
         date_entree:   new Date().toISOString().slice(0, 10),
@@ -166,14 +165,6 @@ function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant (FCFA) *</label>
             <input type="number" min="0" step="1" value={montant}
               onChange={e => setMontant(e.target.value)} required placeholder="0"
-              className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
-          </div>
-
-          {/* Catégorie */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Catégorie</label>
-            <input value={categorie} onChange={e => setCategorie(e.target.value)}
-              placeholder={isDepense ? "Ex: Achat matériel, Loyer…" : "Ex: Acompte client, Prestation…"}
               className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
           </div>
 
@@ -408,7 +399,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
         : item.type === "rentree";
     const matchSearch = !search
       || item.reference.toLowerCase().includes(search.toLowerCase())
-      || (item.categorie ?? "").toLowerCase().includes(search.toLowerCase())
       || (item.description ?? "").toLowerCase().includes(search.toLowerCase());
     return matchTab && matchSearch;
   });
@@ -532,7 +522,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
                   {tab === "transfert" && (
                     <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Source → Destination</th>
                   )}
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Catégorie</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider hidden md:table-cell">Description</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider hidden lg:table-cell">Utilisateur</th>
                   <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Montant</th>
@@ -564,14 +553,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
                         </span>
                       </td>
                     )}
-                    <td className="px-5 py-4">
-                      {item.categorie
-                        ? <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                            {item.categorie}
-                          </span>
-                        : <span className="text-slate-300">—</span>
-                      }
-                    </td>
                     <td className="px-5 py-4 text-slate-500 max-w-[200px] truncate text-xs hidden md:table-cell">
                       {item.description ?? <span className="text-slate-300">—</span>}
                     </td>

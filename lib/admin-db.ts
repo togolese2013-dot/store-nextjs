@@ -2190,6 +2190,12 @@ async function financeEntrieCols() {
     try { await db.execute("ALTER TABLE finance_entries ADD COLUMN compte_destination VARCHAR(30) NULL"); } catch { /* already exists */ }
     names.add("compte_destination");
   }
+  // Ensure 'transfert' is in the type ENUM (older DBs may be missing it)
+  try {
+    await db.execute(
+      `ALTER TABLE finance_entries MODIFY COLUMN type ENUM('caisse','depense','rentree','vente','transfert') NOT NULL`
+    );
+  } catch { /* already correct or DB doesn't support */ }
   _finCols = {
     mode_paiement:      names.has("mode_paiement"),
     admin_id:           names.has("admin_id"),
@@ -2201,20 +2207,18 @@ async function financeEntrieCols() {
 export async function getFinanceStats(): Promise<FinanceStats> {
   const cols = await financeEntrieCols();
 
-  const [[totals], modesRaw, transfersOut, transfersIn] = await Promise.all([
-    // Recettes = caisse + rentree only (no vente, no transfert)
-    db.query<mysql.RowDataPacket[]>(
-      `SELECT
-         SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
-         SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
-       FROM finance_entries`
-    ),
-    // Account balances from regular entries
+  const [netRows, transfersOut, transfersIn, summaryRow] = await Promise.all([
+    // NET balance per account: ventes+rentrees+caisse as credits, depenses as debits
     cols.mode_paiement
       ? db.query<mysql.RowDataPacket[]>(
-          `SELECT mode_paiement, SUM(montant) AS total
+          `SELECT mode_paiement,
+                  SUM(CASE
+                    WHEN type IN ('caisse','rentree','vente') THEN montant
+                    WHEN type = 'depense' THEN -montant
+                    ELSE 0
+                  END) AS net
            FROM finance_entries
-           WHERE type IN ('caisse','rentree')
+           WHERE type != 'transfert'
            GROUP BY mode_paiement`
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),
@@ -2234,33 +2238,41 @@ export async function getFinanceStats(): Promise<FinanceStats> {
            GROUP BY compte_destination`
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),
+    // Summary totals (manual entries only, not ventes)
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT
+         SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
+         SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
+       FROM finance_entries`
+    ).then(([[row]]) => row as mysql.RowDataPacket),
   ]);
 
   const modeMap: Record<string, number> = {};
-  (modesRaw as mysql.RowDataPacket[]).forEach(r => {
-    if (r.mode_paiement) modeMap[r.mode_paiement as string] = Number(r.total ?? 0);
+  netRows.forEach(r => {
+    if (r.mode_paiement) modeMap[r.mode_paiement as string] = Number(r.net ?? 0);
   });
   // Apply transfer debits
-  (transfersOut as mysql.RowDataPacket[]).forEach(r => {
+  transfersOut.forEach(r => {
     if (r.mode_paiement) modeMap[r.mode_paiement as string] = (modeMap[r.mode_paiement as string] ?? 0) - Number(r.total ?? 0);
   });
   // Apply transfer credits
-  (transfersIn as mysql.RowDataPacket[]).forEach(r => {
+  transfersIn.forEach(r => {
     if (r.mode_paiement) modeMap[r.mode_paiement as string] = (modeMap[r.mode_paiement as string] ?? 0) + Number(r.total ?? 0);
   });
 
-  const r        = (totals as mysql.RowDataPacket[])[0];
-  const recettes = Number(r?.recettes ?? 0);
-  const depenses = Number(r?.depenses ?? 0);
+  const especes           = modeMap["especes"]           ?? 0;
+  const moov_money        = modeMap["moov_money"]        ?? 0;
+  const tmoney            = modeMap["tmoney"]            ?? 0;
+  const virement_bancaire = modeMap["virement_bancaire"] ?? 0;
 
   return {
-    total_recettes:    recettes,
-    total_depenses:    depenses,
-    solde_net:         recettes - depenses,
-    especes:           modeMap["especes"]           ?? 0,
-    moov_money:        modeMap["moov_money"]        ?? 0,
-    tmoney:            modeMap["tmoney"]             ?? 0,
-    virement_bancaire: modeMap["virement_bancaire"] ?? 0,
+    total_recettes:    Number(summaryRow?.recettes ?? 0),
+    total_depenses:    Number(summaryRow?.depenses ?? 0),
+    solde_net:         especes + moov_money + tmoney + virement_bancaire,
+    especes,
+    moov_money,
+    tmoney,
+    virement_bancaire,
   };
 }
 
