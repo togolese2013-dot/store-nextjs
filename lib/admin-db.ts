@@ -1661,6 +1661,7 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   const params: (string | number | boolean | null | Buffer)[] = [];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
+  conditions.push("(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))");
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
