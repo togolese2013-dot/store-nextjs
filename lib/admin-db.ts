@@ -2249,8 +2249,9 @@ export async function getVentesStats(): Promise<{
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
 }> {
+  const SITE_ORDER_FILTER = "(source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))";
   const [[f], [l], [ca], [fp]] = await Promise.all([
-    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures"),
+    db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE ${SITE_ORDER_FILTER}`),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
     db.execute<mysql.RowDataPacket[]>(`
       SELECT COALESCE(SUM(
@@ -2259,8 +2260,8 @@ export async function getVentesStats(): Promise<{
           WHEN statut_paiement = 'acompte' THEN COALESCE(montant_acompte, 0)
           ELSE 0
         END
-      ), 0) AS total FROM factures WHERE statut != 'annule'`),
-    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM factures WHERE statut = 'paye'"),
+      ), 0) AS total FROM factures WHERE statut != 'annule' AND ${SITE_ORDER_FILTER}`),
+    db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE statut = 'paye' AND ${SITE_ORDER_FILTER}`),
   ]);
   return {
     factures:       Number((f  as mysql.RowDataPacket[])[0]?.cnt   ?? 0),
