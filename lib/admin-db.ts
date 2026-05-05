@@ -2707,7 +2707,7 @@ async function ensureLivraisonCols(): Promise<void> {
   } catch { /* column already exists */ }
   // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id
   try {
-    await db.execute("ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibkf_2");
+    await db.execute("ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibfk_2");
   } catch { /* FK already dropped or doesn't exist */ }
 }
 
