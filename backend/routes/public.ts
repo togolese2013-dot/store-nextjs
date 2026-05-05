@@ -16,6 +16,7 @@ async function loadBestsellerProducts(limit: number) {
       `SELECT produit_id, SUM(quantite) AS total_sold
        FROM boutique_mouvements
        WHERE type = 'sortie'
+         AND motif IN ('Vente', 'Commande site livrée')
        GROUP BY produit_id
        ORDER BY total_sold DESC
        LIMIT 50`
