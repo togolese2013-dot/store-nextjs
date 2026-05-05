@@ -51,33 +51,35 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
     >
-      {/* ── Mobile: image natural height (no forced aspect ratio) ── */}
-      <div className="md:hidden relative w-full">
-        <SlideWrapper href={slide.href} className="block w-full">
-          {(slide.image_mobile || slide.image) ? (
-            <img
-              src={slide.image_mobile || slide.image}
-              alt={slide.nom ?? ""}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              className="w-full h-auto block"
-            />
-          ) : (
-            <div className={clsx("w-full aspect-[3/2] bg-gradient-to-br", slide.gradient)} />
-          )}
-        </SlideWrapper>
-
-        {total > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-            {slides.map((_, i) => (
-              <button key={i} onClick={() => setCur(i)} aria-label={`Slide ${i + 1}`}
-                className={clsx("h-1.5 rounded-full transition-all duration-300",
-                  i === cur ? "w-6 bg-white shadow" : "w-1.5 bg-white/50")}
+      {/* ── Mobile: rounded card with padding ── */}
+      <div className="md:hidden relative w-full px-3 pt-2">
+        <div className="relative rounded-[20px] overflow-hidden">
+          <SlideWrapper href={slide.href} className="block w-full">
+            {(slide.image_mobile || slide.image) ? (
+              <img
+                src={slide.image_mobile || slide.image}
+                alt={slide.nom ?? ""}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="w-full h-auto block"
               />
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className={clsx("w-full aspect-[3/2] bg-gradient-to-br", slide.gradient)} />
+            )}
+          </SlideWrapper>
+
+          {total > 1 && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+              {slides.map((_, i) => (
+                <button key={i} onClick={() => setCur(i)} aria-label={`Slide ${i + 1}`}
+                  className={clsx("h-1.5 rounded-full transition-all duration-300",
+                    i === cur ? "w-6 bg-white shadow" : "w-1.5 bg-white/50")}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Desktop: fixed aspect ratio, cross-fade all slides simultaneously ── */}

@@ -21,7 +21,7 @@ function TrustBar() {
     { icon: ShieldCheck, label: "100% authentique",        sub: "Produits vérifiés" },
   ];
   return (
-    <div className="bg-white border-b border-[rgba(20,83,45,0.07)]">
+    <div className="hidden sm:block bg-white border-b border-[rgba(20,83,45,0.07)]">
       {/* Mobile — horizontal scroll */}
       <div className="flex sm:hidden gap-0 overflow-x-auto scrollbar-none divide-x divide-slate-100">
         {items.map(({ icon: Icon, label, sub }) => (
