@@ -2366,7 +2366,7 @@ export async function getVentesStats(): Promise<{
     db.execute<mysql.RowDataPacket[]>(`
       SELECT COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS montant
       FROM factures
-      WHERE DATE(created_at) = CURDATE() AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
+      WHERE DATE(created_at) = CURDATE() AND statut_paiement = 'paye_total' AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
     // Commandes en ligne livrées aujourd'hui
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(total), 0) AS montant FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`

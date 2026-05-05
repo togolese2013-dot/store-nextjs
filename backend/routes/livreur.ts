@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../lib/auth";
-import { getUtilisateurById, addOrderEvent } from "@/lib/admin-db";
+import { getUtilisateurById, addOrderEvent, createFinanceEntry } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
 
@@ -286,21 +286,26 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
         "UPDATE livraisons_ventes SET statut = 'livre', livree_le = NOW() WHERE id = ?",
         [entityId]
       );
-      // Mark the linked facture as paid if not already, then record in caisse
+      // Mark facture as paid then record in caisse — non-blocking to not fail the delivery
       if (row.facture_id && row.statut_paiement !== "paye_total") {
-        await pool.execute(
-          `UPDATE factures SET statut = 'paye', statut_paiement = 'paye_total'
-           WHERE id = ? AND statut != 'annule'`,
-          [row.facture_id]
-        );
-        const modePaiement = row.mode_paiement || "especes";
-        const montant = Number(row.total ?? 0);
-        if (montant > 0) {
+        try {
           await pool.execute(
-            `INSERT INTO finance_entries (type, montant, mode_paiement, description, date_entree)
-             VALUES ('vente', ?, ?, ?, NOW())`,
-            [montant, modePaiement, `Livraison confirmée — facture #${row.facture_id}`]
+            `UPDATE factures SET statut = 'paye', statut_paiement = 'paye_total'
+             WHERE id = ? AND statut != 'annule'`,
+            [row.facture_id]
           );
+          const montant = Number(row.total ?? 0);
+          if (montant > 0) {
+            await createFinanceEntry({
+              type:          "vente",
+              montant,
+              mode_paiement: row.mode_paiement || "especes",
+              description:   `Livraison confirmée — facture #${row.facture_id}`,
+              date_entree:   new Date().toISOString().slice(0, 10),
+            });
+          }
+        } catch (e) {
+          console.error("[livreur] finance entry failed:", e);
         }
       }
     } else {
