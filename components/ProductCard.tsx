@@ -29,13 +29,13 @@ export default function ProductCard({ product, className, floatingCart = false }
   const [liked, setLiked]   = useState(false);
   const [added, setAdded]   = useState(false);
   const [imgErr, setImgErr] = useState(false);
-  const [imgOk, setImgOk]   = useState(false);
+  const [imgOk,  setImgOk]  = useState(false);
 
   useEffect(() => {
     setLiked(getWishlist().includes(product.id));
   }, [product.id]);
 
-  const price   = finalPrice(product);
+  const price           = finalPrice(product);
   const discountPercent = product.prix_unitaire > 0
     ? Math.round((Math.min(product.remise, product.prix_unitaire) / product.prix_unitaire) * 100)
     : 0;
@@ -64,17 +64,30 @@ export default function ProductCard({ product, className, floatingCart = false }
     setTimeout(() => setAdded(false), 1800);
   };
 
+  const toggleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const wl   = getWishlist();
+    const next = liked
+      ? wl.filter(id => id !== product.id)
+      : [...wl, product.id];
+    saveWishlist(next);
+    setLiked(!liked);
+    window.dispatchEvent(new Event("wishlist-updated"));
+  };
+
   return (
     <article
       className={clsx(
-        "group relative bg-white rounded-2xl overflow-hidden",
-        "shadow-sm hover:shadow-md transition-shadow duration-300",
+        "group relative bg-white rounded-[20px] overflow-hidden border border-[rgba(20,83,45,0.06)]",
+        "shadow-[0_1px_4px_rgba(20,83,45,0.06)] hover:shadow-[0_8px_24px_rgba(20,83,45,0.11)]",
+        "transition-all duration-200 hover:-translate-y-0.5",
         className
       )}
     >
-      {/* ── Image — portrait 4:5 ── */}
+      {/* ── Image ── */}
       <Link href={`/products/${product.id}`} className="block relative" tabIndex={-1}>
-        <div className="relative overflow-hidden bg-slate-50 aspect-[4/5]">
+        <div className="relative overflow-hidden bg-[#f8fafb] aspect-[4/3]">
 
           {/* Skeleton */}
           {!imgOk && !imgErr && (
@@ -87,7 +100,7 @@ export default function ProductCard({ product, className, floatingCart = false }
               src={imgSrc} alt={product.nom}
               fill sizes="(max-width:640px) 50vw,(max-width:1024px) 33vw,25vw"
               className={clsx(
-                "object-contain p-2 transition-opacity duration-300",
+                "object-contain p-2 transition-all duration-300 group-hover:scale-[1.03]",
                 imgOk ? "opacity-100" : "opacity-0"
               )}
               onLoad={() => setImgOk(true)}
@@ -100,8 +113,8 @@ export default function ProductCard({ product, className, floatingCart = false }
             </div>
           )}
 
-          {/* Subtle overlay on hover */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+          {/* Hover overlay */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/4 transition-colors duration-200" />
 
           {/* Badges top-left */}
           <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
@@ -111,7 +124,7 @@ export default function ProductCard({ product, className, floatingCart = false }
               </span>
             )}
             {isNew && !isPromo && (
-              <span className="px-2 py-0.5 rounded-md bg-brand-500 text-white text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-brand-600 text-white text-[10px] font-bold">
                 Nouveau
               </span>
             )}
@@ -124,28 +137,19 @@ export default function ProductCard({ product, className, floatingCart = false }
 
           {/* Wishlist — top-right */}
           <button
-            onClick={e => {
-              e.preventDefault();
-              e.stopPropagation();
-              const wl  = getWishlist();
-              const next = liked
-                ? wl.filter(id => id !== product.id)
-                : [...wl, product.id];
-              saveWishlist(next);
-              setLiked(!liked);
-              window.dispatchEvent(new Event("wishlist-updated"));
-            }}
+            onClick={toggleWishlist}
             aria-label={liked ? "Retirer des favoris" : "Ajouter aux favoris"}
             className={clsx(
               "absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center",
               "bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-200",
-              liked ? "text-red-500" : "text-slate-400"
+              "opacity-0 group-hover:opacity-100",
+              liked ? "text-red-500 opacity-100" : "text-slate-400"
             )}
           >
             <Heart className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} />
           </button>
 
-          {/* Floating cart button — bottom-right (only when floatingCart=true) */}
+          {/* Floating cart — bottom-right */}
           {floatingCart && !outOf && (
             <button
               onClick={handleAdd}
@@ -153,6 +157,7 @@ export default function ProductCard({ product, className, floatingCart = false }
               className={clsx(
                 "absolute bottom-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center",
                 "shadow-md transition-all duration-200 active:scale-90",
+                "opacity-0 group-hover:opacity-100",
                 added
                   ? "bg-green-500 text-white"
                   : "bg-brand-900 text-white hover:bg-brand-700"
@@ -161,38 +166,44 @@ export default function ProductCard({ product, className, floatingCart = false }
               <ShoppingBag className="w-3.5 h-3.5" />
             </button>
           )}
-
         </div>
       </Link>
 
       {/* ── Content ── */}
       <div className="p-3">
-        {/* Brand or category label */}
+        {/* Marque */}
         {(product.marque_nom || product.categorie_nom) && (
-          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-600 mb-0.5 truncate">
+          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-brand-700 mb-0.5 truncate">
             {product.marque_nom ?? product.categorie_nom}
           </p>
         )}
+
+        {/* Nom */}
         <Link href={`/products/${product.id}`}>
-          <h3 className="font-sans text-sm text-slate-800 leading-snug mb-1 line-clamp-2 hover:text-brand-800 transition-colors">
+          <h3 className="font-sans text-[13px] font-medium text-slate-800 leading-snug mb-1.5 line-clamp-2 hover:text-brand-800 transition-colors">
             {product.nom}
           </h3>
         </Link>
 
+        {/* Rating */}
         <RatingBadge productId={product.id} />
 
+        {/* Prix */}
         <div className="flex items-baseline gap-1.5 mt-1.5 mb-3">
-          <span className="font-display font-bold text-base text-slate-900">
+          <span className={clsx(
+            "font-display font-bold text-[15px] tracking-tight",
+            isPromo ? "text-accent-600" : "text-slate-900"
+          )}>
             {formatPrice(price)}
           </span>
           {isPromo && (
-            <span className="text-xs text-slate-400 line-through">
+            <span className="text-[11px] text-slate-400 line-through">
               {formatPrice(product.prix_unitaire)}
             </span>
           )}
         </div>
 
-        {/* Full-width button — shown when floatingCart is false (default) */}
+        {/* Bouton panier (non-floating) */}
         {!floatingCart && (
           <button
             onClick={handleAdd}
@@ -204,7 +215,7 @@ export default function ProductCard({ product, className, floatingCart = false }
                 ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                 : added
                   ? "bg-green-500 text-white"
-                  : "bg-brand-900 text-white hover:bg-brand-800 active:scale-95"
+                  : "bg-brand-900 text-white hover:bg-brand-800 active:scale-95 shadow-[0_4px_12px_rgba(20,83,45,0.2)]"
             )}
           >
             <ShoppingBag className="w-3.5 h-3.5 shrink-0" />

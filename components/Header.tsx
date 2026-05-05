@@ -43,7 +43,6 @@ export default function Header() {
   const [sugLoading, setSugLoading]   = useState(false);
   const [showSug, setShowSug]         = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  // Avatar data — synced from localStorage and refreshed on login/logout
   const [avatarNom,   setAvatarNom]   = useState<string | null>(null);
   const [avatarPhoto, setAvatarPhoto] = useState<string | null>(null);
 
@@ -54,7 +53,7 @@ export default function Header() {
   const router      = useRouter();
   const pathname    = usePathname();
 
-  /* Instant search — debounced 300ms */
+  /* Instant search */
   const fetchSuggestions = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setSuggestions([]); setShowSug(false); return; }
     setSugLoading(true);
@@ -72,7 +71,6 @@ export default function Header() {
     return () => clearTimeout(t);
   }, [search, fetchSuggestions]);
 
-  /* Read avatar from localStorage (synced after login/logout) */
   const readAvatar = useCallback(() => {
     try {
       const raw = localStorage.getItem("ts_profil");
@@ -93,18 +91,14 @@ export default function Header() {
     return () => window.removeEventListener("profil-updated", readAvatar);
   }, [readAvatar]);
 
-  /* Close dropdowns on outside click */
   useEffect(() => {
     function handle(e: MouseEvent) {
       if (
         dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
         mobileDropdownRef.current && !mobileDropdownRef.current.contains(e.target as Node)
-      ) {
-        setShowSug(false);
-      }
-      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+      ) setShowSug(false);
+      if (accountRef.current && !accountRef.current.contains(e.target as Node))
         setAccountOpen(false);
-      }
     }
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
@@ -122,60 +116,92 @@ export default function Header() {
     e.preventDefault();
     if (search.trim()) {
       router.push(`/products?q=${encodeURIComponent(search.trim())}`);
-      setSearch("");
-      setFocus(false);
+      setSearch(""); setFocus(false);
     }
   };
 
-  /* Called by AccountDropdown after login or logout */
   function handleUserChange(user: ClientUser | null) {
-    if (user) {
-      setAvatarNom(user.nom);
-      setAvatarPhoto(user.photo_url ?? null);
-    } else {
-      setAvatarNom(null);
-      setAvatarPhoto(null);
-    }
+    if (user) { setAvatarNom(user.nom); setAvatarPhoto(user.photo_url ?? null); }
+    else       { setAvatarNom(null);   setAvatarPhoto(null); }
   }
+
+  /* Suggestion item shared by desktop + mobile */
+  const SugItem = ({ p }: { p: Product }) => {
+    const price   = finalPrice(p);
+    const isPromo = p.remise > 0;
+    const imgSrc  = p.image_url
+      ? p.image_url.startsWith("http") ? p.image_url : `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${p.image_url}`
+      : null;
+    return (
+      <Link
+        href={`/products/${p.reference}`}
+        onClick={() => { setShowSug(false); setSearch(""); }}
+        className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+      >
+        <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+          {imgSrc
+            ? <Image src={imgSrc} alt={p.nom} width={40} height={40} className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">📷</div>
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-slate-800 line-clamp-1">{p.nom}</p>
+          {p.categorie_nom && <p className="text-xs text-slate-400">{p.categorie_nom}</p>}
+        </div>
+        <div className="text-right shrink-0">
+          <p className={clsx("text-sm font-bold", isPromo ? "text-accent-600" : "text-slate-900")}>
+            {formatPrice(price)}
+          </p>
+          {isPromo && <p className="text-xs text-slate-400 line-through">{formatPrice(p.prix_unitaire)}</p>}
+        </div>
+      </Link>
+    );
+  };
+
+  const SugDropdown = ({ searchVal }: { searchVal: string }) => (
+    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden">
+      {suggestions.map(p => <SugItem key={p.id} p={p} />)}
+      <Link
+        href={`/products?q=${encodeURIComponent(searchVal)}`}
+        onClick={() => { setShowSug(false); setSearch(""); }}
+        className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 transition-colors"
+      >
+        Voir tous les résultats pour « {searchVal} » →
+      </Link>
+    </div>
+  );
 
   return (
     <>
-      {/* ── Sticky header ── */}
       <header
         className={clsx(
-          "sticky top-0 z-50 bg-white/95 backdrop-blur-md transition-shadow duration-200",
-          scrolled ? "shadow-md border-b border-brand-50" : "border-b border-transparent"
+          "sticky top-0 z-50 bg-white/96 backdrop-blur-md transition-all duration-200",
+          scrolled ? "shadow-[0_2px_12px_rgba(20,83,45,0.08)] border-b border-brand-50" : "border-b border-transparent"
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* ── Mobile top bar (logo centered) ── */}
+
+          {/* ── Mobile top bar ── */}
           <div className="lg:hidden flex items-center h-14 relative">
-            {/* Hamburger — left */}
             <button
               onClick={() => setOpen(!open)}
-              className="p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
-              aria-label="Menu"
-              aria-expanded={open}
+              className="p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+              aria-label="Menu" aria-expanded={open}
             >
-              {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            {/* Logo — absolutely centered */}
+            {/* Logo centré */}
             <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-              <img
-                src="/logo-togolese-shop.svg"
-                alt="Togolese Shop"
-                className="h-8 w-auto"
-              />
+              <img src="/logo-togolese-shop.svg" alt="Togolese Shop" className="h-7 w-auto" />
             </Link>
 
-            {/* Icons — right */}
             <div className="flex items-center gap-0.5 ml-auto">
               <Link href="/wishlist"
-                className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
                 aria-label={`Favoris (${wishlistCount})`}
               >
-                <Heart className="w-6 h-6" />
+                <Heart className="w-5 h-5" />
                 {wishlistCount > 0 && (
                   <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
                     {wishlistCount > 9 ? "9+" : wishlistCount}
@@ -183,10 +209,10 @@ export default function Header() {
                 )}
               </Link>
               <Link href="/cart"
-                className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
                 aria-label={`Panier (${cartCount})`}
               >
-                <ShoppingBag className="w-6 h-6" />
+                <ShoppingBag className="w-5 h-5" />
                 {cartCount > 0 && (
                   <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-accent-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
                     {cartCount > 9 ? "9+" : cartCount}
@@ -197,25 +223,21 @@ export default function Header() {
           </div>
 
           {/* ── Desktop top bar ── */}
-          <div className="hidden lg:flex items-center h-14 gap-3">
+          <div className="hidden lg:flex items-center h-16 gap-4">
 
             {/* Logo */}
-            <Link href="/" className="flex items-center shrink-0 mr-2">
-              <img
-                src="/logo-togolese-shop.svg"
-                alt="Togolese Shop"
-                className="h-7 w-auto"
-              />
+            <Link href="/" className="flex items-center shrink-0 mr-3">
+              <img src="/logo-togolese-shop.svg" alt="Togolese Shop" className="h-7 w-auto" />
             </Link>
 
-            {/* Search bar — desktop */}
-            <div ref={dropdownRef} className="flex flex-1 max-w-lg relative">
+            {/* Search */}
+            <div ref={dropdownRef} className="flex flex-1 max-w-xl relative">
               <form onSubmit={handleSearch} className="w-full">
                 <div className={clsx(
-                  "flex items-center w-full rounded-2xl border-2 transition-all duration-200 bg-slate-50",
+                  "flex items-center w-full rounded-xl border-2 transition-all duration-200 bg-[#f8fafb]",
                   searchFocus
-                    ? "border-brand-600 bg-white shadow-md"
-                    : "border-slate-200 hover:border-slate-300"
+                    ? "border-brand-600 bg-white shadow-[0_4px_16px_rgba(20,83,45,0.10)]"
+                    : "border-[rgba(20,83,45,0.08)] hover:border-[rgba(20,83,45,0.14)]"
                 )}>
                   <Search className="w-4 h-4 text-slate-400 ml-4 shrink-0" />
                   <input
@@ -230,65 +252,20 @@ export default function Header() {
                   {sugLoading && <Loader2 className="w-4 h-4 text-slate-400 mr-3 animate-spin" />}
                   {search && !sugLoading && (
                     <button type="submit"
-                      className="mr-2 px-3 py-1.5 rounded-xl bg-brand-900 text-white text-xs font-semibold hover:bg-brand-800 transition-colors"
+                      className="mr-2 px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-semibold hover:bg-brand-800 transition-colors"
                     >
                       OK
                     </button>
                   )}
                 </div>
               </form>
-
-              {/* Instant search dropdown */}
-              {showSug && suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden">
-                  {suggestions.map(p => {
-                    const price   = finalPrice(p);
-                    const isPromo = p.remise > 0;
-                    const imgSrc  = p.image_url
-                      ? p.image_url.startsWith("http") ? p.image_url : `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${p.image_url}`
-                      : null;
-                    return (
-                      <Link
-                        key={p.id}
-                        href={`/products/${p.reference}`}
-                        onClick={() => { setShowSug(false); setSearch(""); }}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden shrink-0">
-                          {imgSrc
-                            ? <Image src={imgSrc} alt={p.nom} width={40} height={40} className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">📷</div>
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-800 line-clamp-1">{p.nom}</p>
-                          {p.categorie_nom && <p className="text-xs text-slate-400">{p.categorie_nom}</p>}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className={clsx("text-sm font-800", isPromo ? "text-accent-600" : "text-slate-900")}>
-                            {formatPrice(price)}
-                          </p>
-                          {isPromo && <p className="text-xs text-slate-400 line-through">{formatPrice(p.prix_unitaire)}</p>}
-                        </div>
-                      </Link>
-                    );
-                  })}
-                  <Link
-                    href={`/products?q=${encodeURIComponent(search)}`}
-                    onClick={() => { setShowSug(false); setSearch(""); }}
-                    className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 transition-colors"
-                  >
-                    Voir tous les résultats pour « {search} » →
-                  </Link>
-                </div>
-              )}
+              {showSug && suggestions.length > 0 && <SugDropdown searchVal={search} />}
             </div>
 
-            {/* Desktop nav */}
+            {/* Nav */}
             <nav className="flex items-center gap-1 mx-2">
               {NAV.map(({ label, href, icon: Icon, hot }) => (
-                <Link
-                  key={label} href={href}
+                <Link key={label} href={href}
                   className={clsx(
                     "relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
                     pathname === href
@@ -308,15 +285,13 @@ export default function Header() {
               ))}
             </nav>
 
-            {/* Right icons */}
+            {/* Icons droite */}
             <div className="flex items-center gap-1 ml-auto">
-
-              {/* Wishlist */}
               <Link href="/wishlist"
-                className="relative p-1.5 sm:p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                className="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
                 aria-label={`Favoris (${wishlistCount})`}
               >
-                <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Heart className="w-5 h-5" />
                 {wishlistCount > 0 && (
                   <span className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
                     {wishlistCount > 9 ? "9+" : wishlistCount}
@@ -324,12 +299,11 @@ export default function Header() {
                 )}
               </Link>
 
-              {/* Cart */}
               <Link href="/cart"
-                className="relative p-1.5 sm:p-2.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+                className="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
                 aria-label={`Panier (${cartCount})`}
               >
-                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
+                <ShoppingBag className="w-5 h-5" />
                 {cartCount > 0 && (
                   <span className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-accent-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
                     {cartCount > 9 ? "9+" : cartCount}
@@ -337,56 +311,44 @@ export default function Header() {
                 )}
               </Link>
 
-              {/* Account dropdown */}
               <div ref={accountRef} className="hidden sm:block relative">
                 <button
                   onClick={() => setAccountOpen(v => !v)}
                   className={clsx(
                     "flex items-center gap-1.5 p-1.5 rounded-xl transition-colors",
-                    accountOpen ? "bg-brand-50 text-brand-800" : "hover:bg-slate-100 text-slate-700"
+                    accountOpen ? "bg-brand-50 text-brand-800" : "hover:bg-slate-100 text-slate-600"
                   )}
-                  aria-label="Mon compte"
-                  aria-expanded={accountOpen}
+                  aria-label="Mon compte" aria-expanded={accountOpen}
                 >
-                  {/* Avatar : photo > initiale > icône */}
                   <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0">
                     {avatarPhoto ? (
-                      <Image
-                        src={avatarPhoto}
-                        alt={avatarNom ?? "Avatar"}
-                        width={32}
-                        height={32}
-                        className="w-full h-full object-cover"
-                      />
+                      <Image src={avatarPhoto} alt={avatarNom ?? "Avatar"} width={32} height={32} className="w-full h-full object-cover" />
                     ) : avatarNom ? (
-                      <div className="w-full h-full bg-brand-900 text-white flex items-center justify-center text-xs font-800">
+                      <div className="w-full h-full bg-brand-900 text-white flex items-center justify-center text-xs font-bold">
                         {avatarNom.charAt(0).toUpperCase()}
                       </div>
                     ) : (
-                      <div className="w-full h-full bg-slate-200 text-slate-500 flex items-center justify-center">
+                      <div className="w-full h-full bg-slate-100 text-slate-400 flex items-center justify-center">
                         <User className="w-4 h-4" />
                       </div>
                     )}
                   </div>
-                  {/* Show name next to avatar when logged in */}
                   {avatarNom && (
                     <span className="hidden xl:block text-sm font-semibold text-slate-700 max-w-[100px] truncate">
                       {avatarNom.split(" ")[0]}
                     </span>
                   )}
                 </button>
-
                 <AccountDropdown
                   open={accountOpen}
                   onClose={() => setAccountOpen(false)}
                   onUserChange={handleUserChange}
                 />
               </div>
-
             </div>
           </div>
 
-          {/* Mobile/tablet search bar + dropdown */}
+          {/* Mobile search */}
           <div ref={mobileDropdownRef} className="lg:hidden pt-1 pb-2 relative">
             <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -395,51 +357,11 @@ export default function Header() {
                 onChange={e => setSearch(e.target.value)}
                 onFocus={() => { if (suggestions.length) setShowSug(true); }}
                 placeholder="Rechercher…"
-                className="w-full pl-8 pr-4 py-1.5 text-[16px] bg-slate-100 rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
+                className="w-full pl-9 pr-4 py-2 text-[16px] bg-[#f8fafb] rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
                 style={{ fontSize: "16px" }}
               />
             </form>
-
-            {showSug && suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden">
-                {suggestions.map(p => {
-                  const price   = finalPrice(p);
-                  const isPromo = p.remise > 0;
-                  const imgSrc  = p.image_url
-                    ? p.image_url.startsWith("http") ? p.image_url : `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}${p.image_url}`
-                    : null;
-                  return (
-                    <Link
-                      key={p.id}
-                      href={`/products/${p.reference}`}
-                      onClick={() => { setShowSug(false); setSearch(""); }}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden shrink-0">
-                        {imgSrc
-                          ? <Image src={imgSrc} alt={p.nom} width={40} height={40} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">📷</div>
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-800 line-clamp-1">{p.nom}</p>
-                        {p.categorie_nom && <p className="text-xs text-slate-400">{p.categorie_nom}</p>}
-                      </div>
-                      <p className={clsx("text-sm font-bold shrink-0", isPromo ? "text-accent-600" : "text-slate-900")}>
-                        {formatPrice(price)}
-                      </p>
-                    </Link>
-                  );
-                })}
-                <Link
-                  href={`/products?q=${encodeURIComponent(search)}`}
-                  onClick={() => { setShowSug(false); setSearch(""); }}
-                  className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 transition-colors"
-                >
-                  Voir tous les résultats →
-                </Link>
-              </div>
-            )}
+            {showSug && suggestions.length > 0 && <SugDropdown searchVal={search} />}
           </div>
         </div>
 
@@ -447,22 +369,14 @@ export default function Header() {
         {open && (
           <div className="lg:hidden border-t border-slate-100 bg-white px-4 py-3 flex flex-col gap-2 shadow-lg max-h-[70vh] overflow-y-auto">
             {NAV.map(({ label, href, icon: Icon, hot }) => (
-              <Link
-                key={label} href={href}
+              <Link key={label} href={href}
                 className="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-slate-50 hover:bg-brand-50 hover:text-brand-900 text-slate-700 font-semibold transition-colors"
               >
-                <span className="flex items-center gap-2.5">
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </span>
-                {hot && (
-                  <span className="px-2 py-0.5 rounded-full bg-accent-500 text-white text-xs font-bold">
-                    SOLDES
-                  </span>
-                )}
+                <span className="flex items-center gap-2.5"><Icon className="w-4 h-4" />{label}</span>
+                {hot && <span className="px-2 py-0.5 rounded-full bg-accent-500 text-white text-xs font-bold">SOLDES</span>}
               </Link>
             ))}
-            <div className="mt-2 space-y-2">
+            <div className="mt-1 space-y-2">
               <Link href="/account"
                 className="flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-semibold text-sm hover:border-brand-300 transition-colors"
               >
