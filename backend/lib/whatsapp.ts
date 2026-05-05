@@ -218,7 +218,7 @@ export async function sendOrderNotifications({
   reference: string;
   nom:       string;
   telephone: string;
-  items:     Array<{ nom?: string; nom_produit?: string; qty?: number; quantite?: number }>;
+  items:     Array<{ nom?: string; nom_produit?: string; qty?: number; quantite?: number; prix?: number; total?: number }>;
   total:     number;
 }): Promise<void> {
   try {
@@ -242,11 +242,13 @@ export async function sendOrderNotifications({
     const languageCode = lang || "fr";
     const baseUrl      = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
 
+    const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
     const articlesStr = items.map(item => {
-      const name = item.nom || item.nom_produit || "Produit";
-      const qty  = item.qty ?? item.quantite ?? 1;
-      return `${qty}x ${name}`;
-    }).join(", ");
+      const name  = item.nom || item.nom_produit || "Produit";
+      const qty   = item.qty ?? item.quantite ?? 1;
+      const prix  = item.total ?? (item.prix ? item.prix * qty : null);
+      return prix ? `${qty}x ${name} — ${fmt(prix)}` : `${qty}x ${name}`;
+    }).join("\n");
 
     const totalStr    = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
     const trackingUrl = `${baseUrl}/suivi-commande?ref=${encodeURIComponent(reference)}`;
@@ -259,7 +261,7 @@ export async function sendOrderNotifications({
         to:           telephone,
         templateName: clientTemplate,
         languageCode,
-        bodyParams:   [reference, nom, articlesStr, totalStr, trackingUrl],
+        bodyParams:   [nom, reference, articlesStr, totalStr, trackingUrl],
       });
       console.log(`[WA] Client notif result (${reference}):`, result);
     } else {
