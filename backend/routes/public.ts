@@ -21,10 +21,11 @@ async function loadBestsellerProducts(limit: number) {
        ORDER BY total_sold DESC
        LIMIT 50`
     );
+    console.log(`[BS] step1 boutique_mouvements: ${mouvsRows.length} produits`, mouvsRows.map(r => `id=${r.produit_id} qty=${r.total_sold}`));
     for (const r of mouvsRows) {
       salesMap.set(r.produit_id as number, Number(r.total_sold));
     }
-  } catch { /* boutique_mouvements may not exist yet */ }
+  } catch (e) { console.error("[BS] step1 error:", e); }
 
   // Step 2: online order sales via JSON_TABLE (MySQL 8+ only, graceful skip)
   try {
@@ -46,11 +47,14 @@ async function loadBestsellerProducts(limit: number) {
        ORDER BY total_sold DESC
        LIMIT 50`
     );
+    console.log(`[BS] step2 orders JSON_TABLE: ${orderRows.length} produits`, orderRows.map(r => `id=${r.produit_id} qty=${r.total_sold}`));
     for (const r of orderRows) {
       const pid = r.produit_id as number;
       salesMap.set(pid, (salesMap.get(pid) ?? 0) + Number(r.total_sold));
     }
-  } catch { /* JSON_TABLE not supported — boutique sales still counted above */ }
+  } catch (e) { console.error("[BS] step2 JSON_TABLE error:", e); }
+
+  console.log(`[BS] salesMap final: ${salesMap.size} produits —`, [...salesMap.entries()].sort((a,b) => b[1]-a[1]).slice(0,10).map(([id,qty]) => `id=${id}:${qty}`).join(", "));
 
   // Step 3: fetch and rank products by total sales
   let products: import("mysql2/promise").RowDataPacket[] = [];
