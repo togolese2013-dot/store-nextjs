@@ -83,7 +83,8 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
       </div>
 
       {/* ── Desktop: fixed aspect ratio, cross-fade all slides simultaneously ── */}
-      <div className="hidden md:block aspect-[1920/700] relative">
+      <div className="hidden md:block px-4 pt-3">
+      <div className="rounded-[24px] overflow-hidden aspect-[1920/700] relative">
         {slides.map((s, i) => (
           <SlideWrapper key={i} href={s.href}
             className={clsx(
@@ -130,6 +131,7 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
             </div>
           </>
         )}
+      </div>
       </div>
     </section>
   );
