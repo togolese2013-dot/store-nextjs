@@ -45,7 +45,7 @@ export default function ChangePasswordPage() {
       if (!res.ok) { setError(data.error || "Erreur lors du changement."); return; }
       setSuccess(true);
       const meRes = await fetch("/api/admin/auth/me");
-      const me = await meRes.ok ? meRes.json() : {};
+      const me = (await meRes.ok ? meRes.json() : {}) as { role?: string; poste?: string };
       const dest = (me.role === "staff" && me.poste === "Livreur") || me.role === "livreur" ? "/livreur" : "/admin";
       setTimeout(() => { window.location.href = dest; }, 1200);
     } catch {
