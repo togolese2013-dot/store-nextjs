@@ -133,9 +133,8 @@ function formatDate(d: string) {
 }
 
 function getStatutDisplay(f: Facture): { label: string; color: string } {
-  if (f.statut === "annule")              return { label: "Annulé",   color: "bg-red-100 text-red-700" };
-  if (f.statut === "brouillon")           return { label: "Brouillon", color: "bg-slate-100 text-slate-600" };
-  if (f.statut_paiement === "paye_total") return { label: "Complet",  color: "bg-emerald-100 text-emerald-700" };
+  if (f.statut === "annule")   return { label: "Annulé",    color: "bg-red-100 text-red-700" };
+  if (f.statut === "brouillon") return { label: "Brouillon", color: "bg-slate-100 text-slate-600" };
   return { label: "Validé", color: "bg-green-50 text-green-700 border border-green-200" };
 }
 
