@@ -1433,6 +1433,7 @@ export interface BoutiqueMouvement {
   motif:        string | null;
   ref_commande: string | null;
   admin_id:     number | null;
+  admin_nom:    string | null;
   created_at:   string;
 }
 
@@ -1612,9 +1613,12 @@ export async function createBoutiqueMouvement(data: {
 
 export async function getRecentBoutiqueMovements(limit = 30): Promise<BoutiqueMouvement[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT bm.*, p.nom AS nom_produit
+    `SELECT bm.*, p.nom AS nom_produit,
+            COALESCE(au.nom, u.nom) AS admin_nom
      FROM boutique_mouvements bm
      JOIN produits p ON p.id = bm.produit_id
+     LEFT JOIN admin_users au ON au.id = bm.admin_id
+     LEFT JOIN utilisateurs u ON u.id = bm.admin_id
      ORDER BY bm.created_at DESC
      LIMIT ${Number(limit)}`
   );
@@ -2095,16 +2099,19 @@ export async function deleteLivraison(id: number) {
 // ─── Finance ───────────────────────────────────────────────────────────────────
 
 export interface FinanceEntry {
-  id:             number;
-  reference:      string;
-  type:           "caisse" | "depense" | "rentree" | "vente";
-  mode_paiement:  "especes" | "moov_money" | "tmoney" | "virement_bancaire" | null;
-  categorie:      string | null;
-  description:    string | null;
-  montant:        number;
-  date_entree:    string;
-  created_at:     string;
-  updated_at:     string;
+  id:                  number;
+  reference:           string;
+  type:                "caisse" | "depense" | "rentree" | "vente" | "transfert";
+  mode_paiement:       "especes" | "moov_money" | "tmoney" | "virement_bancaire" | null;
+  compte_destination:  "especes" | "moov_money" | "tmoney" | "virement_bancaire" | null;
+  categorie:           string | null;
+  description:         string | null;
+  montant:             number;
+  date_entree:         string;
+  admin_id:            number | null;
+  admin_nom:           string | null;
+  created_at:          string;
+  updated_at:          string;
 }
 
 export interface FinanceStats {
@@ -2124,55 +2131,101 @@ export async function listFinanceEntries(opts: {
   offset?: number;
 } = {}): Promise<{ items: FinanceEntry[]; total: number }> {
   const { limit = 50, offset = 0, type, search } = opts;
-  const conditions: string[] = [];
+  await financeEntrieCols(); // ensure columns exist
+  const conditions: string[] = ["f.type != 'vente'"]; // never show auto-generated vente entries
   const params: (string | number | boolean | null | Buffer)[] = [];
-  if (type)   { conditions.push("type = ?");                                         params.push(type); }
-  if (search) { conditions.push("(categorie LIKE ? OR reference LIKE ?)");           params.push(`%${search}%`, `%${search}%`); }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  if (type)   { conditions.push("f.type = ?");                                                   params.push(type); }
+  if (search) { conditions.push("(f.categorie LIKE ? OR f.reference LIKE ?)");                   params.push(`%${search}%`, `%${search}%`); }
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM finance_entries ${where} ORDER BY date_entree DESC, id DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+    `SELECT f.*, COALESCE(au.nom, u.nom) AS admin_nom
+     FROM finance_entries f
+     LEFT JOIN admin_users au ON au.id = f.admin_id
+     LEFT JOIN utilisateurs u ON u.id = f.admin_id
+     ${where} ORDER BY f.date_entree DESC, f.id DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
-  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM finance_entries ${where}`, params);
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM finance_entries f ${where}`, params
+  );
   const items = (rows as mysql.RowDataPacket[]).map(r => ({ ...r, montant: Number(r.montant) }));
   return { items: items as FinanceEntry[], total: Number(cnt[0]?.cnt ?? 0) };
 }
 
 // Cached column check for finance_entries
-let _finCols: { mode_paiement: boolean } | null = null;
+let _finCols: { mode_paiement: boolean; admin_id: boolean; compte_destination: boolean } | null = null;
 async function financeEntrieCols() {
   if (_finCols) return _finCols;
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'finance_entries'`
   );
-  const names  = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
-  _finCols = { mode_paiement: names.has("mode_paiement") };
+  const names = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
+  // Auto-migrate optional columns
+  if (!names.has("admin_id")) {
+    try { await db.execute("ALTER TABLE finance_entries ADD COLUMN admin_id INT NULL"); } catch { /* already exists */ }
+    names.add("admin_id");
+  }
+  if (!names.has("compte_destination")) {
+    try { await db.execute("ALTER TABLE finance_entries ADD COLUMN compte_destination VARCHAR(30) NULL"); } catch { /* already exists */ }
+    names.add("compte_destination");
+  }
+  _finCols = {
+    mode_paiement:      names.has("mode_paiement"),
+    admin_id:           names.has("admin_id"),
+    compte_destination: names.has("compte_destination"),
+  };
   return _finCols;
 }
 
 export async function getFinanceStats(): Promise<FinanceStats> {
   const cols = await financeEntrieCols();
 
-  const [[totals], modes] = await Promise.all([
+  const [[totals], modesRaw, transfersOut, transfersIn] = await Promise.all([
+    // Recettes = caisse + rentree only (no vente, no transfert)
     db.query<mysql.RowDataPacket[]>(
       `SELECT
-         SUM(CASE WHEN type IN ('caisse','rentree','vente') THEN montant ELSE 0 END) AS recettes,
+         SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
          SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
        FROM finance_entries`
     ),
+    // Account balances from regular entries
     cols.mode_paiement
       ? db.query<mysql.RowDataPacket[]>(
           `SELECT mode_paiement, SUM(montant) AS total
            FROM finance_entries
-           WHERE type IN ('caisse','rentree','vente')
+           WHERE type IN ('caisse','rentree')
            GROUP BY mode_paiement`
+        ).then(([rows]) => rows as mysql.RowDataPacket[])
+      : Promise.resolve([] as mysql.RowDataPacket[]),
+    // Transfer outflows (debit from source account)
+    cols.mode_paiement
+      ? db.query<mysql.RowDataPacket[]>(
+          `SELECT mode_paiement, SUM(montant) AS total
+           FROM finance_entries WHERE type = 'transfert'
+           GROUP BY mode_paiement`
+        ).then(([rows]) => rows as mysql.RowDataPacket[])
+      : Promise.resolve([] as mysql.RowDataPacket[]),
+    // Transfer inflows (credit to destination account)
+    cols.compte_destination
+      ? db.query<mysql.RowDataPacket[]>(
+          `SELECT compte_destination AS mode_paiement, SUM(montant) AS total
+           FROM finance_entries WHERE type = 'transfert' AND compte_destination IS NOT NULL
+           GROUP BY compte_destination`
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),
   ]);
 
   const modeMap: Record<string, number> = {};
-  (modes as mysql.RowDataPacket[]).forEach(r => {
+  (modesRaw as mysql.RowDataPacket[]).forEach(r => {
     if (r.mode_paiement) modeMap[r.mode_paiement as string] = Number(r.total ?? 0);
+  });
+  // Apply transfer debits
+  (transfersOut as mysql.RowDataPacket[]).forEach(r => {
+    if (r.mode_paiement) modeMap[r.mode_paiement as string] = (modeMap[r.mode_paiement as string] ?? 0) - Number(r.total ?? 0);
+  });
+  // Apply transfer credits
+  (transfersIn as mysql.RowDataPacket[]).forEach(r => {
+    if (r.mode_paiement) modeMap[r.mode_paiement as string] = (modeMap[r.mode_paiement as string] ?? 0) + Number(r.total ?? 0);
   });
 
   const r        = (totals as mysql.RowDataPacket[])[0];
@@ -2191,34 +2244,38 @@ export async function getFinanceStats(): Promise<FinanceStats> {
 }
 
 function genFinanceRef(type: string) {
-  const prefix = type === "depense" ? "DEP" : type === "caisse" ? "CAI" : "ENT";
+  const prefix = type === "depense" ? "DEP" : type === "caisse" ? "CAI" : type === "transfert" ? "TRF" : "ENT";
   return `${prefix}-${Date.now()}`;
 }
 
 export async function createFinanceEntry(data: {
-  type:           FinanceEntry["type"];
-  mode_paiement?: string;
-  categorie?:     string;
-  description?:   string;
-  montant:        number;
-  date_entree:    string;
+  type:                FinanceEntry["type"];
+  mode_paiement?:      string;
+  compte_destination?: string;
+  categorie?:          string;
+  description?:        string;
+  montant:             number;
+  date_entree:         string;
+  admin_id?:           number;
 }): Promise<number> {
   const cols      = await financeEntrieCols();
   const reference = genFinanceRef(data.type);
 
-  if (cols.mode_paiement) {
-    const [result] = await db.execute<mysql.ResultSetHeader>(
-      `INSERT INTO finance_entries (reference, type, mode_paiement, categorie, description, montant, date_entree)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [reference, data.type, data.mode_paiement ?? "especes", data.categorie ?? null, data.description ?? null, data.montant, data.date_entree]
-    );
-    return result.insertId;
-  }
-
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO finance_entries (reference, type, categorie, description, montant, date_entree)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [reference, data.type, data.categorie ?? null, data.description ?? null, data.montant, data.date_entree]
+    `INSERT INTO finance_entries
+       (reference, type, mode_paiement, compte_destination, categorie, description, montant, date_entree, admin_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      reference,
+      data.type,
+      cols.mode_paiement      ? (data.mode_paiement ?? "especes") : null,
+      cols.compte_destination ? (data.compte_destination ?? null)  : null,
+      data.categorie    ?? null,
+      data.description  ?? null,
+      data.montant,
+      data.date_entree,
+      cols.admin_id ? (data.admin_id ?? null) : null,
+    ]
   );
   return result.insertId;
 }

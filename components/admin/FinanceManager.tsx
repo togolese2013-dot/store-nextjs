@@ -3,8 +3,8 @@
 import { useState, useCallback } from "react";
 import {
   TrendingUp, TrendingDown, Wallet, Banknote, Smartphone,
-  ArrowLeftRight, Pencil, Trash2, X,
-  Loader2,
+  ArrowLeftRight, Pencil, Trash2, X, Plus,
+  Loader2, User,
 } from "lucide-react";
 import type { FinanceEntry, FinanceStats } from "@/lib/admin-db";
 import PageHeader from "@/components/admin/PageHeader";
@@ -23,10 +23,10 @@ function fmtDate(d: string) {
 // ─── Mode paiement config ─────────────────────────────────────────────────────
 
 const MODES = [
-  { value: "especes",           label: "Espèces",          icon: Banknote,      color: "text-emerald-600" },
-  { value: "moov_money",        label: "Moov Money",       icon: Smartphone,    color: "text-blue-600"    },
-  { value: "tmoney",            label: "TMoney",           icon: Smartphone,    color: "text-purple-600"  },
-  { value: "virement_bancaire", label: "Virement bancaire",icon: ArrowLeftRight, color: "text-slate-600"  },
+  { value: "especes",           label: "Espèces",           icon: Banknote,       color: "text-emerald-600" },
+  { value: "moov_money",        label: "Moov Money",        icon: Smartphone,     color: "text-blue-600"    },
+  { value: "tmoney",            label: "TMoney",            icon: Smartphone,     color: "text-purple-600"  },
+  { value: "virement_bancaire", label: "Virement bancaire", icon: ArrowLeftRight, color: "text-slate-600"   },
 ] as const;
 
 type ModePaiement = typeof MODES[number]["value"];
@@ -66,20 +66,21 @@ function StatCard({
   );
 }
 
-// ─── Modal form ───────────────────────────────────────────────────────────────
+// ─── Modal Écriture (Dépense / Rentrée) ──────────────────────────────────────
 
 type ModalType = "depense" | "rentree";
 
-interface ModalProps {
-  modalType: ModalType;
-  entry?:    FinanceEntry | null;
-  onClose:   () => void;
-  onSaved:   () => void;
+interface EntryModalProps {
+  initialType: ModalType;
+  entry?:      FinanceEntry | null;
+  onClose:     () => void;
+  onSaved:     () => void;
 }
 
-function EntryModal({ modalType, entry, onClose, onSaved }: ModalProps) {
+function EntryModal({ initialType, entry, onClose, onSaved }: EntryModalProps) {
   const isEdit = !!entry;
 
+  const [modalType,    setModalType]    = useState<ModalType>(initialType);
   const [modePaiement, setModePaiement] = useState<ModePaiement>(
     (entry?.mode_paiement as ModePaiement) ?? "especes"
   );
@@ -95,7 +96,7 @@ function EntryModal({ modalType, entry, onClose, onSaved }: ModalProps) {
   const accentRing = isDepense ? "focus:ring-red-300"             : "focus:ring-emerald-300";
   const title      = isEdit
     ? (isDepense ? "Modifier la dépense" : "Modifier la rentrée")
-    : (isDepense ? "Nouvelle dépense"    : "Nouvelle rentrée");
+    : "Nouvelle écriture";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -123,7 +124,6 @@ function EntryModal({ modalType, entry, onClose, onSaved }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
           <h2 className="font-bold text-lg text-slate-900">{title}</h2>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
@@ -132,29 +132,44 @@ function EntryModal({ modalType, entry, onClose, onSaved }: ModalProps) {
         </div>
 
         <form onSubmit={submit} className="p-6 space-y-4">
-          {/* Mode paiement (not shown for depenses) */}
-          {!isDepense && (
+          {/* Type selector — hidden in edit mode */}
+          {!isEdit && (
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-2">Mode de paiement</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-2">Type d&apos;écriture</label>
               <div className="grid grid-cols-2 gap-2">
-                {MODES.map(m => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setModePaiement(m.value)}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
-                      modePaiement === m.value
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-slate-200 text-slate-500 hover:border-slate-300"
-                    }`}
-                  >
-                    <m.icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{m.label}</span>
-                  </button>
-                ))}
+                <button type="button" onClick={() => setModalType("depense")}
+                  className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    isDepense ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}>
+                  <TrendingDown className="w-4 h-4" /> Dépense
+                </button>
+                <button type="button" onClick={() => setModalType("rentree")}
+                  className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    !isDepense ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}>
+                  <TrendingUp className="w-4 h-4" /> Rentrée
+                </button>
               </div>
             </div>
           )}
+
+          {/* Mode paiement */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-2">Mode de paiement</label>
+            <div className="grid grid-cols-2 gap-2">
+              {MODES.map(m => (
+                <button key={m.value} type="button" onClick={() => setModePaiement(m.value)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
+                    modePaiement === m.value
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}>
+                  <m.icon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Date */}
           <div>
@@ -167,7 +182,7 @@ function EntryModal({ modalType, entry, onClose, onSaved }: ModalProps) {
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Catégorie</label>
             <input value={categorie} onChange={e => setCategorie(e.target.value)}
-              placeholder={isDepense ? "Ex: Achat matériel, Loyer…" : "Ex: Vente en ligne, Acompte…"}
+              placeholder={isDepense ? "Ex: Achat matériel, Loyer…" : "Ex: Acompte client, Prestation…"}
               className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
           </div>
 
@@ -180,9 +195,7 @@ function EntryModal({ modalType, entry, onClose, onSaved }: ModalProps) {
 
           {/* Montant */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-              Montant (FCFA) *
-            </label>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant (FCFA) *</label>
             <input type="number" min="0" step="1" value={montant}
               onChange={e => setMontant(e.target.value)} required placeholder="0"
               className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
@@ -199,6 +212,141 @@ function EntryModal({ modalType, entry, onClose, onSaved }: ModalProps) {
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-50 ${accentBg}`}>
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {saving ? "Enregistrement…" : isEdit ? "Modifier" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal Transfert entre comptes ───────────────────────────────────────────
+
+interface TransfertModalProps {
+  onClose:  () => void;
+  onSaved:  () => void;
+}
+
+function TransfertModal({ onClose, onSaved }: TransfertModalProps) {
+  const [source,      setSource]      = useState<ModePaiement>("especes");
+  const [destination, setDestination] = useState<ModePaiement>("moov_money");
+  const [montant,     setMontant]     = useState("");
+  const [date,        setDate]        = useState(new Date().toISOString().slice(0, 10));
+  const [description, setDescription] = useState("");
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!montant || !date) { setError("Montant et date requis."); return; }
+    if (source === destination) { setError("Le compte source et destination doivent être différents."); return; }
+    setSaving(true); setError("");
+    try {
+      const res = await fetch("/api/admin/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type:               "transfert",
+          mode_paiement:      source,
+          compte_destination: destination,
+          description:        description || `Transfert ${modeLabel(source)} → ${modeLabel(destination)}`,
+          montant:            Number(montant),
+          date_entree:        date,
+        }),
+      });
+      if (!res.ok) { const d = await res.json(); setError(d.error ?? "Erreur"); return; }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+              <ArrowLeftRight className="w-4 h-4 text-blue-600" />
+            </div>
+            <h2 className="font-bold text-lg text-slate-900">Transfert entre comptes</h2>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="p-6 space-y-4">
+          {/* Compte source */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-2">Compte source (débit)</label>
+            <div className="grid grid-cols-2 gap-2">
+              {MODES.map(m => (
+                <button key={m.value} type="button" onClick={() => setSource(m.value)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
+                    source === m.value
+                      ? "border-red-500 bg-red-50 text-red-700"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}>
+                  <m.icon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Compte destination */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-2">Compte destination (crédit)</label>
+            <div className="grid grid-cols-2 gap-2">
+              {MODES.map(m => (
+                <button key={m.value} type="button" onClick={() => setDestination(m.value)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
+                    destination === m.value
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}>
+                  <m.icon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Date *</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} required
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Note (optionnel)</label>
+            <input value={description} onChange={e => setDescription(e.target.value)}
+              placeholder={`Transfert ${modeLabel(source)} → ${modeLabel(destination)}`}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Montant (FCFA) *</label>
+            <input type="number" min="0" step="1" value={montant}
+              onChange={e => setMontant(e.target.value)} required placeholder="0"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              Annuler
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-sm font-bold text-white transition-colors disabled:opacity-50">
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? "Enregistrement…" : "Valider le transfert"}
             </button>
           </div>
         </form>
@@ -238,7 +386,7 @@ function DeleteModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: (
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-type Tab = "depense" | "rentree";
+type Tab = "depense" | "rentree" | "transfert";
 
 interface Props {
   initialItems: FinanceEntry[];
@@ -247,13 +395,14 @@ interface Props {
 }
 
 export default function FinanceManager({ initialItems, initialStats, initialTotal }: Props) {
-  const [tab,     setTab]     = useState<Tab>("rentree");
-  const [items,   setItems]   = useState<FinanceEntry[]>(initialItems);
-  const [stats,   setStats]   = useState<FinanceStats>(initialStats);
-  const [search,  setSearch]  = useState("");
-  const [modal,   setModal]   = useState<{ type: ModalType; entry?: FinanceEntry } | null>(null);
-  const [delItem, setDelItem] = useState<FinanceEntry | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [tab,        setTab]        = useState<Tab>("rentree");
+  const [items,      setItems]      = useState<FinanceEntry[]>(initialItems);
+  const [stats,      setStats]      = useState<FinanceStats>(initialStats);
+  const [search,     setSearch]     = useState("");
+  const [modal,      setModal]      = useState<{ type: ModalType; entry?: FinanceEntry } | null>(null);
+  const [showTrf,    setShowTrf]    = useState(false);
+  const [delItem,    setDelItem]    = useState<FinanceEntry | null>(null);
+  const [loading,    setLoading]    = useState(false);
 
   const [, setTotal] = useState(initialTotal);
 
@@ -276,9 +425,12 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
     reload();
   }
 
-  // Filtered items for current tab
   const filtered = items.filter(item => {
-    const matchTab    = tab === "depense" ? item.type === "depense" : item.type === "rentree";
+    const matchTab = tab === "transfert"
+      ? item.type === "transfert"
+      : tab === "depense"
+        ? item.type === "depense"
+        : item.type === "rentree";
     const matchSearch = !search
       || item.reference.toLowerCase().includes(search.toLowerCase())
       || (item.categorie ?? "").toLowerCase().includes(search.toLowerCase())
@@ -293,22 +445,24 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
 
       <PageHeader
         title="Finances"
-        subtitle="Suivez vos rentrées et dépenses"
+        subtitle="Rentrées, dépenses et transferts entre comptes"
         accent="amber"
         onRefresh={reload}
         extra={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setModal({ type: "depense" })}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors whitespace-nowrap"
+              onClick={() => setShowTrf(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors whitespace-nowrap"
             >
-              Nouvelle dépense
+              <ArrowLeftRight className="w-4 h-4" />
+              Transfert entre comptes
             </button>
             <button
-              onClick={() => setModal({ type: "rentree" })}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors whitespace-nowrap"
+              onClick={() => setModal({ type: "depense" })}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold transition-colors whitespace-nowrap"
             >
-              Nouvelle rentrée
+              <Plus className="w-4 h-4" />
+              Nouvelle écriture
             </button>
           </div>
         }
@@ -316,7 +470,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Solde total */}
         <StatCard
           title="Solde Total"
           amount={stats.solde_net}
@@ -325,7 +478,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           icon={Wallet}
           iconColor="text-emerald-500"
         />
-        {/* Espèces */}
         <StatCard
           title="Espèces"
           amount={stats.especes}
@@ -334,7 +486,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           icon={Banknote}
           iconColor="text-green-500"
         />
-        {/* Moov Money */}
         <StatCard
           title="Moov Money"
           amount={stats.moov_money}
@@ -343,7 +494,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           icon={Smartphone}
           iconColor="text-blue-500"
         />
-        {/* TMoney */}
         <StatCard
           title="TMoney"
           amount={stats.tmoney}
@@ -352,7 +502,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           icon={Smartphone}
           iconColor="text-indigo-500"
         />
-        {/* Virement bancaire — on its own row left-aligned */}
         <StatCard
           title="Virement Bancaire"
           amount={stats.virement_bancaire}
@@ -363,11 +512,12 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
         />
       </div>
 
-      {/* ── Toolbar : tabs + search + CTA ── */}
+      {/* ── Tabs ── */}
       <TabBar
         tabs={[
-          { key: "depense", label: "Dépenses", icon: TrendingDown },
-          { key: "rentree", label: "Rentrées", icon: TrendingUp   },
+          { key: "rentree",   label: "Rentrées",   icon: TrendingUp       },
+          { key: "depense",   label: "Dépenses",   icon: TrendingDown     },
+          { key: "transfert", label: "Transferts",  icon: ArrowLeftRight   },
         ]}
         active={tab}
         onChange={k => setTab(k as typeof tab)}
@@ -384,66 +534,88 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
         />
       </div>
 
-      {/* ── Table dépenses / rentrées ── */}
+      {/* ── Table ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {loading ? (
-            <div className="py-16 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Chargement…
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 text-sm">
-              {tab === "depense" ? "Aucune dépense enregistrée." : "Aucune rentrée enregistrée."}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
-                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Référence</th>
+        {loading ? (
+          <div className="py-16 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Chargement…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-16 text-center text-slate-400 text-sm">
+            {tab === "depense" ? "Aucune dépense enregistrée." : tab === "transfert" ? "Aucun transfert enregistré." : "Aucune rentrée enregistrée."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Référence</th>
+                  {tab === "rentree" && (
+                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Mode</th>
+                  )}
+                  {tab === "transfert" && (
+                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Source → Destination</th>
+                  )}
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Catégorie</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider hidden md:table-cell">Description</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider hidden lg:table-cell">Utilisateur</th>
+                  <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Montant</th>
+                  <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filtered.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-5 py-4 text-slate-500 whitespace-nowrap text-xs">
+                      {fmtDate(item.date_entree)}
+                    </td>
+                    <td className="px-5 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">
+                      {item.reference}
+                    </td>
                     {tab === "rentree" && (
-                      <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Mode</th>
-                    )}
-                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Catégorie</th>
-                    <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Description</th>
-                    <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Montant</th>
-                    <th className="text-right px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filtered.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-5 py-4 text-slate-500 whitespace-nowrap text-xs">
-                        {fmtDate(item.date_entree)}
-                      </td>
-                      <td className="px-5 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">
-                        {item.reference}
-                      </td>
-                      {tab === "rentree" && (
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                            {modeLabel(item.mode_paiement)}
-                          </span>
-                        </td>
-                      )}
-                      <td className="px-5 py-4">
-                        {item.categorie
-                          ? <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                              {item.categorie}
-                            </span>
-                          : <span className="text-slate-300">—</span>
-                        }
-                      </td>
-                      <td className="px-5 py-4 text-slate-500 max-w-[200px] truncate text-xs">
-                        {item.description ?? <span className="text-slate-300">—</span>}
-                      </td>
-                      <td className="px-5 py-4 text-right font-bold whitespace-nowrap tabular-nums">
-                        <span className={item.type === "depense" ? "text-red-500" : "text-emerald-600"}>
-                          {item.type === "depense" ? "−" : "+"} {fmtNum(item.montant)} FCFA
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                          {modeLabel(item.mode_paiement)}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    )}
+                    {tab === "transfert" && (
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                          <span className="px-2 py-0.5 rounded-lg bg-red-50 text-red-600">{modeLabel(item.mode_paiement)}</span>
+                          <ArrowLeftRight className="w-3 h-3 text-slate-400" />
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-600">{modeLabel(item.compte_destination)}</span>
+                        </span>
+                      </td>
+                    )}
+                    <td className="px-5 py-4">
+                      {item.categorie
+                        ? <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                            {item.categorie}
+                          </span>
+                        : <span className="text-slate-300">—</span>
+                      }
+                    </td>
+                    <td className="px-5 py-4 text-slate-500 max-w-[200px] truncate text-xs hidden md:table-cell">
+                      {item.description ?? <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-5 py-4 hidden lg:table-cell">
+                      {item.admin_nom
+                        ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                            <User className="w-3 h-3" />{item.admin_nom}
+                          </span>
+                        : <span className="text-slate-300 text-xs">—</span>
+                      }
+                    </td>
+                    <td className="px-5 py-4 text-right font-bold whitespace-nowrap tabular-nums">
+                      <span className={item.type === "depense" ? "text-red-500" : item.type === "transfert" ? "text-blue-600" : "text-emerald-600"}>
+                        {item.type === "depense" ? "−" : item.type === "transfert" ? "⇄" : "+"} {fmtNum(item.montant)} FCFA
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                        {item.type !== "transfert" && (
                           <button
                             onClick={() => setModal({ type: item.type === "depense" ? "depense" : "rentree", entry: item })}
                             className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
@@ -451,30 +623,37 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => setDelItem(item)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                        )}
+                        <button
+                          onClick={() => setDelItem(item)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* ── Modals ── */}
       {modal && (
         <EntryModal
-          modalType={modal.type}
+          initialType={modal.type}
           entry={modal.entry}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); reload(); }}
+        />
+      )}
+      {showTrf && (
+        <TransfertModal
+          onClose={() => setShowTrf(false)}
+          onSaved={() => { setShowTrf(false); reload(); }}
         />
       )}
       {delItem && (

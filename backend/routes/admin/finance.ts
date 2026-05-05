@@ -30,11 +30,15 @@ router.post("/api/admin/finance", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { type, mode_paiement, categorie, description, montant, date_entree } = req.body;
+    const { type, mode_paiement, compte_destination, categorie, description, montant, date_entree } = req.body;
     if (!type || !montant || !date_entree) {
       return res.status(400).json({ error: "type, montant et date_entree sont requis." });
     }
-    const id = await createFinanceEntry({ type, mode_paiement, categorie, description, montant: Number(montant), date_entree });
+    if (type === "transfert" && !compte_destination) {
+      return res.status(400).json({ error: "compte_destination requis pour un transfert." });
+    }
+    const admin_id = typeof session.id === "number" ? session.id : undefined;
+    const id = await createFinanceEntry({ type, mode_paiement, compte_destination, categorie, description, montant: Number(montant), date_entree, admin_id });
     emitAdminEvent("finance");
     res.status(201).json({ ok: true, id });
   } catch (err) {

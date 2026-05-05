@@ -567,6 +567,7 @@ export default function StockBoutiqueManager({
                     {mv.type === "entree" ? "Entrée" : mv.type === "retrait" ? "Retrait client" : mv.type.charAt(0).toUpperCase() + mv.type.slice(1)}
                     {mv.motif ? ` · ${mv.motif}` : ""}
                     {mv.ref_commande ? ` · Réf. ${mv.ref_commande}` : ""}
+                    {mv.admin_nom ? ` · ${mv.admin_nom}` : ""}
                   </p>
                 </div>
                 <div className={`text-sm font-bold shrink-0 ${mv.type === "entree" ? "text-emerald-600" : "text-red-600"}`}>
