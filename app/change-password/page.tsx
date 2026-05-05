@@ -44,7 +44,10 @@ export default function ChangePasswordPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur lors du changement."); return; }
       setSuccess(true);
-      setTimeout(() => { window.location.href = "/admin"; }, 1200);
+      const meRes = await fetch("/api/admin/auth/me");
+      const me = await meRes.ok ? meRes.json() : {};
+      const dest = (me.role === "staff" && me.poste === "Livreur") || me.role === "livreur" ? "/livreur" : "/admin";
+      setTimeout(() => { window.location.href = dest; }, 1200);
     } catch {
       setError("Impossible de se connecter au serveur.");
     } finally {
