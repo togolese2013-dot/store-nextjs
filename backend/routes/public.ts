@@ -22,7 +22,7 @@ async function loadBestsellerProducts(limit: number) {
            qty        INT PATH '$.qty'
          )
        ) AS jt
-       WHERE f.statut != 'annule'
+       WHERE f.statut IN ('valide', 'paye')
          AND jt.produit_id IS NOT NULL
        GROUP BY jt.produit_id
        ORDER BY total_sold DESC
@@ -46,7 +46,7 @@ async function loadBestsellerProducts(limit: number) {
          )
        ) AS jt
        JOIN produits p ON p.reference = jt.reference
-       WHERE o.status NOT IN ('cancelled','annule','annulée')
+       WHERE o.status = 'delivered'
          AND jt.reference IS NOT NULL
          AND jt.reference <> ''
        GROUP BY p.id

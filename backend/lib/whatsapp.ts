@@ -247,8 +247,8 @@ export async function sendOrderNotifications({
       const name  = item.nom || item.nom_produit || "Produit";
       const qty   = item.qty ?? item.quantite ?? 1;
       const prix  = item.total ?? (item.prix ? item.prix * qty : null);
-      return prix ? `${qty}x ${name} — ${fmt(prix)}` : `${qty}x ${name}`;
-    }).join("\n");
+      return prix ? `${qty}x ${name} - ${fmt(prix)}` : `${qty}x ${name}`;
+    }).join(", ");
 
     const totalStr    = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
     const trackingUrl = `${baseUrl}/suivi-commande?ref=${encodeURIComponent(reference)}`;
