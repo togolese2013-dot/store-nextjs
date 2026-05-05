@@ -119,17 +119,17 @@ export default function ProductCard({ product, className, floatingCart = false }
           {/* Badges top-left */}
           <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
             {isPromo && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-accent-500 text-white text-[10px] font-bold shadow-sm">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-500 text-white text-[10px] font-bold shadow-sm">
                 <Zap className="w-2.5 h-2.5" /> -{discountPercent}%
               </span>
             )}
             {isNew && !isPromo && (
-              <span className="px-2 py-0.5 rounded-xl bg-brand-600 text-white text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-brand-600 text-white text-[10px] font-bold">
                 Nouveau
               </span>
             )}
             {outOf && (
-              <span className="px-2 py-0.5 rounded-xl bg-slate-400 text-white text-[10px] font-semibold">
+              <span className="px-2 py-0.5 rounded-md bg-slate-400 text-white text-[10px] font-semibold">
                 Rupture
               </span>
             )}
@@ -155,7 +155,7 @@ export default function ProductCard({ product, className, floatingCart = false }
               onClick={handleAdd}
               aria-label="Ajouter au panier"
               className={clsx(
-                "absolute bottom-2.5 right-2.5 w-8 h-8 rounded-2xl flex items-center justify-center",
+                "absolute bottom-2.5 right-2.5 w-8 h-8 rounded-lg flex items-center justify-center",
                 "shadow-md transition-all duration-200 active:scale-90",
                 "opacity-0 group-hover:opacity-100",
                 added
@@ -213,7 +213,7 @@ export default function ProductCard({ product, className, floatingCart = false }
                 disabled={outOf}
                 aria-label={outOf ? "Indisponible" : added ? "Ajouté" : "Ajouter au panier"}
                 className={clsx(
-                  "lg:hidden shrink-0 w-8 h-8 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90",
+                  "lg:hidden shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 active:scale-90",
                   outOf
                     ? "bg-slate-100 text-slate-300 cursor-not-allowed"
                     : added

@@ -32,7 +32,7 @@ interface PageProps {
 function ActiveFilter({ label, href }: { label: string; href: string }) {
   return (
     <Link href={href}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-100 text-brand-800 text-xs font-semibold hover:bg-brand-200 transition-colors"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-100 text-brand-800 text-xs font-semibold hover:bg-brand-200 transition-colors"
     >
       {label}
       <span className="text-brand-500 font-bold ml-0.5">×</span>
@@ -220,23 +220,23 @@ export default async function ProductsPage({ searchParams }: PageProps) {
             {!promoOnly && !newOnly && !bestOnly && !q && !catId && (
               <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none lg:hidden">
                 <Link href="/products?promo=true"
-                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent-50 text-accent-700 text-sm font-semibold border border-accent-200 hover:bg-accent-100 transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-50 text-accent-700 text-sm font-semibold border border-accent-200 hover:bg-accent-100 transition-colors"
                 >
                   <Tag className="w-3.5 h-3.5" /> Promos
                 </Link>
                 <Link href="/products?new=true"
-                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-50 text-brand-700 text-sm font-semibold border border-brand-200 hover:bg-brand-100 transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-50 text-brand-700 text-sm font-semibold border border-brand-200 hover:bg-brand-100 transition-colors"
                 >
                   <Sparkles className="w-3.5 h-3.5" /> Nouveautés
                 </Link>
                 <Link href="/products?best=true"
-                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200 hover:bg-emerald-100 transition-colors"
                 >
                   <LayoutGrid className="w-3.5 h-3.5" /> Meilleures ventes
                 </Link>
                 {categories.slice(0, 6).map(cat => (
                   <Link key={cat.id} href={`/products?category=${cat.id}`}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-slate-700 text-sm font-semibold border border-slate-200 hover:border-brand-300 hover:text-brand-700 transition-colors"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-200 hover:border-brand-300 hover:text-brand-700 transition-colors"
                   >
                     {cat.nom}
                   </Link>
