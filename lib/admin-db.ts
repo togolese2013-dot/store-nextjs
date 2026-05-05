@@ -2705,6 +2705,10 @@ async function ensureLivraisonCols(): Promise<void> {
       "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL AFTER lien_localisation"
     );
   } catch { /* column already exists */ }
+  // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id
+  try {
+    await db.execute("ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibkf_2");
+  } catch { /* FK already dropped or doesn't exist */ }
 }
 
 export async function listLivraisonsAdmin(opts: {
@@ -2720,7 +2724,7 @@ export async function listLivraisonsAdmin(opts: {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT lv.*, li.nom AS livreur_nom
      FROM livraisons_ventes lv
-     LEFT JOIN livreurs li ON li.id = lv.livreur_id
+     LEFT JOIN utilisateurs li ON li.id = lv.livreur_id
      ${where}
      ORDER BY lv.created_at DESC
      LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
@@ -2765,7 +2769,7 @@ export async function accepterLivraison(livraisonId: number, livreurId: number, 
       return false;
     }
     const [livreurRow] = await conn.execute<mysql.RowDataPacket[]>(
-      "SELECT nom FROM livreurs WHERE id = ?", [livreurId]
+      "SELECT nom FROM utilisateurs WHERE id = ?", [livreurId]
     );
     const nomLivreur = (livreurRow[0] as mysql.RowDataPacket)?.nom ?? null;
     await conn.execute(
@@ -2813,7 +2817,7 @@ export async function getLivraisonsForLivreur(livreurId: number): Promise<Livrai
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT lv.*, li.nom AS livreur_nom
      FROM livraisons_ventes lv
-     LEFT JOIN livreurs li ON li.id = lv.livreur_id
+     LEFT JOIN utilisateurs li ON li.id = lv.livreur_id
      WHERE lv.statut = 'en_attente'
         OR (lv.livreur_id = ? AND lv.statut NOT IN ('livre','echoue'))
      ORDER BY lv.created_at DESC`,
