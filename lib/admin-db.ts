@@ -388,6 +388,7 @@ export interface Utilisateur {
   username:       string | null;
   email:          string | null;
   telephone:      string | null;
+  numero_plaque:  string | null;
   poste:          "Administrateur" | "Commercial" | "Responsable" | "Livreur";
   actif:          number;
   date_creation:  string;
@@ -405,6 +406,7 @@ export async function ensureUtilisateursCols() {
   try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN username VARCHAR(50) NULL AFTER nom"); } catch { /* already exists */ }
   try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN permissions TEXT NULL"); } catch { /* already exists */ }
   try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN must_change_password TINYINT NOT NULL DEFAULT 0"); } catch { /* already exists */ }
+  try { await db.execute("ALTER TABLE utilisateurs ADD COLUMN numero_plaque VARCHAR(30) NULL"); } catch { /* already exists */ }
 }
 
 export async function ensureOrderLivreurCols() {
@@ -435,15 +437,16 @@ export async function migrateAdminLivreursToTeam() {
 }
 
 export async function listUtilisateurs(): Promise<Utilisateur[]> {
+  await ensureUtilisateursCols();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions FROM utilisateurs WHERE actif = 1 ORDER BY date_creation DESC"
+    "SELECT id, nom, username, email, telephone, numero_plaque, poste, actif, date_creation, permissions FROM utilisateurs WHERE actif = 1 ORDER BY date_creation DESC"
   );
   return rows as Utilisateur[];
 }
 
 export async function getUtilisateurById(id: number): Promise<Utilisateur | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions FROM utilisateurs WHERE id = ? LIMIT 1",
+    "SELECT id, nom, username, email, telephone, numero_plaque, poste, actif, date_creation, permissions FROM utilisateurs WHERE id = ? LIMIT 1",
     [id]
   );
   return (rows[0] as Utilisateur) ?? null;
@@ -451,7 +454,7 @@ export async function getUtilisateurById(id: number): Promise<Utilisateur | null
 
 export async function getUtilisateurByUsername(username: string): Promise<(Utilisateur & { mot_de_passe: string }) | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, username, email, telephone, poste, actif, date_creation, permissions, mot_de_passe, must_change_password FROM utilisateurs WHERE username = ? AND actif = 1 LIMIT 1",
+    "SELECT id, nom, username, email, telephone, numero_plaque, poste, actif, date_creation, permissions, mot_de_passe, must_change_password FROM utilisateurs WHERE username = ? AND actif = 1 LIMIT 1",
     [username]
   );
   return (rows[0] as (Utilisateur & { mot_de_passe: string })) ?? null;
@@ -459,29 +462,31 @@ export async function getUtilisateurByUsername(username: string): Promise<(Utili
 
 export async function createUtilisateur(data: {
   nom: string; username?: string; email?: string; telephone?: string;
-  poste: string; motDePasse: string; mustChangePassword?: boolean;
+  numero_plaque?: string; poste: string; motDePasse: string; mustChangePassword?: boolean;
 }): Promise<number> {
+  await ensureUtilisateursCols();
   const [res] = await db.execute<mysql.ResultSetHeader>(
-    "INSERT INTO utilisateurs (nom, username, email, telephone, poste, mot_de_passe, must_change_password) VALUES (?,?,?,?,?,?,?)",
-    [data.nom, data.username ?? null, data.email ?? null, data.telephone ?? null, data.poste, data.motDePasse, data.mustChangePassword ? 1 : 0]
+    "INSERT INTO utilisateurs (nom, username, email, telephone, numero_plaque, poste, mot_de_passe, must_change_password) VALUES (?,?,?,?,?,?,?,?)",
+    [data.nom, data.username ?? null, data.email ?? null, data.telephone ?? null, data.numero_plaque ?? null, data.poste, data.motDePasse, data.mustChangePassword ? 1 : 0]
   );
   return res.insertId;
 }
 
 export async function updateUtilisateur(id: number, data: {
   nom?: string; username?: string; email?: string; telephone?: string;
-  poste?: string; actif?: number; motDePasse?: string; permissions?: string | null;
+  numero_plaque?: string; poste?: string; actif?: number; motDePasse?: string; permissions?: string | null;
 }) {
   const fields: string[] = [];
   const values: (string | number | boolean | null | Buffer)[] = [];
-  if (data.nom         !== undefined) { fields.push("nom = ?");         values.push(data.nom); }
-  if (data.username    !== undefined) { fields.push("username = ?");    values.push(data.username ?? null); }
-  if (data.email       !== undefined) { fields.push("email = ?");       values.push(data.email); }
-  if (data.telephone   !== undefined) { fields.push("telephone = ?");   values.push(data.telephone); }
-  if (data.poste       !== undefined) { fields.push("poste = ?");       values.push(data.poste); }
-  if (data.permissions !== undefined) { fields.push("permissions = ?"); values.push(data.permissions ?? null); }
-  if (data.actif       !== undefined) { fields.push("actif = ?");       values.push(data.actif); }
-  if (data.motDePasse  !== undefined) { fields.push("mot_de_passe = ?"); values.push(data.motDePasse); }
+  if (data.nom           !== undefined) { fields.push("nom = ?");           values.push(data.nom); }
+  if (data.username      !== undefined) { fields.push("username = ?");      values.push(data.username ?? null); }
+  if (data.email         !== undefined) { fields.push("email = ?");         values.push(data.email); }
+  if (data.telephone     !== undefined) { fields.push("telephone = ?");     values.push(data.telephone); }
+  if (data.numero_plaque !== undefined) { fields.push("numero_plaque = ?"); values.push(data.numero_plaque ?? null); }
+  if (data.poste         !== undefined) { fields.push("poste = ?");         values.push(data.poste); }
+  if (data.permissions   !== undefined) { fields.push("permissions = ?");   values.push(data.permissions ?? null); }
+  if (data.actif         !== undefined) { fields.push("actif = ?");         values.push(data.actif); }
+  if (data.motDePasse    !== undefined) { fields.push("mot_de_passe = ?");  values.push(data.motDePasse); }
   if (fields.length === 0) return;
   values.push(id);
   await db.execute(`UPDATE utilisateurs SET ${fields.join(", ")} WHERE id = ?`, values);

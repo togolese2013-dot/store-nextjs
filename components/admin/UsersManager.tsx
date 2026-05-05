@@ -490,15 +490,17 @@ function AdminUserFormModal({
 function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: () => void }) {
   const router   = useRouter();
   const isEdit   = !!user;
-  const [nom,       setNom]       = useState(user?.nom       ?? "");
-  const [username,  setUsername]  = useState(user?.username  ?? "");
-  const [email,     setEmail]     = useState(user?.email     ?? "");
-  const [telephone, setTelephone] = useState(user?.telephone ?? "");
-  const [poste,     setPoste]     = useState<string>(user?.poste ?? "Commercial");
-  const [password,  setPassword]  = useState("");
-  const [showPw,    setShowPw]    = useState(false);
-  const [loading,   setLoading]   = useState(false);
-  const [msg,       setMsg]       = useState("");
+  const [nom,          setNom]          = useState(user?.nom           ?? "");
+  const [username,     setUsername]     = useState(user?.username      ?? "");
+  const [email,        setEmail]        = useState(user?.email         ?? "");
+  const [telephone,    setTelephone]    = useState(user?.telephone     ?? "");
+  const [numeroPlaque, setNumeroPlaque] = useState(user?.numero_plaque ?? "");
+  const [poste,        setPoste]        = useState<string>(user?.poste ?? "Commercial");
+  const [password,     setPassword]     = useState("");
+  const [showPw,       setShowPw]       = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [msg,          setMsg]          = useState("");
+  const isLivreur = poste === "Livreur";
 
   // Auto-suggest username from nom
   function handleNomChange(v: string) {
@@ -512,13 +514,15 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
     if (!nom || !poste) { setMsg("Nom et poste requis."); return; }
     if (!isEdit && !password) { setMsg("Mot de passe requis."); return; }
     if (!isEdit && !username) { setMsg("Nom d'utilisateur requis."); return; }
+    if (isLivreur && !telephone) { setMsg("Le téléphone est obligatoire pour un livreur."); return; }
     setLoading(true); setMsg("");
 
     const body: Record<string, string> = { nom, poste };
-    if (username)  body.username  = username;
-    if (email)     body.email     = email;
-    if (telephone) body.telephone = telephone;
-    if (password)  body.motDePasse = password;
+    if (username)     body.username      = username;
+    if (email)        body.email         = email;
+    if (telephone)    body.telephone     = telephone;
+    if (numeroPlaque) body.numero_plaque = numeroPlaque;
+    if (password)     body.motDePasse    = password;
 
     const res = await fetch(
       isEdit ? `/api/admin/team/${user!.id}` : "/api/admin/team",
@@ -567,9 +571,9 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
                 autoComplete="off" className={inputCls} placeholder="email@ex.com" />
             </div>
             <div>
-              <label className={labelCls}>Téléphone</label>
+              <label className={labelCls}>Téléphone {isLivreur && <span className="text-red-500">*</span>}</label>
               <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value)}
-                className={inputCls} placeholder="+228 90 00 00 00" />
+                className={inputCls} placeholder="+228 90 00 00 00" required={isLivreur} />
             </div>
           </div>
 
@@ -579,6 +583,20 @@ function TeamFormModal({ user, onClose }: { user: Utilisateur | null; onClose: (
               {POSTES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+
+          {isLivreur && (
+            <div>
+              <label className={labelCls}>Numéro de plaque</label>
+              <input
+                type="text"
+                value={numeroPlaque}
+                onChange={e => setNumeroPlaque(e.target.value.toUpperCase())}
+                className={inputCls}
+                placeholder="TG 4074 BG"
+                maxLength={20}
+              />
+            </div>
+          )}
 
           <div>
             <label className={labelCls}>{isEdit ? "Nouveau mot de passe" : "Mot de passe *"}</label>

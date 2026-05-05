@@ -172,10 +172,11 @@ router.post("/api/admin/team", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   try {
-    const { nom, poste, email, telephone, username, motDePasse } = req.body as Record<string, string>;
+    const { nom, poste, email, telephone, numero_plaque, username, motDePasse } = req.body as Record<string, string>;
     if (!nom || !poste || !motDePasse) return res.status(400).json({ error: "Champs manquants." });
+    if (poste === "Livreur" && !telephone) return res.status(400).json({ error: "Le téléphone est obligatoire pour un livreur." });
     const hash = await bcrypt.hash(motDePasse, 12);
-    const id = await createUtilisateur({ nom, poste, email, telephone, username: username?.trim().toLowerCase() || undefined, motDePasse: hash, mustChangePassword: true });
+    const id = await createUtilisateur({ nom, poste, email, telephone, numero_plaque: numero_plaque || undefined, username: username?.trim().toLowerCase() || undefined, motDePasse: hash, mustChangePassword: true });
     res.status(201).json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -188,11 +189,12 @@ router.patch("/api/admin/team/:id", async (req, res) => {
   try {
     const { motDePasse, ...rest } = req.body as Record<string, unknown>;
     const data: Parameters<typeof updateUtilisateur>[1] = {};
-    if (rest.nom       !== undefined) data.nom       = String(rest.nom);
-    if (rest.username  !== undefined) data.username  = rest.username ? String(rest.username).trim().toLowerCase() : undefined;
-    if (rest.email     !== undefined) data.email     = rest.email ? String(rest.email) : undefined;
-    if (rest.telephone !== undefined) data.telephone = rest.telephone ? String(rest.telephone) : undefined;
-    if (rest.poste     !== undefined) data.poste     = String(rest.poste);
+    if (rest.nom           !== undefined) data.nom           = String(rest.nom);
+    if (rest.username      !== undefined) data.username      = rest.username ? String(rest.username).trim().toLowerCase() : undefined;
+    if (rest.email         !== undefined) data.email         = rest.email ? String(rest.email) : undefined;
+    if (rest.telephone     !== undefined) data.telephone     = rest.telephone ? String(rest.telephone) : undefined;
+    if (rest.numero_plaque !== undefined) data.numero_plaque = rest.numero_plaque ? String(rest.numero_plaque) : undefined;
+    if (rest.poste         !== undefined) data.poste         = String(rest.poste);
     if (rest.actif     !== undefined) data.actif     = Number(rest.actif);
     if (motDePasse)                   data.motDePasse = await bcrypt.hash(String(motDePasse), 12);
     await updateUtilisateur(Number(req.params.id), data);
