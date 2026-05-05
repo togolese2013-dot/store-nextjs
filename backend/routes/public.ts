@@ -9,66 +9,65 @@ const router = express.Router();
 async function loadBestsellerProducts(limit: number) {
   const pool = db as import("mysql2/promise").Pool;
 
-  let salesRows: import("mysql2/promise").RowDataPacket[] = [];
+  // Step 1: boutique sales via mouvements table (no JSON_TABLE — always works)
+  const salesMap = new Map<number, number>();
   try {
-    const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
-      `SELECT reference, SUM(total_sold) AS total_sold
-       FROM (
-         SELECT jt.reference, SUM(jt.qty) AS total_sold
-         FROM orders o,
-         JSON_TABLE(
-           o.items, '$[*]'
-           COLUMNS (
-             reference VARCHAR(100) PATH '$.reference',
-             qty       INT          PATH '$.qty'
-           )
-         ) AS jt
-         WHERE o.status NOT IN ('cancelled','annule','annulée')
-           AND jt.reference IS NOT NULL
-           AND jt.reference <> ''
-         GROUP BY jt.reference
-
-         UNION ALL
-
-         SELECT jf.reference, SUM(jf.qty) AS total_sold
-         FROM factures f,
-         JSON_TABLE(
-           f.items, '$[*]'
-           COLUMNS (
-             reference VARCHAR(100) PATH '$.reference',
-             qty       INT          PATH '$.qty'
-           )
-         ) AS jf
-         WHERE f.statut NOT IN ('annule')
-           AND jf.reference IS NOT NULL
-           AND jf.reference <> ''
-         GROUP BY jf.reference
-       ) sales
-       GROUP BY reference
+    const [mouvsRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT produit_id, SUM(quantite) AS total_sold
+       FROM boutique_mouvements
+       WHERE type = 'sortie'
+       GROUP BY produit_id
        ORDER BY total_sold DESC
        LIMIT 50`
     );
-    salesRows = rows;
-  } catch {
-    // JSON_TABLE non supporté sur cette version MySQL — on passe directement au fallback aléatoire
-  }
+    for (const r of mouvsRows) {
+      salesMap.set(r.produit_id as number, Number(r.total_sold));
+    }
+  } catch { /* boutique_mouvements may not exist yet */ }
 
+  // Step 2: online order sales via JSON_TABLE (MySQL 8+ only, graceful skip)
+  try {
+    const [orderRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT p.id AS produit_id, SUM(jt.qty) AS total_sold
+       FROM orders o,
+       JSON_TABLE(
+         o.items, '$[*]'
+         COLUMNS (
+           reference VARCHAR(100) PATH '$.reference',
+           qty       INT          PATH '$.qty'
+         )
+       ) AS jt
+       JOIN produits p ON p.reference = jt.reference
+       WHERE o.status NOT IN ('cancelled','annule','annulée')
+         AND jt.reference IS NOT NULL
+         AND jt.reference <> ''
+       GROUP BY p.id
+       ORDER BY total_sold DESC
+       LIMIT 50`
+    );
+    for (const r of orderRows) {
+      const pid = r.produit_id as number;
+      salesMap.set(pid, (salesMap.get(pid) ?? 0) + Number(r.total_sold));
+    }
+  } catch { /* JSON_TABLE not supported — boutique sales still counted above */ }
+
+  // Step 3: fetch and rank products by total sales
   let products: import("mysql2/promise").RowDataPacket[] = [];
-  if (salesRows.length > 0) {
-    const refs = salesRows.map(r => r.reference as string);
-    const placeholders = refs.map(() => "?").join(",");
+  if (salesMap.size > 0) {
+    const ranked = [...salesMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50);
+    const ids = ranked.map(([id]) => id);
+    const placeholders = ids.map(() => "?").join(",");
+
     const [prodRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
       `SELECT p.*, c.nom AS categorie_nom
        FROM produits p
        LEFT JOIN categories c ON c.id = p.categorie_id
-       WHERE p.reference IN (${placeholders})
-         AND p.actif = 1
-       LIMIT 50`,
-      refs
+       WHERE p.id IN (${placeholders})
+         AND p.actif = 1`,
+      ids
     );
 
-    const rankMap = new Map(salesRows.map((r, i) => [r.reference as string, i]));
-    prodRows.sort((a, b) => (rankMap.get(a.reference) ?? 999) - (rankMap.get(b.reference) ?? 999));
+    prodRows.sort((a, b) => (salesMap.get(b.id as number) ?? 0) - (salesMap.get(a.id as number) ?? 0));
 
     const poolSize = Math.min(prodRows.length, Math.max(limit + 8, 16));
     const topPool = prodRows.slice(0, poolSize);
@@ -79,6 +78,7 @@ async function loadBestsellerProducts(limit: number) {
     products = topPool.slice(0, limit);
   }
 
+  // Step 4: fallback to random active products if not enough results
   if (products.length < limit) {
     const existing = new Set(products.map(p => p.id as number));
     const needed = limit - products.length;

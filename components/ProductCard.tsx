@@ -87,7 +87,7 @@ export default function ProductCard({ product, className, floatingCart = false }
     >
       {/* ── Image ── */}
       <Link href={`/products/${product.id}`} className="block relative" tabIndex={-1}>
-        <div className="relative overflow-hidden bg-[#f8fafb] aspect-square">
+        <div className="relative overflow-hidden bg-[#f8fafb] aspect-square lg:aspect-[4/3]">
 
           {/* Skeleton */}
           {!imgOk && !imgErr && (
@@ -188,40 +188,73 @@ export default function ProductCard({ product, className, floatingCart = false }
         {/* Rating */}
         <RatingBadge productId={product.id} />
 
-        {/* Prix + bouton panier */}
-        <div className="flex items-center justify-between gap-2 mt-1.5">
-          <div className="flex flex-col min-w-0">
-            <span className={clsx(
-              "font-display font-bold text-[15px] tracking-tight leading-tight",
-              isPromo ? "text-accent-600" : "text-slate-900"
-            )}>
-              {formatPrice(price)}
-            </span>
-            {isPromo && (
-              <span className="text-[10px] text-slate-400 line-through leading-tight">
-                {formatPrice(product.prix_unitaire)}
+        {/* Prix + bouton panier — mobile: compact inline, desktop: full-width below */}
+        <div className="mt-1.5">
+          {/* Prix */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col min-w-0">
+              <span className={clsx(
+                "font-display font-bold text-[15px] tracking-tight leading-tight",
+                isPromo ? "text-accent-600" : "text-slate-900"
+              )}>
+                {formatPrice(price)}
               </span>
+              {isPromo && (
+                <span className="text-[10px] text-slate-400 line-through leading-tight">
+                  {formatPrice(product.prix_unitaire)}
+                </span>
+              )}
+            </div>
+
+            {/* Mobile only: compact round button */}
+            {!floatingCart && (
+              <button
+                onClick={handleAdd}
+                disabled={outOf}
+                aria-label={outOf ? "Indisponible" : added ? "Ajouté" : "Ajouter au panier"}
+                className={clsx(
+                  "lg:hidden shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90",
+                  outOf
+                    ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                    : added
+                      ? "bg-green-500 text-white shadow-[0_4px_10px_rgba(34,197,94,0.35)]"
+                      : "bg-brand-900 text-white hover:bg-brand-800 shadow-[0_4px_10px_rgba(20,83,45,0.22)]"
+                )}
+              >
+                {added
+                  ? <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 13l4 4L19 7"/></svg>
+                  : <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                }
+              </button>
             )}
           </div>
 
+          {/* Desktop only: full-width button below price */}
           {!floatingCart && (
             <button
               onClick={handleAdd}
               disabled={outOf}
               aria-label={outOf ? "Indisponible" : added ? "Ajouté" : "Ajouter au panier"}
               className={clsx(
-                "shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90",
+                "hidden lg:flex mt-2 w-full items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-semibold transition-all duration-200 active:scale-95",
                 outOf
-                  ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                   : added
-                    ? "bg-green-500 text-white shadow-[0_4px_10px_rgba(34,197,94,0.35)]"
-                    : "bg-brand-900 text-white hover:bg-brand-800 shadow-[0_4px_10px_rgba(20,83,45,0.22)]"
+                    ? "bg-green-500 text-white shadow-[0_4px_10px_rgba(34,197,94,0.3)]"
+                    : "bg-brand-900 text-white hover:bg-brand-800 shadow-[0_4px_10px_rgba(20,83,45,0.18)]"
               )}
             >
-              {added
-                ? <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 13l4 4L19 7"/></svg>
-                : <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              }
+              {added ? (
+                <>
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 13l4 4L19 7"/></svg>
+                  Ajouté
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                  {outOf ? "Indisponible" : "Ajouter au panier"}
+                </>
+              )}
             </button>
           )}
         </div>
