@@ -5,6 +5,7 @@ import {
   listFactures, createVenteWithStock, getVentesStats,
   updateFactureStatut, updateFacture, deleteFacture, getFactureById,
   listDevis, createDevis, listLivraisons,
+  getFinanceStats, getStockBoutiqueStats,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -18,10 +19,20 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
     const statut = (req.query.statut as string) || undefined;
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset)  || 0);
-    const [{ items, total }, stats] = await Promise.all([
+    const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
       listFactures({ search, statut, limit, offset }),
       getVentesStats(),
+      getFinanceStats().catch(() => null),
+      getStockBoutiqueStats().catch(() => null),
     ]);
+    const stats = {
+      ...ventesStats,
+      total_recettes: financeStats?.total_recettes ?? 0,
+      total_depenses: financeStats?.total_depenses ?? 0,
+      solde_net:      financeStats?.solde_net      ?? 0,
+      stock_produits: stockStats?.total_produits   ?? 0,
+      stock_epuises:  stockStats?.epuises          ?? 0,
+    };
     res.json({ items, total, stats });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";

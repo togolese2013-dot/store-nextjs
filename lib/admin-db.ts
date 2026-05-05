@@ -2248,9 +2248,10 @@ export async function deleteFinanceEntry(id: number) {
 export async function getVentesStats(): Promise<{
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
+  ventes_jour_montant: number; ventes_jour_count: number;
 }> {
   const SITE_ORDER_FILTER = "(source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))";
-  const [[f], [l], [ca], [fp]] = await Promise.all([
+  const [[f], [l], [ca], [fp], [tj]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE ${SITE_ORDER_FILTER}`),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
     db.execute<mysql.RowDataPacket[]>(`
@@ -2262,12 +2263,18 @@ export async function getVentesStats(): Promise<{
         END
       ), 0) AS total FROM factures WHERE statut != 'annule' AND ${SITE_ORDER_FILTER}`),
     db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE statut = 'paye' AND ${SITE_ORDER_FILTER}`),
+    db.execute<mysql.RowDataPacket[]>(`
+      SELECT COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS montant
+      FROM factures
+      WHERE DATE(created_at) = CURDATE() AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
   ]);
   return {
-    factures:       Number((f  as mysql.RowDataPacket[])[0]?.cnt   ?? 0),
-    livraisons:     Number((l  as mysql.RowDataPacket[])[0]?.cnt   ?? 0),
-    ca_total:       Number((ca as mysql.RowDataPacket[])[0]?.total ?? 0),
-    factures_payees:Number((fp as mysql.RowDataPacket[])[0]?.cnt   ?? 0),
+    factures:            Number((f  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    livraisons:          Number((l  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    ca_total:            Number((ca as mysql.RowDataPacket[])[0]?.total   ?? 0),
+    factures_payees:     Number((fp as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    ventes_jour_montant: Number((tj as mysql.RowDataPacket[])[0]?.montant ?? 0),
+    ventes_jour_count:   Number((tj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
   };
 }
 

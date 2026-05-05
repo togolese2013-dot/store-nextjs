@@ -7,6 +7,7 @@ import {
   X, Check, AlertTriangle, Pencil,
   CreditCard, Banknote, Smartphone, Building2, Package,
   ShoppingCart, Minus, MapPin, UserCheck,
+  Warehouse, ArrowDownCircle, ArrowUpCircle, DollarSign,
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import TabBar     from "@/components/admin/TabBar";
@@ -16,7 +17,12 @@ import { formatPrice } from "@/lib/utils";
 /* ─── Types ─── */
 type Tab = "ventes" | "livraisons";
 
-interface Stats { factures: number; livraisons: number; ca_total: number; factures_payees: number }
+interface Stats {
+  factures: number; livraisons: number; ca_total: number; factures_payees: number;
+  ventes_jour_montant: number; ventes_jour_count: number;
+  total_recettes: number; total_depenses: number; solde_net: number;
+  stock_produits: number; stock_epuises: number;
+}
 
 interface Props {
   initialFactures:   Facture[];
@@ -491,40 +497,74 @@ export default function VentesManager({
 
       {/* KPI Dashboard */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Produits en stock */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">CA Total</p>
-            <TrendingUp className="w-8 h-8 text-emerald-500 opacity-20" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Produits en stock</p>
+            <Warehouse className="w-8 h-8 text-slate-400 opacity-30" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{new Intl.NumberFormat("fr-FR").format(stats.stock_produits)}</p>
+          {stats.stock_epuises > 0 && (
+            <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-100">
+              {stats.stock_epuises} produit{stats.stock_epuises > 1 ? "s" : ""} épuisé{stats.stock_epuises > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        {/* Ventes aujourd'hui */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ventes aujourd'hui</p>
+            <ShoppingCart className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums">
-            {new Intl.NumberFormat("fr-FR").format(stats.ca_total)}{" "}
+            {new Intl.NumberFormat("fr-FR").format(stats.ventes_jour_montant)}{" "}
             <span className="text-sm font-semibold text-emerald-500">FCFA</span>
           </p>
-          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Hors annulations</span>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+            {stats.ventes_jour_count} vente{stats.ventes_jour_count !== 1 ? "s" : ""}
+          </span>
         </div>
+
+        {/* Revenu */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ventes</p>
-            <ShoppingCart className="w-8 h-8 text-blue-500 opacity-20" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Revenu</p>
+            <DollarSign className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.factures}</p>
-          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">Total factures</span>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {new Intl.NumberFormat("fr-FR").format(stats.total_recettes)}{" "}
+            <span className="text-sm font-semibold text-emerald-500">FCFA</span>
+          </p>
+          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-100">
+            Solde : {new Intl.NumberFormat("fr-FR").format(stats.solde_net)} FCFA
+          </span>
         </div>
+
+        {/* Rentrées */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payées</p>
-            <Check className="w-8 h-8 text-emerald-500 opacity-20" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rentrées</p>
+            <ArrowDownCircle className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.factures_payees}</p>
-          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Statut payé</span>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {new Intl.NumberFormat("fr-FR").format(stats.total_recettes)}{" "}
+            <span className="text-sm font-semibold text-cyan-500">FCFA</span>
+          </p>
         </div>
+      </div>
+
+      {/* Dépenses — ligne séparée */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-3">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Livraisons</p>
-            <Truck className="w-8 h-8 text-amber-500 opacity-20" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dépenses</p>
+            <ArrowUpCircle className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums">{stats.livraisons}</p>
-          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">Total livraisons</span>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {new Intl.NumberFormat("fr-FR").format(stats.total_depenses)}{" "}
+            <span className="text-sm font-semibold text-red-500">FCFA</span>
+          </p>
         </div>
       </div>
 
