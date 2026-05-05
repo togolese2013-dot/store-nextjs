@@ -9,25 +9,31 @@ const router = express.Router();
 async function loadBestsellerProducts(limit: number) {
   const pool = db as import("mysql2/promise").Pool;
 
-  // Step 1: boutique sales via mouvements table (no JSON_TABLE — always works)
+  // Step 1: boutique ventes via factures.items (produit_id — no collation issue)
   const salesMap = new Map<number, number>();
   try {
-    const [mouvsRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
-      `SELECT produit_id, SUM(quantite) AS total_sold
-       FROM boutique_mouvements
-       WHERE type = 'sortie'
-         AND motif IN ('Vente', 'Commande site livrée')
-       GROUP BY produit_id
+    const [factRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT jt.produit_id, SUM(jt.qty) AS total_sold
+       FROM factures f,
+       JSON_TABLE(
+         f.items, '$[*]'
+         COLUMNS (
+           produit_id INT PATH '$.produit_id',
+           qty        INT PATH '$.qty'
+         )
+       ) AS jt
+       WHERE f.statut != 'annule'
+         AND jt.produit_id IS NOT NULL
+       GROUP BY jt.produit_id
        ORDER BY total_sold DESC
        LIMIT 50`
     );
-    console.log(`[BS] step1 boutique_mouvements: ${mouvsRows.length} produits`, mouvsRows.map(r => `id=${r.produit_id} qty=${r.total_sold}`));
-    for (const r of mouvsRows) {
+    for (const r of factRows) {
       salesMap.set(r.produit_id as number, Number(r.total_sold));
     }
-  } catch (e) { console.error("[BS] step1 error:", e); }
+  } catch (e) { console.error("[BS] step1 factures error:", e); }
 
-  // Step 2: online order sales via JSON_TABLE (MySQL 8+ only, graceful skip)
+  // Step 2: store orders via orders.items (reference → produit)
   try {
     const [orderRows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
       `SELECT p.id AS produit_id, SUM(jt.qty) AS total_sold
@@ -47,14 +53,11 @@ async function loadBestsellerProducts(limit: number) {
        ORDER BY total_sold DESC
        LIMIT 50`
     );
-    console.log(`[BS] step2 orders JSON_TABLE: ${orderRows.length} produits`, orderRows.map(r => `id=${r.produit_id} qty=${r.total_sold}`));
     for (const r of orderRows) {
       const pid = r.produit_id as number;
       salesMap.set(pid, (salesMap.get(pid) ?? 0) + Number(r.total_sold));
     }
-  } catch (e) { console.error("[BS] step2 JSON_TABLE error:", e); }
-
-  console.log(`[BS] salesMap final: ${salesMap.size} produits —`, [...salesMap.entries()].sort((a,b) => b[1]-a[1]).slice(0,10).map(([id,qty]) => `id=${id}:${qty}`).join(", "));
+  } catch (e) { console.error("[BS] step2 orders error:", e); }
 
   // Step 3: fetch and rank products by total sales
   let products: import("mysql2/promise").RowDataPacket[] = [];
