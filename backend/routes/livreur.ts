@@ -292,7 +292,7 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
         return res.status(403).json({ error: "Cette livraison ne vous est pas assignée." });
       }
       await pool.execute(
-        "UPDATE orders SET livraison_statut = 'livre', status = 'delivered', updated_at = NOW() WHERE id = ?",
+        "UPDATE orders SET livraison_statut = 'livre', status = 'delivered' WHERE id = ?",
         [entityId]
       );
       await addOrderEvent(entityId, "delivered", `Livré par ${ctx.member.nom}`, ctx.member.nom);

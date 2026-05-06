@@ -410,9 +410,15 @@ export async function ensureUtilisateursCols() {
 }
 
 export async function ensureOrderLivreurCols() {
-  try { await db.execute("ALTER TABLE orders ADD COLUMN livreur_id INT NULL"); } catch { /* already exists */ }
-  try { await db.execute("ALTER TABLE orders ADD COLUMN livraison_note TEXT NULL"); } catch { /* already exists */ }
-  try { await db.execute("ALTER TABLE orders ADD COLUMN livraison_statut VARCHAR(20) NULL"); } catch { /* already exists */ }
+  const cols = [
+    "ALTER TABLE orders ADD COLUMN livreur_id INT NULL",
+    "ALTER TABLE orders ADD COLUMN livraison_note TEXT NULL",
+    "ALTER TABLE orders ADD COLUMN livraison_statut VARCHAR(20) NULL",
+    "ALTER TABLE orders ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+  ];
+  for (const sql of cols) {
+    try { await db.execute(sql); } catch { /* already exists */ }
+  }
 }
 
 // Migrate livreurs from admin_users to utilisateurs (one-time, idempotent)
@@ -2706,6 +2712,7 @@ export async function ensureLivraisonCols(): Promise<void> {
     "ALTER TABLE livraisons_ventes ADD COLUMN livree_le DATETIME NULL",
     "ALTER TABLE livraisons_ventes ADD COLUMN note TEXT NULL",
     "ALTER TABLE livraisons_ventes ADD COLUMN livreur VARCHAR(255) NULL",
+    "ALTER TABLE livraisons_ventes ADD COLUMN order_id INT NULL",
     // Fix ENUM to include all required values
     "ALTER TABLE livraisons_ventes MODIFY COLUMN statut ENUM('en_attente','acceptee','en_cours','livre','echoue') NOT NULL DEFAULT 'en_attente'",
     // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id

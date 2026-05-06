@@ -69,11 +69,48 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   const id = Number(req.params.id);
 
-  /* ── Status change (existing) ── */
+  /* ── Status change ── */
   if (req.body.status !== undefined && req.body.field !== "update") {
     const { status, note } = req.body;
     await updateOrderStatus(id, status);
     await addOrderEvent(id, status, note ?? "", session.nom);
+
+    /* When confirmed: create livraison entry so it appears in BOUTIQUE livraisons + livreur platform */
+    if (String(status) === "confirmed") {
+      try {
+        const [[orderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+          "SELECT id, reference, nom, telephone, adresse, zone_livraison, lien_localisation FROM orders WHERE id = ? LIMIT 1",
+          [id]
+        );
+        if (orderRow) {
+          /* Idempotent — don't create duplicate for same order */
+          const [[existing]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+            "SELECT id FROM livraisons_ventes WHERE order_id = ? LIMIT 1", [id]
+          );
+          if (!existing) {
+            const livRef = `LV-${orderRow.reference}`;
+            await (db as mysql.Pool).execute(
+              `INSERT INTO livraisons_ventes
+                 (reference, facture_id, client_nom, client_tel, adresse, contact_livraison,
+                  lien_localisation, statut, note, order_id)
+               VALUES (?, NULL, ?, ?, ?, ?, ?, 'en_attente', NULL, ?)`,
+              [
+                livRef,
+                orderRow.nom        ?? null,
+                orderRow.telephone  ?? null,
+                orderRow.adresse    ?? null,
+                orderRow.telephone  ?? null,
+                orderRow.lien_localisation ?? null,
+                id,
+              ]
+            );
+          }
+        }
+      } catch (e) {
+        console.error("[orders] livraison creation failed:", e);
+      }
+    }
+
     if (["delivered", "livree", "livrée", "livre", "livré"].includes(String(status))) {
       await applyOrderDeliveredEffects(id, session.nom);
       await ensureOrderVente(id);

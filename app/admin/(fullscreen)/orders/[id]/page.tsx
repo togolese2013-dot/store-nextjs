@@ -1,7 +1,7 @@
 import { getOrderById, getOrderEvents } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 import OrderTimeline from "@/components/admin/OrderTimeline";
-import OrderStatusSelect from "@/components/admin/OrderStatusSelect";
+import OrderConfirmButton from "@/components/admin/OrderConfirmButton";
 import OrderDetailActions from "@/components/admin/OrderDetailActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -80,6 +80,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {order.status === "pending" && (
+            <OrderConfirmButton orderId={order.id} />
+          )}
           <a
             href={`/api/admin/orders/${id}/invoice`}
             target="_blank" rel="noreferrer"
@@ -184,13 +187,6 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Statut livraison */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
-            <h2 className="font-bold text-slate-700">Statut de livraison</h2>
-            <OrderStatusSelect orderId={order.id} currentStatus={order.status} />
-            <p className="text-xs text-slate-400">Enregistré automatiquement dans l&apos;historique.</p>
           </div>
 
           {/* Statut paiement + actions (modifier / supprimer) */}
