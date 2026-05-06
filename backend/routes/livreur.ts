@@ -221,7 +221,7 @@ router.patch("/api/livreur/orders/:id/accept", async (req, res) => {
       );
     } else {
       const [[order]] = await pool.execute<mysql.RowDataPacket[]>(
-        "SELECT id, status, livreur_id FROM orders WHERE id = ? LIMIT 1", [entityId]
+        "SELECT id, status, livreur_id, delivery_fee FROM orders WHERE id = ? LIMIT 1", [entityId]
       );
       if (!order) return res.status(404).json({ error: "Commande introuvable." });
       if (order.status !== "confirmed" || order.livreur_id != null) {
@@ -232,6 +232,12 @@ router.patch("/api/livreur/orders/:id/accept", async (req, res) => {
         [ctx.member.id, entityId]
       );
       await addOrderEvent(entityId, "shipped", `Pris en charge par ${ctx.member.nom}`, ctx.member.nom);
+      // Sync linked livraisons_ventes so BOUTIQUE table reflects livreur + status
+      await pool.execute(
+        `UPDATE livraisons_ventes SET statut = 'acceptee', livreur_id = ?, livreur = ?, montant_livraison = ?
+         WHERE order_id = ?`,
+        [ctx.member.id, ctx.member.nom, Number(order.delivery_fee ?? 0), entityId]
+      ).catch(() => {});
     }
     res.json({ ok: true });
   } catch (err) {
@@ -296,6 +302,11 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
         [entityId]
       );
       await addOrderEvent(entityId, "delivered", `Livré par ${ctx.member.nom}`, ctx.member.nom);
+      // Sync linked livraisons_ventes
+      await pool.execute(
+        "UPDATE livraisons_ventes SET statut = 'livre', livree_le = NOW() WHERE order_id = ?",
+        [entityId]
+      ).catch(() => {});
     }
     res.json({ ok: true });
   } catch (err) {
@@ -339,6 +350,11 @@ router.patch("/api/livreur/orders/:id/fail", async (req, res) => {
         [note, entityId]
       );
       await addOrderEvent(entityId, "confirmed", `Tentative échouée par ${ctx.member.nom} — ${note}`, ctx.member.nom);
+      // Sync linked livraisons_ventes — return to en_attente for reassignment
+      await pool.execute(
+        "UPDATE livraisons_ventes SET statut = 'en_attente', livreur_id = NULL, livreur = NULL, note = ? WHERE order_id = ?",
+        [note, entityId]
+      ).catch(() => {});
     }
     res.json({ ok: true });
   } catch (err) {
