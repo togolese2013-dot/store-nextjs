@@ -494,14 +494,14 @@ export default function VentesManager({
           )}
         </div>
 
-        {/* Solde */}
+        {/* Solde du jour */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-1">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Solde</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Solde aujourd&apos;hui</p>
             <Banknote className="w-8 h-8 text-emerald-400 opacity-40" />
           </div>
-          <p className={`text-2xl font-bold tabular-nums ${stats.solde_net >= 0 ? "text-slate-900" : "text-red-600"}`}>
-            {new Intl.NumberFormat("fr-FR").format(stats.solde_net)}{" "}
+          <p className={`text-2xl font-bold tabular-nums ${(stats.solde_jour ?? 0) >= 0 ? "text-slate-900" : "text-red-600"}`}>
+            {new Intl.NumberFormat("fr-FR").format(stats.solde_jour ?? 0)}{" "}
             <span className="text-sm font-semibold text-emerald-500">FCFA</span>
           </p>
         </div>
@@ -604,7 +604,9 @@ export default function VentesManager({
                         <td className="px-5 py-4">
                           <div className="font-semibold text-slate-900">{f.client_nom}</div>
                         </td>
-                        <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">{formatPrice(f.total)}</td>
+                        <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">
+                          {formatPrice(f.source === "site_order" ? (f.sous_total ?? f.total) : f.total)}
+                        </td>
                         <td className="px-5 py-4 text-center">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>{s.label}</span>
                         </td>

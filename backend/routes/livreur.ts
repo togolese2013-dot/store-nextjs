@@ -291,8 +291,7 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
       }
     } else {
       const [[order]] = await pool.execute<mysql.RowDataPacket[]>(
-        "SELECT id, livreur_id, subtotal, payment_mode, statut_paiement, vente_facture_id FROM orders WHERE id = ? LIMIT 1",
-        [entityId]
+        "SELECT id, livreur_id FROM orders WHERE id = ? LIMIT 1", [entityId]
       );
       if (!order) return res.status(404).json({ error: "Commande introuvable." });
       if (Number(order.livreur_id) !== ctx.member.id) {
@@ -304,32 +303,18 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
         [entityId]
       );
       await addOrderEvent(entityId, "delivered", `Livré par ${ctx.member.nom}`, ctx.member.nom);
-      // Sync linked livraisons_ventes
+      // Sync livraisons_ventes
       await pool.execute(
         "UPDATE livraisons_ventes SET statut = 'livre', livree_le = NOW() WHERE order_id = ?",
         [entityId]
       ).catch(() => {});
-      // Create/sync facture then mark it paid + create vente finance entry
-      try {
-        const factureId = order.vente_facture_id ? Number(order.vente_facture_id) : await ensureOrderVente(entityId);
-        if (factureId) {
-          await pool.execute(
-            "UPDATE factures SET statut_paiement = 'paye_total', statut = 'paye' WHERE id = ? AND statut != 'annule'",
-            [factureId]
-          );
-        }
-        const montant = Number(order.subtotal ?? 0);
-        if (montant > 0) {
-          await createFinanceEntry({
-            type:          "vente",
-            montant,
-            mode_paiement: order.payment_mode || "especes",
-            description:   `Commande site livrée — réf. #${entityId}`,
-            date_entree:   new Date().toISOString().slice(0, 10),
-          });
-        }
-      } catch (e) {
-        console.error("[livreur] finance/facture sync failed:", e);
+      // ensureOrderVente handles: create facture (with vendeur), create finance entry, mark paid
+      const factureId = await ensureOrderVente(entityId, { id: ctx.member.id, nom: ctx.member.nom }).catch(() => null);
+      if (factureId) {
+        await pool.execute(
+          "UPDATE factures SET statut_paiement = 'paye_total', statut = 'paye' WHERE id = ? AND statut != 'annule'",
+          [factureId]
+        ).catch(() => {});
       }
     }
     res.json({ ok: true });

@@ -780,67 +780,92 @@ function orderPaymentModeToFinanceMode(mode?: string | null): FinanceEntry["mode
   return "especes";
 }
 
-export async function ensureOrderVente(orderId: number): Promise<number | null> {
+export async function ensureOrderVente(
+  orderId: number,
+  actor?: { id?: number; nom?: string }
+): Promise<number | null> {
   await ensureOrderLifecycleCols();
   const [[order]] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT * FROM orders WHERE id = ? LIMIT 1", [orderId]
   );
   if (!order) return null;
-  if (order.vente_facture_id) return Number(order.vente_facture_id);
 
-  const items = parseOrderItems(order.items).map(item => {
-    const qty = Number(item.qty ?? item.quantite ?? 1);
-    const prix = Number(item.prix_unitaire ?? item.prix ?? 0);
-    return {
-      produit_id: Number(item.id ?? item.produit_id ?? 0),
-      nom: String(item.nom ?? "Produit"),
-      reference: String(item.reference ?? ""),
-      qty,
-      prix,
-      total: Number(item.total ?? prix * qty),
-    };
-  });
+  let factureId = order.vente_facture_id ? Number(order.vente_facture_id) : null;
 
-  if (items.length === 0) return null;
+  // Create facture once — actor.id stored as admin_id (vendeur = first confirming admin)
+  if (!factureId) {
+    const items = parseOrderItems(order.items).map(item => {
+      const qty = Number(item.qty ?? item.quantite ?? 1);
+      const prix = Number(item.prix_unitaire ?? item.prix ?? 0);
+      return {
+        produit_id: Number(item.id ?? item.produit_id ?? 0),
+        nom:        String(item.nom ?? "Produit"),
+        reference:  String(item.reference ?? ""),
+        qty, prix,
+        total: Number(item.total ?? prix * qty),
+      };
+    });
+    if (items.length === 0) return null;
 
-  const reference = generateVenteRef("VS");
-  const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO factures
-       (reference, client_nom, client_tel, items, sous_total, remise, total,
-        avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
-        mode_paiement, statut_paiement, statut, note, source, order_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [
-      reference,
-      String(order.nom ?? "").trim().toUpperCase(),
-      order.telephone ?? null,
-      JSON.stringify(items),
-      Number(order.subtotal ?? 0),
-      0,
-      Number(order.total ?? 0),
-      1,
-      order.adresse ?? null,
-      order.telephone ?? null,
-      order.lien_localisation ?? null,
-      orderPaymentModeToFinanceMode(order.payment_mode as string | null),
-      order.statut_paiement === "paye" ? "paye_total" : (order.statut_paiement ?? "non_paye"),
-      "valide",
-      `Commande site ${order.reference}`,
-      "site_order",
-      orderId,
-    ]
-  );
+    const reference = generateVenteRef("VS");
+    const [result] = await db.execute<mysql.ResultSetHeader>(
+      `INSERT INTO factures
+         (reference, client_nom, client_tel, items, sous_total, remise, total,
+          avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
+          mode_paiement, statut_paiement, statut, note, source, order_id, admin_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        reference,
+        String(order.nom ?? "").trim().toUpperCase(),
+        order.telephone ?? null,
+        JSON.stringify(items),
+        Number(order.subtotal ?? 0),
+        0,
+        Number(order.total ?? 0),
+        1,
+        order.adresse         ?? null,
+        order.telephone       ?? null,
+        order.lien_localisation ?? null,
+        orderPaymentModeToFinanceMode(order.payment_mode as string | null),
+        order.statut_paiement === "paye" ? "paye_total" : (order.statut_paiement ?? "non_paye"),
+        "valide",
+        `Commande site ${order.reference}`,
+        "site_order",
+        orderId,
+        actor?.id ?? null,
+      ]
+    );
+    factureId = result.insertId;
+    await db.execute("UPDATE orders SET vente_facture_id = ? WHERE id = ?", [factureId, orderId]);
 
-  const factureId = result.insertId;
-  await db.execute("UPDATE orders SET vente_facture_id = ? WHERE id = ?", [factureId, orderId]);
+    if (order.nom && order.telephone) {
+      await db.execute(
+        `INSERT INTO boutique_clients (nom, telephone, type_client)
+         SELECT ?, ?, 'particulier' FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
+        [String(order.nom).trim(), String(order.telephone).trim(), String(order.telephone).trim()]
+      ).catch(() => {});
+    }
+  }
 
-  if (order.nom && order.telephone) {
-    await db.execute(
-      `INSERT INTO boutique_clients (nom, telephone, type_client)
-       SELECT ?, ?, 'particulier' FROM DUAL
-       WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
-      [String(order.nom).trim(), String(order.telephone).trim(), String(order.telephone).trim()]
-    ).catch(() => {});
+  // Create vente finance entry once when order is delivered
+  const isDelivered = ["delivered", "livree", "livre", "livré"].includes(String(order.status ?? ""));
+  if (isDelivered && !order.finance_entry_id) {
+    const montant = Number(order.subtotal ?? 0);
+    if (montant > 0) {
+      const entryId = await createFinanceEntry({
+        type:          "vente",
+        montant,
+        mode_paiement: orderPaymentModeToFinanceMode(order.payment_mode as string | null) ?? "especes",
+        description:   `Commande site livrée — ${order.reference}`,
+        date_entree:   new Date().toISOString().slice(0, 10),
+        admin_id:      actor?.id,
+        admin_nom:     actor?.nom,
+      }).catch(() => null);
+      if (entryId) {
+        await db.execute("UPDATE orders SET finance_entry_id = ? WHERE id = ?", [entryId, orderId]).catch(() => {});
+      }
+    }
   }
 
   return factureId;
@@ -2379,6 +2404,7 @@ export async function getVentesStats(): Promise<{
   commandes_livrees_jour: number;
   depenses_jour: number;
   rentrees_jour: number;
+  solde_jour: number;
 }> {
   const SITE_ORDER_FILTER = "(source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))";
   const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
@@ -2407,13 +2433,24 @@ export async function getVentesStats(): Promise<{
   // Finance queries are optional — table may not exist yet on fresh DBs
   let depenses_jour = 0;
   let rentrees_jour = 0;
+  let solde_jour    = 0;
   try {
+    const [[sj]] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(
+         CASE WHEN type IN ('vente','rentree','caisse') THEN montant
+              WHEN type = 'depense'                    THEN -montant
+              ELSE 0 END
+       ), 0) AS solde
+       FROM finance_entries
+       WHERE DATE(date_entree) = CURDATE() AND type != 'transfert'`
+    );
     const [[dj]] = await db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'depense' AND DATE(date_entree) = CURDATE()`
     );
     const [[rj]] = await db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'rentree' AND DATE(date_entree) = CURDATE()`
     );
+    solde_jour    = Number((sj as mysql.RowDataPacket)?.solde   ?? 0);
     depenses_jour = Number((dj as mysql.RowDataPacket)?.montant ?? 0);
     rentrees_jour = Number((rj as mysql.RowDataPacket)?.montant ?? 0);
   } catch { /* finance_entries table not yet created */ }
@@ -2428,6 +2465,7 @@ export async function getVentesStats(): Promise<{
     commandes_livrees_jour: Number((cj as mysql.RowDataPacket[])[0]?.montant ?? 0),
     depenses_jour,
     rentrees_jour,
+    solde_jour,
   };
 }
 
