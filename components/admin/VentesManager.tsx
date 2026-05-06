@@ -515,7 +515,7 @@ export default function VentesManager({
             <ShoppingCart className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums">
-            {new Intl.NumberFormat("fr-FR").format(stats.ventes_jour_montant)}{" "}
+            {new Intl.NumberFormat("fr-FR").format(stats.ventes_jour_montant + (stats.commandes_livrees_jour ?? 0))}{" "}
             <span className="text-sm font-semibold text-emerald-500">FCFA</span>
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
