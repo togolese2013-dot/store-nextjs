@@ -115,7 +115,7 @@ router.get("/api/livreur/orders/available", async (req, res) => {
               lv.created_at, lv.lien_localisation, 'livraison' AS source
        FROM livraisons_ventes lv
        LEFT JOIN factures f ON f.id = lv.facture_id
-       WHERE lv.statut = 'en_attente' AND lv.livreur_id IS NULL
+       WHERE lv.statut = 'en_attente' AND lv.livreur_id IS NULL AND lv.order_id IS NULL
        ORDER BY lv.created_at ASC`
     );
     const data = [...orderRows, ...livRows].sort((a, b) =>
