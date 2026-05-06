@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  TrendingUp, Truck, Plus, Search,
+  TrendingUp, TrendingDown, Truck, Plus, Search,
   Eye, Trash2, Printer, Loader2, ChevronLeft, ChevronRight,
   X, Check, AlertTriangle, Pencil,
   CreditCard, Banknote, Smartphone, Building2, Package,
@@ -245,16 +245,15 @@ export default function VentesManager({
 
   /* ── Client autocomplete handlers ── */
   async function handleClientNomChange(val: string) {
-    const upper = val.toUpperCase();
-    setModal(m => m ? { ...m, clientNom: upper, clientTel: "" } : m);
+    setModal(m => m ? { ...m, clientNom: val, clientTel: "" } : m);
     setIsNewClient(false);
-    if (upper.trim().length < 2) {
+    if (val.trim().length < 2) {
       setClientSuggestions([]);
       setShowSuggestions(false);
       return;
     }
     try {
-      const res  = await fetch(`/api/admin/boutique-clients?q=${encodeURIComponent(upper)}&page=1`);
+      const res  = await fetch(`/api/admin/boutique-clients?q=${encodeURIComponent(val)}&page=1`);
       const data = await res.json();
       const list = (data.data ?? []).slice(0, 6) as {id:number;nom:string;telephone:string|null}[];
       setClientSuggestions(list);
@@ -264,7 +263,7 @@ export default function VentesManager({
   }
 
   function selectClient(c: {id:number;nom:string;telephone:string|null}) {
-    setModal(m => m ? { ...m, clientNom: c.nom.toUpperCase(), clientTel: c.telephone ?? "" } : m);
+    setModal(m => m ? { ...m, clientNom: c.nom, clientTel: c.telephone ?? "" } : m);
     setClientSuggestions([]);
     setShowSuggestions(false);
     setIsNewClient(false);
@@ -495,10 +494,22 @@ export default function VentesManager({
           )}
         </div>
 
+        {/* Solde */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Solde</p>
+            <Banknote className="w-8 h-8 text-emerald-400 opacity-40" />
+          </div>
+          <p className={`text-2xl font-bold tabular-nums ${stats.solde_net >= 0 ? "text-slate-900" : "text-red-600"}`}>
+            {new Intl.NumberFormat("fr-FR").format(stats.solde_net)}{" "}
+            <span className="text-sm font-semibold text-emerald-500">FCFA</span>
+          </p>
+        </div>
+
         {/* Ventes aujourd'hui */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-1">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ventes aujourd'hui</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ventes aujourd&apos;hui</p>
             <ShoppingCart className="w-8 h-8 text-slate-400 opacity-30" />
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums">
@@ -510,41 +521,30 @@ export default function VentesManager({
           </span>
         </div>
 
-        {/* Revenu du jour */}
+        {/* Rentrées */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-start justify-between mb-1">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Revenu du jour</p>
-            <DollarSign className="w-8 h-8 text-slate-400 opacity-30" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rentrées</p>
+            <DollarSign className="w-8 h-8 text-cyan-400 opacity-40" />
           </div>
-          {(() => {
-            const revenu = stats.ventes_jour_montant + stats.commandes_livrees_jour + stats.rentrees_jour - stats.depenses_jour;
-            return (
-              <>
-                <p className={`text-2xl font-bold tabular-nums ${revenu >= 0 ? "text-slate-900" : "text-red-600"}`}>
-                  {new Intl.NumberFormat("fr-FR").format(revenu)}{" "}
-                  <span className="text-sm font-semibold text-emerald-500">FCFA</span>
-                </p>
-                <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-100">
-                  Commandes : +{new Intl.NumberFormat("fr-FR").format(stats.commandes_livrees_jour)}
-                </span>
-              </>
-            );
-          })()}
-        </div>
-
-        {/* Solde total caisse */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-1">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Solde Caisse</p>
-            <TrendingUp className="w-8 h-8 text-slate-400 opacity-30" />
-          </div>
-          <p className={`text-2xl font-bold tabular-nums ${stats.solde_net >= 0 ? "text-slate-900" : "text-red-600"}`}>
-            {new Intl.NumberFormat("fr-FR").format(stats.solde_net)}{" "}
-            <span className="text-sm font-semibold text-emerald-500">FCFA</span>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {new Intl.NumberFormat("fr-FR").format(stats.rentrees_jour)}{" "}
+            <span className="text-sm font-semibold text-cyan-500">FCFA</span>
           </p>
-          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-            Toutes caisses
-          </span>
+        </div>
+      </div>
+
+      {/* Dépenses */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dépenses</p>
+            <TrendingDown className="w-8 h-8 text-red-400 opacity-40" />
+          </div>
+          <p className="text-2xl font-bold tabular-nums text-red-600">
+            {new Intl.NumberFormat("fr-FR").format(stats.depenses_jour)}{" "}
+            <span className="text-sm font-semibold text-red-400">FCFA</span>
+          </p>
         </div>
       </div>
 
@@ -598,7 +598,7 @@ export default function VentesManager({
                           </div>
                         </td>
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-900">{f.client_nom?.toUpperCase()}</div>
+                          <div className="font-semibold text-slate-900">{f.client_nom}</div>
                         </td>
                         <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">{formatPrice(f.total)}</td>
                         <td className="px-5 py-4 text-center">
@@ -893,7 +893,11 @@ export default function VentesManager({
                     <input
                       type="checkbox"
                       checked={modal.avecLivraison}
-                      onChange={e => setModal(m => m ? { ...m, avecLivraison: e.target.checked } : m)}
+                      onChange={e => setModal(m => m ? {
+                        ...m,
+                        avecLivraison: e.target.checked,
+                        ...(e.target.checked ? { statutPaiement: "non_paye" } : {}),
+                      } : m)}
                       className="w-4 h-4 rounded border-slate-300 accent-indigo-600"
                     />
                     <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">

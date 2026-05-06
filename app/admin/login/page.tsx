@@ -26,12 +26,10 @@ export default function AdminLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Identifiants incorrects"); return; }
-      if ((data.role === "staff" && data.poste === "Livreur") || data.role === "livreur") {
-        router.push("/livreur");
-      } else {
-        router.push(redirect);
-      }
-      router.refresh();
+      const dest = (data.role === "staff" && data.poste === "Livreur") || data.role === "livreur"
+        ? "/livreur"
+        : redirect;
+      window.location.href = dest;
     } catch {
       setError("Impossible de se connecter. Vérifiez votre connexion.");
     } finally {
