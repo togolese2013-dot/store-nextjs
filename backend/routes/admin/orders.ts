@@ -90,7 +90,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
           if (!existing) {
             const livRef = `LV-${orderRow.reference}`;
             await (db as mysql.Pool).execute(
-              `INSERT INTO livraisons_ventes
+              `INSERT IGNORE INTO livraisons_ventes
                  (reference, facture_id, client_nom, client_tel, adresse, contact_livraison,
                   lien_localisation, statut, note, order_id)
                VALUES (?, NULL, ?, ?, ?, ?, ?, 'en_attente', NULL, ?)`,

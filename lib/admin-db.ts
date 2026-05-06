@@ -707,8 +707,22 @@ export async function updateOrderFields(id: number, data: {
 }
 
 export async function deleteOrder(id: number) {
+  const [[order]] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT finance_entry_id, vente_facture_id, reference FROM orders WHERE id = ? LIMIT 1", [id]
+  );
   await db.execute("DELETE FROM order_events WHERE order_id = ?", [id]);
   await db.execute("DELETE FROM orders WHERE id = ?", [id]);
+  // Clean up linked finance entry (rentree created by applyOrderPaidEffects)
+  if (order?.finance_entry_id) {
+    await db.execute("DELETE FROM finance_entries WHERE id = ?", [order.finance_entry_id]).catch(() => {});
+  }
+  // Clean up vente-type finance entry linked to the boutique facture
+  if (order?.reference) {
+    await db.execute(
+      "DELETE FROM finance_entries WHERE type = 'vente' AND description LIKE ?",
+      [`%${order.reference}%`]
+    ).catch(() => {});
+  }
 }
 
 export async function getOrderById(id: number): Promise<Order | null> {
@@ -2713,6 +2727,8 @@ export async function ensureLivraisonCols(): Promise<void> {
     "ALTER TABLE livraisons_ventes ADD COLUMN note TEXT NULL",
     "ALTER TABLE livraisons_ventes ADD COLUMN livreur VARCHAR(255) NULL",
     "ALTER TABLE livraisons_ventes ADD COLUMN order_id INT NULL",
+    // Prevent duplicate livraison for the same online order (race condition guard)
+    "ALTER TABLE livraisons_ventes ADD UNIQUE KEY uk_order_id (order_id)",
     // Fix ENUM to include all required values
     "ALTER TABLE livraisons_ventes MODIFY COLUMN statut ENUM('en_attente','acceptee','en_cours','livre','echoue') NOT NULL DEFAULT 'en_attente'",
     // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id
