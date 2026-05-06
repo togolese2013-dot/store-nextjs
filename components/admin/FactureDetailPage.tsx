@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Phone, User, Printer, Truck, MapPin,
   Check, X, Loader2, AlertTriangle,
 } from "lucide-react";
-import type { Facture, FactureItem } from "@/lib/admin-db";
+import type { Facture, FactureItem, FacturePaiement } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
 import type { PrintItem } from "@/components/admin/BoutiqueDocPrint";
@@ -55,9 +55,6 @@ function modeLabel(value: string | null) {
   return MODES_PAIEMENT.find(m => m.value === value)?.label ?? value ?? "—";
 }
 
-function payRef(factureId: number, dateStr: string, suffix = "") {
-  return `PAY-${factureId}-${new Date(dateStr).getTime()}${suffix}`;
-}
 
 interface PaymentModal {
   montant:   string;
@@ -71,18 +68,19 @@ interface PaymentModal {
 export default function FactureDetailPage({ facture: initial }: { facture: Facture }) {
   const router   = useRouter();
   const [facture, setFacture] = useState<Facture>(initial);
+  const [paiements, setPaiements] = useState<FacturePaiement[]>(initial.paiements ?? []);
   const [payModal,  setPayModal]  = useState<PaymentModal | null>(null);
   const [showPrint, setShowPrint] = useState(false);
 
   /* ── Parse items ── */
-  const parsedItems = useMemo<FactureItem[]>(() => {
+  const parsedItems: FactureItem[] = (() => {
     try {
       const raw = facture.items;
       if (typeof raw === "string") return JSON.parse(raw);
-      if (Array.isArray(raw)) return raw;
+      if (Array.isArray(raw)) return raw as FactureItem[];
     } catch { /* ignore */ }
     return [];
-  }, [facture.items]);
+  })();
 
   /* ── Payment calculations ── */
   const isPaidFull  = facture.statut_paiement === "paye_total" || facture.statut_paiement === "paye";
@@ -92,26 +90,6 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
   const resteAPayer = Math.max(0, Number(facture.total) - montantPaye);
   const pct = facture.total > 0 ? Math.round((montantPaye / facture.total) * 100) : 0;
 
-  /* ── Synthetic payment history ── */
-  const paymentHistory = useMemo(() => {
-    type Entry = { date: string; type: string; montant: number; reference: string; vendeur: string | null };
-    const entries: Entry[] = [];
-    const mode = modeLabel(facture.mode_paiement);
-    const vendeur = facture.vendeur;
-
-    if (facture.statut_paiement === "paye_total" || facture.statut_paiement === "paye") {
-      if (facture.montant_acompte && facture.montant_acompte > 0 && facture.montant_acompte < facture.total) {
-        entries.push({ date: facture.created_at,  type: mode, montant: facture.montant_acompte, reference: payRef(facture.id, facture.created_at, "-1"), vendeur });
-        entries.push({ date: facture.updated_at,  type: mode, montant: facture.total - facture.montant_acompte, reference: payRef(facture.id, facture.updated_at, "-2"), vendeur });
-      } else {
-        entries.push({ date: facture.updated_at || facture.created_at, type: mode, montant: facture.total, reference: payRef(facture.id, facture.created_at), vendeur });
-      }
-    } else if (facture.montant_acompte && facture.montant_acompte > 0) {
-      entries.push({ date: facture.created_at, type: mode, montant: facture.montant_acompte, reference: payRef(facture.id, facture.created_at), vendeur });
-    }
-
-    return entries;
-  }, [facture]);
 
   /* ── Payment modal handlers ── */
   function openPayModal() {
@@ -138,9 +116,10 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
     const nowPaidFull = newTotal >= Number(facture.total);
 
     const body: Record<string, unknown> = {
-      statut_paiement: nowPaidFull ? "paye_total" : "acompte",
-      mode_paiement:   payModal.mode,
-      montant_acompte: nowPaidFull ? null : newTotal,
+      statut_paiement:  nowPaidFull ? "paye_total" : "acompte",
+      mode_paiement:    payModal.mode,
+      montant_acompte:  nowPaidFull ? null : newTotal,
+      montant_paiement: amount,
     };
     if (nowPaidFull) body.statut = "paye";
 
@@ -159,6 +138,14 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
           mode_paiement:   payModal.mode,
           montant_acompte: nowPaidFull ? null : newTotal,
         }));
+        setPaiements(prev => [...prev, {
+          id:            Date.now(),
+          facture_id:    facture.id,
+          montant:       amount,
+          mode_paiement: payModal.mode,
+          vendeur:       null,
+          created_at:    new Date().toISOString(),
+        }]);
         setPayModal(null);
       } else {
         const data = await res.json().catch(() => ({}));
@@ -331,7 +318,7 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
             <div className="px-6 py-4 border-b border-slate-100">
               <h2 className="font-bold text-slate-900 text-base">Historique des Paiements</h2>
             </div>
-            {paymentHistory.length === 0 ? (
+            {paiements.length === 0 ? (
               <div className="px-6 py-10 text-center text-slate-400 text-sm">
                 Aucun paiement enregistré
               </div>
@@ -341,19 +328,17 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
                       <th className="text-left  px-6 py-3 font-semibold text-slate-500 text-xs">Date</th>
-                      <th className="text-left  px-4 py-3 font-semibold text-slate-500 text-xs">Type</th>
+                      <th className="text-left  px-4 py-3 font-semibold text-slate-500 text-xs">Mode</th>
                       <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs">Montant</th>
-                      <th className="text-left  px-4 py-3 font-semibold text-slate-500 text-xs">Référence</th>
                       <th className="text-left  px-6 py-3 font-semibold text-slate-500 text-xs">Enregistré par</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {paymentHistory.map((p, i) => (
-                      <tr key={i} className="hover:bg-slate-50/60">
-                        <td className="px-6 py-3.5 text-slate-600 text-xs whitespace-nowrap">{formatDate(p.date)}</td>
-                        <td className="px-4 py-3.5 text-slate-700">{p.type}</td>
-                        <td className="px-4 py-3.5 text-right font-semibold text-emerald-600 tabular-nums">{formatPrice(p.montant)}</td>
-                        <td className="px-4 py-3.5 font-mono text-xs text-indigo-600 whitespace-nowrap">{p.reference}</td>
+                    {paiements.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/60">
+                        <td className="px-6 py-3.5 text-slate-600 text-xs whitespace-nowrap">{formatDate(p.created_at)}</td>
+                        <td className="px-4 py-3.5 text-slate-700">{modeLabel(p.mode_paiement)}</td>
+                        <td className="px-4 py-3.5 text-right font-semibold text-emerald-600 tabular-nums">{formatPrice(Number(p.montant))}</td>
                         <td className="px-6 py-3.5 text-slate-600">{p.vendeur ?? "—"}</td>
                       </tr>
                     ))}

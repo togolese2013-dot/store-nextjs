@@ -1692,6 +1692,15 @@ export interface FactureItem {
   total:     number;
 }
 
+export interface FacturePaiement {
+  id:            number;
+  facture_id:    number;
+  montant:       number;
+  mode_paiement: string | null;
+  vendeur:       string | null;
+  created_at:    string;
+}
+
 export interface Facture {
   id:                number;
   reference:         string;
@@ -1717,6 +1726,7 @@ export interface Facture {
   vendeur:           string | null;
   created_at:        string;
   updated_at:        string;
+  paiements?:        FacturePaiement[];
 }
 
 export async function listFactures(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Facture[]; total: number }> {
@@ -1738,6 +1748,46 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   return { items: rows as Facture[], total: Number(cnt[0]?.cnt ?? 0) };
 }
 
+async function ensureFacturePaiementsTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS facture_paiements (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      facture_id    INT NOT NULL,
+      montant       DECIMAL(12,2) NOT NULL,
+      mode_paiement VARCHAR(50) NULL,
+      admin_id      INT NULL,
+      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_fp_facture (facture_id)
+    )
+  `);
+}
+
+async function createFacturePaiement(data: {
+  facture_id:     number;
+  montant:        number;
+  mode_paiement?: string | null;
+  admin_id?:      number | null;
+}) {
+  await ensureFacturePaiementsTable();
+  await db.execute(
+    `INSERT INTO facture_paiements (facture_id, montant, mode_paiement, admin_id) VALUES (?,?,?,?)`,
+    [data.facture_id, data.montant, data.mode_paiement ?? null, data.admin_id ?? null]
+  );
+}
+
+export async function getFacturePaiements(facture_id: number): Promise<FacturePaiement[]> {
+  await ensureFacturePaiementsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT fp.*, COALESCE(au.nom, util.nom) AS vendeur
+     FROM facture_paiements fp
+     LEFT JOIN admin_users au ON au.id = fp.admin_id
+     LEFT JOIN utilisateurs util ON util.id = fp.admin_id
+     WHERE fp.facture_id = ? ORDER BY fp.created_at ASC`,
+    [facture_id]
+  );
+  return rows as FacturePaiement[];
+}
+
 export async function getFactureById(id: number): Promise<Facture | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
@@ -1747,7 +1797,10 @@ export async function getFactureById(id: number): Promise<Facture | null> {
      WHERE f.id = ? LIMIT 1`,
     [id]
   );
-  return (rows[0] as Facture) ?? null;
+  if (!rows[0]) return null;
+  const facture = rows[0] as Facture;
+  facture.paiements = await getFacturePaiements(id);
+  return facture;
 }
 
 export async function getClientFacturesByNom(nom: string, tel?: string | null): Promise<Facture[]> {
@@ -1902,6 +1955,21 @@ export async function createVenteWithStock(data: {
       ).catch(() => {});
     }
 
+    // Insert payment history entry for initial payment
+    if (data.statut_paiement && data.statut_paiement !== "non_paye") {
+      const montantInitial = data.statut_paiement === "acompte"
+        ? (data.montant_acompte ?? 0)
+        : data.total;
+      if (montantInitial > 0) {
+        await createFacturePaiement({
+          facture_id:    factureId,
+          montant:       montantInitial,
+          mode_paiement: data.mode_paiement ?? null,
+          admin_id:      data.admin_id ?? null,
+        }).catch(() => {});
+      }
+    }
+
     // Auto-create finance entry for paid/partial sales
     if (data.statut_paiement && data.statut_paiement !== "non_paye") {
       const montantFinance = data.statut_paiement === "acompte"
@@ -1933,10 +2001,12 @@ export async function updateFactureStatut(id: number, statut: Facture["statut"])
 }
 
 export async function updateFacture(id: number, data: {
-  statut?:           Facture["statut"];
-  statut_paiement?:  string;
-  mode_paiement?:    string;
-  montant_acompte?:  number | null;
+  statut?:            Facture["statut"];
+  statut_paiement?:   string;
+  mode_paiement?:     string;
+  montant_acompte?:   number | null;
+  montant_paiement?:  number;
+  admin_id?:          number | null;
 }) {
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
@@ -1944,9 +2014,18 @@ export async function updateFacture(id: number, data: {
   if (data.statut_paiement !== undefined)   { sets.push("statut_paiement = ?");   params.push(data.statut_paiement); }
   if (data.mode_paiement !== undefined)     { sets.push("mode_paiement = ?");     params.push(data.mode_paiement); }
   if (data.montant_acompte !== undefined)   { sets.push("montant_acompte = ?");   params.push(data.montant_acompte); }
-  if (sets.length === 0) return;
-  params.push(id);
-  await db.execute(`UPDATE factures SET ${sets.join(", ")} WHERE id = ?`, params);
+  if (sets.length > 0) {
+    params.push(id);
+    await db.execute(`UPDATE factures SET ${sets.join(", ")} WHERE id = ?`, params);
+  }
+  if (data.montant_paiement && data.montant_paiement > 0) {
+    await createFacturePaiement({
+      facture_id:    id,
+      montant:       data.montant_paiement,
+      mode_paiement: data.mode_paiement ?? null,
+      admin_id:      data.admin_id ?? null,
+    }).catch(() => {});
+  }
 }
 
 export async function deleteFacture(id: number) {
