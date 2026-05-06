@@ -590,11 +590,15 @@ export default function VentesManager({
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">{f.reference.replace(/-\d{4}$/, "")}</span>
-                            {f.avec_livraison === 1 && (
+                            {f.source === "site_order" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-600 text-[10px] font-bold rounded-full border border-violet-100">
+                                <Truck className="w-3 h-3" /> Commande
+                              </span>
+                            ) : f.avec_livraison === 1 ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full border border-indigo-100">
                                 <Truck className="w-3 h-3" /> Livraison
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-5 py-4">
@@ -605,7 +609,7 @@ export default function VentesManager({
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>{s.label}</span>
                         </td>
                         <td className="px-5 py-4 text-center hidden sm:table-cell">
-                          {f.statut_paiement === "paye_total" ? (
+                          {(f.statut_paiement === "paye_total" || f.statut_paiement === "paye") ? (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Complet</span>
                           ) : f.statut_paiement === "acompte" && f.montant_acompte != null && f.total > 0 ? (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">

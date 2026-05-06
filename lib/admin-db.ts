@@ -1678,6 +1678,8 @@ export interface Facture {
   montant_acompte:   number | null;
   statut:            "brouillon" | "valide" | "paye" | "annule";
   note:              string | null;
+  source:            string | null;
+  order_id:          number | null;
   admin_id:          number | null;
   vendeur:           string | null;
   created_at:        string;
@@ -2244,7 +2246,7 @@ export async function getFinanceStats(): Promise<FinanceStats> {
     // NET balance per account: ventes+rentrees+caisse as credits, depenses as debits
     cols.mode_paiement
       ? db.query<mysql.RowDataPacket[]>(
-          `SELECT mode_paiement,
+          `SELECT COALESCE(mode_paiement, 'especes') AS mode_paiement,
                   SUM(CASE
                     WHEN type IN ('caisse','rentree','vente') THEN montant
                     WHEN type = 'depense' THEN -montant
@@ -2252,7 +2254,7 @@ export async function getFinanceStats(): Promise<FinanceStats> {
                   END) AS net
            FROM finance_entries
            WHERE type != 'transfert'
-           GROUP BY mode_paiement`
+           GROUP BY COALESCE(mode_paiement, 'especes')`
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),
     // Transfer outflows (debit from source account)
@@ -2328,22 +2330,20 @@ export async function createFinanceEntry(data: {
   const cols      = await financeEntrieCols();
   const reference = genFinanceRef(data.type);
 
+  const colNames: string[] = ["reference", "type", "categorie", "description", "montant", "date_entree"];
+  const colVals:  (string | number | null)[] = [
+    reference, data.type,
+    data.categorie ?? null, data.description ?? null,
+    data.montant, data.date_entree,
+  ];
+  if (cols.mode_paiement)      { colNames.push("mode_paiement");      colVals.push(data.mode_paiement ?? "especes"); }
+  if (cols.compte_destination) { colNames.push("compte_destination"); colVals.push(data.compte_destination ?? null); }
+  if (cols.admin_id)           { colNames.push("admin_id");           colVals.push(data.admin_id  ?? null); }
+  if (cols.admin_nom)          { colNames.push("admin_nom");          colVals.push(data.admin_nom ?? null); }
+
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO finance_entries
-       (reference, type, mode_paiement, compte_destination, categorie, description, montant, date_entree, admin_id, admin_nom)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      reference,
-      data.type,
-      cols.mode_paiement      ? (data.mode_paiement ?? "especes") : null,
-      cols.compte_destination ? (data.compte_destination ?? null)  : null,
-      data.categorie    ?? null,
-      data.description  ?? null,
-      data.montant,
-      data.date_entree,
-      cols.admin_id  ? (data.admin_id  ?? null) : null,
-      cols.admin_nom ? (data.admin_nom ?? null) : null,
-    ]
+    `INSERT INTO finance_entries (${colNames.join(", ")}) VALUES (${colNames.map(() => "?").join(", ")})`,
+    colVals
   );
   return result.insertId;
 }
