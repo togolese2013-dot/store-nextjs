@@ -37,8 +37,9 @@ router.post("/api/admin/finance", async (req, res) => {
     if (type === "transfert" && !compte_destination) {
       return res.status(400).json({ error: "compte_destination requis pour un transfert." });
     }
-    const admin_id = typeof session.id === "number" ? session.id : undefined;
-    const id = await createFinanceEntry({ type, mode_paiement, compte_destination, categorie, description, montant: Number(montant), date_entree, admin_id });
+    const admin_id  = typeof session.id === "number" ? session.id : undefined;
+    const admin_nom = typeof session.nom === "string" ? session.nom : undefined;
+    const id = await createFinanceEntry({ type, mode_paiement, compte_destination, categorie, description, montant: Number(montant), date_entree, admin_id, admin_nom });
     emitAdminEvent("finance");
     res.status(201).json({ ok: true, id });
   } catch (err) {

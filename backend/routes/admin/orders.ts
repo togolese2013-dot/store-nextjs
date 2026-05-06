@@ -6,7 +6,7 @@ import type mysql from "mysql2/promise";
 import {
   listOrders, countOrders, createOrder, addOrderEvent,
   updateOrderStatus, updateOrderFields, deleteOrder, getOrderById,
-  applyOrderDeliveredEffects, applyOrderPaidEffects, ensureOrderVente,
+  applyOrderDeliveredEffects, ensureOrderVente,
 } from "@/lib/admin-db";
 
 async function ensurePaymentColumn() {
@@ -135,10 +135,6 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
         [payment_status, orderRow.vente_facture_id]
       );
     }
-    if (payment_status === "paye") {
-      await applyOrderPaidEffects(id, session.nom);
-      emitAdminEvent("finance");
-    }
     emitAdminEvent("commande");
     return res.json({ ok: true });
   }
@@ -157,7 +153,6 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
         ["paye", mmOrderRow.vente_facture_id]
       );
     }
-    await applyOrderPaidEffects(id, session.nom);
     await addOrderEvent(id, "confirmée", "Paiement Mobile Money vérifié et confirmé", session.nom);
     emitAdminEvent("finance");
     emitAdminEvent("commande");

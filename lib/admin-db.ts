@@ -1693,9 +1693,10 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))");
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
+    `SELECT f.*, COALESCE(au.nom, util.nom) AS vendeur
      FROM factures f
-     LEFT JOIN admin_users u ON u.id = f.admin_id
+     LEFT JOIN admin_users au ON au.id = f.admin_id
+     LEFT JOIN utilisateurs util ON util.id = f.admin_id
      ${where} ORDER BY f.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
   const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures f ${where}`, params);
@@ -1704,9 +1705,10 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
 
 export async function getFactureById(id: number): Promise<Facture | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
+    `SELECT f.*, COALESCE(au.nom, util.nom) AS vendeur
      FROM factures f
-     LEFT JOIN admin_users u ON u.id = f.admin_id
+     LEFT JOIN admin_users au ON au.id = f.admin_id
+     LEFT JOIN utilisateurs util ON util.id = f.admin_id
      WHERE f.id = ? LIMIT 1`,
     [id]
   );
@@ -1718,9 +1720,10 @@ export async function getClientFacturesByNom(nom: string, tel?: string | null): 
   const params: (string | number | null)[] = [nom, `%${nom}%`];
   if (tel) { conditions.push("f.client_tel = ?"); params.push(tel); }
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(u.nom, 'N/A') AS vendeur
+    `SELECT f.*, COALESCE(au.nom, util.nom) AS vendeur
      FROM factures f
-     LEFT JOIN admin_users u ON u.id = f.admin_id
+     LEFT JOIN admin_users au ON au.id = f.admin_id
+     LEFT JOIN utilisateurs util ON util.id = f.admin_id
      WHERE f.client_nom = ?
      ORDER BY f.created_at DESC LIMIT 50`,
     [nom]
@@ -2184,7 +2187,7 @@ export async function listFinanceEntries(opts: {
   if (search) { conditions.push("(f.categorie LIKE ? OR f.reference LIKE ?)");                   params.push(`%${search}%`, `%${search}%`); }
   const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(au.nom, u.nom) AS admin_nom
+    `SELECT f.*, COALESCE(f.admin_nom, au.nom, u.nom) AS admin_nom
      FROM finance_entries f
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs u ON u.id = f.admin_id
@@ -2198,7 +2201,7 @@ export async function listFinanceEntries(opts: {
 }
 
 // Cached column check for finance_entries
-let _finCols: { mode_paiement: boolean; admin_id: boolean; compte_destination: boolean } | null = null;
+let _finCols: { mode_paiement: boolean; admin_id: boolean; compte_destination: boolean; admin_nom: boolean } | null = null;
 async function financeEntrieCols() {
   if (_finCols) return _finCols;
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -2215,6 +2218,10 @@ async function financeEntrieCols() {
     try { await db.execute("ALTER TABLE finance_entries ADD COLUMN compte_destination VARCHAR(30) NULL"); } catch { /* already exists */ }
     names.add("compte_destination");
   }
+  if (!names.has("admin_nom")) {
+    try { await db.execute("ALTER TABLE finance_entries ADD COLUMN admin_nom VARCHAR(150) NULL"); } catch { /* already exists */ }
+    names.add("admin_nom");
+  }
   // Ensure 'transfert' is in the type ENUM (older DBs may be missing it)
   try {
     await db.execute(
@@ -2225,6 +2232,7 @@ async function financeEntrieCols() {
     mode_paiement:      names.has("mode_paiement"),
     admin_id:           names.has("admin_id"),
     compte_destination: names.has("compte_destination"),
+    admin_nom:          names.has("admin_nom"),
   };
   return _finCols;
 }
@@ -2315,14 +2323,15 @@ export async function createFinanceEntry(data: {
   montant:             number;
   date_entree:         string;
   admin_id?:           number;
+  admin_nom?:          string;
 }): Promise<number> {
   const cols      = await financeEntrieCols();
   const reference = genFinanceRef(data.type);
 
   const [result] = await db.execute<mysql.ResultSetHeader>(
     `INSERT INTO finance_entries
-       (reference, type, mode_paiement, compte_destination, categorie, description, montant, date_entree, admin_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (reference, type, mode_paiement, compte_destination, categorie, description, montant, date_entree, admin_id, admin_nom)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       reference,
       data.type,
@@ -2332,7 +2341,8 @@ export async function createFinanceEntry(data: {
       data.description  ?? null,
       data.montant,
       data.date_entree,
-      cols.admin_id ? (data.admin_id ?? null) : null,
+      cols.admin_id  ? (data.admin_id  ?? null) : null,
+      cols.admin_nom ? (data.admin_nom ?? null) : null,
     ]
   );
   return result.insertId;
@@ -2377,19 +2387,20 @@ export async function getVentesStats(): Promise<{
     db.execute<mysql.RowDataPacket[]>(`
       SELECT COALESCE(SUM(
         CASE
-          WHEN statut_paiement = 'paye'    THEN total
-          WHEN statut_paiement = 'acompte' THEN COALESCE(montant_acompte, 0)
+          WHEN statut_paiement IN ('paye','paye_total') THEN CASE WHEN source = 'site_order' THEN sous_total ELSE total END
+          WHEN statut_paiement = 'acompte'             THEN COALESCE(montant_acompte, 0)
           ELSE 0
         END
       ), 0) AS total FROM factures WHERE statut != 'annule' AND ${SITE_ORDER_FILTER}`),
     db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE statut = 'paye' AND ${SITE_ORDER_FILTER}`),
     db.execute<mysql.RowDataPacket[]>(`
-      SELECT COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS montant
+      SELECT COUNT(*) AS cnt,
+             COALESCE(SUM(CASE WHEN source = 'site_order' THEN sous_total ELSE total END), 0) AS montant
       FROM factures
       WHERE DATE(created_at) = CURDATE() AND statut_paiement = 'paye_total' AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
-    // Commandes en ligne livrées aujourd'hui
+    // Commandes en ligne livrées aujourd'hui — exclude delivery fee
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(total), 0) AS montant FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+      `SELECT COALESCE(SUM(subtotal), 0) AS montant FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0 }]] as [mysql.RowDataPacket[]]),
   ]);
 

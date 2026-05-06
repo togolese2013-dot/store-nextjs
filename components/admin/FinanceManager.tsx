@@ -16,9 +16,12 @@ function fmtNum(n: number) {
   return new Intl.NumberFormat("fr-FR").format(Math.round(n));
 }
 
-function fmtDate(d: string) {
-  const dt = new Date(d);
-  return dt.toLocaleDateString("fr-FR") + " " + dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function fmtDate(dateEntree: string, createdAt?: string) {
+  const dateOnly = new Date(dateEntree + (dateEntree.includes("T") || dateEntree.includes(" ") ? "" : "T12:00:00"));
+  const timeRef  = createdAt ? new Date(createdAt.includes("T") ? createdAt : createdAt.replace(" ", "T")) : null;
+  const date = dateOnly.toLocaleDateString("fr-FR");
+  const time = timeRef ? timeRef.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+  return time ? `${date} ${time}` : date;
 }
 
 // ─── Mode paiement config ─────────────────────────────────────────────────────
@@ -516,7 +519,7 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
                 <tr>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Référence</th>
-                  {tab === "rentree" && (
+                  {(tab === "rentree" || tab === "depense") && (
                     <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Mode</th>
                   )}
                   {tab === "transfert" && (
@@ -532,14 +535,14 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
                 {filtered.map(item => (
                   <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-5 py-4 text-slate-500 whitespace-nowrap text-xs">
-                      {fmtDate(item.date_entree)}
+                      {fmtDate(item.date_entree, item.created_at)}
                     </td>
                     <td className="px-5 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">
                       {item.reference}
                     </td>
-                    {tab === "rentree" && (
+                    {(tab === "rentree" || tab === "depense") && (
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${tab === "depense" ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-600"}`}>
                           {modeLabel(item.mode_paiement)}
                         </span>
                       </td>
