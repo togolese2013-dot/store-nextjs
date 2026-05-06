@@ -20,6 +20,7 @@ interface Stats {
   factures: number; livraisons: number; ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
   commandes_livrees_jour: number; depenses_jour: number; rentrees_jour: number;
+  solde_jour: number;
   total_recettes: number; total_depenses: number; solde_net: number;
   stock_produits: number; stock_epuises: number;
 }
