@@ -8,7 +8,7 @@ import {
   Users, Star, CheckCircle, XCircle, Truck, Package,
   ArrowRight,
 } from "lucide-react";
-import OrderStatusSelect from "@/components/admin/OrderStatusSelect";
+import OrderStatusBadge from "@/components/admin/OrderStatusBadge";
 import StoreUrlEditor from "@/components/admin/StoreUrlEditor";
 
 export const metadata = { title: "Dashboard Store" };
@@ -273,7 +273,7 @@ export default async function StoreDashboardPage() {
                       <span className="font-bold text-slate-900 text-xs sm:text-sm">{formatPrice(order.total)}</span>
                     </td>
                     <td className="px-3 sm:px-4 py-3 text-center">
-                      <OrderStatusSelect orderId={order.id} currentStatus={order.status} />
+                      <OrderStatusBadge orderId={order.id} status={order.status} />
                     </td>
                     <td className="px-3 py-3 text-right text-xs text-slate-400 hidden sm:table-cell">
                       {new Date(order.created_at).toLocaleDateString("fr-FR")}

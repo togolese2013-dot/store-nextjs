@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
-import OrderStatusSelect from "./OrderStatusSelect";
+import OrderStatusBadge from "./OrderStatusBadge";
 
 interface OrderRow {
   id:             number;
@@ -42,7 +42,7 @@ export default function OrdersTableBody({ orders }: { orders: OrderRow[] }) {
             <span className="font-bold text-slate-900 text-xs sm:text-sm">{formatPrice(order.total)}</span>
           </td>
           <td className="px-3 sm:px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-            <OrderStatusSelect orderId={order.id} currentStatus={order.status} />
+            <OrderStatusBadge orderId={order.id} status={order.status} />
           </td>
           <td className="px-3 py-3 text-right text-xs text-slate-400 hidden sm:table-cell">
             {new Date(order.created_at).toLocaleDateString("fr-FR")}

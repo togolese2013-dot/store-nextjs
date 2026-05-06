@@ -361,7 +361,7 @@ interface Props {
 }
 
 export default function FinanceManager({ initialItems, initialStats, initialTotal }: Props) {
-  const [tab,        setTab]        = useState<Tab>("rentree");
+  const [tab,        setTab]        = useState<Tab>("depense");
   const [items,      setItems]      = useState<FinanceEntry[]>(initialItems);
   const [stats,      setStats]      = useState<FinanceStats>(initialStats);
   const [search,     setSearch]     = useState("");
