@@ -148,7 +148,7 @@ router.get("/api/livreur/orders/mine", async (req, res) => {
               lv.created_at, lv.lien_localisation, 'livraison' AS source
        FROM livraisons_ventes lv
        LEFT JOIN factures f ON f.id = lv.facture_id
-       WHERE lv.livreur_id = ? AND lv.statut = 'acceptee'
+       WHERE lv.livreur_id = ? AND lv.statut = 'acceptee' AND lv.order_id IS NULL
        ORDER BY lv.created_at ASC`,
       [ctx.member.id]
     );
@@ -185,7 +185,7 @@ router.get("/api/livreur/orders/history", async (req, res) => {
               'livraison' AS source
        FROM livraisons_ventes lv
        LEFT JOIN factures f ON f.id = lv.facture_id
-       WHERE lv.livreur_id = ? AND lv.statut IN ('livre', 'echoue')
+       WHERE lv.livreur_id = ? AND lv.statut IN ('livre', 'echoue') AND lv.order_id IS NULL
        ORDER BY lv.created_at DESC LIMIT ${limit}`,
       [ctx.member.id]
     );
