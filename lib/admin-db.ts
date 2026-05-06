@@ -2409,7 +2409,7 @@ export async function getVentesStats(): Promise<{
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
-  commandes_livrees_jour: number;
+  commandes_livrees_jour: number; commandes_livrees_jour_count: number;
   depenses_jour: number;
   rentrees_jour: number;
   solde_jour: number;
@@ -2434,8 +2434,8 @@ export async function getVentesStats(): Promise<{
       WHERE DATE(created_at) = CURDATE() AND statut_paiement IN ('paye','paye_total') AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
     // Commandes en ligne livrées aujourd'hui — exclude delivery fee
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(subtotal), 0) AS montant FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
-    ).catch(() => [[{ montant: 0 }]] as [mysql.RowDataPacket[]]),
+      `SELECT COALESCE(SUM(subtotal), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+    ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
   ]);
 
   // Finance queries are optional — table may not exist yet on fresh DBs
@@ -2470,7 +2470,8 @@ export async function getVentesStats(): Promise<{
     factures_payees:        Number((fp as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     ventes_jour_montant:    Number((tj as mysql.RowDataPacket[])[0]?.montant ?? 0),
     ventes_jour_count:      Number((tj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
-    commandes_livrees_jour: Number((cj as mysql.RowDataPacket[])[0]?.montant ?? 0),
+    commandes_livrees_jour:       Number((cj as mysql.RowDataPacket[])[0]?.montant ?? 0),
+    commandes_livrees_jour_count: Number((cj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     depenses_jour,
     rentrees_jour,
     solde_jour,

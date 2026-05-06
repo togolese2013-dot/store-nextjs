@@ -19,7 +19,8 @@ import { formatPrice } from "@/lib/utils";
 interface Stats {
   factures: number; livraisons: number; ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
-  commandes_livrees_jour: number; depenses_jour: number; rentrees_jour: number;
+  commandes_livrees_jour: number; commandes_livrees_jour_count: number;
+  depenses_jour: number; rentrees_jour: number;
   solde_jour: number;
   total_recettes: number; total_depenses: number; solde_net: number;
   stock_produits: number; stock_epuises: number;
@@ -517,9 +518,16 @@ export default function VentesManager({
             {new Intl.NumberFormat("fr-FR").format(stats.ventes_jour_montant)}{" "}
             <span className="text-sm font-semibold text-emerald-500">FCFA</span>
           </p>
-          <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-            {stats.ventes_jour_count} vente{stats.ventes_jour_count !== 1 ? "s" : ""}
-          </span>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+              {stats.ventes_jour_count} vente{stats.ventes_jour_count !== 1 ? "s" : ""}
+            </span>
+            {(stats.commandes_livrees_jour_count ?? 0) > 0 && (
+              <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100">
+                {stats.commandes_livrees_jour_count} commande{stats.commandes_livrees_jour_count !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Rentrées */}
