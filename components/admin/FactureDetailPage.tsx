@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import type { Facture, FactureItem } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
+import type { PrintItem } from "@/components/admin/BoutiqueDocPrint";
 
 const MODES_PAIEMENT = [
   { value: "especes",           label: "Espèces" },
@@ -70,7 +72,8 @@ interface PaymentModal {
 export default function FactureDetailPage({ facture: initial }: { facture: Facture }) {
   const router   = useRouter();
   const [facture, setFacture] = useState<Facture>(initial);
-  const [payModal, setPayModal] = useState<PaymentModal | null>(null);
+  const [payModal,  setPayModal]  = useState<PaymentModal | null>(null);
+  const [showPrint, setShowPrint] = useState(false);
 
   /* ── Parse items ── */
   const parsedItems = useMemo<FactureItem[]>(() => {
@@ -182,11 +185,11 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            onClick={() => setShowPrint(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-700 font-semibold hover:bg-amber-100 transition-colors"
           >
             <Printer className="w-4 h-4" />
-            Imprimer
+            Facture A5
           </button>
         </div>
       </div>
@@ -575,6 +578,36 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
           </div>
         </div>
       )}
+
+      {/* ══ Facture A5 print overlay ══ */}
+      {showPrint && (() => {
+        const printItems: PrintItem[] = parsedItems.map(i => ({
+          nom:       i.nom,
+          reference: i.reference,
+          qty:       i.qty,
+          prix:      i.prix,
+          total:     i.total,
+        }));
+        return (
+          <BoutiqueDocPrint
+            type="facture"
+            format="A5"
+            reference={facture.reference}
+            date={facture.created_at}
+            client_nom={facture.client_nom}
+            client_tel={facture.client_tel}
+            items={printItems}
+            sous_total={facture.sous_total}
+            remise={facture.remise}
+            total={facture.total}
+            mode_paiement={facture.mode_paiement}
+            statut_paiement={facture.statut_paiement}
+            adresse_livraison={facture.adresse_livraison}
+            note={facture.note}
+            onClose={() => setShowPrint(false)}
+          />
+        );
+      })()}
     </div>
   );
 }
