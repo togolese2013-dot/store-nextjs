@@ -823,7 +823,7 @@ export async function ensureOrderVente(orderId: number): Promise<number | null> 
       order.telephone ?? null,
       order.lien_localisation ?? null,
       orderPaymentModeToFinanceMode(order.payment_mode as string | null),
-      order.statut_paiement ?? "non_paye",
+      order.statut_paiement === "paye" ? "paye_total" : (order.statut_paiement ?? "non_paye"),
       "valide",
       `Commande site ${order.reference}`,
       "site_order",
@@ -1693,7 +1693,7 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))");
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(au.nom, util.nom) AS vendeur
+    `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
@@ -1705,7 +1705,7 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
 
 export async function getFactureById(id: number): Promise<Facture | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(au.nom, util.nom) AS vendeur
+    `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
@@ -1720,7 +1720,7 @@ export async function getClientFacturesByNom(nom: string, tel?: string | null): 
   const params: (string | number | null)[] = [nom, `%${nom}%`];
   if (tel) { conditions.push("f.client_tel = ?"); params.push(tel); }
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(au.nom, util.nom) AS vendeur
+    `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
@@ -2397,7 +2397,7 @@ export async function getVentesStats(): Promise<{
       SELECT COUNT(*) AS cnt,
              COALESCE(SUM(CASE WHEN source = 'site_order' THEN sous_total ELSE total END), 0) AS montant
       FROM factures
-      WHERE DATE(created_at) = CURDATE() AND statut_paiement = 'paye_total' AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
+      WHERE DATE(created_at) = CURDATE() AND statut_paiement IN ('paye','paye_total') AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
     // Commandes en ligne livrées aujourd'hui — exclude delivery fee
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal), 0) AS montant FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`

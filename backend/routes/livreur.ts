@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../lib/auth";
-import { getUtilisateurById, addOrderEvent, createFinanceEntry } from "@/lib/admin-db";
+import { getUtilisateurById, addOrderEvent, createFinanceEntry, ensureOrderVente } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
 
@@ -291,14 +291,16 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
       }
     } else {
       const [[order]] = await pool.execute<mysql.RowDataPacket[]>(
-        "SELECT id, livreur_id FROM orders WHERE id = ? LIMIT 1", [entityId]
+        "SELECT id, livreur_id, subtotal, payment_mode, statut_paiement, vente_facture_id FROM orders WHERE id = ? LIMIT 1",
+        [entityId]
       );
       if (!order) return res.status(404).json({ error: "Commande introuvable." });
       if (Number(order.livreur_id) !== ctx.member.id) {
         return res.status(403).json({ error: "Cette livraison ne vous est pas assignée." });
       }
+      // Mark order as delivered + paid
       await pool.execute(
-        "UPDATE orders SET livraison_statut = 'livre', status = 'delivered' WHERE id = ?",
+        "UPDATE orders SET livraison_statut = 'livre', status = 'delivered', statut_paiement = 'paye_total' WHERE id = ?",
         [entityId]
       );
       await addOrderEvent(entityId, "delivered", `Livré par ${ctx.member.nom}`, ctx.member.nom);
@@ -307,6 +309,28 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
         "UPDATE livraisons_ventes SET statut = 'livre', livree_le = NOW() WHERE order_id = ?",
         [entityId]
       ).catch(() => {});
+      // Create/sync facture then mark it paid + create vente finance entry
+      try {
+        const factureId = order.vente_facture_id ? Number(order.vente_facture_id) : await ensureOrderVente(entityId);
+        if (factureId) {
+          await pool.execute(
+            "UPDATE factures SET statut_paiement = 'paye_total', statut = 'paye' WHERE id = ? AND statut != 'annule'",
+            [factureId]
+          );
+        }
+        const montant = Number(order.subtotal ?? 0);
+        if (montant > 0) {
+          await createFinanceEntry({
+            type:          "vente",
+            montant,
+            mode_paiement: order.payment_mode || "especes",
+            description:   `Commande site livrée — réf. #${entityId}`,
+            date_entree:   new Date().toISOString().slice(0, 10),
+          });
+        }
+      } catch (e) {
+        console.error("[livreur] finance/facture sync failed:", e);
+      }
     }
     res.json({ ok: true });
   } catch (err) {

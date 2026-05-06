@@ -86,7 +86,8 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
   }, [facture.items]);
 
   /* ── Payment calculations ── */
-  const montantPaye = facture.statut_paiement === "paye_total"
+  const isPaidFull  = facture.statut_paiement === "paye_total" || facture.statut_paiement === "paye";
+  const montantPaye = isPaidFull
     ? facture.total
     : (facture.montant_acompte ?? 0);
   const resteAPayer = Math.max(0, facture.total - montantPaye);
@@ -99,7 +100,7 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
     const mode = modeLabel(facture.mode_paiement);
     const vendeur = facture.vendeur;
 
-    if (facture.statut_paiement === "paye_total") {
+    if (facture.statut_paiement === "paye_total" || facture.statut_paiement === "paye") {
       if (facture.montant_acompte && facture.montant_acompte > 0 && facture.montant_acompte < facture.total) {
         entries.push({ date: facture.created_at,  type: mode, montant: facture.montant_acompte, reference: payRef(facture.id, facture.created_at, "-1"), vendeur });
         entries.push({ date: facture.updated_at,  type: mode, montant: facture.total - facture.montant_acompte, reference: payRef(facture.id, facture.updated_at, "-2"), vendeur });
@@ -206,11 +207,11 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
               <h2 className="font-bold text-slate-900 text-base">Articles</h2>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                 facture.statut === "annule" ? STATUT_COLORS.annule :
-                facture.statut_paiement === "paye_total" ? STATUT_COLORS.paye :
+                isPaidFull ? STATUT_COLORS.paye :
                 STATUT_COLORS[facture.statut] ?? "bg-slate-100 text-slate-600"
               }`}>
                 {facture.statut === "annule" ? "Annulé" :
-                 facture.statut_paiement === "paye_total" ? "Payé" :
+                 isPaidFull ? "Payé" :
                  STATUT_LABELS[facture.statut] ?? facture.statut}
               </span>
             </div>

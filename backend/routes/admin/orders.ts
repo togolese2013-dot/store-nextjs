@@ -130,9 +130,10 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
       "SELECT vente_facture_id FROM orders WHERE id = ? LIMIT 1", [id]
     );
     if (orderRow?.vente_facture_id) {
+      const facturePaiement = payment_status === "paye" ? "paye_total" : payment_status;
       await (db as mysql.Pool).execute(
         "UPDATE factures SET statut_paiement = ? WHERE id = ?",
-        [payment_status, orderRow.vente_facture_id]
+        [facturePaiement, orderRow.vente_facture_id]
       );
     }
     emitAdminEvent("commande");
@@ -149,8 +150,8 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     );
     if (mmOrderRow?.vente_facture_id) {
       await (db as mysql.Pool).execute(
-        "UPDATE factures SET statut_paiement = ? WHERE id = ?",
-        ["paye", mmOrderRow.vente_facture_id]
+        "UPDATE factures SET statut_paiement = 'paye_total' WHERE id = ?",
+        [mmOrderRow.vente_facture_id]
       );
     }
     await addOrderEvent(id, "confirmée", "Paiement Mobile Money vérifié et confirmé", session.nom);
