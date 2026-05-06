@@ -262,6 +262,15 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
                   {formatPrice(facture.sous_total > 0 ? facture.sous_total : facture.total)}
                 </span>
               </div>
+              {(() => {
+                const frais = facture.sous_total > 0 ? facture.total - facture.sous_total + (facture.remise ?? 0) : 0;
+                return frais > 0 ? (
+                  <div className="px-6 py-3 flex justify-between text-sm">
+                    <span className="text-slate-500">Frais de livraison</span>
+                    <span className="font-semibold text-slate-900 tabular-nums">+{formatPrice(frais)}</span>
+                  </div>
+                ) : null;
+              })()}
               {facture.remise > 0 && (
                 <div className="px-6 py-3 flex justify-between text-sm">
                   <span className="text-slate-500">Remise</span>
