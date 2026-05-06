@@ -59,63 +59,37 @@ router.get("/api/livreur/stats", async (req, res) => {
   if (!ctx) return;
   const pool = db as mysql.Pool;
   const id   = ctx.member.id;
+
+  async function q(sql: string, params: unknown[]): Promise<number> {
+    try {
+      const [[row]] = await pool.execute<mysql.RowDataPacket[]>(sql, params);
+      return Number(row?.cnt ?? row?.gain ?? 0);
+    } catch { return 0; }
+  }
+
   try {
-    // Count delivered: orders + livraisons_ventes
-    const [[todayOrders]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND DATE(updated_at) = CURDATE()`, [id]
-    );
-    const [[todayLiv]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'livre' AND DATE(livree_le) = CURDATE()`, [id]
-    );
-    const [[weekOrders]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [id]
-    );
-    const [[weekLiv]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'livre' AND livree_le >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [id]
-    );
-    const [[totalOrders]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre'`, [id]
-    );
-    const [[totalLiv]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'livre'`, [id]
-    );
-    const [[enCoursOrders]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'en_cours'`, [id]
-    );
-    const [[enCoursLiv]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'acceptee'`, [id]
-    );
-    const [[totalAssignedOrders]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ?`, [id]
-    );
-    const [[totalAssignedLiv]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ?`, [id]
-    );
+    const todayOrders    = await q(`SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND DATE(updated_at) = CURDATE()`, [id]);
+    const todayLiv       = await q(`SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'livre' AND DATE(livree_le) = CURDATE()`, [id]);
+    const weekOrders     = await q(`SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [id]);
+    const weekLiv        = await q(`SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'livre' AND livree_le >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [id]);
+    const totalOrders    = await q(`SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre'`, [id]);
+    const totalLiv       = await q(`SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'livre'`, [id]);
+    const enCoursOrders  = await q(`SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ? AND livraison_statut = 'en_cours'`, [id]);
+    const enCoursLiv     = await q(`SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ? AND statut = 'acceptee'`, [id]);
+    const assignedOrders = await q(`SELECT COUNT(*) AS cnt FROM orders WHERE livreur_id = ?`, [id]);
+    const assignedLiv    = await q(`SELECT COUNT(*) AS cnt FROM livraisons_ventes WHERE livreur_id = ?`, [id]);
+    const gainToday      = await q(`SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND DATE(updated_at) = CURDATE()`, [id]);
+    const gainWeek       = await q(`SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [id]);
+    const gainTotal      = await q(`SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre'`, [id]);
 
-    // Gains today (delivery_fee from orders)
-    const [[gainTodayRow]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND DATE(updated_at) = CURDATE()`, [id]
-    );
-    const [[gainWeekRow]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre' AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [id]
-    );
-    const [[gainTotalRow]] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(delivery_fee),0) AS gain FROM orders WHERE livreur_id = ? AND livraison_statut = 'livre'`, [id]
-    );
-
-    const today   = Number(todayOrders?.cnt   ?? 0) + Number(todayLiv?.cnt   ?? 0);
-    const week    = Number(weekOrders?.cnt    ?? 0) + Number(weekLiv?.cnt    ?? 0);
-    const total   = Number(totalOrders?.cnt   ?? 0) + Number(totalLiv?.cnt   ?? 0);
-    const enCours = Number(enCoursOrders?.cnt ?? 0) + Number(enCoursLiv?.cnt ?? 0);
-    const assigned = Number(totalAssignedOrders?.cnt ?? 0) + Number(totalAssignedLiv?.cnt ?? 0);
+    const today    = todayOrders  + todayLiv;
+    const week     = weekOrders   + weekLiv;
+    const total    = totalOrders  + totalLiv;
+    const enCours  = enCoursOrders + enCoursLiv;
+    const assigned = assignedOrders + assignedLiv;
     const tauxReussite = assigned > 0 ? Math.round((total / assigned) * 100) : 0;
 
-    res.json({
-      today, week, total, enCours, tauxReussite,
-      gainToday: Number(gainTodayRow?.gain ?? 0),
-      gainWeek:  Number(gainWeekRow?.gain  ?? 0),
-      gainTotal: Number(gainTotalRow?.gain  ?? 0),
-    });
+    res.json({ today, week, total, enCours, tauxReussite, gainToday, gainWeek, gainTotal });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
@@ -199,20 +173,21 @@ router.get("/api/livreur/orders/history", async (req, res) => {
               created_at, livraison_statut, livraison_note, 'order' AS source
        FROM orders
        WHERE livreur_id = ? AND livraison_statut IN ('livre', 'echec')
-       ORDER BY created_at DESC LIMIT ?`,
-      [ctx.member.id, limit]
+       ORDER BY created_at DESC LIMIT ${limit}`,
+      [ctx.member.id]
     );
     const [livRows] = await pool.execute<mysql.RowDataPacket[]>(
       `SELECT lv.id, lv.reference, lv.client_nom AS nom, lv.client_tel AS telephone,
               lv.adresse, '' AS zone_livraison, 0 AS delivery_fee,
               COALESCE(f.total, 0) AS total,
-              lv.created_at, lv.statut AS livraison_statut, lv.note AS livraison_note,
+              lv.created_at, lv.statut AS livraison_statut,
+              COALESCE(lv.note, '') AS livraison_note,
               'livraison' AS source
        FROM livraisons_ventes lv
        LEFT JOIN factures f ON f.id = lv.facture_id
        WHERE lv.livreur_id = ? AND lv.statut IN ('livre', 'echoue')
-       ORDER BY lv.created_at DESC LIMIT ?`,
-      [ctx.member.id, limit]
+       ORDER BY lv.created_at DESC LIMIT ${limit}`,
+      [ctx.member.id]
     );
     const data = [...orderRows, ...livRows]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())

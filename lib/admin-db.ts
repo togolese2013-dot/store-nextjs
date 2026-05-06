@@ -2700,15 +2700,20 @@ export interface LivraisonAdmin {
 }
 
 export async function ensureLivraisonCols(): Promise<void> {
-  try {
-    await db.execute(
-      "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL AFTER lien_localisation"
-    );
-  } catch { /* column already exists */ }
-  // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id
-  try {
-    await db.execute("ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibfk_2");
-  } catch { /* FK already dropped or doesn't exist */ }
+  // Each ALTER is independent — a missing column must not block the others
+  const alters: string[] = [
+    "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL",
+    "ALTER TABLE livraisons_ventes ADD COLUMN livree_le DATETIME NULL",
+    "ALTER TABLE livraisons_ventes ADD COLUMN note TEXT NULL",
+    "ALTER TABLE livraisons_ventes ADD COLUMN livreur VARCHAR(255) NULL",
+    // Fix ENUM to include all required values
+    "ALTER TABLE livraisons_ventes MODIFY COLUMN statut ENUM('en_attente','acceptee','en_cours','livre','echoue') NOT NULL DEFAULT 'en_attente'",
+    // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id
+    "ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibfk_2",
+  ];
+  for (const sql of alters) {
+    try { await db.execute(sql); } catch { /* already applied */ }
+  }
 }
 
 export async function listLivraisonsAdmin(opts: {
