@@ -112,11 +112,12 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     }
 
     // Create/sync facture at any status change — first admin to confirm = vendeur
-    ensureOrderVente(id, { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom }).catch(() => {});
+    const actor = { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom };
+    await ensureOrderVente(id, actor).catch(e => console.error("[orders] ensureOrderVente failed:", e));
 
     if (["delivered", "livree", "livrée", "livre", "livré"].includes(String(status))) {
       await applyOrderDeliveredEffects(id, session.nom);
-      await ensureOrderVente(id, { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom });
+      await ensureOrderVente(id, actor);
       emitAdminEvent("stock");
     }
     emitAdminEvent("commande");

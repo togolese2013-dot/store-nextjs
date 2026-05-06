@@ -792,6 +792,14 @@ export async function ensureOrderVente(
 
   let factureId = order.vente_facture_id ? Number(order.vente_facture_id) : null;
 
+  // If facture exists but admin_id not yet set, stamp the confirming actor (first write wins)
+  if (factureId && actor?.id) {
+    await db.execute(
+      "UPDATE factures SET admin_id = ? WHERE id = ? AND admin_id IS NULL",
+      [actor.id, factureId]
+    ).catch(() => {});
+  }
+
   // Create facture once — actor.id stored as admin_id (vendeur = first confirming admin)
   if (!factureId) {
     const items = parseOrderItems(order.items).map(item => {
