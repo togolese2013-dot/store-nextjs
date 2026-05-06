@@ -2437,7 +2437,7 @@ export async function getVentesStats(): Promise<{
                END
              ), 0) AS montant
       FROM factures
-      WHERE DATE(created_at) = CURDATE() AND statut_paiement IN ('paye','paye_total','acompte') AND statut != 'annule' AND ${SITE_ORDER_FILTER}`),
+      WHERE DATE(created_at) = CURDATE() AND statut_paiement IN ('paye','paye_total','acompte') AND statut != 'annule' AND (source IS NULL OR source != 'site_order')`),
     // Commandes en ligne livrées aujourd'hui — exclude delivery fee
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
