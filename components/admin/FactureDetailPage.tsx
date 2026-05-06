@@ -15,7 +15,6 @@ const MODES_PAIEMENT = [
   { value: "especes",           label: "Espèces" },
   { value: "mix_by_yas",        label: "Mix by Yas" },
   { value: "moov_money",        label: "Moov Money" },
-  { value: "tmoney",            label: "TMoney" },
   { value: "virement_bancaire", label: "Virement bancaire" },
 ];
 
@@ -88,9 +87,9 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
   /* ── Payment calculations ── */
   const isPaidFull  = facture.statut_paiement === "paye_total" || facture.statut_paiement === "paye";
   const montantPaye = isPaidFull
-    ? facture.total
-    : (facture.montant_acompte ?? 0);
-  const resteAPayer = Math.max(0, facture.total - montantPaye);
+    ? Number(facture.total)
+    : Number(facture.montant_acompte ?? 0);
+  const resteAPayer = Math.max(0, Number(facture.total) - montantPaye);
   const pct = facture.total > 0 ? Math.round((montantPaye / facture.total) * 100) : 0;
 
   /* ── Synthetic payment history ── */
@@ -135,34 +134,38 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
     }
     setPayModal(m => m ? { ...m, saving: true, error: "" } : m);
 
-    const newTotal  = montantPaye + amount;
-    const isPaidFull = newTotal >= facture.total;
+    const newTotal   = montantPaye + amount;
+    const nowPaidFull = newTotal >= Number(facture.total);
 
     const body: Record<string, unknown> = {
-      statut_paiement: isPaidFull ? "paye_total" : "acompte",
+      statut_paiement: nowPaidFull ? "paye_total" : "acompte",
       mode_paiement:   payModal.mode,
-      montant_acompte: isPaidFull ? null : newTotal,
+      montant_acompte: nowPaidFull ? null : newTotal,
     };
-    if (isPaidFull) body.statut = "paye";
+    if (nowPaidFull) body.statut = "paye";
 
-    const res = await fetch(`/api/admin/ventes/factures/${facture.id}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(body),
-    });
+    try {
+      const res = await fetch(`/api/admin/ventes/factures/${facture.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(body),
+      });
 
-    if (res.ok) {
-      setFacture(f => ({
-        ...f,
-        statut:          isPaidFull ? "paye" : f.statut,
-        statut_paiement: isPaidFull ? "paye_total" : "acompte",
-        mode_paiement:   payModal.mode,
-        montant_acompte: isPaidFull ? null : newTotal,
-      }));
-      setPayModal(null);
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setPayModal(m => m ? { ...m, saving: false, error: data.error ?? "Erreur serveur" } : m);
+      if (res.ok) {
+        setFacture(f => ({
+          ...f,
+          statut:          nowPaidFull ? "paye" : f.statut,
+          statut_paiement: nowPaidFull ? "paye_total" : "acompte",
+          mode_paiement:   payModal.mode,
+          montant_acompte: nowPaidFull ? null : newTotal,
+        }));
+        setPayModal(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setPayModal(m => m ? { ...m, saving: false, error: data.error ?? "Erreur serveur" } : m);
+      }
+    } catch {
+      setPayModal(m => m ? { ...m, saving: false, error: "Erreur réseau, réessayez." } : m);
     }
   }
 
@@ -516,9 +519,18 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
                     FCFA
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  Reste à payer : {new Intl.NumberFormat("fr-FR").format(resteAPayer)} FCFA
-                </p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-xs text-slate-400">
+                    Reste à payer : {new Intl.NumberFormat("fr-FR").format(resteAPayer)} FCFA
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPayModal(m => m ? { ...m, montant: String(resteAPayer) } : m)}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                  >
+                    Solder le reste →
+                  </button>
+                </div>
               </div>
 
               {/* Mode */}

@@ -1,0 +1,1018 @@
+{
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/middleware.ts": {
+    "mtime": 1777456091.4186685,
+    "hash": "91f8adbf10f24bbf4d44cc488eafd13d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/postcss.config.mjs": {
+    "mtime": 1775880074.2251005,
+    "hash": "be6a489d3ee67ebb7a759620703b689a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/next-env.d.ts": {
+    "mtime": 1775985098.8925424,
+    "hash": "ba64ff7d54714a8f64db89b1003207d8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/next.config.ts": {
+    "mtime": 1776825110.8254552,
+    "hash": "ac85c7f85d0fadda720d1dd58fa3bdda"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/context/CartContext.tsx": {
+    "mtime": 1777916024.2206745,
+    "hash": "e76e724903bd1b7bb7bd37ad308e1b13"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/sitemap.ts": {
+    "mtime": 1776829375.373478,
+    "hash": "9a8e14288a67dd405a2b6b41b425635e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/layout.tsx": {
+    "mtime": 1777014294.301025,
+    "hash": "106358539424975931b39df9d8e49156"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/layout.tsx": {
+    "mtime": 1777456072.3933563,
+    "hash": "1c9c521faffde22ba4228a9020be53db"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/page.tsx": {
+    "mtime": 1777497366.6082745,
+    "hash": "f6946195b1cfcbbf7fcb33c573ab2cbc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/messages/page.tsx": {
+    "mtime": 1777582167.984502,
+    "hash": "afcd9bd33ef698328db6aafcfe2c579a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/products/page.tsx": {
+    "mtime": 1777120604.0189977,
+    "hash": "28cca3001bf6fbac5ad10238995abbf7"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/products/new/page.tsx": {
+    "mtime": 1776829363.4090436,
+    "hash": "2281921197076e48ff8f7d3f24baf397"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/products/[id]/page.tsx": {
+    "mtime": 1776878130.2798493,
+    "hash": "82a5faec51d184183c89e1369ef8258a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/fournisseurs/page.tsx": {
+    "mtime": 1776495773.950453,
+    "hash": "dd19469ed90723f693d1c0d2d4754b7e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/rapports/page.tsx": {
+    "mtime": 1777495941.2695763,
+    "hash": "3c9bf191c995ab01c1efe14aeff94e5d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/achats/page.tsx": {
+    "mtime": 1776994923.4366846,
+    "hash": "0c9d4b21b341ef05746d6fe198391fab"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/entrepots/page.tsx": {
+    "mtime": 1776531716.7851825,
+    "hash": "184f990616381f5c596bff013bafa138"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/commerciaux/page.tsx": {
+    "mtime": 1777546356.3059099,
+    "hash": "fdeb14502269c24f6c20b2497c897637"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/ventes/page.tsx": {
+    "mtime": 1777977065.3985782,
+    "hash": "a9d36541344efdd739418cfa05146819"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/ventes/[id]/page.tsx": {
+    "mtime": 1777982687.3391113,
+    "hash": "dc27989b4e1aab0dcdf02402616e1d44"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/proforma/page.tsx": {
+    "mtime": 1778069305.4161627,
+    "hash": "a458ec579516d4b1fc206131382fc125"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/verifications/page.tsx": {
+    "mtime": 1777351711.9833524,
+    "hash": "93be1bac6056f4de5a57ac386c776be7"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/crm/page.tsx": {
+    "mtime": 1776763861.7908638,
+    "hash": "5ca02400cdc2dc2c1ea5678560de0b1f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/crm/[id]/page.tsx": {
+    "mtime": 1776363650.944707,
+    "hash": "00cd6bade1ae21684cb27290e8a3dd4e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/layout.tsx": {
+    "mtime": 1777055025.6794486,
+    "hash": "0c7df6ca3c18b8242ca4b10408e86a5d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/settings/page.tsx": {
+    "mtime": 1777495951.5052826,
+    "hash": "d60e5be7a9c28182d8a872093d3f2277"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/settings/theme/page.tsx": {
+    "mtime": 1777495962.7172427,
+    "hash": "4359b9ba708e800ea66b71b37543ef86"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/settings/hero/page.tsx": {
+    "mtime": 1777495956.8486116,
+    "hash": "aeb92b073c83758b2b814ef53141ad4c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/settings/domain/page.tsx": {
+    "mtime": 1777495969.2659578,
+    "hash": "24dc783464b76a3b3a0e0bc1918c7003"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/settings/whatsapp/page.tsx": {
+    "mtime": 1777495975.341918,
+    "hash": "bf1cb32c7425eb109bb9a74d77a08758"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/config/page.tsx": {
+    "mtime": 1777099542.3757553,
+    "hash": "9a5bca7ceec186661f5f3d2d1e793c16"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(admin-zone)/users/page.tsx": {
+    "mtime": 1777495985.1245606,
+    "hash": "406cd76d3b64a65a6048f0e8e36c9e1b"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/parrainage/page.tsx": {
+    "mtime": 1776603660.0210116,
+    "hash": "f6a4fd4e5073b2bda5caa7873b44f7a8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/factures/page.tsx": {
+    "mtime": 1776351629.2167537,
+    "hash": "94991070c7d691ef509131416692297a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/tendances/page.tsx": {
+    "mtime": 1777495946.2179523,
+    "hash": "7dfe276a5a04ba5baa130958db22a44e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/boutique-segmentation/page.tsx": {
+    "mtime": 1776348888.52966,
+    "hash": "462d5a905aaef1196276df88ef208c29"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/paiements/page.tsx": {
+    "mtime": 1777322877.4574783,
+    "hash": "7e2f0d0bab0c7b2227bc3e32a03158bb"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/layout.tsx": {
+    "mtime": 1777186550.4196165,
+    "hash": "ec269a2f30cdf25c7bdc628e2ae3d437"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/settings/payment/page.tsx": {
+    "mtime": 1777186624.6237135,
+    "hash": "4f44bd8895de05729f4ace03e94fd4cb"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/settings/delivery/page.tsx": {
+    "mtime": 1777186614.3681545,
+    "hash": "b430ee10610dc5f6f34788f89e873102"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/coupons/page.tsx": {
+    "mtime": 1777186587.5175052,
+    "hash": "576caa3786455ccae7b6abb3b770ecae"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/orders/page.tsx": {
+    "mtime": 1777916087.1833553,
+    "hash": "50d5103bdf0eb64d136bc55faff8d1fb"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/orders/new/page.tsx": {
+    "mtime": 1775903568.770516,
+    "hash": "d0b3f0edba3a1a7de6409144a5da1f26"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/orders/[id]/page.tsx": {
+    "mtime": 1778049246.4170856,
+    "hash": "85c28ce778b294add80146ad5771c00f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/whatsapp/page.tsx": {
+    "mtime": 1775884534.2103848,
+    "hash": "e9eac36ee348cfcd44b818aaa12089fd"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/(fullscreen)/store/page.tsx": {
+    "mtime": 1778048416.7312148,
+    "hash": "45988ed3aba504dd36bad64c471e30fc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/finance/page.tsx": {
+    "mtime": 1776824987.1951418,
+    "hash": "0644d8c5b12ace518be0b255a8ccdd9d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/newsletter/page.tsx": {
+    "mtime": 1776603689.920829,
+    "hash": "0d24f10dc30ca8d11d32c50c17d92803"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/fidelite/page.tsx": {
+    "mtime": 1776591159.6669574,
+    "hash": "b1101f2b0ede5e0cec963700176c5e7e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/stock/page.tsx": {
+    "mtime": 1776351629.335393,
+    "hash": "986561d7785cc0e9294911f1b60f2783"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/stock/entree/page.tsx": {
+    "mtime": 1776351629.3634677,
+    "hash": "165ecc362c2ccf6b6d9e370fdb76225a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/stock/ajustement/page.tsx": {
+    "mtime": 1776351629.3452811,
+    "hash": "3d5836227cca8b8fd335645c92cf1de0"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/stock/sortie/page.tsx": {
+    "mtime": 1776351629.3774366,
+    "hash": "02b2625175c08f4cd3d1be5c11d2435d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/livraisons/page.tsx": {
+    "mtime": 1776824969.250865,
+    "hash": "290c7d4eb3aee2176ed9d741468f0575"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/categories/page.tsx": {
+    "mtime": 1776714673.2880566,
+    "hash": "a3a54971367784614713d82d0b22de19"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/stock-boutique/page.tsx": {
+    "mtime": 1776140863.986613,
+    "hash": "30e145948fbd283007a99cfe70b40463"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/login/layout.tsx": {
+    "mtime": 1775884956.149022,
+    "hash": "8b188b02cacca6cc0a2211e89535ff02"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/login/page.tsx": {
+    "mtime": 1778046541.9145858,
+    "hash": "80cc989e1a3531e7276185291f2d5c8a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/offline/page.tsx": {
+    "mtime": 1776351629.2414155,
+    "hash": "c6c1590508b819fcae1a7d7e4d850e73"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/comptes-clients/page.tsx": {
+    "mtime": 1776603713.051569,
+    "hash": "4a9ad4c6e984253874a9c0a80ffe23cd"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/reviews/page.tsx": {
+    "mtime": 1777187586.7387238,
+    "hash": "df8386d6f76bb5f8eead8ef5e3f92e02"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/boutique-clients/page.tsx": {
+    "mtime": 1776348874.2352254,
+    "hash": "76be2840aeef1f07392692a21888e996"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/admin/boutique-clients/[id]/page.tsx": {
+    "mtime": 1778006008.4216194,
+    "hash": "4994fb85537ddfafb9f2f2762e4721ab"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/layout.tsx": {
+    "mtime": 1777114238.6962283,
+    "hash": "a04ee1d675638be688e8dea36be3758f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/error.tsx": {
+    "mtime": 1776847458.1702328,
+    "hash": "a2288603f0037fd7a4bd787a34dbfe9e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/loading.tsx": {
+    "mtime": 1777038804.8803434,
+    "hash": "9bdc3bc16e73bb1425749ac1cea2e2bd"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/page.tsx": {
+    "mtime": 1777971928.8835475,
+    "hash": "31b80f97cbe1456b2695a7d804288d7d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/products/loading.tsx": {
+    "mtime": 1777038814.0999973,
+    "hash": "be9d5d2dc7407289d9910725c0d87390"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/products/page.tsx": {
+    "mtime": 1778002361.2548435,
+    "hash": "9f8f7a79ec44ab8a1cc5b3814bda7a58"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/products/[slug]/page.tsx": {
+    "mtime": 1777916157.3053231,
+    "hash": "689af9bb4f51635010b711b72f470870"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/checkout/page.tsx": {
+    "mtime": 1777916136.8539932,
+    "hash": "7fb15100f2f55c9df71c4d5f6e5c615e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/parrainage/page.tsx": {
+    "mtime": 1776575061.6213858,
+    "hash": "1d455b03048a276792489cee639ef420"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/suivi-commande/page.tsx": {
+    "mtime": 1777395731.5915945,
+    "hash": "ceaf3b4dddf922cd1c5efeb3b4774f70"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/cart/page.tsx": {
+    "mtime": 1777350591.1858695,
+    "hash": "8de949073e84fe70955c075e4808423d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/page.tsx": {
+    "mtime": 1777351173.748185,
+    "hash": "cbf80cf85d06e0d9371b99b8f54d6a8c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/profil/page.tsx": {
+    "mtime": 1776611531.7728527,
+    "hash": "550225c49f4422178d554e784f934c44"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/commandes/page.tsx": {
+    "mtime": 1777319606.9577508,
+    "hash": "119d6fc3a3de63a409621ed260d9e057"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/commandes/[ref]/page.tsx": {
+    "mtime": 1777322793.373004,
+    "hash": "407c28de1e1f5b9369541be63d868b05"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/verification/page.tsx": {
+    "mtime": 1777351120.4096882,
+    "hash": "2d8dc8de15daa697e24617f60d017002"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/adresses/page.tsx": {
+    "mtime": 1776587138.9187062,
+    "hash": "16b1eca2e4df65e7ce85a994856838f6"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/recently-viewed/page.tsx": {
+    "mtime": 1777102327.751191,
+    "hash": "f443d49b2ee66f4bb834e6e0482a635f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/notifications/page.tsx": {
+    "mtime": 1776587145.6598742,
+    "hash": "7246bcb767440fe4adea0c5679325f49"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/account/paiement/page.tsx": {
+    "mtime": 1776587142.0657785,
+    "hash": "17ee18f8d20c91b6f1d56b179ef57b2a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/fidelite/page.tsx": {
+    "mtime": 1776575029.1364303,
+    "hash": "79c5830475544eeafa915b7bd05b97d9"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/(shop)/wishlist/page.tsx": {
+    "mtime": 1776571255.2604175,
+    "hash": "c1a6bb4bd75f2a5aef4833209fbf17a2"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/livreur/layout.tsx": {
+    "mtime": 1777456075.9022233,
+    "hash": "15c8d46c880b2a31721f0edce012e258"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/livreur/page.tsx": {
+    "mtime": 1778020420.9855063,
+    "hash": "0638cd48e68add1710d0b1e064bea60f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/livreur/[code]/page.tsx": {
+    "mtime": 1776806316.2500606,
+    "hash": "d7fea44712bdf0614a43832349919fc0"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/app/change-password/page.tsx": {
+    "mtime": 1778021598.807087,
+    "hash": "d70f2371db6a7f2d6c3a8d1be30f8e48"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/index.ts": {
+    "mtime": 1778022154.6369846,
+    "hash": "fdb329eac63c20bf909dc640248f8dc1"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/lib/client-auth.ts": {
+    "mtime": 1777100265.3001797,
+    "hash": "1549d9a374581e1fb14c846ca6c3c9cb"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/lib/admin-events.ts": {
+    "mtime": 1777318419.3381205,
+    "hash": "48dbd96eaa73f58100240a011a8f8a61"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/lib/whatsapp.ts": {
+    "mtime": 1777968342.3423102,
+    "hash": "e27ea255f0450c9646bd7307e7cf86d8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/lib/auth.ts": {
+    "mtime": 1777454224.7338758,
+    "hash": "127eb04261ab16e36b6b9c31ad05b966"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/account.ts": {
+    "mtime": 1777392879.8131342,
+    "hash": "b697c9c38bc3ee0acdd6f924f6b29dca"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/livreur.ts": {
+    "mtime": 1778088718.3841,
+    "hash": "898ef11c48fb5eccb5cc3bdc17129a18"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/mobile-money.ts": {
+    "mtime": 1777371533.6454613,
+    "hash": "45e60d5cf3f8fa763b54d95a0b826e0d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/orders.ts": {
+    "mtime": 1777915873.3552911,
+    "hash": "a101afea1ca6a5cc01862a21544d25b2"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/public.ts": {
+    "mtime": 1777968601.1413152,
+    "hash": "bf4dadf01e5fcc9e07ce5ac244c96318"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/schema.ts": {
+    "mtime": 1776978096.3461297,
+    "hash": "cadceb5d3bf002e89199321be51720e8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/boutique-clients.ts": {
+    "mtime": 1778005833.5596735,
+    "hash": "d11571a364f145116cf474927fc96add"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/settings.ts": {
+    "mtime": 1776824782.5358999,
+    "hash": "edaa7ddc22065ee4df86c9cfdaa71fdc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/clients.ts": {
+    "mtime": 1776824749.7627919,
+    "hash": "5b967dd63af77939e8be59a6d94beed8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/fournisseurs.ts": {
+    "mtime": 1776993120.3111434,
+    "hash": "8785f143cc70253506a5b6c7722fac75"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/newsletter.ts": {
+    "mtime": 1776824831.614497,
+    "hash": "2a0e3c7673c8096d98ac606a37796948"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/stock.ts": {
+    "mtime": 1776824667.816286,
+    "hash": "ddeff170fc07f3c987942b68aa7e845a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/stock-boutique.ts": {
+    "mtime": 1776824688.128018,
+    "hash": "42361fc699dc25caa568dcd2c315ac62"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/ventes.ts": {
+    "mtime": 1777982789.1282825,
+    "hash": "2c2e45cc67f761c3e5758748ca31fcc3"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/products.ts": {
+    "mtime": 1777123060.735688,
+    "hash": "a16ffaedc9025178bf57706502809e47"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/orders.ts": {
+    "mtime": 1778089384.5362926,
+    "hash": "9b21337b6e6b8fc1978c391cc08ace56"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/payment-plans.ts": {
+    "mtime": 1777395563.8413498,
+    "hash": "0e4cfc408544159637393aa4e8fcadbc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/events.ts": {
+    "mtime": 1777318608.9306402,
+    "hash": "dd4775cce9329653c1f9a075d519c3df"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/categories.ts": {
+    "mtime": 1776861801.1664112,
+    "hash": "1ee513653586e659879242e29491815c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/commerciaux.ts": {
+    "mtime": 1777542533.0760167,
+    "hash": "d1f0195247bb4888b81ece2bf704f167"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/verifications.ts": {
+    "mtime": 1777351042.9351044,
+    "hash": "7b4e983b37aa5230e7e606ccdea5ce28"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/users.ts": {
+    "mtime": 1778018822.6570187,
+    "hash": "57a97b7ebf7bfc11b4e8c1dd9ef45922"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/whatsapp.ts": {
+    "mtime": 1777583804.1474497,
+    "hash": "0ca7cee11b11e577cb7f0e12ebf3cf34"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/upload.ts": {
+    "mtime": 1776824776.7217345,
+    "hash": "2e49b9d1d9061b15e9cbed4bb66dc290"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/variants.ts": {
+    "mtime": 1777122106.5380697,
+    "hash": "387d61f0537ec645c9c658884a972e3e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/finance.ts": {
+    "mtime": 1778086685.6662493,
+    "hash": "82a419b37c85a477e474f8edcda8869f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/reviews.ts": {
+    "mtime": 1777321311.666153,
+    "hash": "68f39ba4063c339c82128734b79fb776"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/auth.ts": {
+    "mtime": 1777455105.7359881,
+    "hash": "26676f61c5395225561b3ba0ee994337"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/backend/routes/admin/livraisons.ts": {
+    "mtime": 1776824725.5247245,
+    "hash": "fe578ffcf673de2819616e8bc4bc59e1"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/Newsletter.tsx": {
+    "mtime": 1777098686.7717655,
+    "hash": "5dea18f01accec16233af891cfe55621"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/RecentViewTracker.tsx": {
+    "mtime": 1777045824.9068418,
+    "hash": "182cb661d37f55e5a33f71615ba09e97"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/WhatsAppButton.tsx": {
+    "mtime": 1776571168.1790738,
+    "hash": "7e38e7c39d1daeb6600d9e5d2f927351"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/AccountDropdown.tsx": {
+    "mtime": 1776611541.8425589,
+    "hash": "0ab7590a9cdaba09c4cc95fde4568766"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/CatalogueFilters.tsx": {
+    "mtime": 1777916006.9935875,
+    "hash": "9455869d44480c48810d12ae567edcf3"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ProductImageGallery.tsx": {
+    "mtime": 1775912845.7282453,
+    "hash": "eef8a03bec071b32629ebb78bcaae7b8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/CollapsibleText.tsx": {
+    "mtime": 1777102114.6130083,
+    "hash": "bbc2340470a20a1289464454cb1f924a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ProductReviews.tsx": {
+    "mtime": 1777185772.340187,
+    "hash": "1ae4eb534e0aba275ee1422e38666ce1"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ThemeLoader.tsx": {
+    "mtime": 1777099506.365241,
+    "hash": "6028f2e708a6d213fe97764ebc0053dc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/BottomNav.tsx": {
+    "mtime": 1777949131.601965,
+    "hash": "85e77ca38fb7edd9bcf8ca73a5398831"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ProductVariantSelector.tsx": {
+    "mtime": 1776533391.3354738,
+    "hash": "11e9451c7fcbeceb2e3dd249e7e72637"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/TestimonialsSlider.tsx": {
+    "mtime": 1777098712.6504183,
+    "hash": "1a4968bd7277ffd0b75d63962a546192"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/HeroSectionClient.tsx": {
+    "mtime": 1777972536.593323,
+    "hash": "d696a232c37bf60e57e7d8ece235afad"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ProductCard.tsx": {
+    "mtime": 1778002335.5923324,
+    "hash": "25c671358dec3176b71c045db8768a02"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/RatingBadge.tsx": {
+    "mtime": 1777567005.6909974,
+    "hash": "b9835ec9d2acb4517f5b35b5c76cb574"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/AddToCartButton.tsx": {
+    "mtime": 1777103946.6487463,
+    "hash": "6913ce7f8a2580f82cb14115295c0162"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/Footer.tsx": {
+    "mtime": 1777946193.7006826,
+    "hash": "6cdafce92cf9a26db09e8dae311a77e3"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ReferralBanner.tsx": {
+    "mtime": 1776575084.3260128,
+    "hash": "9139d400ec2fdd90d6f691bdb493b5b8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/AnnouncementBar.tsx": {
+    "mtime": 1777053455.0501046,
+    "hash": "fa4f06e4f227d34bb4432f61cd285e32"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ThemeProvider.tsx": {
+    "mtime": 1776377135.5250907,
+    "hash": "94fcbf19321368d78d2d3c255a5a13d0"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/RecentlyViewed.tsx": {
+    "mtime": 1777045882.1325023,
+    "hash": "58462c5ae42b2dd91c8a28b7a3e75b19"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/HeroSection.tsx": {
+    "mtime": 1777138325.2019808,
+    "hash": "f3d444b9daf1c0c3b142ba526bd7ba6d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/Header.tsx": {
+    "mtime": 1777983415.0662534,
+    "hash": "3207728aeb7285ea715186ce70275bb5"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ProductCardSkeleton.tsx": {
+    "mtime": 1777038790.7417834,
+    "hash": "fe7809b534c5089d6ed47ea6061ee4d1"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ProductImageGallerySimple.tsx": {
+    "mtime": 1777916109.408151,
+    "hash": "46db6f2630fd230aabb5aa39a2406b4b"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/RefDetector.tsx": {
+    "mtime": 1776575103.8329356,
+    "hash": "73659e7cb126b461366155ebaca42cef"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/CartSuggestions.tsx": {
+    "mtime": 1777045232.7034614,
+    "hash": "ec34363257ae30e36cf46b521e425c91"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/StickyCartBar.tsx": {
+    "mtime": 1777114250.5903678,
+    "hash": "1180ee859bb94ad3507aaca61f6c9cb6"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/ThemeVars.tsx": {
+    "mtime": 1776411155.6639004,
+    "hash": "ca2dc4f7785bee276fac3e8e3f729e34"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/HeroSettingsForm.tsx": {
+    "mtime": 1777138313.923131,
+    "hash": "72349af15d778048fe89bbd8367554b9"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ProductQuickViewModal.tsx": {
+    "mtime": 1777119739.9724014,
+    "hash": "c3da24c94a7a6f74de4f9e03187bb693"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/CategoriesManager.tsx": {
+    "mtime": 1777305524.1494737,
+    "hash": "3af1ec0d82e696b927b9ebb9cc16ac20"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/VentesManager.tsx": {
+    "mtime": 1778091803.3373592,
+    "hash": "774632e51af5d79ea3cd3ce57648f1f4"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminShell.tsx": {
+    "mtime": 1777472680.5251782,
+    "hash": "c8d132b6d7a3001da9572a31aa97ea3b"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/FideliteManager.tsx": {
+    "mtime": 1776591201.1131353,
+    "hash": "b556a32eb1452a5da2240a494b82420a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminTopBar.tsx": {
+    "mtime": 1776696621.3378198,
+    "hash": "e9ddf2b8a83779cd35059b21086ef1c4"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/OrderStatusSelect.tsx": {
+    "mtime": 1775884593.4766169,
+    "hash": "ddd9e323d3eaa9c0dea0eb5cefade02e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/TendancesManager.tsx": {
+    "mtime": 1776417507.7640798,
+    "hash": "76096de10fff31144e34dc37877fb98b"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ProformaManager.tsx": {
+    "mtime": 1778069286.8275454,
+    "hash": "7b3a8347c6633f3be1219284d3be0d0a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ClientDetailPage.tsx": {
+    "mtime": 1778005993.252001,
+    "hash": "80d88576befc5390c3e4eec0d749032c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/PaymentMethodsManager.tsx": {
+    "mtime": 1776351366.9012609,
+    "hash": "ef95cb9c3eea94a1bff77e60b552d856"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/FactureDetailPage.tsx": {
+    "mtime": 1778091472.6742647,
+    "hash": "bdf53be0b0972f0510d2b2085ff73f5d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/StockBoutiqueManager.tsx": {
+    "mtime": 1778005870.561888,
+    "hash": "e497c655f4560980d240049c141c50e9"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/NewsletterTable.tsx": {
+    "mtime": 1776603681.5274472,
+    "hash": "276d720f70b68dbd59eef01109a69e59"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/OrdersTableBody.tsx": {
+    "mtime": 1778048394.3619692,
+    "hash": "707b5653fbc3f82907029842b603ff50"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/FournisseursManager.tsx": {
+    "mtime": 1776380125.985373,
+    "hash": "7384071bed58ef3ca3fcd160b2ba3790"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ReviewActions.tsx": {
+    "mtime": 1776351334.132809,
+    "hash": "cdbcd2c2d4f9ebeeb33cef2978310245"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ThemeSettingsForm.tsx": {
+    "mtime": 1777055072.8788161,
+    "hash": "2b22f6194b93b4f56540df6c038cf8cc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminFloatingUI.tsx": {
+    "mtime": 1777466134.908764,
+    "hash": "2ead8c207fd9aa1238370ff0ba662fca"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/BoutiqueClientsManager.tsx": {
+    "mtime": 1778006031.695178,
+    "hash": "4abcf052d4e000aede1edfea914f5685"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/RapportsManager.tsx": {
+    "mtime": 1776411826.6173909,
+    "hash": "3ac768415ff9db58ab6842e519223737"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/EditProductModal.tsx": {
+    "mtime": 1777118763.893755,
+    "hash": "36a42e97458d32394c141c92231f66e3"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/OrderStatusBadge.tsx": {
+    "mtime": 1778049227.4243994,
+    "hash": "4c07c89c787e29d66e9d94bb619fd511"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/DeliveryZonesManager.tsx": {
+    "mtime": 1776351366.8340485,
+    "hash": "3a5063c1513880befc4d350d232e67b6"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminZonePage.tsx": {
+    "mtime": 1777495914.9742994,
+    "hash": "5caa5499a18b3e99c514d2772912c587"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/OrderConfirmButton.tsx": {
+    "mtime": 1778049232.4272888,
+    "hash": "3fad07eac10119f4edfab082c59e12f8"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/BoutiqueSegmentation.tsx": {
+    "mtime": 1776762546.5100832,
+    "hash": "bf0481642e278795d4119ac523c8c49f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminUserChip.tsx": {
+    "mtime": 1777468116.2809181,
+    "hash": "efb9dbecb8056d0ac96e894dab2eab83"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/PageHeader.tsx": {
+    "mtime": 1776762478.4080784,
+    "hash": "ea6f3195e0dc5ec170dfc078f901c075"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminSidebar.tsx": {
+    "mtime": 1777546414.3094294,
+    "hash": "36e6654d8dea2b50a2648223a12e49c5"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ClientsTable.tsx": {
+    "mtime": 1776603781.8394167,
+    "hash": "5a4d7f69f0a554428d1c096f2321b3f9"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/StatCard.tsx": {
+    "mtime": 1776380063.606593,
+    "hash": "a1cb1244fc795576d0f82c20d9cc4c43"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/WhatsAppAPISettingsForm.tsx": {
+    "mtime": 1777484613.7887733,
+    "hash": "38f799de12097d4bfbb2a1832e00fa7b"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ReviewsClient.tsx": {
+    "mtime": 1776603815.4335403,
+    "hash": "289ee17526ed750abb433b0c8a056ce6"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/RelatedProductsManager.tsx": {
+    "mtime": 1775913745.8202364,
+    "hash": "8e7963c1b66d068950c70c5b1cf403d7"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/CommerciauxManager.tsx": {
+    "mtime": 1777547114.2634706,
+    "hash": "99fec2cac480ea587b4c718972107c3f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ImportExportManager.tsx": {
+    "mtime": 1776417144.4847064,
+    "hash": "db1f00336b88d372e76373e9483cda8a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/VerificationsManager.tsx": {
+    "mtime": 1777351271.351592,
+    "hash": "12784131f3446a4053a17028c62c38ed"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/MessagesClient.tsx": {
+    "mtime": 1777584687.845178,
+    "hash": "0e7e1015b229fb9ad741061757778897"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/CreateOrderForm.tsx": {
+    "mtime": 1777305506.8782773,
+    "hash": "bb1fb1747d7c38d033b469c317222271"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ClientEditForm.tsx": {
+    "mtime": 1776363650.9845665,
+    "hash": "0b739049cb6160a79597e76656acaa7c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/OrderNotifier.tsx": {
+    "mtime": 1777318526.4369316,
+    "hash": "97d17c38833da523204c1bc9f8841d16"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/StoreUrlEditor.tsx": {
+    "mtime": 1777305569.896576,
+    "hash": "847af8b34dd03f4f448f247871b2f664"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/useAdminSSE.tsx": {
+    "mtime": 1777318707.255368,
+    "hash": "278364b386ed78565c9a83e3bd833943"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/DomainSettingsForm.tsx": {
+    "mtime": 1776351366.9529898,
+    "hash": "3a6f8b4821229a152bebd2b53e61b45a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/MouvementModal.tsx": {
+    "mtime": 1776379143.320873,
+    "hash": "cc107384f486123bb5cf987a651b2778"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/ProductForm.tsx": {
+    "mtime": 1777121857.839564,
+    "hash": "d9c43cd72d6bc26e37393932800ca570"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/OrderTimeline.tsx": {
+    "mtime": 1775903553.7235239,
+    "hash": "b7498c815f54f84a36941a5e3db44618"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AddProductModal.tsx": {
+    "mtime": 1777122832.9143293,
+    "hash": "192f2092bb143fd61ab4869764fcdf88"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/CouponsManager.tsx": {
+    "mtime": 1776366296.5919356,
+    "hash": "ad5cf95cecbc8f68f8e976bbcb492738"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AchatsManager.tsx": {
+    "mtime": 1776994966.492968,
+    "hash": "811d4885fe86a8d39fc0e23fdf790475"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminTopNav.tsx": {
+    "mtime": 1777467042.2203045,
+    "hash": "47a14f099e7984bf4e624112682bd980"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/LivraisonsManager.tsx": {
+    "mtime": 1776806548.7839923,
+    "hash": "8b522c9895b7ca556d2c1d58d53bb029"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/UsersManager.tsx": {
+    "mtime": 1778018851.7851393,
+    "hash": "f087f93184d4efcb5dea1c08026d75f0"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/BoutiqueDocPrint.tsx": {
+    "mtime": 1778069176.8687437,
+    "hash": "bc025d79c13655e668f12d829b36789e"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/FinanceManager.tsx": {
+    "mtime": 1778086710.4191246,
+    "hash": "40f20e8e00310c0c858062e3cf1c6ffe"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/AdminProductActions.tsx": {
+    "mtime": 1776993085.8554652,
+    "hash": "7cd1a00527df7334be447b16c490527d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/TabBar.tsx": {
+    "mtime": 1776365262.4962516,
+    "hash": "bf1a255e93f6c12620fd7fbbf34f45c7"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/PaymentPlansManager.tsx": {
+    "mtime": 1777322841.1859632,
+    "hash": "87c2db4be5782544f1cbfbab3c6576d1"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/VariantsManager.tsx": {
+    "mtime": 1777121817.3708773,
+    "hash": "ad9384b0a6e9deee445f0728a95c47cc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/OrderDetailActions.tsx": {
+    "mtime": 1777395654.7670193,
+    "hash": "7c1fa6c2da2ae45444460b35eb9f46bb"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/BroadcastClient.tsx": {
+    "mtime": 1776363651.0132735,
+    "hash": "00251e1552ee92def9b1e07924193ea0"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/components/admin/GeneralSettingsForm.tsx": {
+    "mtime": 1777053292.9241998,
+    "hash": "e28427dfcd443796ffbaa5b91e83a748"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/sw.js": {
+    "mtime": 1777318462.4513845,
+    "hash": "1583aad4257ff9f9d1a6aa6c0d1ad12d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/hooks/useRecentlyViewed.ts": {
+    "mtime": 1777045817.4006023,
+    "hash": "3b926bcb13be2fb91ef88878c8d0455c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/livraisons-migration.sql": {
+    "mtime": 1776260274.9717832,
+    "hash": "a2929e1c1e33343455d4f22dd112208c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/finance-mode-paiement-migration.sql": {
+    "mtime": 1776283913.023007,
+    "hash": "d4880968ff10044e208298b0b7407045"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/admin-migration.sql": {
+    "mtime": 1775883998.8722365,
+    "hash": "8779f1c67a8e292d775d3a3dad507bd1"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/schema.sql": {
+    "mtime": 1775922638.070882,
+    "hash": "4a963d755851784759d4934ec2dff3d0"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/gen-icons.js": {
+    "mtime": 1775922103.4440424,
+    "hash": "f2b2e628856a4e2d2cfddfe69333e95f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/run-migration.js": {
+    "mtime": 1775914465.5444126,
+    "hash": "bc5485563990814bd1ea4c3af42cf7b1"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/stock-boutique-migration.sql": {
+    "mtime": 1776141290.7282867,
+    "hash": "06bdb6e6b2b00a73ebb9d4598ce03cd7"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/ventes-migration.sql": {
+    "mtime": 1776141604.835008,
+    "hash": "4b18ea55ba2a72db1141e25052a9c1bc"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/gallery-migration.sql": {
+    "mtime": 1775911225.2214596,
+    "hash": "ff3a1389cb38986b026695b4a68fc898"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/related-products-migration.sql": {
+    "mtime": 1775913582.410589,
+    "hash": "de618236f5eb11c02a02855e412f49e4"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/boutique-clients-migration.sql": {
+    "mtime": 1776348507.574348,
+    "hash": "3c5db697801f5b27a14bc188f694abb3"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/ventes-v2-migration.sql": {
+    "mtime": 1776205258.0773277,
+    "hash": "921d373e9bd93981834ccd5e1959d8a0"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/migrate_dump.py": {
+    "mtime": 1776679685.0101395,
+    "hash": "0d4c98af317260808ad25f78350f3673"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/scripts/features-migration.sql": {
+    "mtime": 1775902738.7823768,
+    "hash": "d279b9b3b855913534a34bf2582bd322"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/client-auth.ts": {
+    "mtime": 1776586892.1752086,
+    "hash": "1cf33384c6a90326b1e0d32b377d7c18"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/admin-permissions.ts": {
+    "mtime": 1777405797.8641691,
+    "hash": "d3d9b6dd50abbed06baa484b016610b3"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/theme-utils.ts": {
+    "mtime": 1776411143.2933264,
+    "hash": "d8889e176c2239386324711fda682a2b"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/admin-events.ts": {
+    "mtime": 1776824503.0490346,
+    "hash": "a690d95fa5c970253ccfde37a90dbfd6"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/utils.ts": {
+    "mtime": 1777948143.8750973,
+    "hash": "2ac08ab97f66609e2f9d93727b6ddfa5"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/api.ts": {
+    "mtime": 1776846402.7703202,
+    "hash": "6cb8d6b4d5c761026ba6e5ff6968e500"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/related-products.ts": {
+    "mtime": 1776978135.8122158,
+    "hash": "610e44216d4b9ce03ba440f11ca6c943"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/admin-db.ts": {
+    "mtime": 1778091476.4237962,
+    "hash": "f8df77f29779961176eada993b10402d"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/db.ts": {
+    "mtime": 1777948154.7598743,
+    "hash": "60131dc83241bfc022653769a323c296"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/auth.ts": {
+    "mtime": 1777454216.7054627,
+    "hash": "07b1b88b85a361358f22b76212139d90"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/lib/pdf/InvoiceDocument.tsx": {
+    "mtime": 1775903513.5969436,
+    "hash": "a3dfd7571ae0625a31460c0156f808da"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/README.md": {
+    "mtime": 1776140818.6174533,
+    "hash": "5ca47c1f312a77a8dd0c171acfd72490"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/HANDOFF.md": {
+    "mtime": 1776803010.280456,
+    "hash": "04145a3f00b02a3aa3f9e333f167d3ab"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/logo-togolese-shop.svg": {
+    "mtime": 1776676451.6622615,
+    "hash": "dd7fdaa1167537c85d353e734f9dc26b"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/logo-moov-money.svg": {
+    "mtime": 1777369500.9078975,
+    "hash": "c33ac025a6b2fe2dc5edbd937a762b2f"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/logo-togolese-shop-white.svg": {
+    "mtime": 1776676460.90476,
+    "hash": "bef8fb37f0c9f264d986e041fdc29cb4"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/logo-mixx-by-yas.svg": {
+    "mtime": 1777369484.9028542,
+    "hash": "793790c9a8554109bad02461a0bf2a5a"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/uploads/154be2a8-3da7-43c0-8e15-4389c0dc13b6.png": {
+    "mtime": 1775915694.7775753,
+    "hash": "a822f743a65deb10f12b3492460e938c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/uploads/9c7195c2-61fb-4e69-af43-411c019254d0.png": {
+    "mtime": 1775919168.317108,
+    "hash": "a822f743a65deb10f12b3492460e938c"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/uploads/45f30305-5eb4-4ac0-9c31-529fe75f013b.jpg": {
+    "mtime": 1776170037.6650069,
+    "hash": "fcf7aa77997322b65cf16105fe0caf85"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/icons/icon-192.png": {
+    "mtime": 1775922136.4546158,
+    "hash": "38a5aa2917fe9e0343dc1c50c93add59"
+  },
+  "/Volumes/LOCAL/CLAUDE CODE/store-nextjs/public/icons/icon-512.png": {
+    "mtime": 1775922136.4846268,
+    "hash": "9490a8ba5b4dbd86f4779e9e88b244fc"
+  }
+}

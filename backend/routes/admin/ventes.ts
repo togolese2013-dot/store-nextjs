@@ -77,6 +77,7 @@ router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
     } else {
       await updateFacture(Number(req.params.id), { statut, statut_paiement, mode_paiement, montant_acompte });
     }
+    emitAdminEvent("vente");
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
