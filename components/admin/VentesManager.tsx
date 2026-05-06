@@ -13,6 +13,7 @@ import {
 import PageHeader from "@/components/admin/PageHeader";
 import type { Facture, Livraison, BoutiqueStockItem } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
 
 /* ─── Types ─── */
 
@@ -181,7 +182,8 @@ export default function VentesManager({
 
   /* ── Modal Modifier ── */
   type EditState = { facture: Facture; statut: string; statut_paiement: string; mode_paiement: string; saving: boolean; error: string };
-  const [editState, setEditState] = useState<EditState | null>(null);
+  const [editState,    setEditState]    = useState<EditState | null>(null);
+  const [printFacture, setPrintFacture] = useState<Facture | null>(null);
 
   const router = useRouter();
 
@@ -405,7 +407,7 @@ export default function VentesManager({
     }
   }
 
-  function handlePrint(ref: string) { window.print(); void ref; }
+  function handlePrint(f: Facture) { setPrintFacture(f); }
 
   /* ── Voir détail ── */
   function handleView(f: Facture) { router.push(`/admin/ventes/${f.id}`); }
@@ -635,7 +637,7 @@ export default function VentesManager({
                           <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleView(f)} title="Voir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>
                             <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>
-                            <button onClick={() => handlePrint(f.reference)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
+                            <button onClick={() => handlePrint(f)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
                             <button onClick={() => handleDelete(f.id)} title="Supprimer" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
@@ -1102,6 +1104,32 @@ export default function VentesManager({
           </div>
         </div>
       )}
+
+      {/* ── Print overlay ── */}
+      {printFacture && (() => {
+        const parsedItems = (() => {
+          try { return JSON.parse(printFacture.items); } catch { return []; }
+        })();
+        return (
+          <BoutiqueDocPrint
+            type="facture"
+            format="A4"
+            reference={printFacture.reference}
+            date={printFacture.created_at}
+            client_nom={printFacture.client_nom}
+            client_tel={printFacture.client_tel}
+            items={parsedItems}
+            sous_total={printFacture.sous_total}
+            remise={printFacture.remise}
+            total={printFacture.total}
+            mode_paiement={printFacture.mode_paiement}
+            statut_paiement={printFacture.statut_paiement}
+            adresse_livraison={printFacture.adresse_livraison}
+            note={printFacture.note}
+            onClose={() => setPrintFacture(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

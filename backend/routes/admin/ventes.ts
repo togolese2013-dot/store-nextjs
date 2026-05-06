@@ -82,7 +82,7 @@ router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
       });
     }
     emitAdminEvent("vente");
-    res.json({ ok: true });
+    res.json({ ok: true, vendeur: session.nom });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }

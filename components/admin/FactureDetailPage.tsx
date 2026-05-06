@@ -131,6 +131,7 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
       });
 
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         setFacture(f => ({
           ...f,
           statut:          nowPaidFull ? "paye" : f.statut,
@@ -143,7 +144,7 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
           facture_id:    facture.id,
           montant:       amount,
           mode_paiement: payModal.mode,
-          vendeur:       null,
+          vendeur:       data.vendeur ?? null,
           created_at:    new Date().toISOString(),
         }]);
         setPayModal(null);
