@@ -8,14 +8,33 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_SIZE      = 10 * 1024 * 1024;
+const MAX_SIZE = 10 * 1024 * 1024;
+
+/** Detect real MIME type from magic bytes — never trust client-supplied type. */
+function detectMimeFromBuffer(buf: Buffer): string | null {
+  if (buf.length < 4) return null;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return "image/jpeg";
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return "image/png";
+  // GIF: GIF8
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return "image/gif";
+  // WebP: RIFF????WEBP (bytes 0-3 = RIFF, bytes 8-11 = WEBP)
+  if (buf.length >= 12 &&
+      buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return "image/webp";
+  return null;
+}
 
 const router = express.Router();
 
-async function uploadToCloudinary(buffer: Buffer, mimetype: string): Promise<string> {
-  if (!ALLOWED_TYPES.includes(mimetype)) throw new Error(`Type non autorisé: ${mimetype}`);
+async function uploadToCloudinary(buffer: Buffer, _clientType: string): Promise<string> {
   if (buffer.length > MAX_SIZE) throw new Error("Fichier trop volumineux (max 10 Mo)");
+
+  // Verify real type from magic bytes — ignore client-supplied type
+  const realMime = detectMimeFromBuffer(buffer);
+  if (!realMime) throw new Error("Format de fichier non reconnu. Utilisez JPEG, PNG, WebP ou GIF.");
+
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       { folder: "togolese-shop", resource_type: "image" },

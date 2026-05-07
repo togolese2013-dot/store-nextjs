@@ -39,7 +39,9 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
-import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam, ensureLivraisonCols } from "@/lib/admin-db";
+import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam, ensureLivraisonCols, ensureTokenVersionCols } from "@/lib/admin-db";
+import adminSecurityLogsRoutes from "./routes/admin/security-logs";
+import { ensureSecurityLogsTable } from "./lib/security-log";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -118,6 +120,7 @@ app.use(adminPaymentPlansRoutes);
 app.use(adminVerificationsRoutes);
 app.use(adminWhatsappRoutes);
 app.use(adminCommerciauxRoutes);
+app.use(adminSecurityLogsRoutes);
 app.use(livreurRoutes);
 app.use(publicRoutes);
 app.use(accountRoutes);
@@ -167,6 +170,18 @@ app.listen(PORT, async () => {
     console.log("[backend] livraisons_ventes FK migration OK");
   } catch (e) {
     console.error("[backend] ensureLivraisonCols failed:", e);
+  }
+  try {
+    await ensureTokenVersionCols();
+    console.log("[backend] token_version cols OK");
+  } catch (e) {
+    console.error("[backend] ensureTokenVersionCols failed:", e);
+  }
+  try {
+    await ensureSecurityLogsTable();
+    console.log("[backend] security_logs table OK");
+  } catch (e) {
+    console.error("[backend] ensureSecurityLogsTable failed:", e);
   }
 });
 

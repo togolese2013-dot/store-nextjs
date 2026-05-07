@@ -3383,3 +3383,28 @@ export async function updateMarque(id: number, data: { nom: string; description:
 export async function deleteMarque(id: number) {
   await db.execute(`DELETE FROM marques WHERE id = ?`, [id]);
 }
+
+/* ─── Token version — JWT revocation ─── */
+export async function ensureTokenVersionCols() {
+  const alters = [
+    "ALTER TABLE admin_users ADD COLUMN token_version INT NOT NULL DEFAULT 0",
+    "ALTER TABLE utilisateurs ADD COLUMN token_version INT NOT NULL DEFAULT 0",
+  ];
+  for (const sql of alters) {
+    try { await db.execute(sql); } catch { /* column already exists */ }
+  }
+}
+
+export async function getTokenVersion(table: "admin_users" | "utilisateurs", id: number): Promise<number> {
+  const col = table === "admin_users" ? "id" : "id";
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT token_version FROM ${table} WHERE ${col} = ? LIMIT 1`, [id]
+  );
+  return Number((rows as mysql.RowDataPacket[])[0]?.token_version ?? 0);
+}
+
+export async function incrementTokenVersion(table: "admin_users" | "utilisateurs", id: number): Promise<void> {
+  await db.execute(
+    `UPDATE ${table} SET token_version = token_version + 1 WHERE id = ?`, [id]
+  );
+}
