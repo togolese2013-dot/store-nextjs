@@ -54,7 +54,7 @@ export default function Footer() {
                 ].map(([label, href]) => (
                   <li key={label}>
                     <Link href={href}
-                      className="text-white hover:text-white/70 text-sm transition-colors inline-flex items-center gap-1.5 hover:translate-x-0.5 duration-150"
+                      className="text-white/70 hover:text-white text-sm transition-colors inline-flex items-center gap-1.5 hover:translate-x-0.5 duration-150"
                     >
                       <span className="text-brand-400 text-xs">›</span> {label}
                     </Link>
@@ -78,7 +78,7 @@ export default function Footer() {
                 ].map(([label, href]) => (
                   <li key={label}>
                     <Link href={href}
-                      className="text-white hover:text-white/70 text-sm transition-colors inline-flex items-center gap-1.5 duration-150"
+                      className="text-white/70 hover:text-white text-sm transition-colors inline-flex items-center gap-1.5 duration-150"
                     >
                       <span className="text-brand-400 text-xs">›</span> {label}
                     </Link>
@@ -96,22 +96,22 @@ export default function Footer() {
             <ul className="flex flex-col gap-4">
               <li className="flex gap-3 text-sm">
                 <MapPin className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
-                <span className="text-white">Lomé, Togo</span>
+                <span className="text-white/70">Lomé, Togo</span>
               </li>
               <li className="flex gap-3 text-sm">
                 <Phone className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
-                <span className="text-white font-semibold">+228 90 52 79 12 · +228 90 22 64 91</span>
+                <span className="text-white/70 font-semibold">+228 90 52 79 12 · +228 90 22 64 91</span>
               </li>
               <li className="flex gap-3 text-sm">
                 <Clock className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
-                <span className="text-white">Lun–Sam · 8h–18h30</span>
+                <span className="text-white/70">Lun–Sam · 8h–18h30</span>
               </li>
             </ul>
 
             {/* Garanties */}
             <div className="hidden lg:block mt-6 p-4 rounded-2xl bg-white/4 border border-white/8">
               <p className="text-xs font-semibold text-white/50 mb-3 uppercase tracking-widest">Nos garanties</p>
-              <ul className="flex flex-col gap-2 text-xs text-white">
+              <ul className="flex flex-col gap-2 text-xs text-white/70">
                 <li className="flex items-center gap-2"><span className="text-brand-400">✓</span> Paiement à la livraison</li>
                 <li className="flex items-center gap-2"><span className="text-brand-400">✓</span> Retour sous 7 jours</li>
                 <li className="flex items-center gap-2"><span className="text-brand-400">✓</span> Produits authentiques</li>
@@ -123,11 +123,11 @@ export default function Footer() {
 
       {/* Bottom bar */}
       <div className="border-t border-white/8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/70">
           <span>©2020–{year} Togolese Group (Vente-distribution) — Tous droits réservés</span>
           <div className="flex gap-4">
-            <Link href="/cgu" className="hover:text-white/70 transition-colors">CGU & Mentions légales</Link>
-            <Link href="/politique-retour" className="hover:text-white/70 transition-colors">Retours</Link>
+            <Link href="/cgu" className="hover:text-white transition-colors">CGU & Mentions légales</Link>
+            <Link href="/politique-retour" className="hover:text-white transition-colors">Retours</Link>
           </div>
         </div>
       </div>

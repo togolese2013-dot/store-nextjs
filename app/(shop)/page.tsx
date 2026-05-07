@@ -4,7 +4,6 @@ import { apiGet } from "@/lib/api";
 import type { Product } from "@/lib/utils";
 import ProductCard from "@/components/ProductCard";
 import HeroSection from "@/components/HeroSection";
-import Newsletter from "@/components/Newsletter";
 import TestimonialsSlider from "@/components/TestimonialsSlider";
 import Link from "next/link";
 import {
@@ -301,7 +300,6 @@ export default async function HomePage() {
 
       <Testimonials />
       <WhatsAppCTA />
-      <Newsletter />
     </>
   );
 }
