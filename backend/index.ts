@@ -54,8 +54,18 @@ const allowedOrigins = [
 
 // ── Security middlewares ─────────────────────────────────────────────────────
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }, // allow images/assets cross-origin
-  contentSecurityPolicy: false,                          // handled by Next.js
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'none'"],
+      styleSrc:   ["'none'"],
+      imgSrc:     ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
+    },
+  },
 }));
 
 app.use(cors({

@@ -7,35 +7,65 @@ const SECRET      = new TextEncoder().encode(
 );
 const COOKIE_NAME = "ts_admin_token";
 
+function buildCsp(nonce: string): string {
+  return [
+    `default-src 'self'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+    `font-src 'self' https://fonts.gstatic.com`,
+    `img-src 'self' data: blob: https://res.cloudinary.com`,
+    `connect-src 'self'`,
+    `frame-ancestors 'none'`,
+    `base-uri 'self'`,
+    `form-action 'self'`,
+  ].join("; ");
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isAdminRoute        = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
-  const isLivreurRoute      = pathname.startsWith("/livreur");
-  const isChangePassRoute   = pathname.startsWith("/change-password");
+  // Generate a unique nonce for every request
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
 
-  if (!isAdminRoute && !isLivreurRoute && !isChangePassRoute) return NextResponse.next();
+  const isAdminRoute      = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
+  const isLivreurRoute    = pathname.startsWith("/livreur");
+  const isChangePassRoute = pathname.startsWith("/change-password");
 
-  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const isProtected = isAdminRoute || isLivreurRoute || isChangePassRoute;
 
-  if (!token) {
-    const login = new URL("/admin/login", request.url);
-    login.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(login);
+  if (isProtected) {
+    const token = request.cookies.get(COOKIE_NAME)?.value;
+
+    const redirectToLogin = (deleteToken = false) => {
+      const login = new URL("/admin/login", request.url);
+      login.searchParams.set("redirect", pathname);
+      const res = NextResponse.redirect(login);
+      if (deleteToken) res.cookies.delete(COOKIE_NAME);
+      res.headers.set("Content-Security-Policy", buildCsp(nonce));
+      return res;
+    };
+
+    if (!token) return redirectToLogin();
+
+    try {
+      await jwtVerify(token, SECRET);
+    } catch {
+      return redirectToLogin(true);
+    }
   }
 
-  try {
-    await jwtVerify(token, SECRET);
-    return NextResponse.next();
-  } catch {
-    const login = new URL("/admin/login", request.url);
-    login.searchParams.set("redirect", pathname);
-    const res = NextResponse.redirect(login);
-    res.cookies.delete(COOKIE_NAME);
-    return res;
-  }
+  // Pass nonce to Server Components via request header
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("Content-Security-Policy", buildCsp(nonce));
+  return response;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/livreur/:path*", "/change-password/:path*", "/change-password"],
+  // Run on all routes except static assets and Next.js internals
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?)$).*)",
+  ],
 };
