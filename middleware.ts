@@ -13,7 +13,7 @@ function buildCsp(nonce: string): string {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com`,
-    `img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com`,
+    `img-src 'self' https: data: blob:`,
     `connect-src 'self'`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
