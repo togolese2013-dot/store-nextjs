@@ -19,7 +19,7 @@ export default function Footer() {
                 className="h-7 w-auto"
               />
             </Link>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">
+            <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-xs">
               Votre boutique spécialisée en accessoires photographiques au Togo.
               Livraison le jour même, produits de qualité, paiement à la réception.
             </p>
@@ -32,7 +32,7 @@ export default function Footer() {
                 <a key={label} href={href} aria-label={label}
                   className="w-9 h-9 rounded-xl bg-white/6 hover:bg-white/14 flex items-center justify-center transition-colors border border-white/8"
                 >
-                  <Icon className="w-4 h-4 text-slate-300" />
+                  <Icon className="w-4 h-4 text-white" />
                 </a>
               ))}
             </div>
@@ -41,7 +41,7 @@ export default function Footer() {
           {/* Navigation + Support */}
           <div className="sm:col-span-2 lg:col-span-1 grid grid-cols-2 gap-6 lg:contents">
             <div className="lg:col-auto">
-              <h4 className="font-display text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 mb-5">
+              <h4 className="font-display text-[10px] font-bold uppercase tracking-[0.14em] text-white/50 mb-5">
                 Navigation
               </h4>
               <ul className="flex flex-col gap-3">
@@ -54,9 +54,9 @@ export default function Footer() {
                 ].map(([label, href]) => (
                   <li key={label}>
                     <Link href={href}
-                      className="text-slate-400 hover:text-white text-sm transition-colors inline-flex items-center gap-1.5 hover:translate-x-0.5 duration-150"
+                      className="text-white hover:text-white/70 text-sm transition-colors inline-flex items-center gap-1.5 hover:translate-x-0.5 duration-150"
                     >
-                      <span className="text-brand-500 text-xs">›</span> {label}
+                      <span className="text-brand-400 text-xs">›</span> {label}
                     </Link>
                   </li>
                 ))}
@@ -64,23 +64,23 @@ export default function Footer() {
             </div>
 
             <div className="lg:col-auto">
-              <h4 className="font-display text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 mb-5">
+              <h4 className="font-display text-[10px] font-bold uppercase tracking-[0.14em] text-white/50 mb-5">
                 Support
               </h4>
               <ul className="flex flex-col gap-3">
                 {[
-                  ["Mon compte",           "/account"],
-                  ["Mes commandes",        "/account/commandes"],
-                  ["Politique de retour",  "/politique-retour"],
-                  ["Programme Fidélité",   "/fidelite"],
-                  ["Parrainage",           "/parrainage"],
-                  ["Suivi de commande",    "/suivi-commande"],
+                  ["Mon compte",          "/account"],
+                  ["Mes commandes",       "/account/commandes"],
+                  ["Politique de retour", "/politique-retour"],
+                  ["Programme Fidélité",  "/fidelite"],
+                  ["Parrainage",          "/parrainage"],
+                  ["Suivi de commande",   "/suivi-commande"],
                 ].map(([label, href]) => (
                   <li key={label}>
                     <Link href={href}
-                      className="text-slate-400 hover:text-white text-sm transition-colors inline-flex items-center gap-1.5 duration-150"
+                      className="text-white hover:text-white/70 text-sm transition-colors inline-flex items-center gap-1.5 duration-150"
                     >
-                      <span className="text-brand-500 text-xs">›</span> {label}
+                      <span className="text-brand-400 text-xs">›</span> {label}
                     </Link>
                   </li>
                 ))}
@@ -90,28 +90,28 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="font-display text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 mb-5">
+            <h4 className="font-display text-[10px] font-bold uppercase tracking-[0.14em] text-white/50 mb-5">
               Contact
             </h4>
             <ul className="flex flex-col gap-4">
               <li className="flex gap-3 text-sm">
                 <MapPin className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
-                <span className="text-slate-400">Lomé, Togo</span>
+                <span className="text-white">Lomé, Togo</span>
               </li>
               <li className="flex gap-3 text-sm">
                 <Phone className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
-                <span className="text-slate-400 font-semibold">+228 90 52 79 12 · +228 90 22 64 91</span>
+                <span className="text-white font-semibold">+228 90 52 79 12 · +228 90 22 64 91</span>
               </li>
               <li className="flex gap-3 text-sm">
                 <Clock className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
-                <span className="text-slate-400">Lun–Sam · 8h–18h30</span>
+                <span className="text-white">Lun–Sam · 8h–18h30</span>
               </li>
             </ul>
 
             {/* Garanties */}
             <div className="hidden lg:block mt-6 p-4 rounded-2xl bg-white/4 border border-white/8">
-              <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-widest">Nos garanties</p>
-              <ul className="flex flex-col gap-2 text-xs text-slate-500">
+              <p className="text-xs font-semibold text-white/50 mb-3 uppercase tracking-widest">Nos garanties</p>
+              <ul className="flex flex-col gap-2 text-xs text-white">
                 <li className="flex items-center gap-2"><span className="text-brand-400">✓</span> Paiement à la livraison</li>
                 <li className="flex items-center gap-2"><span className="text-brand-400">✓</span> Retour sous 7 jours</li>
                 <li className="flex items-center gap-2"><span className="text-brand-400">✓</span> Produits authentiques</li>
@@ -123,11 +123,11 @@ export default function Footer() {
 
       {/* Bottom bar */}
       <div className="border-t border-white/8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white">
           <span>©2020–{year} Togolese Group (Vente-distribution) — Tous droits réservés</span>
           <div className="flex gap-4">
-            <Link href="/cgu" className="hover:text-slate-400 transition-colors">CGU & Mentions légales</Link>
-            <Link href="/politique-retour" className="hover:text-slate-400 transition-colors">Retours</Link>
+            <Link href="/cgu" className="hover:text-white/70 transition-colors">CGU & Mentions légales</Link>
+            <Link href="/politique-retour" className="hover:text-white/70 transition-colors">Retours</Link>
           </div>
         </div>
       </div>
