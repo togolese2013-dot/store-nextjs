@@ -9,7 +9,7 @@ import {
 } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 import { signToken, getSession, setAuthCookie, clearAuthCookie } from "../../lib/auth";
-import { logSecurityEvent } from "../lib/security-log";
+import { logSecurityEvent } from "../../lib/security-log";
 import type { AdminPermissions } from "@/lib/admin-permissions";
 import type mysql from "mysql2/promise";
 
