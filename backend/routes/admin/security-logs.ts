@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
-import { getSecurityLogs } from "../lib/security-log";
+import { getSecurityLogs } from "../../lib/security-log";
 
 const router = express.Router();
 
