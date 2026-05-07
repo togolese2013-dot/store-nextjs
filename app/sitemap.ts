@@ -1,19 +1,18 @@
 import { MetadataRoute } from "next";
 import { apiGet } from "@/lib/api";
 import type { Product, Category } from "@/lib/utils";
-
-const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-nextjs-production.up.railway.app";
+import { getSiteUrl } from "@/lib/site-settings";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const BASE = await getSiteUrl();
+
   const staticPages: MetadataRoute.Sitemap = [
-    { url: BASE,                     lastModified: new Date(), changeFrequency: "daily",   priority: 1.0 },
-    { url: `${BASE}/products`,       lastModified: new Date(), changeFrequency: "daily",   priority: 0.9 },
-    { url: `${BASE}/cart`,           lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
-    { url: `${BASE}/wishlist`,       lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
-    { url: `${BASE}/fidelite`,       lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
-    { url: `${BASE}/parrainage`,     lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
-    { url: `${BASE}/account`,        lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
-    { url: `${BASE}/account/commandes`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
+    { url: BASE,                          lastModified: new Date(), changeFrequency: "daily",   priority: 1.0 },
+    { url: `${BASE}/products`,            lastModified: new Date(), changeFrequency: "daily",   priority: 0.9 },
+    { url: `${BASE}/fidelite`,            lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE}/parrainage`,          lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE}/cgu`,                 lastModified: new Date(), changeFrequency: "yearly",  priority: 0.2 },
+    { url: `${BASE}/politique-retour`,    lastModified: new Date(), changeFrequency: "yearly",  priority: 0.2 },
   ];
 
   let productPages: MetadataRoute.Sitemap = [];

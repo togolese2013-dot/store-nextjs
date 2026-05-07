@@ -9,6 +9,7 @@ import AddToCartButton from "@/components/AddToCartButton";
 import ProductVariantSelector, { type Variant } from "@/components/ProductVariantSelector";
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
 import RecentViewTracker from "@/components/RecentViewTracker";
+import ShareButtons from "@/components/ShareButtons";
 import Link from "next/link";
 import RatingBadge from "@/components/RatingBadge";
 import {
@@ -16,6 +17,7 @@ import {
   Sparkles, Star,
 } from "lucide-react";
 import ProductReviews from "@/components/ProductReviews";
+import { getSiteUrl, getSiteName } from "@/lib/site-settings";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -37,16 +39,38 @@ async function fetchProductBySlug(slug: string): Promise<Product | null> {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product  = await fetchProductBySlug(slug);
+  const [product, siteUrl, siteName] = await Promise.all([
+    fetchProductBySlug(slug),
+    getSiteUrl(),
+    getSiteName(),
+  ]);
   if (!product) return { title: "Produit introuvable" };
 
-  const price = finalPrice(product);
+  const price       = finalPrice(product);
+  const description = product.description
+    ?? `${product.nom} — ${formatPrice(price)} FCFA — Livraison rapide au Togo.`;
+  const canonicalUrl = `${siteUrl}/products/${product.reference ?? slug}`;
+  const ogImage = product.image_url
+    ? { url: product.image_url, width: 800, height: 800, alt: product.nom }
+    : undefined;
+
   return {
-    title: product.nom,
-    description: product.description ?? `${product.nom} — ${formatPrice(price)} — Livraison rapide au Togo.`,
+    title:       product.nom,
+    description,
+    alternates:  { canonical: canonicalUrl },
     openGraph: {
-      title:       product.nom,
-      description: product.description ?? `${product.nom} — ${formatPrice(price)}`,
+      type:        "website",
+      url:         canonicalUrl,
+      siteName,
+      title:       `${product.nom} | ${siteName}`,
+      description,
+      images:      ogImage ? [ogImage] : [],
+      locale:      "fr_TG",
+    },
+    twitter: {
+      card:        "summary_large_image",
+      title:       `${product.nom} | ${siteName}`,
+      description,
       images:      product.image_url ? [product.image_url] : [],
     },
   };
@@ -286,6 +310,11 @@ export default async function ProductPage({ params }: PageProps) {
                   </div>
                 </>
               )}
+
+              {/* Share */}
+              <div className="mt-5">
+                <ShareButtons title={product.nom} />
+              </div>
 
               {/* Trust badges */}
               <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-2 gap-3">

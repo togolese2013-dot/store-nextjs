@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ShoppingBag, Heart, Zap } from "lucide-react";
+import { ShoppingBag, Heart, Zap, Share2 } from "lucide-react";
 import RatingBadge from "@/components/RatingBadge";
 import { clsx } from "clsx";
 import { type Product, finalPrice, formatPrice } from "@/lib/utils";
@@ -147,6 +147,25 @@ export default function ProductCard({ product, className, floatingCart = false }
             )}
           >
             <Heart className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} />
+          </button>
+
+          {/* Share — bottom-left, hover only */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const url = encodeURIComponent(window.location.origin + `/products/${product.reference ?? product.id}`);
+              const text = encodeURIComponent(`${product.nom} — `);
+              window.open(`https://wa.me/?text=${text}${url}`, "_blank", "noopener");
+            }}
+            aria-label="Partager sur WhatsApp"
+            className={clsx(
+              "absolute bottom-2.5 left-2.5 w-7 h-7 rounded-full flex items-center justify-center",
+              "bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-200",
+              "opacity-0 group-hover:opacity-100 text-green-600 hover:bg-green-50"
+            )}
+          >
+            <Share2 className="w-3 h-3" />
           </button>
 
           {/* Floating cart — bottom-right */}

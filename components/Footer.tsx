@@ -71,11 +71,10 @@ export default function Footer() {
                 {[
                   ["Mon compte",           "/account"],
                   ["Mes commandes",        "/account/commandes"],
-                  ["Politique de retour",  "/returns"],
-                  ["Livraisons",           "/shipping"],
-                  ["Contact",              "/contact"],
+                  ["Politique de retour",  "/politique-retour"],
                   ["Programme Fidélité",   "/fidelite"],
                   ["Parrainage",           "/parrainage"],
+                  ["Suivi de commande",    "/suivi-commande"],
                 ].map(([label, href]) => (
                   <li key={label}>
                     <Link href={href}
@@ -127,9 +126,8 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
           <span>©2020–{year} Togolese Group (Vente-distribution) — Tous droits réservés</span>
           <div className="flex gap-4">
-            {["CGV", "Confidentialité", "Cookies"].map(l => (
-              <span key={l} className="hover:text-slate-400 cursor-pointer transition-colors">{l}</span>
-            ))}
+            <Link href="/cgu" className="hover:text-slate-400 transition-colors">CGU & Mentions légales</Link>
+            <Link href="/politique-retour" className="hover:text-slate-400 transition-colors">Retours</Link>
           </div>
         </div>
       </div>
