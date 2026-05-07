@@ -104,6 +104,8 @@ export default function ChangePasswordPage() {
                       placeholder="Mot de passe actuel"
                       required
                       autoFocus
+                      autoComplete="current-password"
+                      name="current-password"
                     />
                     <button type="button" onClick={() => setShowCur(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
@@ -124,6 +126,8 @@ export default function ChangePasswordPage() {
                       className={inputCls + " pr-11"}
                       placeholder="••••••••"
                       required
+                      autoComplete="new-password"
+                      name="new-password"
                     />
                     <button type="button" onClick={() => setShowNew(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
@@ -158,6 +162,8 @@ export default function ChangePasswordPage() {
                     className={inputCls + (confirm && confirm !== next ? " border-red-300" : "")}
                     placeholder="••••••••"
                     required
+                    autoComplete="new-password"
+                    name="confirm-password"
                   />
                   {confirm && confirm !== next && (
                     <p className="text-xs text-red-500 mt-1">Les mots de passe ne correspondent pas</p>
