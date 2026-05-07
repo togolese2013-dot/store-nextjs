@@ -4,9 +4,12 @@ import type { AdminPermissions } from "@/lib/admin-permissions";
 
 export type { AdminPermissions };
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "togolese-shop-secret-change-in-production-2024"
-);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  console.error("FATAL: JWT_SECRET env var is not set. Server cannot start securely.");
+  process.exit(1);
+}
+const SECRET = new TextEncoder().encode(jwtSecret);
 
 export const COOKIE_NAME = "ts_admin_token";
 const TTL = 60 * 60 * 8; // 8 hours
@@ -48,7 +51,7 @@ export async function getSession(req: Request): Promise<AdminPayload | null> {
 export function setAuthCookie(res: Response, token: string) {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
     maxAge:   TTL * 1000,
     path:     "/",
     secure:   process.env.NODE_ENV === "production",

@@ -6,6 +6,8 @@ config({ path: resolve(__dirname, "../.env") });
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 
 import adminAuthRoutes      from "./routes/admin/auth";
 import adminProductsRoutes  from "./routes/admin/products";
@@ -48,6 +50,12 @@ const allowedOrigins = [
   "http://localhost:3003",
 ].filter(Boolean) as string[];
 
+// ── Security middlewares ─────────────────────────────────────────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // allow images/assets cross-origin
+  contentSecurityPolicy: false,                          // handled by Next.js
+}));
+
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
@@ -59,8 +67,30 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+// Rate limiter — login endpoint: 10 attempts per 15 min per IP
+const loginLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,
+  max:              10,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message:          { error: "Trop de tentatives. Réessayez dans 15 minutes." },
+  keyGenerator:     (req) => req.ip ?? "unknown",
+});
+app.use("/api/admin/auth/login", loginLimiter);
+
+// General API rate limiter — 200 requests per minute per IP
+const generalLimiter = rateLimit({
+  windowMs:         60 * 1000,
+  max:              200,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message:          { error: "Trop de requêtes. Ralentissez." },
+  skip:             (req) => req.path.startsWith("/api/admin/upload"), // uploads exempt
+});
+app.use(generalLimiter);
+
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 app.use(cookieParser());
 
 // ── Routes ──────────────────────────────────────────────────────────────────
