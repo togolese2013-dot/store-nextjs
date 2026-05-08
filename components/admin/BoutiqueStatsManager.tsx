@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
+  ComposedChart, Area,
 } from "recharts";
 import {
   FileText, FileSpreadsheet, Printer,
   TrendingUp, Package, Clock,
   ShoppingCart, BarChart2, Calendar,
+  RotateCcw, Filter,
 } from "lucide-react";
 import PageHeader from "./PageHeader";
 
@@ -30,6 +32,16 @@ type RapportRow = {
 };
 
 type User = { id: number; nom: string };
+
+type PerfProduit = {
+  nom: string; reference: string; prix: number; prix_achat: number | null;
+  quantite: number; ca: number; marge_brute: number; taux_marge: number; nb_ventes: number;
+};
+type PerfData = {
+  stats:    { nb_produits: number; ca: number; marge_brute: number; quantite_vendue: number };
+  produits: PerfProduit[];
+  evolution: { date: string; quantite: number; ca: number }[];
+};
 
 type TendancesData = {
   stats:              { nb_ventes: number; ca: number; panier_moyen: number; annee: number };
@@ -574,6 +586,247 @@ function TendanceVentesTab() {
   );
 }
 
+// ─── Onglet Performance produit ───────────────────────────────────────────────
+
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function firstOfMonthStr() {
+  const d = new Date(); d.setDate(1);
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDateLabel(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+function PerformanceProduitTab() {
+  const [dateDebut, setDateDebut] = useState(firstOfMonthStr());
+  const [dateFin,   setDateFin]   = useState(todayStr());
+  const [top,       setTop]       = useState("10");
+  const [data,      setData]      = useState<PerfData | null>(null);
+  const [loading,   setLoading]   = useState(false);
+
+  const load = useCallback(async (dd = dateDebut, df = dateFin, t = top) => {
+    setLoading(true);
+    try {
+      const res  = await fetch(`/api/admin/performance-produits?date_debut=${dd}&date_fin=${df}&top=${t}`);
+      const json = await res.json();
+      setData(json);
+    } finally {
+      setLoading(false);
+    }
+  }, [dateDebut, dateFin, top]);
+
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function reset() {
+    const dd = firstOfMonthStr(); const df = todayStr(); const t = "10";
+    setDateDebut(dd); setDateFin(df); setTop(t);
+    load(dd, df, t);
+  }
+
+  // Build comparative chart data
+  const comparativeData = (data?.produits ?? []).map(p => ({
+    nom:         p.nom.length > 14 ? p.nom.slice(0, 14) + "…" : p.nom,
+    ca:          p.ca,
+    marge_brute: p.marge_brute,
+    taux_marge:  p.taux_marge,
+  }));
+
+  const evolutionData = (data?.evolution ?? []).map(e => ({
+    ...e,
+    label: fmtDateLabel(e.date),
+  }));
+
+  const INPUT_CLS = "border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-white";
+
+  return (
+    <div className="space-y-6">
+      {/* Subtitle */}
+      <p className="text-xs text-slate-400 -mt-2">Analyse détaillée des ventes par produit</p>
+
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <div className="flex items-end gap-4 flex-wrap">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Date de début</label>
+            <input type="date" value={dateDebut} onChange={e => setDateDebut(e.target.value)} className={INPUT_CLS} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Date de fin</label>
+            <input type="date" value={dateFin} onChange={e => setDateFin(e.target.value)} className={INPUT_CLS} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Nombre de produits</label>
+            <select value={top} onChange={e => setTop(e.target.value)} className={INPUT_CLS}>
+              <option value="5">Top 5</option>
+              <option value="10">Top 10</option>
+              <option value="20">Top 20</option>
+              <option value="50">Top 50</option>
+            </select>
+          </div>
+          <button onClick={() => load()} disabled={loading}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60">
+            <Filter className="w-4 h-4" />
+            {loading ? "Chargement…" : "Appliquer les filtres"}
+          </button>
+          <button onClick={reset} disabled={loading}
+            className="flex items-center gap-2 bg-slate-500 hover:bg-slate-400 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors disabled:opacity-60">
+            <RotateCcw className="w-4 h-4" />
+            Réinitialiser
+          </button>
+        </div>
+      </div>
+
+      {loading && !data && (
+        <div className="text-center py-14 text-slate-400 text-sm">Chargement…</div>
+      )}
+
+      {data && (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: "PRODUITS ANALYSÉS",   value: String(data.stats.nb_produits),          icon: Package,     color: "text-slate-400" },
+              { label: "CHIFFRE D'AFFAIRES",   value: fmtPrice(data.stats.ca),                icon: BarChart2,   color: "text-emerald-400" },
+              { label: "MARGE BRUTE",          value: fmtPrice(data.stats.marge_brute),       icon: TrendingUp,  color: "text-violet-400" },
+              { label: "QUANTITÉ VENDUE",      value: String(data.stats.quantite_vendue),     icon: ShoppingCart, color: "text-blue-400" },
+            ].map(card => {
+              const Icon = card.icon;
+              return (
+                <div key={card.label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight">{card.label}</p>
+                    <Icon className={`w-8 h-8 opacity-25 ${card.color}`} />
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900 tabular-nums leading-tight">{card.value}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Charts row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Évolution des ventes par produit — dual-axis */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+              <h2 className="font-bold text-slate-800 mb-5">Évolution des ventes par produit</h2>
+              {evolutionData.length === 0 ? (
+                <p className="text-slate-400 text-sm text-center py-10">Aucune donnée</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart data={evolutionData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="gradQty" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradCA" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#10b981" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="qty" orientation="left"  tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="ca"  orientation="right" tickFormatter={v => fmtAxis(v) + " FCFA"} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      formatter={(v, name) => name === "Quantité vendue" ? [v, name] : [fmtPrice(Number(v)), name]}
+                      labelStyle={{ color: "#1e293b", fontWeight: 600 }}
+                      contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "12px" }} />
+                    <Area yAxisId="qty" type="monotone" dataKey="quantite" name="Quantité vendue"
+                      stroke="#3b82f6" strokeWidth={2} fill="url(#gradQty)" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                    <Area yAxisId="ca"  type="monotone" dataKey="ca" name="Chiffre d'affaires (FCFA)"
+                      stroke="#10b981" strokeWidth={2} fill="url(#gradCA)" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Performance comparative */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+              <h2 className="font-bold text-slate-800 mb-5">Performance comparative des produits</h2>
+              {comparativeData.length === 0 ? (
+                <p className="text-slate-400 text-sm text-center py-10">Aucune donnée</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart data={comparativeData} margin={{ top: 5, right: 30, left: 10, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="nom" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false}
+                      angle={-45} textAnchor="end" interval={0} />
+                    <YAxis yAxisId="montant" orientation="left" tickFormatter={v => fmtAxis(v) + " FCFA"}
+                      tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="taux" orientation="right" tickFormatter={v => v + "%"}
+                      tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} domain={[0, 200]} />
+                    <Tooltip
+                      formatter={(v, name) => name === "Taux de marge (%)" ? [v + "%", name] : [fmtPrice(Number(v)), name]}
+                      labelStyle={{ color: "#1e293b", fontWeight: 600 }}
+                      contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "11px" }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "4px" }} />
+                    <Bar yAxisId="montant" dataKey="ca"          name="Chiffre d'affaires (FCFA)" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                    <Bar yAxisId="montant" dataKey="marge_brute" name="Marge brute (FCFA)"        fill="#10b981" radius={[3, 3, 0, 0]} />
+                    <Line yAxisId="taux"  dataKey="taux_marge"  name="Taux de marge (%)"
+                      stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          {/* Tableau détail */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <h2 className="font-bold text-slate-800 mb-4">Détail des performances produits</h2>
+            {data.produits.length === 0 ? (
+              <p className="text-slate-400 text-sm">Aucun produit vendu sur cette période</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left py-3 pr-4 font-semibold text-slate-700">Produit</th>
+                      <th className="text-left py-3 pr-4 font-semibold text-slate-700">Référence</th>
+                      <th className="text-left py-3 pr-4 font-semibold text-slate-700">Prix</th>
+                      <th className="text-left py-3 pr-4 font-semibold text-slate-700">Quantité vendue</th>
+                      <th className="text-left py-3 pr-4 font-semibold text-slate-700">Chiffre d&apos;affaires</th>
+                      <th className="text-left py-3 pr-4 font-semibold text-slate-700">Marge brute</th>
+                      <th className="text-left py-3 pr-4 font-semibold text-slate-700">Taux de marge</th>
+                      <th className="text-left py-3 font-semibold text-slate-700">Ventes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.produits.map((p, i) => (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="py-3.5 pr-4 font-semibold text-slate-800 uppercase text-xs">{p.nom}</td>
+                        <td className="py-3.5 pr-4 font-mono text-xs text-slate-500">{p.reference}</td>
+                        <td className="py-3.5 pr-4 text-slate-700">{fmtPrice(p.prix)}</td>
+                        <td className="py-3.5 pr-4 text-slate-700">{p.quantite}</td>
+                        <td className="py-3.5 pr-4 font-semibold text-slate-800">{fmtPrice(p.ca)}</td>
+                        <td className="py-3.5 pr-4 text-emerald-700 font-semibold">{fmtPrice(p.marge_brute)}</td>
+                        <td className="py-3.5 pr-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                            p.taux_marge >= 50 ? "bg-emerald-100 text-emerald-700"
+                            : p.taux_marge >= 20 ? "bg-amber-100 text-amber-700"
+                            : "bg-red-100 text-red-700"
+                          }`}>
+                            {p.taux_marge}%
+                          </span>
+                        </td>
+                        <td className="py-3.5 text-slate-700">{p.nb_ventes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Placeholder Tab ──────────────────────────────────────────────────────────
 
 function PlaceholderTab({ icon: Icon, title, description }: {
@@ -640,13 +893,7 @@ export default function BoutiqueStatsManager() {
       {/* Tab content */}
       {activeTab === "rapports"    && <RapportsTab />}
       {activeTab === "tendances"   && <TendanceVentesTab />}
-      {activeTab === "performance" && (
-        <PlaceholderTab
-          icon={Package}
-          title="Performance produit"
-          description="Analysez les performances de chaque produit : meilleures ventes, taux de rotation, marges."
-        />
-      )}
+      {activeTab === "performance" && <PerformanceProduitTab />}
     </div>
   );
 }

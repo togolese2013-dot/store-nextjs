@@ -136,6 +136,7 @@ app.use(adminCommerciauxRoutes);
 app.use(adminSecurityLogsRoutes);
 app.use(adminRapportsRoutes);
 app.use(adminTendancesRoutes);
+app.use(adminPerfProduitsRoutes);
 app.use(livreurRoutes);
 app.use(publicRoutes);
 app.use(accountRoutes);
