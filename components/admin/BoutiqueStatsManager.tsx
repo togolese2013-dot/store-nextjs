@@ -345,13 +345,18 @@ function TendanceVentesTab() {
   const [annee,    setAnnee]    = useState(CURRENT_YEAR);
   const [data,     setData]     = useState<TendancesData | null>(null);
   const [loading,  setLoading]  = useState(false);
+  const [errMsg,   setErrMsg]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setErrMsg(null);
     try {
       const res  = await fetch(`/api/admin/tendances?periode=${periode}&annee=${annee}`);
       const json = await res.json();
-      setData(json);
+      if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setData(json as TendancesData);
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
@@ -361,12 +366,12 @@ function TendanceVentesTab() {
 
   const SELECT_CLS = "border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-white";
 
-  // Build comparaison chart data
-  const comparaisonData = data?.comparaison.labels.map((label, i) => ({
+  // Build comparaison chart data — safe access
+  const comparaisonData = (data?.comparaison?.labels ?? []).map((label, i) => ({
     label,
-    [String(annee - 1)]: data.comparaison.annee_precedente[i],
-    [String(annee)]:     data.comparaison.annee_courante[i],
-  })) ?? [];
+    [String(annee - 1)]: data?.comparaison?.annee_precedente?.[i] ?? 0,
+    [String(annee)]:     data?.comparaison?.annee_courante?.[i]   ?? 0,
+  }));
 
   return (
     <div className="space-y-6">
@@ -399,12 +404,19 @@ function TendanceVentesTab() {
         <div className="text-center py-14 text-slate-400 text-sm">Chargement…</div>
       )}
 
-      {data && (
+      {errMsg && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-red-700 text-sm">
+          <p className="font-semibold mb-1">Erreur de chargement</p>
+          <p className="text-xs opacity-80">{errMsg}</p>
+        </div>
+      )}
+
+      {data && !errMsg && (
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "NOMBRE DE VENTES",   value: String(data.stats.nb_ventes),   icon: ShoppingCart, color: "text-slate-400" },
+              { label: "NOMBRE DE VENTES",   value: String(data.stats?.nb_ventes ?? 0),   icon: ShoppingCart, color: "text-slate-400" },
               { label: "CHIFFRE D'AFFAIRES",  value: fmtPrice(data.stats.ca),        icon: TrendingUp,   color: "text-emerald-400" },
               { label: "PANIER MOYEN",        value: fmtPrice(data.stats.panier_moyen), icon: BarChart2, color: "text-violet-400" },
               { label: "PÉRIODE ANALYSÉE",    value: String(data.stats.annee),       icon: Calendar,     color: "text-slate-400" },
@@ -605,13 +617,18 @@ function PerformanceProduitTab() {
   const [top,       setTop]       = useState("10");
   const [data,      setData]      = useState<PerfData | null>(null);
   const [loading,   setLoading]   = useState(false);
+  const [errMsg,    setErrMsg]    = useState<string | null>(null);
 
   const load = useCallback(async (dd = dateDebut, df = dateFin, t = top) => {
     setLoading(true);
+    setErrMsg(null);
     try {
       const res  = await fetch(`/api/admin/performance-produits?date_debut=${dd}&date_fin=${df}&top=${t}`);
       const json = await res.json();
-      setData(json);
+      if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setData(json as PerfData);
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
@@ -682,15 +699,22 @@ function PerformanceProduitTab() {
         <div className="text-center py-14 text-slate-400 text-sm">Chargement…</div>
       )}
 
-      {data && (
+      {errMsg && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-red-700 text-sm">
+          <p className="font-semibold mb-1">Erreur de chargement</p>
+          <p className="text-xs opacity-80">{errMsg}</p>
+        </div>
+      )}
+
+      {data && !errMsg && (
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "PRODUITS ANALYSÉS",   value: String(data.stats.nb_produits),          icon: Package,     color: "text-slate-400" },
-              { label: "CHIFFRE D'AFFAIRES",   value: fmtPrice(data.stats.ca),                icon: BarChart2,   color: "text-emerald-400" },
-              { label: "MARGE BRUTE",          value: fmtPrice(data.stats.marge_brute),       icon: TrendingUp,  color: "text-violet-400" },
-              { label: "QUANTITÉ VENDUE",      value: String(data.stats.quantite_vendue),     icon: ShoppingCart, color: "text-blue-400" },
+              { label: "PRODUITS ANALYSÉS",   value: String(data.stats?.nb_produits ?? 0),    icon: Package,     color: "text-slate-400" },
+              { label: "CHIFFRE D'AFFAIRES",   value: fmtPrice(data.stats?.ca ?? 0),           icon: BarChart2,   color: "text-emerald-400" },
+              { label: "MARGE BRUTE",          value: fmtPrice(data.stats?.marge_brute ?? 0),  icon: TrendingUp,  color: "text-violet-400" },
+              { label: "QUANTITÉ VENDUE",      value: String(data.stats?.quantite_vendue ?? 0), icon: ShoppingCart, color: "text-blue-400" },
             ].map(card => {
               const Icon = card.icon;
               return (
