@@ -5,6 +5,7 @@ import {
   FileText, FileSpreadsheet, Printer,
   TrendingUp, Package, Clock,
 } from "lucide-react";
+import PageHeader from "./PageHeader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -363,6 +364,12 @@ export default function BoutiqueStatsManager() {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="Statistiques"
+        subtitle="Rapports, tendances et performances de la boutique"
+        accent="amber"
+      />
+
       {/* Tab bar */}
       <div className="flex items-center gap-1 bg-slate-100 rounded-2xl p-1.5 w-fit">
         {TABS.map(tab => {
