@@ -1,6 +1,12 @@
 import { getAdminSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import BoutiqueStatsManager from "@/components/admin/BoutiqueStatsManager";
+import dynamic from "next/dynamic";
+
+// ssr: false — recharts and date calculations are browser-only
+const BoutiqueStatsManager = dynamic(
+  () => import("@/components/admin/BoutiqueStatsManager"),
+  { ssr: false, loading: () => null }
+);
 
 export const metadata = { title: "Statistiques — Boutique" };
 
