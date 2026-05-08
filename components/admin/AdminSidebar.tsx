@@ -49,6 +49,7 @@ const MODULES: Record<string, {
       { label: "Clients",        href: "/admin/boutique-clients",      icon: Users },
       { label: "Segmentation",   href: "/admin/boutique-segmentation", icon: PieChart },
       { label: "Commerciaux",    href: "/admin/commerciaux",           icon: UserCheck },
+      { label: "Statistiques",   href: "/admin/boutique-stats",        icon: BarChart2 },
     ],
   },
   store: {
@@ -114,6 +115,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/proforma",              "boutique"],
   ["/admin/finance",               "boutique"],
   ["/admin/commerciaux",           "boutique"],
+  ["/admin/boutique-stats",        "boutique"],
   ["/admin/store",                 "store"],
   ["/admin/orders",                "store"],
   ["/admin/coupons",               "store"],
