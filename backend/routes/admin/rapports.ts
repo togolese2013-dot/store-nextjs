@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
-import pool from "@/lib/db";
+import { db as pool } from "@/lib/db";
 import mysql from "mysql2/promise";
 
 const router = express.Router();
