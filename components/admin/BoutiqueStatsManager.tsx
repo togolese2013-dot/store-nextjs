@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
+} from "recharts";
 import {
   FileText, FileSpreadsheet, Printer,
   TrendingUp, Package, Clock,
+  ShoppingCart, BarChart2, Calendar,
 } from "lucide-react";
 import PageHeader from "./PageHeader";
 
@@ -26,6 +31,15 @@ type RapportRow = {
 
 type User = { id: number; nom: string };
 
+type TendancesData = {
+  stats:              { nb_ventes: number; ca: number; panier_moyen: number; annee: number };
+  evolution:          { label: string; mois: number; nb_ventes: number; ca: number; panier_moyen: number; montant_paye: number }[];
+  details:            { periode: string; nb_ventes: number; ca: number; panier_moyen: number; montant_paye: number }[];
+  top_produits:       { nom: string; quantite: number; ca: number; pourcentage: number }[];
+  methodes_paiement:  { methode: string; nb_ventes: number; montant: number; pourcentage: number }[];
+  comparaison:        { labels: string[]; annee_courante: number[]; annee_precedente: number[] };
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TYPES_RAPPORT = [
@@ -42,7 +56,7 @@ const TYPES_RAPPORT = [
   { value: "activites",    label: "Rapport des Activités" },
 ];
 
-const PERIODES = [
+const PERIODES_RAPPORT = [
   { value: "aujourd_hui",   label: "Aujourd'hui" },
   { value: "cette_semaine", label: "Cette semaine" },
   { value: "ce_mois",       label: "Ce Mois" },
@@ -73,13 +87,26 @@ const COLUMN_LABELS: Record<string, { col3: string; col4: string; col5: string }
   activites:    { col3: "Description",  col4: "Acteur",       col5: "Montant" },
 };
 
-// Types that don't show "Reste" and "Montant Payé" columns
 const NO_RESTE_TYPES = new Set(["depenses", "rentrees", "combine", "financier", "clients", "produits", "stock", "activites", "achats"]);
+
+const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#a855f7", "#ef4444"];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = [CURRENT_YEAR - 2, CURRENT_YEAR - 1, CURRENT_YEAR];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function fmtPrice(n: number) {
+  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+}
+
+function fmtAxis(n: number) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (n >= 1_000)     return (n / 1_000).toFixed(0) + "k";
+  return String(n);
+}
+
 function formatPrice(n: number, type: string) {
-  if (["stock"].includes(type)) return String(n);
+  if (type === "stock") return String(n);
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
 }
 
@@ -98,23 +125,15 @@ function StatutBadge({ statut, statut_paiement }: { statut: string; statut_paiem
     : statut;
 
   const map: Record<string, string> = {
-    paye:        "bg-emerald-100 text-emerald-700",
-    paye_total:  "bg-emerald-100 text-emerald-700",
-    valide:      "bg-blue-100 text-blue-700",
-    acompte:     "bg-amber-100 text-amber-700",
-    annule:      "bg-red-100 text-red-700",
-    brouillon:   "bg-slate-100 text-slate-600",
-    recu:        "bg-emerald-100 text-emerald-700",
-    en_attente:  "bg-amber-100 text-amber-700",
-    en_stock:    "bg-emerald-100 text-emerald-700",
-    rupture:     "bg-red-100 text-red-700",
-    depense:     "bg-red-100 text-red-700",
-    rentree:     "bg-emerald-100 text-emerald-700",
-    vente:       "bg-blue-100 text-blue-700",
-    caisse:      "bg-violet-100 text-violet-700",
-    transfert:   "bg-slate-100 text-slate-600",
-    entree:      "bg-emerald-100 text-emerald-700",
-    sortie:      "bg-orange-100 text-orange-700",
+    paye: "bg-emerald-100 text-emerald-700", paye_total: "bg-emerald-100 text-emerald-700",
+    valide: "bg-blue-100 text-blue-700", acompte: "bg-amber-100 text-amber-700",
+    annule: "bg-red-100 text-red-700", brouillon: "bg-slate-100 text-slate-600",
+    recu: "bg-emerald-100 text-emerald-700", en_attente: "bg-amber-100 text-amber-700",
+    en_stock: "bg-emerald-100 text-emerald-700", rupture: "bg-red-100 text-red-700",
+    depense: "bg-red-100 text-red-700", rentree: "bg-emerald-100 text-emerald-700",
+    vente: "bg-blue-100 text-blue-700", caisse: "bg-violet-100 text-violet-700",
+    transfert: "bg-slate-100 text-slate-600", entree: "bg-emerald-100 text-emerald-700",
+    sortie: "bg-orange-100 text-orange-700",
   };
   const labels: Record<string, string> = {
     paye: "Payé", paye_total: "Payé", valide: "Validé", acompte: "Acompte",
@@ -166,13 +185,10 @@ function RapportsTab() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `rapport-${type}-${periode}.csv`;
-    a.click();
+    a.href = url; a.download = `rapport-${type}-${periode}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
-  // Summary totals
   const totalMontant = rows.reduce((s, r) => s + Number(r.total), 0);
   const totalPaye    = rows.reduce((s, r) => s + Number(r.montant_paye), 0);
   const totalReste   = rows.reduce((s, r) => s + Number(r.reste), 0);
@@ -181,7 +197,6 @@ function RapportsTab() {
 
   return (
     <div className="space-y-5">
-      {/* Filters */}
       <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
@@ -193,7 +208,7 @@ function RapportsTab() {
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Période</label>
             <select value={periode} onChange={e => setPeriode(e.target.value)} className={SELECT_CLS}>
-              {PERIODES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              {PERIODES_RAPPORT.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
           <div>
@@ -210,29 +225,21 @@ function RapportsTab() {
             </select>
           </div>
         </div>
-
         <div className="flex items-center gap-3 flex-wrap pt-1">
-          <button
-            onClick={generate}
-            disabled={loading}
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60"
-          >
+          <button onClick={generate} disabled={loading}
+            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60">
             <FileText className="w-4 h-4" />
             {loading ? "Génération…" : "Générer le Rapport"}
           </button>
           {generated && rows.length > 0 && (
             <>
-              <button
-                onClick={exportCSV}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
-              >
+              <button onClick={exportCSV}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors">
                 <FileSpreadsheet className="w-4 h-4" />
                 Exporter en Excel
               </button>
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
-              >
+              <button onClick={() => window.print()}
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors">
                 <Printer className="w-4 h-4" />
                 Imprimer
               </button>
@@ -241,18 +248,13 @@ function RapportsTab() {
         </div>
       </div>
 
-      {/* Results */}
       {generated && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Header */}
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
             <div>
-              <h2 className="font-bold text-slate-800">
-                {TYPES_RAPPORT.find(t => t.value === type)?.label}
-              </h2>
+              <h2 className="font-bold text-slate-800">{TYPES_RAPPORT.find(t => t.value === type)?.label}</h2>
               <p className="text-xs text-slate-400 mt-0.5">{rows.length} résultat(s)</p>
             </div>
-            {/* Summary totals */}
             {rows.length > 0 && (
               <div className="flex items-center gap-4 text-sm">
                 <div className="text-right">
@@ -274,11 +276,8 @@ function RapportsTab() {
               </div>
             )}
           </div>
-
           {rows.length === 0 ? (
-            <div className="text-center py-14 text-slate-400 text-sm">
-              Aucune donnée pour cette période
-            </div>
+            <div className="text-center py-14 text-slate-400 text-sm">Aucune donnée pour cette période</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -322,6 +321,254 @@ function RapportsTab() {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet Tendance des ventes ───────────────────────────────────────────────
+
+function TendanceVentesTab() {
+  const [periode,  setPeriode]  = useState("mensuelle");
+  const [annee,    setAnnee]    = useState(CURRENT_YEAR);
+  const [data,     setData]     = useState<TendancesData | null>(null);
+  const [loading,  setLoading]  = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res  = await fetch(`/api/admin/tendances?periode=${periode}&annee=${annee}`);
+      const json = await res.json();
+      setData(json);
+    } finally {
+      setLoading(false);
+    }
+  }, [periode, annee]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const SELECT_CLS = "border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-white";
+
+  // Build comparaison chart data
+  const comparaisonData = data?.comparaison.labels.map((label, i) => ({
+    label,
+    [String(annee - 1)]: data.comparaison.annee_precedente[i],
+    [String(annee)]:     data.comparaison.annee_courante[i],
+  })) ?? [];
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <div className="flex items-end gap-4 flex-wrap">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Période</label>
+            <select value={periode} onChange={e => setPeriode(e.target.value)} className={SELECT_CLS}>
+              <option value="mensuelle">Mensuelle</option>
+              <option value="trimestrielle">Trimestrielle</option>
+              <option value="annuelle">Annuelle</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Année</label>
+            <select value={annee} onChange={e => setAnnee(Number(e.target.value))} className={SELECT_CLS}>
+              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <button onClick={load} disabled={loading}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60">
+            <BarChart2 className="w-4 h-4" />
+            {loading ? "Chargement…" : "Appliquer"}
+          </button>
+        </div>
+      </div>
+
+      {loading && !data && (
+        <div className="text-center py-14 text-slate-400 text-sm">Chargement…</div>
+      )}
+
+      {data && (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: "NOMBRE DE VENTES",   value: String(data.stats.nb_ventes),   icon: ShoppingCart, color: "text-slate-400" },
+              { label: "CHIFFRE D'AFFAIRES",  value: fmtPrice(data.stats.ca),        icon: TrendingUp,   color: "text-emerald-400" },
+              { label: "PANIER MOYEN",        value: fmtPrice(data.stats.panier_moyen), icon: BarChart2, color: "text-violet-400" },
+              { label: "PÉRIODE ANALYSÉE",    value: String(data.stats.annee),       icon: Calendar,     color: "text-slate-400" },
+            ].map(card => {
+              const Icon = card.icon;
+              return (
+                <div key={card.label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight">{card.label}</p>
+                    <Icon className={`w-8 h-8 opacity-30 ${card.color}`} />
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900 tabular-nums leading-tight">{card.value}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Line chart — évolution */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <h2 className="font-bold text-slate-800 mb-5">Évolution des ventes en {data.stats.annee}</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={data.evolution} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  formatter={(v, name) => [fmtPrice(Number(v) || 0), String(name)]}
+                  labelStyle={{ color: "#1e293b", fontWeight: 600 }}
+                  contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+                />
+                <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "16px" }} />
+                <Line type="monotone" dataKey="ca"           name="Chiffre d'affaires (FCFA)" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="panier_moyen" name="Panier moyen (FCFA)"       stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="montant_paye" name="Montant payé (FCFA)"       stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Details table */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <h2 className="font-bold text-slate-800 mb-4">Détails par période</h2>
+            {data.details.length === 0 ? (
+              <p className="text-slate-400 text-sm">Aucune donnée pour cette période</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left py-3 font-semibold text-slate-700">Période</th>
+                      <th className="text-left py-3 font-semibold text-slate-700">Nombre de ventes</th>
+                      <th className="text-left py-3 font-semibold text-slate-700">Chiffre d&apos;affaires</th>
+                      <th className="text-left py-3 font-semibold text-slate-700">Panier moyen</th>
+                      <th className="text-left py-3 font-semibold text-slate-700">Montant payé</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.details.map((d, i) => (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="py-3.5 font-medium text-slate-800">{d.periode}</td>
+                        <td className="py-3.5 text-slate-600">{d.nb_ventes}</td>
+                        <td className="py-3.5 text-slate-700">{fmtPrice(d.ca)}</td>
+                        <td className="py-3.5 text-slate-700">{fmtPrice(d.panier_moyen)}</td>
+                        <td className="py-3.5 font-semibold text-emerald-700">{fmtPrice(d.montant_paye)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Top produits + Méthodes paiement */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top 5 produits */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+              <h2 className="font-bold text-slate-800 mb-4">Top 5 des produits en {data.stats.annee}</h2>
+              {data.top_produits.length === 0 ? (
+                <p className="text-slate-400 text-sm">Aucune donnée</p>
+              ) : (
+                <div className="space-y-4">
+                  {data.top_produits.slice(0, 5).map((p, i) => (
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                            <Package className="w-4 h-4 text-slate-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800 text-xs uppercase tracking-wide truncate">{p.nom}</p>
+                            <p className="text-xs text-slate-400">{p.quantite} unités vendues</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-slate-800 text-sm">{fmtPrice(p.ca)}</p>
+                          <p className="text-xs text-slate-400">{p.pourcentage}%</p>
+                        </div>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="h-1 bg-slate-100 rounded-full overflow-hidden ml-11">
+                        <div
+                          className="h-full bg-blue-400 rounded-full"
+                          style={{ width: `${Math.min(p.pourcentage, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Méthodes de paiement — liste + donut */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+              <h2 className="font-bold text-slate-800 mb-4">Méthodes de paiement en {data.stats.annee}</h2>
+              {data.methodes_paiement.length === 0 ? (
+                <p className="text-slate-400 text-sm">Aucune donnée</p>
+              ) : (
+                <div className="flex items-center gap-6">
+                  {/* Donut */}
+                  <div className="w-[160px] h-[160px] shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={data.methodes_paiement} dataKey="montant" nameKey="methode"
+                          cx="50%" cy="50%" innerRadius={45} outerRadius={72}>
+                          {data.methodes_paiement.map((_, i) => (
+                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v, name) => [fmtPrice(Number(v) || 0), String(name)]}
+                          contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Liste détaillée */}
+                  <div className="flex-1 space-y-3 min-w-0">
+                    {data.methodes_paiement.map((m, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                          <p className="text-sm text-slate-700 truncate">{m.methode}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold text-slate-800">{fmtPrice(m.montant)}</p>
+                          <p className="text-xs text-slate-400">({m.nb_ventes} ventes)</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Comparaison année précédente */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <h2 className="font-bold text-slate-800 mb-5">
+              Comparaison Année Précédente ({annee - 1} vs {annee})
+            </h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={comparaisonData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  formatter={(v, name) => [fmtPrice(Number(v) || 0), String(name)]}
+                  labelStyle={{ color: "#1e293b", fontWeight: 600 }}
+                  contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+                />
+                <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "16px" }} />
+                <Bar dataKey={String(annee - 1)} name={String(annee - 1)} fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey={String(annee)}     name={String(annee)}     fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
       )}
     </div>
   );
@@ -380,9 +627,7 @@ export default function BoutiqueStatsManager() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
-                active
-                  ? "bg-white text-amber-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                active ? "bg-white text-amber-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -393,16 +638,8 @@ export default function BoutiqueStatsManager() {
       </div>
 
       {/* Tab content */}
-      {activeTab === "rapports" && <RapportsTab />}
-
-      {activeTab === "tendances" && (
-        <PlaceholderTab
-          icon={TrendingUp}
-          title="Tendance des ventes"
-          description="Visualisez l'évolution de vos ventes sur plusieurs périodes avec des graphiques interactifs."
-        />
-      )}
-
+      {activeTab === "rapports"    && <RapportsTab />}
+      {activeTab === "tendances"   && <TendanceVentesTab />}
       {activeTab === "performance" && (
         <PlaceholderTab
           icon={Package}

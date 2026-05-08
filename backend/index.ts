@@ -42,7 +42,9 @@ import mobileMoneyRoutes    from "./routes/mobile-money";
 import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam, ensureLivraisonCols, ensureTokenVersionCols } from "@/lib/admin-db";
 import adminSecurityLogsRoutes from "./routes/admin/security-logs";
 import { ensureSecurityLogsTable } from "./lib/security-log";
-import adminRapportsRoutes from "./routes/admin/rapports";
+import adminRapportsRoutes  from "./routes/admin/rapports";
+import adminTendancesRoutes        from "./routes/admin/tendances";
+import adminPerfProduitsRoutes     from "./routes/admin/performance-produits";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -133,6 +135,7 @@ app.use(adminWhatsappRoutes);
 app.use(adminCommerciauxRoutes);
 app.use(adminSecurityLogsRoutes);
 app.use(adminRapportsRoutes);
+app.use(adminTendancesRoutes);
 app.use(livreurRoutes);
 app.use(publicRoutes);
 app.use(accountRoutes);
