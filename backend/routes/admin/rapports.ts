@@ -43,7 +43,10 @@ router.get("/api/admin/rapports", async (req, res) => {
 
     // ── VENTES ───────────────────────────────────────────────────────────────
     if (type === "ventes") {
-      const conditions: string[] = [pc("f.created_at", periode)];
+      const conditions: string[] = [
+        pc("f.created_at", periode),
+        "(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))",
+      ];
       const params: unknown[] = [];
       if (statut !== "all") {
         if (statut === "paye") {
@@ -221,6 +224,7 @@ router.get("/api/admin/rapports", async (req, res) => {
       const conditions: string[] = [
         "f.mode_paiement IN ('moov_money','tmoney','mobile_money')",
         pc("f.created_at", periode),
+        "(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))",
       ];
       const params: unknown[] = [];
       if (statut !== "all") {
@@ -335,7 +339,8 @@ router.get("/api/admin/rapports", async (req, res) => {
           FROM factures f
           LEFT JOIN admin_users au ON au.id = f.admin_id
           LEFT JOIN utilisateurs util ON util.id = f.admin_id
-          WHERE ${pVentes})
+          WHERE ${pVentes}
+            AND (f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered')))
          UNION ALL
          (SELECT fe.reference, fe.date_entree AS created_at,
                  CONCAT('[',UPPER(fe.type),'] ',COALESCE(fe.description,'')) AS client_nom,
