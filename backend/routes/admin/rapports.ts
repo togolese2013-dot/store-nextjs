@@ -62,8 +62,9 @@ router.get("/api/admin/rapports", async (req, res) => {
         `SELECT f.id, f.reference, f.created_at, f.client_nom,
                 CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web'
                      ELSE COALESCE(au.nom, util.nom) END AS vendeur,
-                f.total, f.montant_paye,
-                (f.total - f.montant_paye) AS reste,
+                f.total,
+                CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END AS montant_paye,
+                f.total - CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END AS reste,
                 f.statut_paiement, f.statut
          FROM factures f
          LEFT JOIN admin_users au   ON au.id   = f.admin_id
@@ -230,8 +231,9 @@ router.get("/api/admin/rapports", async (req, res) => {
       const [r] = await pool.execute<mysql.RowDataPacket[]>(
         `SELECT f.id, f.reference, f.created_at, f.client_nom,
                 COALESCE(au.nom, util.nom) AS vendeur,
-                f.total, f.montant_paye,
-                (f.total - f.montant_paye) AS reste,
+                f.total,
+                CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END AS montant_paye,
+                f.total - CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END AS reste,
                 f.statut_paiement, f.statut
          FROM factures f
          LEFT JOIN admin_users au    ON au.id   = f.admin_id

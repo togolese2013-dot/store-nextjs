@@ -22,7 +22,7 @@ router.get("/api/admin/tendances", async (req, res) => {
          COUNT(*) AS nb_ventes,
          COALESCE(SUM(total), 0) AS ca,
          COALESCE(AVG(total), 0) AS panier_moyen,
-         COALESCE(SUM(montant_paye), 0) AS montant_paye_total
+         COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye_total
        FROM factures
        WHERE YEAR(created_at) = ? AND statut != 'annule'`,
       [annee]
@@ -43,7 +43,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COUNT(*) AS nb_ventes,
            COALESCE(SUM(total), 0) AS ca,
            COALESCE(AVG(total), 0) AS panier_moyen,
-           COALESCE(SUM(montant_paye), 0) AS montant_paye
+           COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye
          FROM factures
          WHERE YEAR(created_at) = ? AND statut != 'annule'
          GROUP BY MONTH(created_at)
@@ -58,7 +58,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COUNT(*) AS nb_ventes,
            COALESCE(SUM(total), 0) AS ca,
            COALESCE(AVG(total), 0) AS panier_moyen,
-           COALESCE(SUM(montant_paye), 0) AS montant_paye
+           COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye
          FROM factures
          WHERE YEAR(created_at) = ? AND statut != 'annule'
          GROUP BY QUARTER(created_at)
@@ -74,7 +74,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COUNT(*) AS nb_ventes,
            COALESCE(SUM(total), 0) AS ca,
            COALESCE(AVG(total), 0) AS panier_moyen,
-           COALESCE(SUM(montant_paye), 0) AS montant_paye
+           COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye
          FROM factures
          WHERE statut != 'annule'
          GROUP BY YEAR(created_at)
@@ -144,7 +144,7 @@ router.get("/api/admin/tendances", async (req, res) => {
       `SELECT
          COALESCE(mode_paiement, 'especes') AS methode,
          COUNT(*) AS nb_ventes,
-         COALESCE(SUM(montant_paye), 0) AS montant
+         COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant
        FROM factures
        WHERE YEAR(created_at) = ? AND statut != 'annule' AND statut_paiement != 'non_paye'
        GROUP BY mode_paiement
