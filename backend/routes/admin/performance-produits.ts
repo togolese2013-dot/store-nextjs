@@ -8,7 +8,7 @@ const router = express.Router();
 // Auto-migrate prix_achat column on produits table
 async function ensurePrixAchat() {
   try {
-    await pool.execute(`ALTER TABLE produits ADD COLUMN prix_achat DECIMAL(12,2) NULL DEFAULT NULL`);
+    await pool.execute(`ALTER TABLE products ADD COLUMN prix_achat DECIMAL(12,2) NULL DEFAULT NULL`);
   } catch { /* column already exists */ }
 }
 ensurePrixAchat().catch(console.error);
@@ -35,7 +35,7 @@ router.get("/api/admin/performance-produits", async (req, res) => {
         `SELECT
            jt.nom,
            jt.ref       AS reference,
-           COALESCE(p.prix_unitaire, jt.prix_u, 0) AS prix,
+           COALESCE(p.prix, jt.prix_u, 0) AS prix,
            p.prix_achat,
            SUM(jt.qty)  AS quantite,
            SUM(jt.total) AS ca,
@@ -51,10 +51,11 @@ router.get("/api/admin/performance-produits", async (req, res) => {
              total DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         LEFT JOIN produits p ON p.reference = jt.ref
+         LEFT JOIN products p ON p.reference = jt.ref
          WHERE f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND jt.nom IS NOT NULL
+           AND (f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))
          GROUP BY jt.nom, jt.ref, p.prix_unitaire, p.prix_achat
          ORDER BY ca DESC
          LIMIT ${top}`,
@@ -110,6 +111,7 @@ router.get("/api/admin/performance-produits", async (req, res) => {
          ) AS jt
          WHERE f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
+           AND (f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))
          GROUP BY DATE(f.created_at)
          ORDER BY date`,
         [dateDebut, dateFin]

@@ -24,7 +24,8 @@ router.get("/api/admin/tendances", async (req, res) => {
          COALESCE(AVG(total), 0) AS panier_moyen,
          COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye_total
        FROM factures
-       WHERE YEAR(created_at) = ? AND statut != 'annule'`,
+       WHERE YEAR(created_at) = ? AND statut != 'annule'
+         AND (source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))`,
       [annee]
     );
     const stats = {
@@ -46,6 +47,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye
          FROM factures
          WHERE YEAR(created_at) = ? AND statut != 'annule'
+           AND (source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))
          GROUP BY MONTH(created_at)
          ORDER BY mois`,
         [annee]
@@ -61,6 +63,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye
          FROM factures
          WHERE YEAR(created_at) = ? AND statut != 'annule'
+           AND (source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))
          GROUP BY QUARTER(created_at)
          ORDER BY mois`,
         [annee]
@@ -77,6 +80,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant_paye
          FROM factures
          WHERE statut != 'annule'
+           AND (source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))
          GROUP BY YEAR(created_at)
          ORDER BY mois`
       );
@@ -125,6 +129,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            )
          ) AS jt
          WHERE YEAR(f.created_at) = ? AND f.statut != 'annule' AND jt.nom IS NOT NULL
+           AND (f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))
          GROUP BY jt.nom
          ORDER BY ca DESC
          LIMIT 10`,
@@ -147,6 +152,7 @@ router.get("/api/admin/tendances", async (req, res) => {
          COALESCE(SUM(CASE WHEN statut_paiement = 'paye_total' THEN total ELSE COALESCE(montant_acompte, 0) END), 0) AS montant
        FROM factures
        WHERE YEAR(created_at) = ? AND statut != 'annule' AND statut_paiement != 'non_paye'
+         AND (source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))
        GROUP BY mode_paiement
        ORDER BY montant DESC`,
       [annee]
@@ -172,6 +178,7 @@ router.get("/api/admin/tendances", async (req, res) => {
               COALESCE(SUM(total), 0) AS ca
        FROM factures
        WHERE YEAR(created_at) IN (?, ?) AND statut != 'annule'
+         AND (source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))
        GROUP BY annee, mois
        ORDER BY annee, mois`,
       [prevAnnee, annee]
