@@ -56,6 +56,27 @@ router.post("/api/admin/orders", async (req, res) => {
   res.json({ success: true, id });
 });
 
+router.get("/api/admin/orders/clients-search", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const q = ((req.query.q as string) ?? "").trim();
+  if (!q || q.length < 2) return res.json({ data: [] });
+  try {
+    const [rows] = await (db as mysql.Pool).query<mysql.RowDataPacket[]>(
+      `SELECT nom, telephone, adresse
+       FROM orders
+       WHERE nom LIKE ? OR telephone LIKE ?
+       GROUP BY nom, telephone, adresse
+       ORDER BY MAX(created_at) DESC
+       LIMIT 8`,
+      [`%${q}%`, `%${q}%`]
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 router.get("/api/admin/orders/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });

@@ -6,7 +6,6 @@ import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, User, Phone, MapPin
 import { formatPrice } from "@/lib/utils";
 
 interface ClientSuggestion {
-  id: number;
   nom: string;
   telephone: string | null;
   adresse: string | null;
@@ -69,7 +68,7 @@ export default function CreateOrderForm({ zones }: Props) {
     if (value.trim().length < 2) { setClientSuggestions([]); return; }
     clientDebounceRef.current = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/admin/clients?q=${encodeURIComponent(value)}&limit=5`);
+        const r = await fetch(`/api/admin/orders/clients-search?q=${encodeURIComponent(value)}`);
         const j = await r.json();
         setClientSuggestions(j.data ?? []);
       } catch { setClientSuggestions([]); }
@@ -275,8 +274,8 @@ export default function CreateOrderForm({ zones }: Props) {
               autoComplete="off" />
             {clientSuggestions.length > 0 && (
               <div className="absolute z-30 w-full mt-1 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
-                {clientSuggestions.map(c => (
-                  <button key={c.id} type="button" onClick={() => selectClient(c)}
+                {clientSuggestions.map((c, i) => (
+                  <button key={i} type="button" onClick={() => selectClient(c)}
                     className="w-full flex flex-col px-4 py-2.5 hover:bg-brand-50 text-left transition-colors">
                     <span className="font-semibold text-sm text-slate-800">{c.nom}</span>
                     <span className="text-xs text-slate-400">{c.telephone ?? "—"}</span>
