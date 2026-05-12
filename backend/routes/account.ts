@@ -311,7 +311,7 @@ router.get("/api/account/orders", async (req, res) => {
     const [rows] = await pool.execute<mysql.RowDataPacket[]>(
       `SELECT id, reference, nom, telephone, total, subtotal, delivery_fee,
               status, items, adresse, zone_livraison, created_at
-       FROM orders WHERE ${conditions.join(" OR ")} ORDER BY created_at DESC`,
+       FROM orders WHERE ${conditions.join(" OR ")} ORDER BY created_at DESC LIMIT 50`,
       params
     );
     return res.json({ orders: rows });
@@ -337,7 +337,10 @@ router.get("/api/account/orders/:ref", async (req, res) => {
     const telephone = userRows[0]?.telephone as string | null;
 
     const [orderRows] = await pool.execute<mysql.RowDataPacket[]>(
-      "SELECT * FROM orders WHERE reference = ? LIMIT 1",
+      `SELECT id, reference, nom, telephone, adresse, zone_livraison, lien_localisation,
+              delivery_fee, subtotal, total, status, statut_paiement, payment_mode,
+              items, created_at, updated_at
+       FROM orders WHERE reference = ? LIMIT 1`,
       [req.params.ref]
     );
     const order = orderRows[0];

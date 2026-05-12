@@ -555,18 +555,31 @@ export async function setUtilisateurPermissions(utilisateurId: number, permissio
   }
 }
 
-/* ─── Settings ─── */
+/* ─── Settings — in-memory cache 5 min TTL ─── */
+let _settingsCache: { data: Record<string, string>; expiresAt: number } | null = null;
+
+function invalidateSettingsCache() { _settingsCache = null; }
+
+async function loadSettings(): Promise<Record<string, string>> {
+  const now = Date.now();
+  if (_settingsCache && _settingsCache.expiresAt > now) return _settingsCache.data;
+  const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT `key`, `value` FROM settings");
+  const data = Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
+  _settingsCache = { data, expiresAt: now + 5 * 60_000 };
+  return data;
+}
+
 export async function getSettings(): Promise<Record<string, string>> {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT `key`, `value` FROM settings"
-  );
-  return Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
+  return loadSettings();
 }
 
 export async function getSetting(key: string): Promise<string> {
+  const all = await loadSettings();
+  // Key already cached — return immediately
+  if (key in all) return all[key] ?? "";
+  // Key not in cache (new key) — fall back to direct query without poisoning cache
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT `value` FROM settings WHERE `key` = ?",
-    [key]
+    "SELECT `value` FROM settings WHERE `key` = ?", [key]
   );
   return (rows[0]?.value as string) ?? "";
 }
@@ -576,14 +589,18 @@ export async function setSetting(key: string, value: string) {
     "INSERT INTO settings (`key`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
     [key, value]
   );
+  invalidateSettingsCache();
 }
 
 export async function setSettings(entries: Record<string, string>) {
   if (!Object.keys(entries).length) return;
-  const rows = Object.entries(entries).map(([k, v]) => [k, v]);
-  for (const [k, v] of rows) {
-    await setSetting(k, v);
+  for (const [k, v] of Object.entries(entries)) {
+    await db.execute(
+      "INSERT INTO settings (`key`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+      [k, v]
+    );
   }
+  invalidateSettingsCache();
 }
 
 /* ─── Delivery Zones ─── */
@@ -641,7 +658,10 @@ export interface Order {
 
 export async function listOrders(limit = 50, offset = 0): Promise<Order[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM orders ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+    `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
+            items, subtotal, total, status, statut_paiement,
+            livreur_id, livraison_statut, created_at, updated_at
+     FROM orders ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
   );
   return rows as Order[];
 }
@@ -1007,7 +1027,8 @@ export async function getDashboardStats() {
   ).catch(() => [[{ cnt: 0 }]] as unknown as [mysql.RowDataPacket[], mysql.FieldPacket[]]);
 
   const [recentOrders] = await db.query<mysql.RowDataPacket[]>(
-    "SELECT * FROM orders ORDER BY created_at DESC LIMIT 5"
+    `SELECT id, reference, nom, telephone, zone_livraison, subtotal, total, status, statut_paiement, created_at
+     FROM orders ORDER BY created_at DESC LIMIT 5`
   ).catch(() => [[] as mysql.RowDataPacket[], [] as mysql.FieldPacket[]]);
 
   return {
@@ -1068,7 +1089,8 @@ export async function getOrdersStats(): Promise<OrdersStats> {
        ORDER BY date ASC`
     ),
     db.query<mysql.RowDataPacket[]>(
-      "SELECT * FROM orders ORDER BY created_at DESC LIMIT 8"
+      `SELECT id, reference, nom, telephone, zone_livraison, subtotal, total, status, statut_paiement, created_at
+       FROM orders ORDER BY created_at DESC LIMIT 8`
     ),
   ]);
 
@@ -1369,7 +1391,9 @@ export async function deleteClient(id: number) {
 
 export async function getClientOrders(telephone: string): Promise<Order[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    "SELECT * FROM orders WHERE telephone = ? ORDER BY created_at DESC",
+    `SELECT id, reference, nom, telephone, zone_livraison, delivery_fee,
+            subtotal, total, status, statut_paiement, created_at
+     FROM orders WHERE telephone = ? ORDER BY created_at DESC LIMIT 20`,
     [telephone]
   );
   return rows as Order[];
@@ -2074,7 +2098,9 @@ export async function listDevis(opts: { limit?: number; offset?: number; search?
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM devis ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+    `SELECT id, reference, client_nom, client_tel, client_email,
+            sous_total, remise, total, statut, valide_jusqu, note, admin_id, created_at, updated_at
+     FROM devis ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
   const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM devis ${where}`, params);
   return { items: rows as Devis[], total: Number(cnt[0]?.cnt ?? 0) };
@@ -2252,7 +2278,10 @@ export async function listLivraisons(opts: { limit?: number; offset?: number; se
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM livraisons_ventes ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
+    `SELECT id, reference, facture_id, client_nom, client_tel, adresse,
+            contact_livraison, lien_localisation, statut, livreur,
+            montant_livraison, order_id, livree_le, created_at, updated_at
+     FROM livraisons_ventes ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
   const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM livraisons_ventes ${where}`, params);
   return { items: rows as Livraison[], total: Number(cnt[0]?.cnt ?? 0) };
@@ -3514,8 +3543,15 @@ export async function ensureIndexes(): Promise<void> {
     // orders — LEFT JOIN + filtre status/updated_at
     ["CREATE INDEX IF NOT EXISTS idx_ord_status     ON orders (status)",             "orders.status"],
     ["CREATE INDEX IF NOT EXISTS idx_ord_status_upd ON orders (status, updated_at)", "orders.status+updated_at"],
-    // finance_entries — GROUP BY type + filtre date
+    // finance_entries — GROUP BY type + filtre date + ORDER BY date_entree
     ["CREATE INDEX IF NOT EXISTS idx_fe_type_date   ON finance_entries (type, date_entree)", "finance_entries.type+date_entree"],
+    ["CREATE INDEX IF NOT EXISTS idx_fe_created     ON finance_entries (date_entree)",        "finance_entries.date_entree"],
+    // devis — ORDER BY / filtre date
+    ["CREATE INDEX IF NOT EXISTS idx_dev_created    ON devis (created_at)",                  "devis.created_at"],
+    // livraisons_ventes — ORDER BY / filtre date
+    ["CREATE INDEX IF NOT EXISTS idx_liv_created    ON livraisons_ventes (created_at)",      "livraisons_ventes.created_at"],
+    // orders — recherche par téléphone (suivi commande public)
+    ["CREATE INDEX IF NOT EXISTS idx_ord_telephone  ON orders (telephone)",                  "orders.telephone"],
   ];
   for (const [sql, label] of indexes) {
     try {

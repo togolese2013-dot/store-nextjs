@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { RefreshCw, Menu } from "lucide-react";
 import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
@@ -19,7 +19,6 @@ interface Props {
 /* ── Inner shell — consumes SSE context ─────────────────────────────────── */
 function AdminShellContent({ nom, role, permissions, children }: Props) {
   const pathname = usePathname();
-  const router   = useRouter();
 
   const [mobileOpen,  setMobileOpen]  = useState(false);
   const [hasUpdates,  setHasUpdates]  = useState(false);
@@ -37,8 +36,8 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
 
   const handleRefresh = useCallback(() => {
     setHasUpdates(false);
-    router.refresh();
-  }, [router]);
+    window.location.reload();
+  }, []);
 
   const ADMIN_ZONE = ["/admin/config", "/admin/settings", "/admin/users", "/admin/rapports", "/admin/tendances"];
   const STORE_EXCEPTIONS = ["/admin/settings/delivery", "/admin/settings/payment", "/admin/store"];

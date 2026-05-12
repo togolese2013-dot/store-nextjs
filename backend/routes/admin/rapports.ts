@@ -45,7 +45,7 @@ router.get("/api/admin/rapports", async (req, res) => {
     if (type === "ventes") {
       const conditions: string[] = [
         pc("f.created_at", periode),
-        "(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))",
+        "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)",
       ];
       const params: unknown[] = [];
       if (statut !== "all") {
@@ -60,7 +60,7 @@ router.get("/api/admin/rapports", async (req, res) => {
         conditions.push("f.admin_id = ?");
         params.push(Number(utilisateur));
       }
-      const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+      const where = "WHERE " + conditions.join(" AND ");
       const [r] = await pool.execute<mysql.RowDataPacket[]>(
         `SELECT f.id, f.reference, f.created_at, f.client_nom,
                 CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web'
@@ -70,8 +70,9 @@ router.get("/api/admin/rapports", async (req, res) => {
                 f.total - CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END AS reste,
                 f.statut_paiement, f.statut
          FROM factures f
-         LEFT JOIN admin_users au   ON au.id   = f.admin_id
-         LEFT JOIN utilisateurs util ON util.id = f.admin_id
+         LEFT JOIN orders _so        ON _so.id   = f.order_id AND _so.status = 'delivered'
+         LEFT JOIN admin_users au    ON au.id     = f.admin_id
+         LEFT JOIN utilisateurs util ON util.id   = f.admin_id
          ${where}
          ORDER BY f.created_at DESC
          LIMIT 500`,
@@ -224,7 +225,7 @@ router.get("/api/admin/rapports", async (req, res) => {
       const conditions: string[] = [
         "f.mode_paiement IN ('moov_money','tmoney','mobile_money')",
         pc("f.created_at", periode),
-        "(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))",
+        "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)",
       ];
       const params: unknown[] = [];
       if (statut !== "all") {
@@ -240,6 +241,7 @@ router.get("/api/admin/rapports", async (req, res) => {
                 f.total - CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END AS reste,
                 f.statut_paiement, f.statut
          FROM factures f
+         LEFT JOIN orders _so        ON _so.id   = f.order_id AND _so.status = 'delivered'
          LEFT JOIN admin_users au    ON au.id   = f.admin_id
          LEFT JOIN utilisateurs util ON util.id = f.admin_id
          ${where}
@@ -337,10 +339,11 @@ router.get("/api/admin/rapports", async (req, res) => {
                  COALESCE(au.nom, util.nom) AS vendeur,
                  f.total, f.statut
           FROM factures f
-          LEFT JOIN admin_users au ON au.id = f.admin_id
+          LEFT JOIN orders _so        ON _so.id = f.order_id AND _so.status = 'delivered'
+          LEFT JOIN admin_users au    ON au.id  = f.admin_id
           LEFT JOIN utilisateurs util ON util.id = f.admin_id
           WHERE ${pVentes}
-            AND (f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered')))
+            AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL))
          UNION ALL
          (SELECT fe.reference, fe.date_entree AS created_at,
                  CONCAT('[',UPPER(fe.type),'] ',COALESCE(fe.description,'')) AS client_nom,
