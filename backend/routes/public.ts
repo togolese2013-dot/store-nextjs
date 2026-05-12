@@ -25,7 +25,9 @@ async function loadBestsellerProducts(limit: number) {
            qty        INT PATH '$.qty'
          )
        ) AS jt
-       WHERE f.statut IN ('valide', 'paye')
+       LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
+       WHERE f.statut = 'paye'
+         AND (lv.id IS NULL OR lv.statut = 'livre')
          AND jt.produit_id IS NOT NULL
        GROUP BY jt.produit_id
        ORDER BY total_sold DESC

@@ -33,8 +33,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   if (!order) notFound();
 
-  const items: { nom: string; reference?: string; qty: number; prix_unitaire: number; total: number }[] =
-    typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+  let items: { nom: string; reference?: string; qty: number; prix_unitaire: number; total: number }[] = [];
+  try {
+    const raw = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+    if (Array.isArray(raw)) items = raw;
+  } catch { /* malformed items JSON — render empty */ }
 
   /* Build typed order for client component */
   const orderForActions = {
