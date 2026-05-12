@@ -246,6 +246,26 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     await (db as import("mysql2/promise").Pool).execute(
       `UPDATE produits SET ${sets.join(", ")} WHERE id = ?`, vals
     );
+
+    // Sync boutique_stock table if stock_boutique was updated
+    if ("stock_boutique" in body) {
+      const newQty = Math.max(0, Number(body.stock_boutique ?? 0));
+      const produitId = Number(req.params.id);
+      try {
+        const pool = db as import("mysql2/promise").Pool;
+        await pool.execute(
+          `INSERT INTO boutique_stock (produit_id, quantite) VALUES (?, ?)
+           ON DUPLICATE KEY UPDATE quantite = VALUES(quantite), updated_at = NOW()`,
+          [produitId, newQty]
+        );
+        await pool.execute(
+          `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, admin_id)
+           VALUES (?, 'ajustement', ?, 'Modifié via fiche produit', ?)`,
+          [produitId, newQty, session.id]
+        );
+      } catch { /* boutique_stock table may not exist yet */ }
+    }
+
     emitAdminEvent("produit");
     res.json({ ok: true });
   } catch (err) {

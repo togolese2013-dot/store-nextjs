@@ -1600,7 +1600,7 @@ export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
   await ensureBoutiqueStockPopulated();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT
-      COUNT(bs.produit_id)                                                                  AS total_produits,
+      (SELECT COUNT(*) FROM produits)                                                        AS total_produits,
       COALESCE(SUM(bs.quantite * p.prix_unitaire), 0)                                      AS valeur_boutique,
       SUM(CASE WHEN bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte THEN 1 ELSE 0 END) AS stock_faible,
       SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
