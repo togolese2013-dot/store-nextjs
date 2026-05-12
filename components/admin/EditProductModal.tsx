@@ -22,6 +22,7 @@ interface ProductData {
   marque_id:          number | "";
   prix_unitaire:      number | "";
   stock_magasin:      number | "";
+  stock_boutique:     number | "";
   stock_minimum:      number | "";
   remise:             number | "";
   neuf:               boolean;
@@ -57,8 +58,9 @@ export default function EditProductModal({ productId, productRef, onClose }: Pro
         categorie_id:       p.categorie_id ? Number(p.categorie_id) : "",
         marque_id:          p.marque_id    ? Number(p.marque_id)    : "",
         prix_unitaire:      Number(p.prix_unitaire),
-        stock_magasin:      Number(p.stock_magasin ?? 0),
-        stock_minimum:      Number(p.stock_minimum ?? 5),
+        stock_magasin:      Number(p.stock_magasin  ?? 0),
+        stock_boutique:     Number(p.stock_boutique ?? 0),
+        stock_minimum:      Number(p.stock_minimum  ?? 5),
         remise:             Number(p.remise ?? 0),
         neuf:               Boolean(p.neuf),
         actif:              Boolean(p.actif),

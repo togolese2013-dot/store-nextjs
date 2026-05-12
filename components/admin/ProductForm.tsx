@@ -17,6 +17,7 @@ interface ProductData {
   marque_id:          number | "";
   prix_unitaire:      number | "";
   stock_magasin:      number | "";
+  stock_boutique:     number | "";
   stock_minimum:      number | "";
   remise:             number | "";
   neuf:               boolean;
@@ -66,6 +67,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     marque_id:          initial?.marque_id          ?? "",
     prix_unitaire:      initial?.prix_unitaire      ?? "",
     stock_magasin:      initial?.stock_magasin      ?? "",
+    stock_boutique:     initial?.stock_boutique     ?? "",
     stock_minimum:      initial?.stock_minimum      ?? 5,
     remise:             initial?.remise             ?? "",
     neuf:               initial?.neuf               ?? false,
@@ -218,8 +220,9 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
         categorie_id:       form.categorie_id || null,
         marque_id:          form.marque_id    || null,
         prix_unitaire:      form.prix_unitaire,
-        stock_magasin:      form.stock_magasin !== "" ? Number(form.stock_magasin) : 0,
-        stock_minimum:      form.stock_minimum !== "" ? form.stock_minimum : 5,
+        stock_magasin:      form.stock_magasin  !== "" ? Number(form.stock_magasin)  : 0,
+        stock_boutique:     form.stock_boutique !== "" ? Number(form.stock_boutique) : 0,
+        stock_minimum:      form.stock_minimum  !== "" ? form.stock_minimum : 5,
         actif:              form.actif,
         image_url:          form.image_url,
       };
@@ -428,18 +431,6 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                         placeholder="0" className={inputCls} />
                     </div>
                   )}
-                  <div>
-                    <label className={labelCls}>Stock magasin</label>
-                    <input type="number" min="0" value={form.stock_magasin}
-                      onChange={e => set("stock_magasin", e.target.value ? Number(e.target.value) : "")}
-                      placeholder="10" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Seuil minimum</label>
-                    <input type="number" min="0" value={form.stock_minimum}
-                      onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
-                      placeholder="5" className={inputCls} />
-                  </div>
                 </div>
               )}
 
@@ -450,6 +441,33 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                 <Toggle checked={form.actif} onChange={v => set("actif", v)} label="Produit actif (visible)" color="green" />
               </div>
             </section>
+
+            {/* Stock */}
+            {!hasVariants && (
+              <section className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Stock</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelCls}>Stock magasin</label>
+                    <input type="number" min="0" value={form.stock_magasin}
+                      onChange={e => set("stock_magasin", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="0" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Stock boutique</label>
+                    <input type="number" min="0" value={form.stock_boutique}
+                      onChange={e => set("stock_boutique", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="0" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Seuil minimum</label>
+                    <input type="number" min="0" value={form.stock_minimum}
+                      onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="5" className={inputCls} />
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Variantes */}
             <section className="space-y-3">

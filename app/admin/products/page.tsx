@@ -335,18 +335,20 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
 
                         {/* Row 3 : stock badge + actions */}
                         <div className="flex items-center justify-between mt-2">
+                          {(() => { const st = (p.stock_magasin ?? 0) + (p.stock_boutique ?? 0); return (
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                            p.stock_magasin === 0
+                            st === 0
                               ? "bg-red-100 text-red-700"
-                              : p.stock_magasin <= 5
+                              : st <= 5
                               ? "bg-amber-100 text-amber-700"
                               : "bg-green-100 text-green-700"
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
-                              p.stock_magasin === 0 ? "bg-red-400" : p.stock_magasin <= 5 ? "bg-amber-400" : "bg-green-400"
+                              st === 0 ? "bg-red-400" : st <= 5 ? "bg-amber-400" : "bg-green-400"
                             }`} />
-                            Stock {p.stock_magasin} · {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
+                            Stock {st} · {st === 0 ? "Épuisé" : st <= 5 ? "Faible" : "Disponible"}
                           </span>
+                          ); })()}
                           <AdminProductActions product={p} />
                         </div>
                       </div>
@@ -408,20 +410,24 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <span className={`font-semibold ${p.stock_magasin === 0 ? "text-red-500" : p.stock_magasin <= 5 ? "text-amber-500" : "text-green-600"}`}>
-                              {p.stock_magasin}
+                            {(() => { const st = (p.stock_magasin ?? 0) + (p.stock_boutique ?? 0); return (
+                            <span className={`font-semibold ${st === 0 ? "text-red-500" : st <= 5 ? "text-amber-500" : "text-green-600"}`}>
+                              {st}
                             </span>
+                            ); })()}
                           </td>
                           <td className="px-4 py-3 text-center hidden lg:table-cell">
+                            {(() => { const st = (p.stock_magasin ?? 0) + (p.stock_boutique ?? 0); return (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              p.stock_magasin === 0
+                              st === 0
                                 ? "bg-red-100 text-red-700"
-                                : p.stock_magasin <= 5
+                                : st <= 5
                                 ? "bg-amber-100 text-amber-700"
                                 : "bg-green-100 text-green-700"
                             }`}>
-                              {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
+                              {st === 0 ? "Épuisé" : st <= 5 ? "Faible" : "Disponible"}
                             </span>
+                            ); })()}
                           </td>
                           <td className="px-4 py-3">
                             <AdminProductActions product={p} />
