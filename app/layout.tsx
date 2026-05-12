@@ -11,11 +11,11 @@ export const metadata: Metadata = {
   openGraph: {
     type:        "website",
     locale:      "fr_TG",
-    url:         "https://store.togolese.net",
+    url:         "https://store.togolese.fr",
     siteName:    "Togolese Shop",
     title:       "Togolese Shop — Boutique Premium au Togo",
     description: "Électronique, accessoires et plus — livraison rapide au Togo.",
-    images:      [{ url: "https://store.togolese.net/uploads/ad/logo.png", width: 1200, height: 630 }],
+    images:      [{ url: "https://store.togolese.fr/icons/icon-512.png", width: 512, height: 512 }],
   },
 };
 
@@ -38,14 +38,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="min-h-screen flex flex-col">
         {children}
-        {/* Service Worker registration — nonce required by CSP */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `
-          if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js').catch(function() {});
-            });
-          }
-        `}} />
       </body>
     </html>
   );
