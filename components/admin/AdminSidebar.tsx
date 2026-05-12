@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import {
-  Package, ShoppingBag, Settings, Users, MessageCircle, Send, Star, Tag,
+  Package, ShoppingBag, Settings, Users, MessageCircle, Star, Tag,
   X, ChevronRight, Palette, MapPin, CreditCard, Link2,
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
@@ -75,9 +75,7 @@ const MODULES: Record<string, {
     dot:    "bg-indigo-400",
     items: [
       { label: "Clients",         href: "/admin/crm",             icon: Users },
-      { label: "Messages reçus",  href: "/admin/messages",        icon: MessageCircle },
-      { label: "Diffusion",       href: "/admin/whatsapp",        icon: Send },
-      { label: "Fidélité",        href: "/admin/fidelite",        icon: Gift },
+{ label: "Fidélité",        href: "/admin/fidelite",        icon: Gift },
       { label: "Parrainage",      href: "/admin/parrainage",      icon: Link2 },
       { label: "Newsletter",      href: "/admin/newsletter",      icon: Mail },
       { label: "Comptes clients", href: "/admin/comptes-clients", icon: UserCheck },
@@ -129,9 +127,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/rapports",              "admin"],
   ["/admin/tendances",             "admin"],
   ["/admin/crm",                   "crm"],
-  ["/admin/messages",              "crm"],
-  ["/admin/whatsapp",              "crm"],
-  ["/admin/fidelite",              "crm"],
+["/admin/fidelite",              "crm"],
   ["/admin/parrainage",            "crm"],
   ["/admin/newsletter",            "crm"],
   ["/admin/comptes-clients",       "crm"],

@@ -31,7 +31,6 @@ import adminUsersRoutes     from "./routes/admin/users";
 import adminReviewsRoutes       from "./routes/admin/reviews";
 import adminPaymentPlansRoutes  from "./routes/admin/payment-plans";
 import adminVerificationsRoutes from "./routes/admin/verifications";
-import adminWhatsappRoutes, { ensureWhatsappMessagesTable } from "./routes/admin/whatsapp";
 import adminCommerciauxRoutes  from "./routes/admin/commerciaux";
 import { ensureCommerciauxTables } from "./routes/admin/commerciaux";
 import livreurRoutes        from "./routes/livreur";
@@ -131,7 +130,6 @@ app.use(adminUsersRoutes);
 app.use(adminReviewsRoutes);
 app.use(adminPaymentPlansRoutes);
 app.use(adminVerificationsRoutes);
-app.use(adminWhatsappRoutes);
 app.use(adminCommerciauxRoutes);
 app.use(adminSecurityLogsRoutes);
 app.use(adminRapportsRoutes);
@@ -175,13 +173,7 @@ app.listen(PORT, async () => {
   } catch (e) {
     console.error("[backend] ensureCommerciauxTables failed:", e);
   }
-  try {
-    await ensureWhatsappMessagesTable();
-    console.log("[backend] whatsapp_messages table OK");
-  } catch (e) {
-    console.error("[backend] ensureWhatsappMessagesTable failed:", e);
-  }
-  try {
+try {
     await ensureLivraisonCols();
     console.log("[backend] livraisons_ventes FK migration OK");
   } catch (e) {
