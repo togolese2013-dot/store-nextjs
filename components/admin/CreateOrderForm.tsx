@@ -42,6 +42,23 @@ interface Props {
 export default function CreateOrderForm({ zones }: Props) {
   const router = useRouter();
 
+  // Client fields
+  const [nom, setNom]                           = useState("");
+  const [telephone, setTelephone]               = useState("");
+  const [adresse, setAdresse]                   = useState("");
+  const [lienLocalisation, setLienLocalisation] = useState("");
+  const [note, setNote]                         = useState("");
+  const [zoneId, setZoneId]                     = useState<number>(zones[0]?.id ?? 0);
+
+  // Cart
+  const [items, setItems] = useState<OrderItem[]>([]);
+
+  // Product search
+  const [query, setQuery]         = useState("");
+  const [results, setResults]     = useState<Product[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Client autocomplete
   const [clientSuggestions, setClientSuggestions] = useState<ClientSuggestion[]>([]);
   const clientDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,23 +82,6 @@ export default function CreateOrderForm({ zones }: Props) {
     if (c.adresse)   setAdresse(c.adresse);
     setClientSuggestions([]);
   }
-
-  // Product search
-  const [query, setQuery]         = useState("");
-  const [results, setResults]     = useState<Product[]>([]);
-  const [searching, setSearching] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Cart
-  const [items, setItems] = useState<OrderItem[]>([]);
-
-  // Client fields
-  const [nom, setNom]                           = useState("");
-  const [telephone, setTelephone]               = useState("");
-  const [adresse, setAdresse]                   = useState("");
-  const [lienLocalisation, setLienLocalisation] = useState("");
-  const [note, setNote]                         = useState("");
-  const [zoneId, setZoneId]                     = useState<number>(zones[0]?.id ?? 0);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
