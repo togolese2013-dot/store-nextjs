@@ -18,11 +18,13 @@ router.get("/api/admin/stock-boutique", async (req, res) => {
     const limit  = Math.min(500, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
 
-    const [stats, { items, total }, movements] = await Promise.all([
+    const [stats, { items, total }, movements, prodCount] = await Promise.all([
       getStockBoutiqueStats(),
       getStockBoutiqueList({ search: q, filter, limit, offset }),
       getRecentBoutiqueMovements(20),
+      (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM produits"),
     ]);
+    stats.total_produits = Number((prodCount[0] as mysql.RowDataPacket[])[0]?.cnt ?? stats.total_produits);
     res.json({ stats, items, total, movements });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur serveur";

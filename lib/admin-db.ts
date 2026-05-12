@@ -1486,7 +1486,7 @@ export async function updateProductStock(produit_id: number, _entrepot_id: numbe
 export async function getStockStats() {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT
-      SUM(CASE WHEN COALESCE(stock_magasin, 0) > 0 THEN 1 ELSE 0 END)                           AS en_stock,
+      COUNT(*)                                                                                   AS en_stock,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) = 0 THEN 1 ELSE 0 END)                           AS en_rupture,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) > 0 AND COALESCE(stock_magasin, 0) <= 5 THEN 1 ELSE 0 END) AS stock_faible,
       COALESCE(SUM(prix_unitaire * COALESCE(stock_magasin, 0)), 0)                               AS valeur_totale

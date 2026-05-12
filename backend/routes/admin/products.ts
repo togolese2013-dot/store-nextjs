@@ -11,10 +11,12 @@ router.get("/api/admin/products/stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const [stockStats, statusCounts] = await Promise.all([
+    const [stockStats, statusCounts, totalCount] = await Promise.all([
       getStockStats(),
       getProductStatusCounts(),
+      (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM produits"),
     ]);
+    stockStats.en_stock = Number((totalCount[0] as mysql.RowDataPacket[])[0]?.cnt ?? stockStats.en_stock);
     res.json({ stockStats, statusCounts });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
