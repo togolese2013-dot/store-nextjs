@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { WaMessage } from "@/lib/admin-db";
 import { MessageCircle, Send, Loader2, RefreshCw, Paperclip, X, Mic, Square } from "lucide-react";
 import { clsx } from "clsx";
+import { useAdminSSE } from "./useAdminSSE";
 
 export default function MessagesClient() {
+  const { subscribe } = useAdminSSE();
   const [messages,   setMessages]   = useState<WaMessage[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [selected,   setSelected]   = useState<WaMessage | null>(null);
@@ -40,11 +42,12 @@ export default function MessagesClient() {
   // Initial load
   useEffect(() => { refresh(true); }, [refresh]);
 
-  // Auto-poll every 15 s
+  // Refresh on SSE "message" event (new incoming or outgoing message)
   useEffect(() => {
-    const t = setInterval(() => refresh(true), 15_000);
-    return () => clearInterval(t);
-  }, [refresh]);
+    return subscribe(event => {
+      if (event.type === "message") refresh(true);
+    });
+  }, [subscribe, refresh]);
 
   // Scroll to bottom when selected thread changes or new messages arrive
   useEffect(() => {

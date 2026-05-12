@@ -6,7 +6,14 @@ import {
 
 const router = express.Router();
 
+// ── Bestsellers cache — 10 min TTL ───────────────────────────────────────────
+const _bsCache = new Map<number, { data: import("mysql2/promise").RowDataPacket[]; expiresAt: number }>();
+
 async function loadBestsellerProducts(limit: number) {
+  const cached = _bsCache.get(limit);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+
   const pool = db as import("mysql2/promise").Pool;
 
   // Step 1: boutique ventes via factures.items (produit_id — no collation issue)
@@ -86,6 +93,7 @@ async function loadBestsellerProducts(limit: number) {
     products = topPool.slice(0, limit);
   }
 
+  _bsCache.set(limit, { data: products, expiresAt: Date.now() + 10 * 60_000 });
   return products;
 }
 

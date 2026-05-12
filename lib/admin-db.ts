@@ -1735,16 +1735,19 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   const params: (string | number | boolean | null | Buffer)[] = [];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
-  conditions.push("(f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))");
+  conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
+     LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
      ${where} ORDER BY f.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
-  const [cnt] = await db.query<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures f ${where}`, params);
+  const [cnt] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM factures f LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered' ${where}`, params
+  );
   return { items: rows as Facture[], total: Number(cnt[0]?.cnt ?? 0) };
 }
 
@@ -1987,6 +1990,7 @@ export async function createVenteWithStock(data: {
       }
     }
 
+    invalidateVentesStats();
     return factureId;
   } catch (err) {
     await conn.rollback();
@@ -1998,6 +2002,7 @@ export async function createVenteWithStock(data: {
 
 export async function updateFactureStatut(id: number, statut: Facture["statut"]) {
   await db.execute("UPDATE factures SET statut = ? WHERE id = ?", [statut, id]);
+  invalidateVentesStats();
 }
 
 export async function updateFacture(id: number, data: {
@@ -2026,6 +2031,7 @@ export async function updateFacture(id: number, data: {
       admin_id:      data.admin_id ?? null,
     }).catch(() => {});
   }
+  invalidateVentesStats();
 }
 
 export async function deleteFacture(id: number) {
@@ -2038,6 +2044,7 @@ export async function deleteFacture(id: number) {
       [`Vente ${ref}%`]
     ).catch(() => {});
   }
+  invalidateVentesStats();
 }
 
 /* ─── Ventes : Devis ─── */
@@ -2484,6 +2491,17 @@ export async function deleteFinanceEntry(id: number) {
   await db.execute("DELETE FROM finance_entries WHERE id = ?", [id]);
 }
 
+// ── In-memory cache for getVentesStats — 60s TTL ─────────────────────────────
+type VentesStatsResult = {
+  factures: number; livraisons: number;
+  ca_total: number; factures_payees: number;
+  ventes_jour_montant: number; ventes_jour_count: number;
+  commandes_livrees_jour: number; commandes_livrees_jour_count: number;
+  depenses_jour: number; rentrees_jour: number; solde_jour: number;
+};
+let _ventesStatsCache: { data: VentesStatsResult; expiresAt: number } | null = null;
+export function invalidateVentesStats() { _ventesStatsCache = null; }
+
 export async function getVentesStats(): Promise<{
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
@@ -2493,31 +2511,37 @@ export async function getVentesStats(): Promise<{
   rentrees_jour: number;
   solde_jour: number;
 }> {
-  const SITE_ORDER_FILTER = "(source IS NULL OR source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.status = 'delivered'))";
+  const now = Date.now();
+  if (_ventesStatsCache && _ventesStatsCache.expiresAt > now) return _ventesStatsCache.data;
+
+  // LEFT JOIN replaces the correlated EXISTS — one join scanned once instead of one subquery per row
+  const SITE_JOIN = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
+  const SITE_COND = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
   const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
-    db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE ${SITE_ORDER_FILTER}`),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE ${SITE_COND}`),
     db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
-    db.execute<mysql.RowDataPacket[]>(`
-      SELECT COALESCE(SUM(
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(SUM(
         CASE
-          WHEN statut_paiement IN ('paye','paye_total') THEN CASE WHEN source = 'site_order' THEN sous_total ELSE total END
-          WHEN statut_paiement = 'acompte'             THEN COALESCE(montant_acompte, 0)
+          WHEN f.statut_paiement IN ('paye','paye_total') THEN CASE WHEN f.source = 'site_order' THEN f.sous_total ELSE f.total END
+          WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
           ELSE 0
         END
-      ), 0) AS total FROM factures WHERE statut != 'annule' AND ${SITE_ORDER_FILTER}`),
-    db.execute<mysql.RowDataPacket[]>(`SELECT COUNT(*) AS cnt FROM factures WHERE statut = 'paye' AND ${SITE_ORDER_FILTER}`),
-    db.execute<mysql.RowDataPacket[]>(`
-      SELECT COUNT(*) AS cnt,
-             COALESCE(SUM(
-               CASE
-                 WHEN statut_paiement IN ('paye','paye_total') THEN CASE WHEN source = 'site_order' THEN sous_total ELSE total END
-                 WHEN statut_paiement = 'acompte'             THEN COALESCE(montant_acompte, 0)
-                 ELSE 0
-               END
-             ), 0) AS montant
-      FROM factures
-      WHERE DATE(created_at) = CURDATE() AND statut_paiement IN ('paye','paye_total','acompte') AND statut != 'annule' AND (source IS NULL OR source != 'site_order')`),
-    // Commandes en ligne livrées aujourd'hui — exclude delivery fee
+      ), 0) AS total FROM factures f ${SITE_JOIN} WHERE f.statut != 'annule' AND ${SITE_COND}`),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE f.statut = 'paye' AND ${SITE_COND}`),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt,
+              COALESCE(SUM(
+                CASE
+                  WHEN f.statut_paiement IN ('paye','paye_total') THEN CASE WHEN f.source = 'site_order' THEN f.sous_total ELSE f.total END
+                  WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
+                  ELSE 0
+                END
+              ), 0) AS montant
+       FROM factures f
+       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')`),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
@@ -2548,7 +2572,7 @@ export async function getVentesStats(): Promise<{
     rentrees_jour = Number((rj as mysql.RowDataPacket)?.montant ?? 0);
   } catch { /* finance_entries table not yet created */ }
 
-  return {
+  const result: VentesStatsResult = {
     factures:               Number((f  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     livraisons:             Number((l  as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     ca_total:               Number((ca as mysql.RowDataPacket[])[0]?.total   ?? 0),
@@ -2561,6 +2585,8 @@ export async function getVentesStats(): Promise<{
     rentrees_jour,
     solde_jour,
   };
+  _ventesStatsCache = { data: result, expiresAt: Date.now() + 60_000 };
+  return result;
 }
 
 export async function getLivraisonsStats(): Promise<{
@@ -3474,4 +3500,31 @@ export async function incrementTokenVersion(table: "admin_users" | "utilisateurs
   await db.execute(
     `UPDATE ${table} SET token_version = token_version + 1 WHERE id = ?`, [id]
   );
+}
+
+// ─── Performance indexes — idempotent, run at startup ────────────────────────
+export async function ensureIndexes(): Promise<void> {
+  const indexes: [string, string][] = [
+    // factures — filtres fréquents sur statut, date, order_id et statut_paiement
+    ["CREATE INDEX IF NOT EXISTS idx_fac_statut     ON factures (statut)",          "factures.statut"],
+    ["CREATE INDEX IF NOT EXISTS idx_fac_created    ON factures (created_at)",       "factures.created_at"],
+    ["CREATE INDEX IF NOT EXISTS idx_fac_order_id   ON factures (order_id)",         "factures.order_id"],
+    ["CREATE INDEX IF NOT EXISTS idx_fac_statut_pmt ON factures (statut_paiement)",  "factures.statut_paiement"],
+    ["CREATE INDEX IF NOT EXISTS idx_fac_source     ON factures (source(20))",       "factures.source"],
+    // orders — LEFT JOIN + filtre status/updated_at
+    ["CREATE INDEX IF NOT EXISTS idx_ord_status     ON orders (status)",             "orders.status"],
+    ["CREATE INDEX IF NOT EXISTS idx_ord_status_upd ON orders (status, updated_at)", "orders.status+updated_at"],
+    // finance_entries — GROUP BY type + filtre date
+    ["CREATE INDEX IF NOT EXISTS idx_fe_type_date   ON finance_entries (type, date_entree)", "finance_entries.type+date_entree"],
+  ];
+  for (const [sql, label] of indexes) {
+    try {
+      await db.execute(sql);
+      console.log(`[indexes] OK: ${label}`);
+    } catch (e) {
+      // ER_DUP_KEYNAME = index already exists under a different name — safe to ignore
+      const code = (e as { code?: string }).code;
+      if (code !== "ER_DUP_KEYNAME") console.warn(`[indexes] ${label}:`, (e as Error).message);
+    }
+  }
 }

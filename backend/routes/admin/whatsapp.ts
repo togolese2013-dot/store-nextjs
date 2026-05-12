@@ -3,6 +3,7 @@ import multer from "multer";
 import { getSession } from "../../lib/auth";
 import { getSetting, saveIncomingMessage, listWaMessages } from "@/lib/admin-db";
 import { sendWaText, sendWaImage, sendWaAudio, uploadWaMedia, getWaMediaUrl } from "../../lib/whatsapp";
+import { emitAdminEvent } from "../../lib/admin-events";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
 
@@ -111,6 +112,7 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
         media_url:     msg.image?.id ?? msg.video?.id ?? msg.audio?.id ?? "",
         status:        "received",
       }).catch(console.error);
+      emitAdminEvent("message", { from, contact_name: name });
     }
   } catch (e) {
     console.error("[WA webhook]", e);
@@ -214,6 +216,7 @@ router.post("/api/admin/whatsapp/send", async (req, res) => {
       media_url:     mediaId,
       status:        "sent",
     }).catch(console.error);
+    emitAdminEvent("message", { to });
   } else {
     // Text message
     if (!message) return res.status(400).json({ error: "message requis" });
@@ -231,6 +234,7 @@ router.post("/api/admin/whatsapp/send", async (req, res) => {
       media_url:     "",
       status:        "sent",
     }).catch(console.error);
+    emitAdminEvent("message", { to });
   }
 
   return res.json({ success: true });

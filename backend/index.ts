@@ -39,7 +39,7 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
-import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam, ensureLivraisonCols, ensureTokenVersionCols } from "@/lib/admin-db";
+import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes } from "@/lib/admin-db";
 import adminSecurityLogsRoutes from "./routes/admin/security-logs";
 import { ensureSecurityLogsTable } from "./lib/security-log";
 import adminRapportsRoutes  from "./routes/admin/rapports";
@@ -198,6 +198,12 @@ app.listen(PORT, async () => {
     console.log("[backend] security_logs table OK");
   } catch (e) {
     console.error("[backend] ensureSecurityLogsTable failed:", e);
+  }
+  try {
+    await ensureIndexes();
+    console.log("[backend] indexes OK");
+  } catch (e) {
+    console.error("[backend] ensureIndexes failed:", e);
   }
 });
 

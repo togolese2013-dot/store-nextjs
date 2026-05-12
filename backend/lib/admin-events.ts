@@ -10,7 +10,7 @@ export const adminEmitter: EventEmitter =
   (globalThis.__adminEmitter = new EventEmitter().setMaxListeners(200));
 
 export type AdminEventType =
-  | "stock" | "achat" | "vente" | "commande" | "produit" | "finance" | "livraison";
+  | "stock" | "achat" | "vente" | "commande" | "produit" | "finance" | "livraison" | "message";
 
 export function emitAdminEvent(type: AdminEventType, payload?: Record<string, unknown>) {
   adminEmitter.emit("admin", { type, ts: Date.now(), ...(payload ?? {}) });
