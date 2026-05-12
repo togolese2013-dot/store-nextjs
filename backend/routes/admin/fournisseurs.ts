@@ -3,7 +3,8 @@ import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
 import {
   listFournisseurs, createFournisseur, updateFournisseur, deleteFournisseur,
-  listAchats, countAchats, getAchatStats, createAchat, getAchatById, updateAchat,
+  listAchats, countAchats, getAchatStats, createAchat, getAchatById,
+  updateAchat, deleteAchat, recevoirAchat,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -85,7 +86,23 @@ router.patch("/api/admin/achats/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    await updateAchat(Number(req.params.id), req.body);
+    const id = Number(req.params.id);
+    if (req.body.action === "recevoir") {
+      await recevoirAchat(id);
+    } else {
+      await updateAchat(id, req.body);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.delete("/api/admin/achats/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    await deleteAchat(Number(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

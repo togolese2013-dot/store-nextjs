@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Truck, Plus, Trash2, X, Save, Loader2, AlertCircle,
-  CheckCircle2, Clock, ChevronDown, DollarSign, ShoppingCart,
-  Plane, Ship, Search, UserPlus,
+  DollarSign, ShoppingCart, Clock, CheckCircle2,
+  Plane, Ship, Search, UserPlus, Eye, Pencil, PackageCheck,
 } from "lucide-react";
-import type { Achat, Fournisseur } from "@/lib/admin-db";
+import type { Achat, AchatItem, Fournisseur } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 import PageHeader from "@/components/admin/PageHeader";
 
@@ -45,32 +45,54 @@ const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
 const STATUT_COLORS: Record<string, string> = {
   en_attente: "bg-amber-100 text-amber-700",
   recu:       "bg-blue-100 text-blue-700",
-  valide:     "bg-green-100 text-green-700",
+};
+
+const STATUT_LABELS: Record<string, string> = {
+  en_attente: "En attente",
+  recu:       "Reçu",
 };
 
 function emptyLine(): LineItem {
   return { produit_id: null, designation: "", quantite: "", prix_unitaire: "", search: "", showDropdown: false };
 }
 
+function lineFromItem(item: AchatItem): LineItem {
+  return {
+    produit_id:    item.produit_id,
+    designation:   item.designation,
+    quantite:      item.quantite,
+    prix_unitaire: item.prix_unitaire,
+    search:        item.produit_nom ?? item.designation,
+    showDropdown:  false,
+  };
+}
+
 export default function AchatsManager({ initialAchats, total, stats, fournisseurs: initFournisseurs, products, page, limit }: Props) {
   const router = useRouter();
-  const [achats,      setAchats]      = useState<Achat[]>(initialAchats);
+  const [achats,       setAchats]       = useState<Achat[]>(initialAchats);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(initFournisseurs);
-  const [showForm,    setShowForm]    = useState(false);
-  const [saving,      setSaving]      = useState(false);
-  const [deleting,    setDeleting]    = useState<number | null>(null);
-  const [error,       setError]       = useState("");
+  const [saving,       setSaving]       = useState(false);
+  const [deleting,     setDeleting]     = useState<number | null>(null);
+  const [receiving,    setReceiving]    = useState<number | null>(null);
+  const [error,        setError]        = useState("");
+
+  // Modals
+  const [showCreate,   setShowCreate]   = useState(false);
+  const [editAchat,    setEditAchat]    = useState<Achat | null>(null);
+  const [loadingEdit,  setLoadingEdit]  = useState(false);
+  const [detailAchat,  setDetailAchat]  = useState<Achat | null>(null);
+  const [detailItems,  setDetailItems]  = useState<AchatItem[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   // New fournisseur inline
-  const [showNewFourn,  setShowNewFourn]  = useState(false);
-  const [newFournNom,   setNewFournNom]   = useState("");
-  const [savingFourn,   setSavingFourn]   = useState(false);
+  const [showNewFourn, setShowNewFourn] = useState(false);
+  const [newFournNom,  setNewFournNom]  = useState("");
+  const [savingFourn,  setSavingFourn]  = useState(false);
 
   const [form, setForm] = useState({
     fournisseur_id: "",
     transport:      "" as "" | "avion" | "bateau",
     date_achat:     new Date().toISOString().slice(0, 10),
-    statut:         "en_attente" as "en_attente" | "recu" | "valide",
     notes:          "",
   });
   const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
@@ -87,7 +109,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
       ...ln,
       produit_id:    prod.id,
       designation:   prod.nom,
-      prix_unitaire: "",   // user enters actual purchase price
+      prix_unitaire: "",
       search:        prod.nom,
       showDropdown:  false,
     }));
@@ -95,45 +117,8 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
 
   const montantTotal = lines.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
 
-  async function handleSave() {
-    setError("");
-    if (!form.date_achat) { setError("La date est obligatoire."); return; }
-    const validLines = lines.filter(l => l.designation.trim() && Number(l.quantite) > 0);
-    if (!validLines.length) { setError("Ajoutez au moins un article valide."); return; }
-
-    setSaving(true);
-    try {
-      const res = await fetch("/api/admin/achats", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fournisseur_id: form.fournisseur_id ? Number(form.fournisseur_id) : null,
-          date_achat:     form.date_achat,
-          statut:         form.statut,
-          transport:      form.transport || null,
-          note:           form.notes || null,
-          items: validLines.map(l => ({
-            produit_id:    l.produit_id,
-            designation:   l.designation,
-            quantite:      Number(l.quantite),
-            prix_unitaire: Number(l.prix_unitaire) || 0,
-          })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setShowForm(false);
-      resetForm();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   function resetForm() {
-    setForm({ fournisseur_id: "", transport: "", date_achat: new Date().toISOString().slice(0, 10), statut: "en_attente", notes: "" });
+    setForm({ fournisseur_id: "", transport: "", date_achat: new Date().toISOString().slice(0, 10), notes: "" });
     setLines([emptyLine()]);
     setShowNewFourn(false);
     setNewFournNom("");
@@ -162,24 +147,142 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
     }
   }
 
+  async function handleSave() {
+    setError("");
+    if (!form.date_achat) { setError("La date est obligatoire."); return; }
+    const validLines = lines.filter(l => l.designation.trim() && Number(l.quantite) > 0);
+    if (!validLines.length) { setError("Ajoutez au moins un article valide."); return; }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/achats", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fournisseur_id: form.fournisseur_id ? Number(form.fournisseur_id) : null,
+          date_achat:     form.date_achat,
+          statut:         "en_attente",
+          transport:      form.transport || null,
+          note:           form.notes || null,
+          items: validLines.map(l => ({
+            produit_id:    l.produit_id,
+            designation:   l.designation,
+            quantite:      Number(l.quantite),
+            prix_unitaire: Number(l.prix_unitaire) || 0,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShowCreate(false);
+      resetForm();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDelete(id: number) {
     if (!confirm("Supprimer cet achat ?")) return;
     setDeleting(id);
     try {
-      await fetch(`/api/admin/achats/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/achats/${id}`, { method: "DELETE" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       setAchats(l => l.filter(a => a.id !== id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur lors de la suppression.");
     } finally {
       setDeleting(null);
     }
   }
 
-  async function handleStatut(id: number, statut: string) {
-    await fetch(`/api/admin/achats/${id}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ statut }),
+  async function handleRecevoir(id: number) {
+    if (!confirm("Confirmer la réception ? Les quantités seront ajoutées au stock magasin.")) return;
+    setReceiving(id);
+    try {
+      const res = await fetch(`/api/admin/achats/${id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ action: "recevoir" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setAchats(l => l.map(a => a.id === id ? { ...a, statut: "recu" } : a));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur.");
+    } finally {
+      setReceiving(null);
+    }
+  }
+
+  async function openDetail(achat: Achat) {
+    setDetailAchat(achat);
+    setDetailItems([]);
+    setLoadingDetail(true);
+    try {
+      const res  = await fetch(`/api/admin/achats/${achat.id}`);
+      const data = await res.json();
+      setDetailItems(data.achat?.items ?? data.items ?? []);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
+
+  async function openEdit(achat: Achat) {
+    setEditAchat(achat);
+    setEditItems([]);
+    setLoadingEdit(true);
+    setForm({
+      fournisseur_id: achat.fournisseur_id ? String(achat.fournisseur_id) : "",
+      transport:      (achat.transport ?? "") as "" | "avion" | "bateau",
+      date_achat:     achat.date_achat.slice(0, 10),
+      notes:          achat.notes ?? "",
     });
-    setAchats(l => l.map(a => a.id === id ? { ...a, statut: statut as Achat["statut"] } : a));
+    try {
+      const res  = await fetch(`/api/admin/achats/${achat.id}`);
+      const data = await res.json();
+      const items: AchatItem[] = data.achat?.items ?? data.items ?? [];
+      setLines(items.length ? items.map(lineFromItem) : [emptyLine()]);
+    } finally {
+      setLoadingEdit(false);
+    }
+  }
+
+  async function handleUpdate() {
+    if (!editAchat) return;
+    setError("");
+    if (!form.date_achat) { setError("La date est obligatoire."); return; }
+    const validLines = lines.filter(l => l.designation.trim() && Number(l.quantite) > 0);
+    if (!validLines.length) { setError("Ajoutez au moins un article valide."); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/achats/${editAchat.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fournisseur_id: form.fournisseur_id ? Number(form.fournisseur_id) : null,
+          date_achat:     form.date_achat,
+          transport:      form.transport || null,
+          note:           form.notes || null,
+          items: validLines.map(l => ({
+            produit_id:    l.produit_id,
+            designation:   l.designation,
+            quantite:      Number(l.quantite),
+            prix_unitaire: Number(l.prix_unitaire) || 0,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setEditAchat(null);
+      resetForm();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const totalPages = Math.ceil(total / limit);
@@ -194,7 +297,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
         onRefresh={() => router.refresh()}
         ctaLabel="Nouvel achat"
         ctaIcon={Plus}
-        onCtaClick={() => { setShowForm(true); setError(""); }}
+        onCtaClick={() => { setShowCreate(true); setError(""); resetForm(); }}
       />
 
       {/* KPIs */}
@@ -263,24 +366,50 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                       <span className="font-bold text-slate-900">{formatPrice(a.montant_total)}</span>
                     </td>
                     <td className="px-5 py-4 text-center">
-                      <div className="relative inline-block">
-                        <select
-                          value={a.statut}
-                          onChange={e => handleStatut(a.id, e.target.value)}
-                          className={`appearance-none pl-2.5 pr-6 py-1 rounded-full text-xs font-bold cursor-pointer border-0 outline-none ${STATUT_COLORS[a.statut] ?? "bg-slate-100 text-slate-700"}`}
-                        >
-                          <option value="en_attente">En attente</option>
-                          <option value="recu">Reçu</option>
-                          <option value="valide">Validé</option>
-                        </select>
-                        <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" />
-                      </div>
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${STATUT_COLORS[a.statut] ?? "bg-slate-100 text-slate-700"}`}>
+                        {STATUT_LABELS[a.statut] ?? a.statut}
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleDelete(a.id)} disabled={deleting === a.id}
-                          className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-40">
-                          <Trash2 className="w-4 h-4" />
+                      <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                        {/* Voir détails */}
+                        <button
+                          onClick={() => openDetail(a)}
+                          title="Voir les détails"
+                          className="p-1.5 rounded-xl hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {/* Modifier */}
+                        <button
+                          onClick={() => { setError(""); openEdit(a); }}
+                          title="Modifier"
+                          className="p-1.5 rounded-xl hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        {/* Valider réception — seulement si en_attente */}
+                        {a.statut === "en_attente" && (
+                          <button
+                            onClick={() => handleRecevoir(a.id)}
+                            disabled={receiving === a.id}
+                            title="Valider la réception"
+                            className="p-1.5 rounded-xl hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors disabled:opacity-40"
+                          >
+                            {receiving === a.id
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <PackageCheck className="w-4 h-4" />
+                            }
+                          </button>
+                        )}
+                        {/* Supprimer */}
+                        <button
+                          onClick={() => handleDelete(a.id)}
+                          disabled={deleting === a.id}
+                          title="Supprimer"
+                          className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-40"
+                        >
+                          {deleting === a.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                         </button>
                       </div>
                     </td>
@@ -306,25 +435,192 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
         )}
       </div>
 
-      {/* ── Create modal ── */}
-      {showForm && (
+      {/* ── Modal Détail ── */}
+      {detailAchat && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8 p-8 space-y-6">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl my-8 p-8 space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-xl text-slate-900">Nouvel achat fournisseur</h2>
-              <button onClick={() => { setShowForm(false); resetForm(); }} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
+              <div>
+                <h2 className="font-bold text-xl text-slate-900">Détail de l&apos;achat</h2>
+                <p className="text-xs font-mono text-slate-400 mt-0.5">{detailAchat.reference}</p>
+              </div>
+              <button onClick={() => setDetailAchat(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {error && (
-              <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-red-50 text-red-700 text-sm">
-                <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="bg-slate-50 rounded-xl px-4 py-3">
+                <p className="text-xs text-slate-400 font-semibold mb-0.5">Fournisseur</p>
+                <p className="font-semibold text-slate-800">{detailAchat.fournisseur_nom ?? "—"}</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl px-4 py-3">
+                <p className="text-xs text-slate-400 font-semibold mb-0.5">Date</p>
+                <p className="font-semibold text-slate-800">{new Date(detailAchat.date_achat).toLocaleDateString("fr-FR")}</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl px-4 py-3">
+                <p className="text-xs text-slate-400 font-semibold mb-0.5">Transport</p>
+                <p className="font-semibold text-slate-800 flex items-center gap-1">
+                  {detailAchat.transport === "avion" && <><Plane className="w-3.5 h-3.5" /> Avion</>}
+                  {detailAchat.transport === "bateau" && <><Ship className="w-3.5 h-3.5" /> Bateau</>}
+                  {!detailAchat.transport && "—"}
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-xl px-4 py-3">
+                <p className="text-xs text-slate-400 font-semibold mb-0.5">Statut</p>
+                <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${STATUT_COLORS[detailAchat.statut] ?? "bg-slate-100 text-slate-700"}`}>
+                  {STATUT_LABELS[detailAchat.statut] ?? detailAchat.statut}
+                </span>
+              </div>
+            </div>
+
+            {detailAchat.notes && (
+              <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm text-slate-600">
+                <p className="text-xs text-slate-400 font-semibold mb-0.5">Note</p>
+                {detailAchat.notes}
               </div>
             )}
 
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Articles</p>
+              {loadingDetail ? (
+                <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
+              ) : (
+                <div className="rounded-xl border border-slate-100 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500">Désignation</th>
+                        <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500">Qté</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500">Prix u.</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {detailItems.map((item, i) => (
+                        <tr key={i}>
+                          <td className="px-4 py-2.5 text-slate-700">{item.designation}</td>
+                          <td className="px-4 py-2.5 text-center text-slate-600">{item.quantite}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">{item.prix_unitaire.toLocaleString("fr-FR")}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-slate-900">{(item.quantite * item.prix_unitaire).toLocaleString("fr-FR")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50">
+                      <tr>
+                        <td colSpan={3} className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Total</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-slate-900">
+                          {detailAchat.montant_total.toLocaleString("fr-FR")} <span className="text-emerald-500 text-xs">FCFA</span>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
 
+            <button onClick={() => setDetailAchat(null)}
+              className="w-full px-5 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Créer / Modifier ── */}
+      {(showCreate || editAchat) && (
+        <AchatFormModal
+          mode={editAchat ? "edit" : "create"}
+          form={form}
+          setForm={setForm}
+          lines={lines}
+          setLines={setLines}
+          addLine={addLine}
+          removeLine={removeLine}
+          setLineField={setLineField}
+          selectProduct={selectProduct}
+          montantTotal={montantTotal}
+          fournisseurs={fournisseurs}
+          products={products}
+          showNewFourn={showNewFourn}
+          setShowNewFourn={setShowNewFourn}
+          newFournNom={newFournNom}
+          setNewFournNom={setNewFournNom}
+          savingFourn={savingFourn}
+          handleCreateFournisseur={handleCreateFournisseur}
+          saving={saving}
+          loadingEdit={loadingEdit}
+          error={error}
+          onSave={editAchat ? handleUpdate : handleSave}
+          onClose={() => {
+            setShowCreate(false);
+            setEditAchat(null);
+            resetForm();
+            setError("");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Extracted form modal ──────────────────────────────────────────────────────
+
+interface FormModalProps {
+  mode:    "create" | "edit";
+  form:    { fournisseur_id: string; transport: "" | "avion" | "bateau"; date_achat: string; notes: string };
+  setForm: React.Dispatch<React.SetStateAction<{ fournisseur_id: string; transport: "" | "avion" | "bateau"; date_achat: string; notes: string }>>;
+  lines:   LineItem[];
+  setLines: React.Dispatch<React.SetStateAction<LineItem[]>>;
+  addLine:  () => void;
+  removeLine: (i: number) => void;
+  setLineField: (i: number, key: keyof LineItem, val: unknown) => void;
+  selectProduct: (i: number, prod: AdminProduct) => void;
+  montantTotal:  number;
+  fournisseurs:  Fournisseur[];
+  products:      AdminProduct[];
+  showNewFourn:  boolean;
+  setShowNewFourn: (v: boolean | ((prev: boolean) => boolean)) => void;
+  newFournNom:   string;
+  setNewFournNom: (v: string) => void;
+  savingFourn:   boolean;
+  handleCreateFournisseur: () => void;
+  saving:      boolean;
+  loadingEdit: boolean;
+  error:       string;
+  onSave:      () => void;
+  onClose:     () => void;
+}
+
+function AchatFormModal({
+  mode, form, setForm, lines, addLine, removeLine, setLineField, selectProduct,
+  montantTotal, fournisseurs, products, showNewFourn, setShowNewFourn,
+  newFournNom, setNewFournNom, savingFourn, handleCreateFournisseur,
+  saving, loadingEdit, error, onSave, onClose,
+}: FormModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8 p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-xl text-slate-900">
+            {mode === "create" ? "Nouvel achat fournisseur" : "Modifier l'achat"}
+          </h2>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-red-50 text-red-700 text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+          </div>
+        )}
+
+        {loadingEdit ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
+        ) : (
+          <>
+            <div className="grid sm:grid-cols-2 gap-4">
               {/* Fournisseur */}
               <div>
                 <label className={labelCls}>Fournisseur</label>
@@ -393,22 +689,8 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                 </select>
               </div>
 
-              {/* Statut */}
-              <div>
-                <label className={labelCls}>Statut</label>
-                <select
-                  value={form.statut}
-                  onChange={e => setForm(f => ({ ...f, statut: e.target.value as "en_attente" | "recu" | "valide" }))}
-                  className={inputCls}
-                >
-                  <option value="en_attente">En attente</option>
-                  <option value="recu">Reçu</option>
-                  <option value="valide">Validé</option>
-                </select>
-              </div>
-
               {/* Note */}
-              <div className="sm:col-span-2">
+              <div>
                 <label className={labelCls}>Note</label>
                 <textarea
                   value={form.notes}
@@ -441,7 +723,6 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                   return (
                     <div key={i} className="space-y-1">
                       <div className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-center">
-                        {/* Product search */}
                         <div className="relative">
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                           <input
@@ -489,7 +770,6 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                           <X className="w-4 h-4" />
                         </button>
                       </div>
-                      {/* Show selected product stock info */}
                       {ln.produit_id && (() => {
                         const p = products.find(p => p.id === ln.produit_id);
                         return p ? (
@@ -512,19 +792,19 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
             </div>
 
             <div className="flex gap-3 pt-1">
-              <button onClick={() => { setShowForm(false); resetForm(); }}
+              <button onClick={onClose}
                 className="flex-1 px-5 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
                 Annuler
               </button>
-              <button onClick={handleSave} disabled={saving}
+              <button onClick={onSave} disabled={saving}
                 className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? "Enregistrement…" : "Enregistrer"}
+                {saving ? "Enregistrement…" : mode === "create" ? "Enregistrer" : "Mettre à jour"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

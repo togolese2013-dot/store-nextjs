@@ -2631,7 +2631,7 @@ export interface Achat {
   nom_fournisseur?: string;
   reference:      string;
   date_achat:     string;
-  statut:         "en_attente" | "recu" | "valide";
+  statut:         "en_attente" | "recu";
   montant_total:  number;
   notes:          string | null;
   transport?:     "avion" | "bateau" | null;
@@ -2762,6 +2762,73 @@ export async function deleteAchat(id: number) {
     await conn.beginTransaction();
     await conn.execute("DELETE FROM achat_items WHERE achat_id = ?", [id]);
     await conn.execute("DELETE FROM achats WHERE id = ?", [id]);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function updateAchat(id: number, data: {
+  fournisseur_id?: number | null;
+  date_achat?:     string;
+  transport?:      string | null;
+  note?:           string | null;
+  items?: Array<{ produit_id: number | null; designation: string; quantite: number; prix_unitaire: number }>;
+}) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const sets: string[] = [];
+    const vals: (string | number | null)[] = [];
+    if ("fournisseur_id" in data) { sets.push("fournisseur_id = ?"); vals.push(data.fournisseur_id ?? null); }
+    if (data.date_achat)          { sets.push("date_achat = ?");     vals.push(data.date_achat); }
+    if ("transport" in data)      { sets.push("transport = ?");      vals.push(data.transport ?? null); }
+    if ("note" in data)           { sets.push("notes = ?");          vals.push(data.note ?? null); }
+    if (data.items) {
+      const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
+      sets.push("montant_total = ?");
+      vals.push(montant_total);
+      await conn.execute("DELETE FROM achat_items WHERE achat_id = ?", [id]);
+      for (const item of data.items) {
+        await conn.execute(
+          `INSERT INTO achat_items (achat_id, produit_id, designation, quantite, prix_unitaire) VALUES (?,?,?,?,?)`,
+          [id, item.produit_id ?? null, item.designation, item.quantite, item.prix_unitaire]
+        );
+      }
+    }
+    if (sets.length) {
+      vals.push(id);
+      await conn.execute(`UPDATE achats SET ${sets.join(", ")} WHERE id = ?`, vals);
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function recevoirAchat(id: number) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.execute<mysql.RowDataPacket[]>("SELECT statut FROM achats WHERE id = ?", [id]);
+    if (!rows[0]) throw new Error("Achat introuvable.");
+    if (rows[0].statut !== "en_attente") throw new Error("Cet achat n'est pas en attente.");
+    await conn.execute("UPDATE achats SET statut = 'recu' WHERE id = ?", [id]);
+    const [items] = await conn.execute<mysql.RowDataPacket[]>(
+      "SELECT produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL", [id]
+    );
+    for (const item of items) {
+      await conn.execute(
+        "UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?",
+        [item.quantite, item.produit_id]
+      );
+    }
     await conn.commit();
   } catch (err) {
     await conn.rollback();
