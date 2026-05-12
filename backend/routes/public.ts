@@ -26,7 +26,7 @@ async function loadBestsellerProducts(limit: number) {
          )
        ) AS jt
        LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
-       WHERE f.statut = 'paye'
+       WHERE f.statut IN ('valide', 'paye')
          AND (lv.id IS NULL OR lv.statut = 'livre')
          AND jt.produit_id IS NOT NULL
        GROUP BY jt.produit_id
