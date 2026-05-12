@@ -41,8 +41,11 @@ const nextConfig: NextConfig = {
     if (BACKEND_URL) {
       rules.push({ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` });
     }
-    // Proxy Séréna AI widget chat endpoint
-    rules.push({ source: "/chat", destination: "https://serena-togolese-production.up.railway.app/chat" });
+    // Proxy Séréna AI widget — tout passe par Next.js, pas de CORS
+    const SERENA = "https://serena-togolese-production.up.railway.app";
+    rules.push({ source: "/static/widget.js",  destination: `${SERENA}/static/widget.js` });
+    rules.push({ source: "/static/widget.css", destination: `${SERENA}/static/widget.css` });
+    rules.push({ source: "/chat",              destination: `${SERENA}/chat` });
     return rules;
   },
 };
