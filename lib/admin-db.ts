@@ -752,6 +752,9 @@ export async function deleteOrder(id: number) {
   } else {
     await db.execute("DELETE FROM factures WHERE order_id = ?", [id]).catch(() => {});
   }
+  // Also delete the linked livraison
+  await db.execute("DELETE FROM livraisons_ventes WHERE order_id = ?", [id]).catch(() => {});
+  invalidateVentesStats();
 }
 
 export async function getOrderById(id: number): Promise<Order | null> {
