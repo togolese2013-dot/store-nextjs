@@ -8,14 +8,9 @@ import AnnouncementBar from "@/components/AnnouncementBar";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import ReferralBanner from "@/components/ReferralBanner";
 import RefDetector from "@/components/RefDetector";
-import { apiGet } from "@/lib/api";
 import ThemeLoader from "@/components/ThemeLoader";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
-  const waNumber = await apiGet<{ settings: Record<string, string> }>(
-    "/api/settings/public", { noAuth: true }
-  ).then(r => r.settings.whatsapp_number || "").catch(() => "");
-
   return (
     <CartProvider>
       <ThemeLoader />
@@ -30,7 +25,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
         {children}
       </main>
       <Footer />
-      {waNumber && <WhatsAppButton number={waNumber} />}
+      <WhatsAppButton />
     </CartProvider>
   );
 }
