@@ -1,6 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
+import { sendBoutiqueVenteNotif } from "../lib/whatsapp";
 import {
   listFactures, createVenteWithStock, getVentesStats,
   updateFactureStatut, updateFacture, deleteFacture, getFactureById,
@@ -53,6 +54,19 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
     }
     const id = await createVenteWithStock({ ...body, admin_id: session.id });
     emitAdminEvent("vente");
+    if (body.client_tel) {
+      getFactureById(id).then(facture => {
+        if (!facture) return;
+        sendBoutiqueVenteNotif({
+          telephone:       body.client_tel,
+          nom:             body.client_nom,
+          reference:       facture.reference,
+          total:           Number(body.total ?? 0),
+          montant_acompte: body.montant_acompte ? Number(body.montant_acompte) : null,
+          statut_paiement: body.statut_paiement ?? null,
+        });
+      }).catch(console.error);
+    }
     res.json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

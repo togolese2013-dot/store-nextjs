@@ -210,6 +210,54 @@ export async function sendWaAudio({
   }
 }
 
+/* ── Boutique vente notification ─────────────────────────────────────────── */
+export async function sendBoutiqueVenteNotif({
+  telephone, nom, reference, total, montant_acompte, statut_paiement,
+}: {
+  telephone:        string;
+  nom:              string;
+  reference:        string;
+  total:            number;
+  montant_acompte:  number | null;
+  statut_paiement:  string | null;
+}): Promise<void> {
+  try {
+    const [enabled, templateFull, templateAcompte, lang, siteUrl] = await Promise.all([
+      getSetting("wa_boutique_vente_enabled"),
+      getSetting("wa_boutique_vente_template_full"),
+      getSetting("wa_boutique_vente_template_acompte"),
+      getSetting("wa_order_lang"),
+      getSetting("site_url"),
+    ]);
+
+    if (enabled !== "1" || !telephone) return;
+
+    const languageCode = lang || "fr";
+    const baseUrl      = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
+    const fmt          = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+
+    if (statut_paiement === "acompte" && templateAcompte) {
+      const acompte      = montant_acompte ?? 0;
+      const resteAPayer  = total - acompte;
+      await sendWaTemplate({
+        to:           telephone,
+        templateName: templateAcompte,
+        languageCode,
+        bodyParams:   [nom, reference, fmt(acompte), fmt(resteAPayer), baseUrl],
+      });
+    } else if (templateFull) {
+      await sendWaTemplate({
+        to:           telephone,
+        templateName: templateFull,
+        languageCode,
+        bodyParams:   [nom, reference, fmt(total), baseUrl],
+      });
+    }
+  } catch (e) {
+    console.error("[WA] sendBoutiqueVenteNotif error:", e);
+  }
+}
+
 /* ── Order notifications ──────────────────────────────────────────────────── */
 export async function sendOrderNotifications({
   id, reference, nom, telephone, items, total,

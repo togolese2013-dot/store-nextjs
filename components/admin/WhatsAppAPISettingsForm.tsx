@@ -12,13 +12,18 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
   const [verifyTok, setVerifyTok] = useState(settings.wa_webhook_verify_token ?? "");
   const [bizId,     setBizId]     = useState(settings.wa_business_account_id  ?? "");
 
-  // Notifications automatiques
+  // Notifications automatiques commandes store
   const [clientEnabled,  setClientEnabled]  = useState(settings.wa_order_client_enabled  === "1");
   const [adminEnabled,   setAdminEnabled]   = useState(settings.wa_order_admin_enabled   === "1");
   const [clientTemplate, setClientTemplate] = useState(settings.wa_order_client_template ?? "");
   const [adminTemplate,  setAdminTemplate]  = useState(settings.wa_order_admin_template  ?? "");
   const [adminNumber,    setAdminNumber]    = useState(settings.wa_order_admin_number     ?? "");
   const [lang,           setLang]           = useState(settings.wa_order_lang             ?? "fr");
+
+  // Notifications ventes boutique physique
+  const [venteEnabled,          setVenteEnabled]          = useState(settings.wa_boutique_vente_enabled          === "1");
+  const [venteTemplateFull,     setVenteTemplateFull]     = useState(settings.wa_boutique_vente_template_full    ?? "");
+  const [venteTemplateAcompte,  setVenteTemplateAcompte]  = useState(settings.wa_boutique_vente_template_acompte ?? "");
 
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState("");
@@ -44,6 +49,9 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
         wa_order_admin_template:  adminTemplate,
         wa_order_admin_number:    adminNumber,
         wa_order_lang:            lang,
+        wa_boutique_vente_enabled:          venteEnabled ? "1" : "0",
+        wa_boutique_vente_template_full:    venteTemplateFull,
+        wa_boutique_vente_template_acompte: venteTemplateAcompte,
       }),
     });
     setLoading(false);
@@ -202,6 +210,58 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
                   <p><span className="text-emerald-600">{"{{4}}"}</span> → Liste des articles</p>
                   <p><span className="text-emerald-600">{"{{5}}"}</span> → Total</p>
                   <p><span className="text-emerald-600">{"{{6}}"}</span> → Lien vers la commande (admin)</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Notifications ventes boutique physique */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
+        <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">
+          Notifications ventes boutique physique
+        </h2>
+        <div className="rounded-2xl border border-slate-100 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">Activer les notifications vente</p>
+              <p className="text-xs text-slate-400 mt-0.5">Envoie un message WhatsApp au client à chaque vente enregistrée en boutique</p>
+            </div>
+            <button onClick={() => setVenteEnabled(v => !v)}
+              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${venteEnabled ? "bg-emerald-500" : "bg-slate-200"}`}>
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${venteEnabled ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+
+          {venteEnabled && (
+            <div className="space-y-4 pt-1">
+              {/* Template paiement total */}
+              <div>
+                <label className={labelCls}>Template — Paiement total (nom Meta approuvé)</label>
+                <input type="text" value={venteTemplateFull} onChange={e => setVenteTemplateFull(e.target.value)}
+                  placeholder="ex : boutique_vente_merci" className={inputCls} />
+                <div className="mt-2 bg-slate-50 rounded-xl p-3 text-xs text-slate-500 space-y-1 font-mono">
+                  <p className="font-sans font-semibold text-slate-600 mb-1.5">Variables :</p>
+                  <p><span className="text-emerald-600">{"{{1}}"}</span> → Nom du client</p>
+                  <p><span className="text-emerald-600">{"{{2}}"}</span> → Référence facture</p>
+                  <p><span className="text-emerald-600">{"{{3}}"}</span> → Montant total</p>
+                  <p><span className="text-emerald-600">{"{{4}}"}</span> → URL du site</p>
+                </div>
+              </div>
+
+              {/* Template acompte */}
+              <div>
+                <label className={labelCls}>Template — Acompte (nom Meta approuvé)</label>
+                <input type="text" value={venteTemplateAcompte} onChange={e => setVenteTemplateAcompte(e.target.value)}
+                  placeholder="ex : boutique_vente_acompte" className={inputCls} />
+                <div className="mt-2 bg-slate-50 rounded-xl p-3 text-xs text-slate-500 space-y-1 font-mono">
+                  <p className="font-sans font-semibold text-slate-600 mb-1.5">Variables :</p>
+                  <p><span className="text-emerald-600">{"{{1}}"}</span> → Nom du client</p>
+                  <p><span className="text-emerald-600">{"{{2}}"}</span> → Référence facture</p>
+                  <p><span className="text-emerald-600">{"{{3}}"}</span> → Acompte versé</p>
+                  <p><span className="text-emerald-600">{"{{4}}"}</span> → Reste à payer</p>
+                  <p><span className="text-emerald-600">{"{{5}}"}</span> → URL du site</p>
                 </div>
               </div>
             </div>
