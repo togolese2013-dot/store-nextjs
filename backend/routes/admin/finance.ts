@@ -5,6 +5,7 @@ import {
   listFinanceEntries, getFinanceStats, createFinanceEntry,
   updateFinanceEntry, deleteFinanceEntry,
 } from "@/lib/admin-db";
+import db from "@/lib/db";
 
 const router = express.Router();
 
@@ -73,7 +74,6 @@ router.delete("/api/admin/finance", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const db = (await import("@/lib/db")).default;
     await db.execute("TRUNCATE TABLE finance_entries");
     emitAdminEvent("finance");
     res.json({ ok: true });
