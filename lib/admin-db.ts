@@ -1906,7 +1906,7 @@ export async function createVenteWithStock(data: {
   note?:              string;
   admin_id?:          number;
   items: Array<{ produit_id: number; nom: string; reference: string; qty: number; prix: number; total: number }>;
-}): Promise<number> {
+}): Promise<{ id: number; reference: string }> {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -2026,7 +2026,7 @@ export async function createVenteWithStock(data: {
     }
 
     invalidateVentesStats();
-    return factureId;
+    return { id: factureId, reference };
   } catch (err) {
     await conn.rollback();
     throw err;

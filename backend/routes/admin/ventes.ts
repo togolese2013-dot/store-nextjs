@@ -52,25 +52,22 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const id = await createVenteWithStock({ ...body, admin_id: session.id });
+    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id });
     emitAdminEvent("vente");
     if (body.client_tel) {
-      getFactureById(id).then(facture => {
-        if (!facture) return;
-        const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];
-        sendBoutiqueVenteNotif({
-          telephone:       body.client_tel,
-          nom:             body.client_nom,
-          reference:       facture.reference,
-          total:           Number(body.total ?? 0),
-          montant_acompte: body.montant_acompte ? Number(body.montant_acompte) : null,
-          statut_paiement: body.statut_paiement ?? null,
-          items:           rawItems.map((i: { nom?: string; qty?: number; total?: number }) => ({
-            nom:   i.nom ?? "Produit",
-            qty:   i.qty ?? 1,
-            total: i.total ?? 0,
-          })),
-        });
+      const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];
+      sendBoutiqueVenteNotif({
+        telephone:       body.client_tel,
+        nom:             body.client_nom,
+        reference,
+        total:           Number(body.total ?? 0),
+        montant_acompte: body.montant_acompte ? Number(body.montant_acompte) : null,
+        statut_paiement: body.statut_paiement ?? null,
+        items:           rawItems.map((i: { nom?: string; qty?: number; total?: number }) => ({
+          nom:   i.nom ?? "Produit",
+          qty:   i.qty ?? 1,
+          total: i.total ?? 0,
+        })),
       }).catch(console.error);
     }
     res.json({ ok: true, id });
