@@ -298,6 +298,11 @@ export default function WhatsAppButton() {
 
     const script = document.createElement("script");
     script.src = "/static/widget.js";
+    // After script loads, remove the Railway CSS link it injects
+    // so only our custom theme applies
+    script.onload = () => {
+      document.querySelectorAll('link[href*="widget.css"]').forEach(el => el.remove());
+    };
     document.body.appendChild(script);
 
     return () => {
