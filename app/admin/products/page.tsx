@@ -12,6 +12,7 @@ import {
   Activity,
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
+import ExportProductsButton from "@/components/admin/ExportProductsButton";
 
 export const metadata = { title: "Tous les produits" };
 
@@ -153,7 +154,15 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         accent="brand"
         extra={
           view === "stock" ? (
-            <AddProductModal categories={categories} marques={marques} />
+            <div className="flex items-center gap-2">
+              <ExportProductsButton
+                q={q}
+                catId={catId}
+                brandId={brandId}
+                statut={statut !== "all" ? statut : undefined}
+              />
+              <AddProductModal categories={categories} marques={marques} />
+            </div>
           ) : (
             <MouvementModal />
           )

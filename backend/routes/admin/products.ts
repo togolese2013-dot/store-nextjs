@@ -126,6 +126,63 @@ router.post("/api/admin/products", async (req, res) => {
   }
 });
 
+// ── Export CSV ────────────────────────────────────────────────────────────────
+router.get("/api/admin/products/export", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+
+  try {
+    const q       = (req.query.q as string) || undefined;
+    const catId   = req.query.category ? Number(req.query.category) : undefined;
+    const brandId = req.query.brand    ? Number(req.query.brand)    : undefined;
+    const statut  = (req.query.statut  as string) || undefined;
+    const statutFilter = ["disponible","faible","epuise"].includes(statut ?? "")
+      ? statut as "disponible" | "faible" | "epuise"
+      : undefined;
+
+    const products = await getProducts({
+      search: q, categoryId: catId, marqueId: brandId,
+      statut: statutFilter, includeInactive: true,
+      limit: 5000, offset: 0,
+    });
+
+    // Build CSV
+    const escape = (v: unknown) => {
+      const s = v == null ? "" : String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const headers = [
+      "Référence","Nom","Catégorie","Marque","Prix","Prix promo",
+      "Stock magasin","Stock boutique","Stock minimum",
+      "Statut","Actif","Créé le",
+    ];
+    const rows = products.map((p: mysql.RowDataPacket) => {
+      const prix     = Number(p.prix_unitaire ?? 0);
+      const remise   = Number(p.remise ?? 0);
+      const promo    = remise > 0 ? Math.round(prix * (1 - remise / 100)) : "";
+      const stMag    = Number(p.stock_magasin ?? 0);
+      const stBout   = Number(p.stock_boutique ?? p.stock ?? 0);
+      const stMin    = Number(p.stock_minimum ?? 0);
+      const statut   = stMag === 0 ? "Épuisé" : stMag <= stMin ? "Stock faible" : "Disponible";
+      const actif    = p.actif ? "Oui" : "Non";
+      const date     = p.created_at ? String(p.created_at).slice(0, 10) : "";
+      return [
+        p.reference, p.nom, p.categorie_nom ?? "", p.marque_nom ?? p.marque ?? "",
+        prix, promo, stMag, stBout, stMin, statut, actif, date,
+      ].map(escape).join(",");
+    });
+
+    const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
+    const filename = `produits_${new Date().toISOString().slice(0,10)}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("﻿" + csv); // BOM for Excel UTF-8
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 router.get("/api/admin/products/search", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
