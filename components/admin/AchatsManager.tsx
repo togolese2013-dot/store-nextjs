@@ -231,7 +231,6 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
 
   async function openEdit(achat: Achat) {
     setEditAchat(achat);
-    setEditItems([]);
     setLoadingEdit(true);
     setForm({
       fournisseur_id: achat.fournisseur_id ? String(achat.fournisseur_id) : "",
