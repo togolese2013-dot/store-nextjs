@@ -5,12 +5,19 @@ import { useRouter } from "next/navigation";
 import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, User, Phone, MapPin, MessageSquare, Link2 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
+interface ClientSuggestion {
+  id: number;
+  nom: string;
+  telephone: string | null;
+  adresse: string | null;
+}
+
 interface Product {
   id: number;
   nom: string;
   reference: string;
-  prix: number;
-  stock: number;
+  prix_unitaire: number;
+  stock_magasin: number;
 }
 
 interface OrderItem {
@@ -34,6 +41,30 @@ interface Props {
 
 export default function CreateOrderForm({ zones }: Props) {
   const router = useRouter();
+
+  // Client autocomplete
+  const [clientSuggestions, setClientSuggestions] = useState<ClientSuggestion[]>([]);
+  const clientDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleNomChange = useCallback((value: string) => {
+    setNom(value);
+    if (clientDebounceRef.current) clearTimeout(clientDebounceRef.current);
+    if (value.trim().length < 2) { setClientSuggestions([]); return; }
+    clientDebounceRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/admin/clients?q=${encodeURIComponent(value)}&limit=5`);
+        const j = await r.json();
+        setClientSuggestions(j.data ?? []);
+      } catch { setClientSuggestions([]); }
+    }, 250);
+  }, []);
+
+  function selectClient(c: ClientSuggestion) {
+    setNom(c.nom);
+    if (c.telephone) setTelephone(c.telephone);
+    if (c.adresse)   setAdresse(c.adresse);
+    setClientSuggestions([]);
+  }
 
   // Product search
   const [query, setQuery]         = useState("");
@@ -70,7 +101,7 @@ export default function CreateOrderForm({ zones }: Props) {
       try {
         const r = await fetch(`/api/admin/products/search?q=${encodeURIComponent(q)}`);
         const j = await r.json();
-        setResults(j.data ?? []);
+        setResults(j.products ?? []);
       } finally {
         setSearching(false);
       }
@@ -85,7 +116,7 @@ export default function CreateOrderForm({ zones }: Props) {
         next[idx] = { ...next[idx], qty: next[idx].qty + 1, total: (next[idx].qty + 1) * next[idx].prix_unitaire };
         return next;
       }
-      return [...prev, { product_id: p.id, nom: p.nom, reference: p.reference, qty: 1, prix_unitaire: p.prix, total: p.prix }];
+      return [...prev, { product_id: p.id, nom: p.nom, reference: p.reference, qty: 1, prix_unitaire: p.prix_unitaire, total: p.prix_unitaire }];
     });
     setQuery("");
     setResults([]);
@@ -168,9 +199,9 @@ export default function CreateOrderForm({ zones }: Props) {
                   >
                     <div>
                       <p className="font-semibold text-sm text-slate-800">{p.nom}</p>
-                      <p className="text-xs text-slate-400">{p.reference} · stock: {p.stock}</p>
+                      <p className="text-xs text-slate-400">{p.reference} · stock: {p.stock_magasin}</p>
                     </div>
-                    <span className="font-display font-700 text-brand-600 text-sm">{formatPrice(p.prix)}</span>
+                    <span className="font-display font-700 text-brand-600 text-sm">{formatPrice(p.prix_unitaire)}</span>
                   </button>
                 ))}
               </div>
@@ -237,10 +268,22 @@ export default function CreateOrderForm({ zones }: Props) {
           <h2 className="font-bold text-slate-700 flex items-center gap-2">
             <User className="w-4 h-4" /> Client
           </h2>
-          <div>
+          <div className="relative">
             <label className="block text-xs font-semibold text-slate-500 mb-1">Nom</label>
-            <input value={nom} onChange={e => setNom(e.target.value)} type="text" placeholder="Nom du client"
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400" />
+            <input value={nom} onChange={e => handleNomChange(e.target.value)} type="text" placeholder="Nom du client"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400"
+              autoComplete="off" />
+            {clientSuggestions.length > 0 && (
+              <div className="absolute z-30 w-full mt-1 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
+                {clientSuggestions.map(c => (
+                  <button key={c.id} type="button" onClick={() => selectClient(c)}
+                    className="w-full flex flex-col px-4 py-2.5 hover:bg-brand-50 text-left transition-colors">
+                    <span className="font-semibold text-sm text-slate-800">{c.nom}</span>
+                    <span className="text-xs text-slate-400">{c.telephone ?? "—"}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Téléphone *</label>
