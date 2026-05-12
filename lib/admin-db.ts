@@ -2008,8 +2008,8 @@ export async function createVenteWithStock(data: {
       }
     }
 
-    // Auto-create finance entry for paid/partial sales
-    if (data.statut_paiement && data.statut_paiement !== "non_paye") {
+    // Auto-create finance entry for paid/partial sales (skip if delivery pending — entry created on delivery confirmation)
+    if (!data.avec_livraison && data.statut_paiement && data.statut_paiement !== "non_paye") {
       const montantFinance = data.statut_paiement === "acompte"
         ? (data.montant_acompte ?? 0)
         : data.total;
@@ -2088,7 +2088,10 @@ export async function updateFacture(id: number, data: {
 export async function deleteFacture(id: number) {
   const [[row]] = await db.execute<mysql.RowDataPacket[]>("SELECT reference FROM factures WHERE id = ?", [id]);
   const ref = (row as mysql.RowDataPacket)?.reference as string | undefined;
-  await db.execute("DELETE FROM factures WHERE id = ?", [id]);
+  await Promise.all([
+    db.execute("DELETE FROM factures WHERE id = ?", [id]),
+    db.execute("DELETE FROM livraisons_ventes WHERE facture_id = ?", [id]).catch(() => {}),
+  ]);
   if (ref) {
     await db.execute(
       "DELETE FROM finance_entries WHERE type = 'vente' AND description LIKE ?",
@@ -2597,7 +2600,9 @@ export async function getVentesStats(): Promise<{
                 END
               ), 0) AS montant
        FROM factures f
-       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')`),
+       LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
+       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
+         AND (lv.id IS NULL OR lv.statut = 'livre')`),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
@@ -3080,6 +3085,34 @@ export async function updateLivraisonAdmin(id: number, data: {
   if (fields.length === 0) return;
   values.push(id);
   await db.execute(`UPDATE livraisons_ventes SET ${fields.join(", ")} WHERE id = ?`, values);
+
+  // When delivery is confirmed, create the finance entry for the linked facture
+  if (data.statut === "livre") {
+    const [[liv]] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT lv.facture_id, f.reference, f.client_nom, f.total, f.sous_total,
+              f.statut_paiement, f.montant_acompte, f.mode_paiement, f.source
+       FROM livraisons_ventes lv
+       LEFT JOIN factures f ON f.id = lv.facture_id
+       WHERE lv.id = ? LIMIT 1`, [id]
+    );
+    const f = liv as mysql.RowDataPacket | undefined;
+    if (f?.reference && f.statut_paiement && f.statut_paiement !== "non_paye") {
+      const montant = f.statut_paiement === "acompte"
+        ? Number(f.montant_acompte ?? 0)
+        : Number(f.source === "site_order" ? f.sous_total : f.total);
+      if (montant > 0) {
+        await createFinanceEntry({
+          type:          "vente",
+          mode_paiement: f.mode_paiement ?? "especes",
+          categorie:     "Vente boutique",
+          description:   `Vente ${f.reference} – ${f.client_nom}`,
+          montant,
+          date_entree:   new Date().toISOString().slice(0, 10),
+        }).catch(() => {});
+      }
+    }
+    invalidateVentesStats();
+  }
 }
 
 // Called by driver: accept a delivery (atomic — only if still en_attente)
