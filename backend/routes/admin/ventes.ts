@@ -1,7 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
-import { sendBoutiqueVenteNotif } from "../lib/whatsapp";
+import { sendBoutiqueVenteNotif } from "../../lib/whatsapp";
 import {
   listFactures, createVenteWithStock, getVentesStats,
   updateFactureStatut, updateFacture, deleteFacture, getFactureById,
