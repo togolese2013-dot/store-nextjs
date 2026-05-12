@@ -262,15 +262,17 @@ export default async function HomePage() {
       <HeroSection />
       <TrustBar />
 
-      <Section
-        title="Meilleures ventes"
-        subtitle="Populaires"
-        icon={TrendingUp}
-        viewAll={{ label: "Voir tout", href: "/products?best=true" }}
-        bg="bg-white"
-      >
-        <ProductGrid products={bestsellers} />
-      </Section>
+      {bestsellers.length > 0 && (
+        <Section
+          title="Meilleures ventes"
+          subtitle="Populaires"
+          icon={TrendingUp}
+          viewAll={{ label: "Voir tout", href: "/products?best=true" }}
+          bg="bg-white"
+        >
+          <ProductGrid products={bestsellers} />
+        </Section>
+      )}
 
       <PromoBanner />
 

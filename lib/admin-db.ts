@@ -746,6 +746,12 @@ export async function deleteOrder(id: number) {
       [`%${order.reference}%`]
     ).catch(() => {});
   }
+  // Delete the auto-created facture linked to this order
+  if (order?.vente_facture_id) {
+    await db.execute("DELETE FROM factures WHERE id = ?", [order.vente_facture_id]).catch(() => {});
+  } else {
+    await db.execute("DELETE FROM factures WHERE order_id = ?", [id]).catch(() => {});
+  }
 }
 
 export async function getOrderById(id: number): Promise<Order | null> {
