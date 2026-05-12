@@ -212,7 +212,7 @@ export async function sendWaAudio({
 
 /* ── Boutique vente notification ─────────────────────────────────────────── */
 export async function sendBoutiqueVenteNotif({
-  telephone, nom, reference, total, montant_acompte, statut_paiement,
+  telephone, nom, reference, total, montant_acompte, statut_paiement, items,
 }: {
   telephone:        string;
   nom:              string;
@@ -220,6 +220,7 @@ export async function sendBoutiqueVenteNotif({
   total:            number;
   montant_acompte:  number | null;
   statut_paiement:  string | null;
+  items:            Array<{ nom: string; qty: number; total: number }>;
 }): Promise<void> {
   try {
     const [enabled, templateFull, templateAcompte, lang, siteUrl] = await Promise.all([
@@ -235,22 +236,23 @@ export async function sendBoutiqueVenteNotif({
     const languageCode = lang || "fr";
     const baseUrl      = (siteUrl || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://store.togolese.fr").replace(/\/$/, "");
     const fmt          = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+    const articlesList = items.map(i => `${i.qty}x ${i.nom} - ${fmt(i.total)}`).join("\n");
 
     if (statut_paiement === "acompte" && templateAcompte) {
-      const acompte      = montant_acompte ?? 0;
-      const resteAPayer  = total - acompte;
+      const acompte     = montant_acompte ?? 0;
+      const resteAPayer = total - acompte;
       await sendWaTemplate({
         to:           telephone,
         templateName: templateAcompte,
         languageCode,
-        bodyParams:   [nom, reference, fmt(acompte), fmt(resteAPayer), baseUrl],
+        bodyParams:   [nom, reference, articlesList, fmt(acompte), fmt(resteAPayer), baseUrl],
       });
     } else if (templateFull) {
       await sendWaTemplate({
         to:           telephone,
         templateName: templateFull,
         languageCode,
-        bodyParams:   [nom, reference, fmt(total), baseUrl],
+        bodyParams:   [nom, reference, articlesList, fmt(total), baseUrl],
       });
     }
   } catch (e) {

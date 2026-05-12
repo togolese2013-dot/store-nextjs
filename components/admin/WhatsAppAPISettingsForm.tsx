@@ -245,8 +245,9 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
                   <p className="font-sans font-semibold text-slate-600 mb-1.5">Variables :</p>
                   <p><span className="text-emerald-600">{"{{1}}"}</span> → Nom du client</p>
                   <p><span className="text-emerald-600">{"{{2}}"}</span> → Référence facture</p>
-                  <p><span className="text-emerald-600">{"{{3}}"}</span> → Montant total</p>
-                  <p><span className="text-emerald-600">{"{{4}}"}</span> → URL du site</p>
+                  <p><span className="text-emerald-600">{"{{3}}"}</span> → Liste des articles (un par ligne)</p>
+                  <p><span className="text-emerald-600">{"{{4}}"}</span> → Montant total</p>
+                  <p><span className="text-emerald-600">{"{{5}}"}</span> → URL du site</p>
                 </div>
               </div>
 
@@ -259,9 +260,10 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
                   <p className="font-sans font-semibold text-slate-600 mb-1.5">Variables :</p>
                   <p><span className="text-emerald-600">{"{{1}}"}</span> → Nom du client</p>
                   <p><span className="text-emerald-600">{"{{2}}"}</span> → Référence facture</p>
-                  <p><span className="text-emerald-600">{"{{3}}"}</span> → Acompte versé</p>
-                  <p><span className="text-emerald-600">{"{{4}}"}</span> → Reste à payer</p>
-                  <p><span className="text-emerald-600">{"{{5}}"}</span> → URL du site</p>
+                  <p><span className="text-emerald-600">{"{{3}}"}</span> → Liste des articles (un par ligne)</p>
+                  <p><span className="text-emerald-600">{"{{4}}"}</span> → Acompte versé</p>
+                  <p><span className="text-emerald-600">{"{{5}}"}</span> → Reste à payer</p>
+                  <p><span className="text-emerald-600">{"{{6}}"}</span> → URL du site</p>
                 </div>
               </div>
             </div>

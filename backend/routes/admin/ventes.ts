@@ -57,6 +57,7 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
     if (body.client_tel) {
       getFactureById(id).then(facture => {
         if (!facture) return;
+        const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];
         sendBoutiqueVenteNotif({
           telephone:       body.client_tel,
           nom:             body.client_nom,
@@ -64,6 +65,11 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
           total:           Number(body.total ?? 0),
           montant_acompte: body.montant_acompte ? Number(body.montant_acompte) : null,
           statut_paiement: body.statut_paiement ?? null,
+          items:           rawItems.map((i: { nom?: string; qty?: number; total?: number }) => ({
+            nom:   i.nom ?? "Produit",
+            qty:   i.qty ?? 1,
+            total: i.total ?? 0,
+          })),
         });
       }).catch(console.error);
     }
