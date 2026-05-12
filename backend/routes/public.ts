@@ -6,6 +6,18 @@ import {
 
 const router = express.Router();
 
+// ── Seeded shuffle — deterministic random order that changes every hour ───────
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const result = [...arr];
+  let s = seed | 0;
+  for (let i = result.length - 1; i > 0; i--) {
+    s = Math.imul(s, 1664525) + 1013904223 | 0;
+    const j = Math.abs(s) % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 // ── Bestsellers cache — 10 min TTL ───────────────────────────────────────────
 async function loadBestsellerProducts(limit: number) {
 
@@ -145,7 +157,14 @@ router.get("/api/products", async (req, res) => {
         ? Promise.resolve(1)
         : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice }),
     ]);
-    res.json({ success: true, data: products, total });
+
+    // Shuffle when no active filter — order changes every hour
+    const isFiltered = search || categoryId || promoOnly || newOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
+    const data = isFiltered
+      ? products
+      : seededShuffle(products, Math.floor(Date.now() / (1000 * 60 * 60)));
+
+    res.json({ success: true, data, total });
   } catch (err) {
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }
