@@ -759,7 +759,7 @@ export async function getOrderById(id: number): Promise<Order | null> {
     `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
             note, items, subtotal, total, status, statut_paiement, payment_mode,
             livreur_id, livraison_statut, stock_boutique_deducted, finance_entry_id,
-            vente_facture_id, source, order_id, created_at, updated_at
+            vente_facture_id, created_at, updated_at
      FROM orders WHERE id = ? LIMIT 1`,
     [id]
   );
