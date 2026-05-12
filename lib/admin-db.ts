@@ -2092,12 +2092,41 @@ export async function updateFacture(id: number, data: {
 }
 
 export async function deleteFacture(id: number) {
-  const [[row]] = await db.execute<mysql.RowDataPacket[]>("SELECT reference FROM factures WHERE id = ?", [id]);
-  const ref = (row as mysql.RowDataPacket)?.reference as string | undefined;
+  const [[row]] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT reference, items FROM factures WHERE id = ?", [id]
+  );
+  const ref   = (row as mysql.RowDataPacket)?.reference as string | undefined;
+  const items = (() => {
+    try {
+      const raw = (row as mysql.RowDataPacket)?.items;
+      return Array.isArray(raw) ? raw : JSON.parse(raw ?? "[]");
+    } catch { return []; }
+  })() as Array<{ produit_id?: number; qty?: number; nom?: string }>;
+
   await Promise.all([
     db.execute("DELETE FROM factures WHERE id = ?", [id]),
     db.execute("DELETE FROM livraisons_ventes WHERE facture_id = ?", [id]).catch(() => {}),
   ]);
+
+  // Restore boutique stock for each item
+  for (const item of items) {
+    if (!item.produit_id || !item.qty) continue;
+    await db.execute(
+      "UPDATE boutique_stock SET quantite = quantite + ?, updated_at = NOW() WHERE produit_id = ?",
+      [item.qty, item.produit_id]
+    ).catch(() => {});
+    await db.execute(
+      `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande)
+       VALUES (?, 'entree', ?, 'Annulation vente', ?)`,
+      [item.produit_id, item.qty, ref ?? null]
+    ).catch(() => {});
+    await db.execute(
+      `UPDATE produits p JOIN boutique_stock bs ON bs.produit_id = p.id
+       SET p.stock_boutique = bs.quantite WHERE p.id = ?`,
+      [item.produit_id]
+    ).catch(() => {});
+  }
+
   if (ref) {
     await db.execute(
       "DELETE FROM finance_entries WHERE type = 'vente' AND description LIKE ?",
