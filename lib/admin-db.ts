@@ -739,10 +739,10 @@ export async function deleteOrder(id: number) {
   if (order?.finance_entry_id) {
     await db.execute("DELETE FROM finance_entries WHERE id = ?", [order.finance_entry_id]).catch(() => {});
   }
-  // Clean up vente-type finance entry linked to the boutique facture
+  // Clean up all finance entries linked to this order reference
   if (order?.reference) {
     await db.execute(
-      "DELETE FROM finance_entries WHERE type = 'vente' AND description LIKE ?",
+      "DELETE FROM finance_entries WHERE description LIKE ?",
       [`%${order.reference}%`]
     ).catch(() => {});
   }
@@ -2129,7 +2129,7 @@ export async function deleteFacture(id: number) {
 
   if (ref) {
     await db.execute(
-      "DELETE FROM finance_entries WHERE type = 'vente' AND description LIKE ?",
+      "DELETE FROM finance_entries WHERE description LIKE ?",
       [`%${ref}%`]
     ).catch(() => {});
   }
@@ -3124,14 +3124,15 @@ export async function updateLivraisonAdmin(id: number, data: {
   // When delivery is confirmed, create the finance entry for the linked facture
   if (data.statut === "livre") {
     const [[liv]] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT lv.facture_id, f.reference, f.client_nom, f.total, f.sous_total,
+      `SELECT lv.facture_id, lv.order_id, f.reference, f.client_nom, f.total, f.sous_total,
               f.statut_paiement, f.montant_acompte, f.mode_paiement, f.source
        FROM livraisons_ventes lv
        LEFT JOIN factures f ON f.id = lv.facture_id
        WHERE lv.id = ? LIMIT 1`, [id]
     );
     const f = liv as mysql.RowDataPacket | undefined;
-    if (f?.reference && f.statut_paiement && f.statut_paiement !== "non_paye") {
+    // Site order livraisons (order_id set): finance entry handled by ensureOrderVente on delivery
+    if (!f?.order_id && f?.reference && f.statut_paiement && f.statut_paiement !== "non_paye") {
       const montant = f.statut_paiement === "acompte"
         ? Number(f.montant_acompte ?? 0)
         : Number(f.source === "site_order" ? f.sous_total : f.total);

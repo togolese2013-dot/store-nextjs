@@ -504,10 +504,15 @@ export default function VentesManager({
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Solde aujourd&apos;hui</p>
             <Banknote className="w-8 h-8 text-emerald-400 opacity-40" />
           </div>
-          <p className={`text-2xl font-bold tabular-nums ${(stats.solde_jour ?? 0) >= 0 ? "text-slate-900" : "text-red-600"}`}>
-            {new Intl.NumberFormat("fr-FR").format(stats.solde_jour ?? 0)}{" "}
-            <span className="text-sm font-semibold text-emerald-500">FCFA</span>
-          </p>
+          {(() => {
+            const solde = (stats.ventes_jour_montant + (stats.commandes_livrees_jour ?? 0)) + stats.rentrees_jour - stats.depenses_jour;
+            return (
+              <p className={`text-2xl font-bold tabular-nums ${solde >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                {new Intl.NumberFormat("fr-FR").format(solde)}{" "}
+                <span className="text-sm font-semibold text-emerald-500">FCFA</span>
+              </p>
+            );
+          })()}
         </div>
 
         {/* Ventes aujourd'hui */}
