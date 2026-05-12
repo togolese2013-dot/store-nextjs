@@ -2065,6 +2065,22 @@ export async function updateFacture(id: number, data: {
       mode_paiement: data.mode_paiement ?? null,
       admin_id:      data.admin_id ?? null,
     }).catch(() => {});
+    // Record in finance_entries so solde_jour reflects the payment
+    try {
+      const [[f]] = await db.execute<mysql.RowDataPacket[]>(
+        "SELECT reference, client_nom FROM factures WHERE id = ? LIMIT 1", [id]
+      );
+      if (f) {
+        await createFinanceEntry({
+          type:          "vente",
+          mode_paiement: data.mode_paiement ?? "especes",
+          categorie:     "Vente boutique",
+          description:   `Paiement ${f.reference} – ${f.client_nom}`,
+          montant:       data.montant_paiement,
+          date_entree:   new Date().toISOString().slice(0, 10),
+        });
+      }
+    } catch { /* non-bloquant */ }
   }
   invalidateVentesStats();
 }
