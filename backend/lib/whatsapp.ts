@@ -233,7 +233,7 @@ export async function sendBoutiqueVenteNotif({
     if (enabled !== "1" || !telephone) return;
 
     const languageCode = lang || "fr";
-    const baseUrl      = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
+    const baseUrl      = (siteUrl || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://store.togolese.fr").replace(/\/$/, "");
     const fmt          = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
 
     if (statut_paiement === "acompte" && templateAcompte) {
