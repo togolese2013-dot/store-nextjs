@@ -540,10 +540,12 @@ export async function setUtilisateurPermissions(utilisateurId: number, permissio
   try {
     await conn.beginTransaction();
     await conn.execute("DELETE FROM utilisateur_permissions WHERE utilisateur_id = ?", [utilisateurId]);
-    for (const pid of permissionIds) {
+    if (permissionIds.length > 0) {
+      const placeholders = permissionIds.map(() => "(?,?)").join(",");
+      const values = permissionIds.flatMap(pid => [utilisateurId, pid]);
       await conn.execute(
-        "INSERT IGNORE INTO utilisateur_permissions (utilisateur_id, permission_id) VALUES (?,?)",
-        [utilisateurId, pid]
+        `INSERT IGNORE INTO utilisateur_permissions (utilisateur_id, permission_id) VALUES ${placeholders}`,
+        values
       );
     }
     await conn.commit();
@@ -593,13 +595,14 @@ export async function setSetting(key: string, value: string) {
 }
 
 export async function setSettings(entries: Record<string, string>) {
-  if (!Object.keys(entries).length) return;
-  for (const [k, v] of Object.entries(entries)) {
-    await db.execute(
-      "INSERT INTO settings (`key`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-      [k, v]
-    );
-  }
+  const pairs = Object.entries(entries);
+  if (!pairs.length) return;
+  const placeholders = pairs.map(() => "(?,?)").join(",");
+  const values = pairs.flatMap(([k, v]) => [k, v]);
+  await db.execute(
+    `INSERT INTO settings (\`key\`, \`value\`) VALUES ${placeholders} ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
+    values
+  );
   invalidateSettingsCache();
 }
 
@@ -747,7 +750,12 @@ export async function deleteOrder(id: number) {
 
 export async function getOrderById(id: number): Promise<Order | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT * FROM orders WHERE id = ? LIMIT 1", [id]
+    `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
+            note, items, subtotal, total, status, statut_paiement, payment_mode,
+            livreur_id, livraison_statut, stock_boutique_deducted, finance_entry_id,
+            vente_facture_id, source, order_id, created_at, updated_at
+     FROM orders WHERE id = ? LIMIT 1`,
+    [id]
   );
   return (rows[0] as Order) ?? null;
 }
@@ -906,7 +914,9 @@ export async function applyOrderDeliveredEffects(orderId: number, actor?: string
   try {
     await conn.beginTransaction();
     const [rows] = await conn.execute<mysql.RowDataPacket[]>(
-      "SELECT * FROM orders WHERE id = ? FOR UPDATE", [orderId]
+      `SELECT id, reference, items, stock_boutique_deducted
+       FROM orders WHERE id = ? FOR UPDATE`,
+      [orderId]
     );
     const order = rows[0];
     if (!order || Number(order.stock_boutique_deducted ?? 0) === 1) {
@@ -971,7 +981,9 @@ export async function applyOrderDeliveredEffects(orderId: number, actor?: string
 export async function applyOrderPaidEffects(orderId: number, actor?: string): Promise<void> {
   await ensureOrderLifecycleCols();
   const [[order]] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT * FROM orders WHERE id = ? LIMIT 1", [orderId]
+    `SELECT id, reference, nom, telephone, total, payment_mode, finance_entry_id
+     FROM orders WHERE id = ? LIMIT 1`,
+    [orderId]
   );
   if (!order || order.finance_entry_id) return;
 
@@ -1240,7 +1252,7 @@ export interface Coupon {
 
 export async function listCoupons(): Promise<Coupon[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT * FROM coupons ORDER BY created_at DESC"
+    "SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif, created_at FROM coupons ORDER BY created_at DESC LIMIT 500"
   );
   return rows.map(r => ({ ...r, actif: Boolean(r.actif) })) as Coupon[];
 }
@@ -2653,7 +2665,7 @@ export interface Fournisseur {
 
 export async function listFournisseurs(): Promise<Fournisseur[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    "SELECT * FROM fournisseurs ORDER BY nom"
+    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs ORDER BY nom LIMIT 500"
   );
   return rows as Fournisseur[];
 }
@@ -2791,10 +2803,12 @@ export async function createAchat(data: {
       achatVals
     );
     const achatId = res.insertId;
-    for (const item of data.items) {
+    if (data.items.length > 0) {
+      const placeholders = data.items.map(() => "(?,?,?,?,?)").join(",");
+      const values = data.items.flatMap(i => [achatId, i.produit_id ?? null, i.designation, i.quantite, i.prix_unitaire]);
       await conn.execute(
-        `INSERT INTO achat_items (achat_id, produit_id, designation, quantite, prix_unitaire) VALUES (?,?,?,?,?)`,
-        [achatId, item.produit_id ?? null, item.designation, item.quantite, item.prix_unitaire]
+        `INSERT INTO achat_items (achat_id, produit_id, designation, quantite, prix_unitaire) VALUES ${placeholders}`,
+        values
       );
     }
     await conn.commit();
@@ -2847,10 +2861,12 @@ export async function updateAchat(id: number, data: {
       sets.push("montant_total = ?");
       vals.push(montant_total);
       await conn.execute("DELETE FROM achat_items WHERE achat_id = ?", [id]);
-      for (const item of data.items) {
+      if (data.items.length > 0) {
+        const placeholders = data.items.map(() => "(?,?,?,?,?)").join(",");
+        const values = data.items.flatMap(i => [id, i.produit_id ?? null, i.designation, i.quantite, i.prix_unitaire]);
         await conn.execute(
-          `INSERT INTO achat_items (achat_id, produit_id, designation, quantite, prix_unitaire) VALUES (?,?,?,?,?)`,
-          [id, item.produit_id ?? null, item.designation, item.quantite, item.prix_unitaire]
+          `INSERT INTO achat_items (achat_id, produit_id, designation, quantite, prix_unitaire) VALUES ${placeholders}`,
+          values
         );
       }
     }
@@ -2878,10 +2894,13 @@ export async function recevoirAchat(id: number) {
     const [items] = await conn.execute<mysql.RowDataPacket[]>(
       "SELECT produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL", [id]
     );
-    for (const item of items) {
+    if ((items as mysql.RowDataPacket[]).length > 0) {
+      const cases = (items as mysql.RowDataPacket[]).map(() => "WHEN id = ? THEN COALESCE(stock_magasin, 0) + ?").join(" ");
+      const ids   = (items as mysql.RowDataPacket[]).map(i => i.produit_id);
+      const vals  = (items as mysql.RowDataPacket[]).flatMap(i => [i.produit_id, i.quantite]);
       await conn.execute(
-        "UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?",
-        [item.quantite, item.produit_id]
+        `UPDATE produits SET stock_magasin = CASE ${cases} END WHERE id IN (${ids.map(() => "?").join(",")})`,
+        [...vals, ...ids]
       );
     }
     await conn.commit();
@@ -2916,7 +2935,7 @@ async function ensureLivreurCols(): Promise<void> {
 export async function listLivreurs(): Promise<Livreur[]> {
   await ensureLivreurCols();
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    "SELECT * FROM livreurs ORDER BY nom ASC"
+    "SELECT id, nom, telephone, numero_plaque, code_acces, statut, created_at FROM livreurs ORDER BY nom ASC LIMIT 200"
   );
   return rows as Livreur[];
 }

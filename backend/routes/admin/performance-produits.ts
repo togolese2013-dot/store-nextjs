@@ -51,11 +51,12 @@ router.get("/api/admin/performance-produits", async (req, res) => {
              total DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         LEFT JOIN products p ON p.reference = jt.ref
+         LEFT JOIN products p  ON p.reference  = jt.ref
+         LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
          WHERE f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND jt.nom IS NOT NULL
-           AND (f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))
+           AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)
          GROUP BY jt.nom, jt.ref, p.prix_unitaire, p.prix_achat
          ORDER BY ca DESC
          LIMIT ${top}`,
@@ -109,9 +110,10 @@ router.get("/api/admin/performance-produits", async (req, res) => {
              total DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
+         LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
          WHERE f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
-           AND (f.source IS NULL OR f.source != 'site_order' OR EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id AND o.status = 'delivered'))
+           AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)
          GROUP BY DATE(f.created_at)
          ORDER BY date`,
         [dateDebut, dateFin]
