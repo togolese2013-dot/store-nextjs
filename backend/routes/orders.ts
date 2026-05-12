@@ -92,8 +92,6 @@ router.post("/api/orders", async (req, res) => {
       );
     }
 
-    // Mobile money direct — statut reste 'pending', payment_mode indique la vérification nécessaire
-
     // Payment plan: put order in "plan_paiement" status and create tranches
     if (isEchelonne && tranches) {
       await pool.execute(
@@ -107,8 +105,42 @@ router.post("/api/orders", async (req, res) => {
       await addOrderEvent(id, "plan_paiement",
         `Paiement en ${tranches} fois — tranche 1 à régler pour confirmer`
       );
+    } else if (payment_mode === "moov_direct" || payment_mode === "yas_direct") {
+      // Mobile money — reste en attente de vérification manuelle
+      await addOrderEvent(id, "pending", "Commande passée en ligne — vérification paiement mobile money en attente");
     } else {
-      await addOrderEvent(id, "pending", "Commande passée en ligne");
+      // Paiement à la livraison — confirmation et livraison automatiques
+      await pool.execute("UPDATE orders SET status = 'confirmed' WHERE id = ?", [id]);
+      await addOrderEvent(id, "confirmed", "Confirmé automatiquement (paiement à la livraison)");
+      // Créer l'entrée livraison immédiatement
+      try {
+        const [[existingLiv]] = await pool.execute<mysql.RowDataPacket[]>(
+          "SELECT id FROM livraisons_ventes WHERE order_id = ? LIMIT 1", [id]
+        );
+        if (!existingLiv) {
+          const [[orderRow]] = await pool.execute<mysql.RowDataPacket[]>(
+            "SELECT reference FROM orders WHERE id = ? LIMIT 1", [id]
+          );
+          const livRef = `LV-${orderRow?.reference ?? id}`;
+          await pool.execute(
+            `INSERT IGNORE INTO livraisons_ventes
+               (reference, facture_id, client_nom, client_tel, adresse, contact_livraison,
+                lien_localisation, statut, note, order_id)
+             VALUES (?, NULL, ?, ?, ?, ?, ?, 'en_attente', NULL, ?)`,
+            [
+              livRef,
+              nom            ?? null,
+              cleanTelephone ?? null,
+              adresse        ?? null,
+              cleanTelephone ?? null,
+              lien_localisation ?? null,
+              id,
+            ]
+          );
+        }
+      } catch (e) {
+        console.error("[orders] auto livraison creation failed:", e);
+      }
     }
 
     await ensureOrderVente(id);

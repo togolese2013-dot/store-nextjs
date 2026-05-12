@@ -48,6 +48,8 @@ export default function CreateOrderForm({ zones }: Props) {
   const [lienLocalisation, setLienLocalisation] = useState("");
   const [note, setNote]                         = useState("");
   const [zoneId, setZoneId]                     = useState<number>(zones[0]?.id ?? 0);
+  const [zoneNomManuel, setZoneNomManuel]       = useState("");
+  const [zoneFeeManuel, setZoneFeeManuel]       = useState<number>(0);
 
   // Cart
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -85,8 +87,9 @@ export default function CreateOrderForm({ zones }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
 
-  const selectedZone = zones.find(z => z.id === Number(zoneId));
-  const deliveryFee  = selectedZone?.fee ?? 0;
+  const selectedZone  = zones.find(z => z.id === Number(zoneId));
+  const deliveryFee   = zones.length > 0 ? (selectedZone?.fee ?? 0) : zoneFeeManuel;
+  const zoneLivraison = zones.length > 0 ? (selectedZone?.nom ?? "") : zoneNomManuel;
   const subtotal     = items.reduce((s, i) => s + i.total, 0);
   const total        = subtotal + deliveryFee;
 
@@ -148,7 +151,7 @@ export default function CreateOrderForm({ zones }: Props) {
         body: JSON.stringify({
           nom, telephone, adresse,
           lien_localisation: lienLocalisation || undefined,
-          zone_livraison: selectedZone?.nom ?? "",
+          zone_livraison: zoneLivraison,
           delivery_fee: deliveryFee,
           note,
           items: items.map(({ product_id, nom, reference, qty, prix_unitaire, total }) => ({
@@ -294,12 +297,24 @@ export default function CreateOrderForm({ zones }: Props) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Zone de livraison</label>
-            <select value={zoneId} onChange={e => setZoneId(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400 bg-white">
-              {zones.map(z => (
-                <option key={z.id} value={z.id}>{z.nom} — {formatPrice(z.fee)}</option>
-              ))}
-            </select>
+            {zones.length > 0 ? (
+              <select value={zoneId} onChange={e => setZoneId(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400 bg-white">
+                {zones.map(z => (
+                  <option key={z.id} value={z.id}>{z.nom} — {formatPrice(z.fee)}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex gap-2">
+                <input value={zoneNomManuel} onChange={e => setZoneNomManuel(e.target.value)}
+                  type="text" placeholder="Ex: Lomé centre"
+                  className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400" />
+                <input value={zoneFeeManuel === 0 ? "" : zoneFeeManuel}
+                  onChange={e => setZoneFeeManuel(Number(e.target.value) || 0)}
+                  type="number" min="0" placeholder="Frais"
+                  className="w-24 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brand-400" />
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Adresse</label>

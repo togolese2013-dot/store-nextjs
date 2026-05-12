@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 export const metadata = { title: "Nouvelle commande" };
 
 export default async function NewOrderPage() {
-  const zones = await getDeliveryZones(true);
+  const zones = await getDeliveryZones(false);
 
   return (
     <div className="space-y-6">
