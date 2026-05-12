@@ -1859,11 +1859,10 @@ export async function getClientFacturesByNom(nom: string, tel?: string | null): 
 }
 
 function generateVenteRef(prefix: string): string {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const time = now.toTimeString().slice(0, 8).replace(/:/g, "");
-  const seq  = String(Math.floor(1 + Math.random() * 9999)).padStart(4, "0");
-  return `${prefix}-${date}_${time}-${seq}`;
+  const now  = new Date();
+  const date = now.toISOString().slice(2, 10).replace(/-/g, "");
+  const seq  = String(Math.floor(1000 + Math.random() * 9000));
+  return `${prefix}${date}${seq}`;
 }
 
 export async function createFacture(data: {
