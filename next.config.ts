@@ -37,13 +37,13 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    if (!BACKEND_URL) return [];
-    return [
-      {
-        source:      "/api/:path*",
-        destination: `${BACKEND_URL}/api/:path*`,
-      },
-    ];
+    const rules = [];
+    if (BACKEND_URL) {
+      rules.push({ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` });
+    }
+    // Proxy Séréna AI widget chat endpoint
+    rules.push({ source: "/chat", destination: "https://serena-togolese-production.up.railway.app/chat" });
+    return rules;
   },
 };
 
