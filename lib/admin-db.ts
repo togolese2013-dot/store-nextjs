@@ -2101,7 +2101,7 @@ export async function deleteFacture(id: number) {
   if (ref) {
     await db.execute(
       "DELETE FROM finance_entries WHERE type = 'vente' AND description LIKE ?",
-      [`Vente ${ref}%`]
+      [`%${ref}%`]
     ).catch(() => {});
   }
   invalidateVentesStats();
