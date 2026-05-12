@@ -13,25 +13,6 @@ interface AdminTopBarProps {
   onMobileMenuToggle?: () => void;
 }
 
-function LiveDate() {
-  const [date, setDate] = useState("");
-  useEffect(() => {
-    const update = () =>
-      setDate(new Date().toLocaleDateString("fr-FR", {
-        weekday: "short", day: "2-digit", month: "short", year: "numeric",
-      }));
-    update();
-    const id = setInterval(update, 60_000);
-    return () => clearInterval(id);
-  }, []);
-  if (!date) return null;
-  return (
-    <span className="hidden md:block text-xs text-slate-400 capitalize select-none tabular-nums">
-      {date}
-    </span>
-  );
-}
-
 export default function AdminTopBar({ nom, role, onMobileMenuToggle }: AdminTopBarProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -83,8 +64,6 @@ export default function AdminTopBar({ nom, role, onMobileMenuToggle }: AdminTopB
       <div className="flex-1" />
 
       <div className="flex items-center gap-1.5">
-
-        <LiveDate />
 
         {/* Voir le site */}
         <Link

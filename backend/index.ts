@@ -38,7 +38,7 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
-import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, migrateAdminLivreursToTeam, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes } from "@/lib/admin-db";
+import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes } from "@/lib/admin-db";
 import adminSecurityLogsRoutes from "./routes/admin/security-logs";
 import { ensureSecurityLogsTable } from "./lib/security-log";
 import adminRapportsRoutes  from "./routes/admin/rapports";
@@ -161,13 +161,7 @@ app.listen(PORT, async () => {
   } catch (e) {
     console.error("[backend] ensureOrderLivreurCols failed:", e);
   }
-  try {
-    await migrateAdminLivreursToTeam();
-    console.log("[backend] livreurs migration OK");
-  } catch (e) {
-    console.error("[backend] migrateAdminLivreursToTeam failed:", e);
-  }
-  try {
+try {
     await ensureCommerciauxTables();
     console.log("[backend] commerciaux tables OK");
   } catch (e) {
