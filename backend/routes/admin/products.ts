@@ -58,19 +58,8 @@ router.post("/api/admin/products", async (req, res) => {
     const { nom, description, description_longue, categorie_id, marque_id, prix_unitaire,
             stock_magasin, stock_boutique, stock_minimum, remise, neuf, actif, image_url, images } = body;
 
-    let reference = body.reference?.trim() || "";
-    if (!reference) {
-      const [refRows] = await (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>(
-        `SELECT reference FROM produits
-         WHERE reference REGEXP '^PROD-[0-9]+$'
-         ORDER BY CAST(SUBSTRING(reference, 6) AS UNSIGNED) DESC
-         LIMIT 1`
-      );
-      const lastNum = refRows.length > 0
-        ? parseInt((refRows[0].reference as string).replace("PROD-", ""), 10)
-        : 0;
-      reference = `PROD-${String(isNaN(lastNum) ? 1 : lastNum + 1).padStart(3, "0")}`;
-    }
+    const reference = body.reference?.trim() || "";
+    const autoRef = !reference;
 
     if (!nom || prix_unitaire == null) {
       return res.status(400).json({ error: "Champs obligatoires manquants." });
@@ -88,7 +77,7 @@ router.post("/api/admin/products", async (req, res) => {
 
     const columns: string[] = ["reference", "nom", "description", "categorie_id", "prix_unitaire"];
     const values: (string | number | boolean | null)[] = [
-      reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire),
+      autoRef ? "PROD-TMP" : reference, nom, description ?? null, categorie_id ?? null, Number(prix_unitaire),
     ];
     // Optional description_longue
     columns.push("description_longue"); values.push(description_longue?.trim() || null);
@@ -110,6 +99,13 @@ router.post("/api/admin/products", async (req, res) => {
       `INSERT INTO produits (${columns.join(", ")}) VALUES (${placeholders})`, values
     );
     const newId = result.insertId;
+
+    if (autoRef) {
+      await (db as import("mysql2/promise").Pool).execute(
+        "UPDATE produits SET reference = ? WHERE id = ?",
+        [`PROD-${newId}`, newId]
+      );
+    }
 
     if (stockMagasin > 0) {
       try {
