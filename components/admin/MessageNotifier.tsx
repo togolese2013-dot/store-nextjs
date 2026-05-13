@@ -104,7 +104,6 @@ export default function MessageNotifier() {
 
       const toastId = ++toastIdRef.current;
       setToasts(prev => [...prev, { id: toastId, from, nom, body }]);
-      setTimeout(() => removeToast(toastId), 8_000);
     });
   }, [subscribe, removeToast]);
 
