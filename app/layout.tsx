@@ -6,8 +6,8 @@ import "./globals.css";
 
 const FALLBACK_NAME    = "Togolese Shop";
 const FALLBACK_TAGLINE = "Boutique Premium au Togo";
-const FALLBACK_IMAGE   = "https://store.togolese.fr/icons/icon-512.png";
-const SITE_URL         = "https://store.togolese.fr";
+const FALLBACK_IMAGE   = "https://togolese.tg/icons/icon-512.png";
+const SITE_URL         = "https://togolese.tg";
 
 export async function generateMetadata(): Promise<Metadata> {
   const s        = await getSettings().catch(() => ({} as Record<string, string>));

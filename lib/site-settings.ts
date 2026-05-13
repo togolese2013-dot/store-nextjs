@@ -1,6 +1,6 @@
 import { getSetting } from "./admin-db";
 
-const FALLBACK_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store.togolese.fr";
+const FALLBACK_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
 
 /** Returns the canonical site URL stored in admin settings, falls back to env var. */
 export async function getSiteUrl(): Promise<string> {

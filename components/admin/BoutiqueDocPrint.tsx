@@ -163,7 +163,7 @@ export default function BoutiqueDocPrint({
                     Lomé, Togo
                   </div>
                   <div style={{ fontSize: fs.small, color: "#666", fontFamily: "sans-serif" }}>
-                    store.togolese.fr
+                    togolese.tg
                   </div>
                 </div>
               </div>
@@ -330,7 +330,7 @@ export default function BoutiqueDocPrint({
                     </div>
                   )}
                   <div><span style={{ color: "#999" }}>Tél :</span> +228 90 52 79 12</div>
-                  <div><span style={{ color: "#999" }}>Site :</span> store.togolese.fr</div>
+                  <div><span style={{ color: "#999" }}>Site :</span> togolese.tg</div>
                 </div>
               </div>
 

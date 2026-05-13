@@ -112,7 +112,7 @@ router.post("/api/orders/pay/mobile-money", async (req, res) => {
     if (!mode) return res.status(400).json({ error: "Opérateur non supporté." });
 
     const cleanPhone = phone.replace(/\D/g, "").replace(/^228/, "");
-    const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://store.togolese.fr";
+    const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://togolese.tg";
 
     /* ── Étape 1 : Créer le client ── */
     const parts = (nom || "Client").trim().split(/\s+/);
