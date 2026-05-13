@@ -44,7 +44,7 @@ import { ensureSecurityLogsTable } from "./lib/security-log";
 import adminRapportsRoutes  from "./routes/admin/rapports";
 import adminTendancesRoutes        from "./routes/admin/tendances";
 import adminPerfProduitsRoutes     from "./routes/admin/performance-produits";
-import adminWhatsappInboxRoutes    from "./routes/admin/whatsapp-inbox";
+import adminWhatsappInboxRoutes, { ensureWaMessagesCols } from "./routes/admin/whatsapp-inbox";
 import waWebhookRoutes, { ensureWaMessagesTable } from "./routes/whatsapp-webhook";
 
 const app  = express();
@@ -200,6 +200,12 @@ try {
     console.log("[backend] wa_messages table OK");
   } catch (e) {
     console.error("[backend] ensureWaMessagesTable failed:", e);
+  }
+  try {
+    await ensureWaMessagesCols();
+    console.log("[backend] wa_messages media cols OK");
+  } catch (e) {
+    console.error("[backend] ensureWaMessagesCols failed:", e);
   }
 });
 
