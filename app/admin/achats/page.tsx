@@ -2,8 +2,7 @@ import { listAchats, countAchats, getAchatStats } from "@/lib/admin-db";
 import { apiGet } from "@/lib/api";
 import { getProducts } from "@/lib/db";
 import type { Fournisseur } from "@/lib/admin-db";
-import dynamic from "next/dynamic";
-const AchatsManager = dynamic(() => import("@/components/admin/AchatsManager"), { ssr: false });
+import AchatsManager from "@/components/admin/AchatsManagerClient";
 
 export const metadata = { title: "Achats fournisseurs" };
 

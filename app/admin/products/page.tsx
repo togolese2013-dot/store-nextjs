@@ -3,9 +3,8 @@ import { finalPrice, formatPrice } from "@/lib/utils";
 import type { Product, Category } from "@/lib/utils";
 import Link from "next/link";
 import AdminProductActions from "@/components/admin/AdminProductActions";
-import dynamic from "next/dynamic";
-const MouvementModal  = dynamic(() => import("@/components/admin/MouvementModal"),  { ssr: false });
-const AddProductModal = dynamic(() => import("@/components/admin/AddProductModal"),  { ssr: false });
+import MouvementModal  from "@/components/admin/MouvementModalClient";
+import AddProductModal from "@/components/admin/AddProductModalClient";
 import Image from "next/image";
 import {
   Search, Package,

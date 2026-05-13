@@ -1,6 +1,5 @@
 import { apiGet } from "@/lib/api";
-import dynamic from "next/dynamic";
-const FinanceManager = dynamic(() => import("@/components/admin/FinanceManager"), { ssr: false });
+import FinanceManager from "@/components/admin/FinanceManagerClient";
 
 export const metadata = { title: "Finance" };
 export const dynamic  = "force-dynamic";
