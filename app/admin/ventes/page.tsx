@@ -1,5 +1,6 @@
 import { apiGet } from "@/lib/api";
 import VentesManager from "@/components/admin/VentesManagerClient";
+import type VentesManagerType from "@/components/admin/VentesManager";
 
 export const metadata = { title: "Ventes" };
 export const dynamic  = "force-dynamic";
@@ -9,15 +10,15 @@ export default async function VentesPage() {
     const [facturesRes, livraisonsRes, stats] = await Promise.all([
       apiGet<{ items: unknown[]; total: number }>("/api/admin/ventes/factures?limit=50"),
       apiGet<{ items: unknown[]; total: number }>("/api/admin/ventes/livraisons?limit=50"),
-      apiGet<{ items: unknown[]; total: number; stats: Parameters<typeof VentesManager>[0]["initialStats"] }>(
+      apiGet<{ items: unknown[]; total: number; stats: Parameters<typeof VentesManagerType>[0]["initialStats"] }>(
         "/api/admin/ventes/factures?limit=1"
       ).then(r => r.stats),
     ]);
 
     return (
       <VentesManager
-        initialFactures={facturesRes.items as Parameters<typeof VentesManager>[0]["initialFactures"]}
-        initialLivraisons={livraisonsRes.items as Parameters<typeof VentesManager>[0]["initialLivraisons"]}
+        initialFactures={facturesRes.items as Parameters<typeof VentesManagerType>[0]["initialFactures"]}
+        initialLivraisons={livraisonsRes.items as Parameters<typeof VentesManagerType>[0]["initialLivraisons"]}
         initialStats={stats}
         totalFactures={facturesRes.total}
         totalLivraisons={livraisonsRes.total}
