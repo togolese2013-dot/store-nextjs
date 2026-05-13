@@ -111,6 +111,7 @@ export default function WhatsappInboxPage() {
               <Link
                 key={t.telephone}
                 href={`/admin/whatsapp/${encodeURIComponent(t.telephone)}`}
+                onClick={() => window.dispatchEvent(new CustomEvent("wa-conversation-opened", { detail: { phone: t.telephone } }))}
                 className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group"
               >
                 {/* Avatar */}

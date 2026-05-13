@@ -86,6 +86,17 @@ export default function MessageNotifier() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  // Ferme le toast quand la conversation correspondante est ouverte (depuis la page inbox)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const phone = (e as CustomEvent<{ phone: string }>).detail?.phone;
+      if (!phone) return;
+      setToasts(prev => prev.filter(t => t.from !== phone));
+    };
+    window.addEventListener("wa-conversation-opened", handler);
+    return () => window.removeEventListener("wa-conversation-opened", handler);
+  }, []);
+
   useEffect(() => {
     return subscribe((data) => {
       // Only inbound messages (not "sent" confirmations)
