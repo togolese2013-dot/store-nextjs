@@ -1,24 +1,37 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import ThemeVars from "@/components/ThemeVars";
+import { getSettings } from "@/lib/admin-db";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title:       { default: "Togolese Shop — Boutique Premium au Togo", template: "%s | Togolese Shop" },
-  description: "Découvrez Togolese Shop, votre boutique d'électronique et accessoires premium. Livraison rapide à Lomé, paiement à la réception.",
-  keywords:    ["boutique en ligne", "Togo", "électronique", "accessoires", "Lomé", "livraison rapide"],
-  authors:     [{ name: "Togolese Shop" }],
-  robots:      { index: true, follow: true },
-  openGraph: {
-    type:        "website",
-    locale:      "fr_TG",
-    url:         "https://store.togolese.fr",
-    siteName:    "Togolese Shop",
-    title:       "Togolese Shop — Boutique Premium au Togo",
-    description: "Électronique, accessoires et plus — livraison rapide au Togo.",
-    images:      [{ url: "https://store.togolese.fr/icons/icon-512.png", width: 512, height: 512 }],
-  },
-};
+const FALLBACK_NAME    = "Togolese Shop";
+const FALLBACK_TAGLINE = "Boutique Premium au Togo";
+const FALLBACK_IMAGE   = "https://store.togolese.fr/icons/icon-512.png";
+const SITE_URL         = "https://store.togolese.fr";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const s        = await getSettings().catch(() => ({} as Record<string, string>));
+  const name     = s.site_name    || FALLBACK_NAME;
+  const tagline  = s.site_tagline || FALLBACK_TAGLINE;
+  const ogImage  = s.site_logo    || FALLBACK_IMAGE;
+  const fullTitle = `${name} — ${tagline}`;
+
+  return {
+    title:       { default: fullTitle, template: `%s | ${name}` },
+    description: tagline,
+    authors:     [{ name }],
+    robots:      { index: true, follow: true },
+    openGraph: {
+      type:        "website",
+      locale:      "fr_TG",
+      url:         SITE_URL,
+      siteName:    name,
+      title:       fullTitle,
+      description: tagline,
+      images:      [{ url: ogImage }],
+    },
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get("x-nonce") ?? "";
