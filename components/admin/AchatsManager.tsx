@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Truck, Plus, Trash2, X, Save, Loader2, AlertCircle,
@@ -71,6 +71,10 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
   const router = useRouter();
   const [achats,       setAchats]       = useState<Achat[]>(initialAchats);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(initFournisseurs);
+
+  // Sync when RSC refresh delivers new data (router.refresh() after SSE event)
+  useEffect(() => { setAchats(initialAchats); }, [initialAchats]);
+  useEffect(() => { setFournisseurs(initFournisseurs); }, [initFournisseurs]);
   const [saving,       setSaving]       = useState(false);
   const [deleting,     setDeleting]     = useState<number | null>(null);
   const [receiving,    setReceiving]    = useState<number | null>(null);
