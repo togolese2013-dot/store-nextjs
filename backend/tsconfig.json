@@ -10,8 +10,16 @@
     "rootDir": "..",
     "baseUrl": "..",
     "paths": {
-      "@/lib/*": ["lib/*"]
+      "@/lib/*": ["lib/*"],
+      "@/backend/*": ["backend/*"]
     }
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    },
+    "esm": false,
+    "experimentalEsm": false
   },
   "include": ["backend/**/*", "lib/**/*"],
   "exclude": ["node_modules", "backend/dist", "app", "components"]

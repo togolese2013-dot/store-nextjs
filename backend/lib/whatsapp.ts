@@ -124,7 +124,7 @@ export async function uploadWaMedia(
     const form = new FormData();
     form.append("messaging_product", "whatsapp");
     form.append("type", mimeType);
-    form.append("file", new Blob([buffer], { type: mimeType }), filename);
+    form.append("file", new Blob([new Uint8Array(buffer)], { type: mimeType }), filename);
 
     const res = await fetch(`${WA_API}/${phoneId}/media`, {
       method:  "POST",

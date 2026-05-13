@@ -1,0 +1,274 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendWaTemplate = sendWaTemplate;
+exports.sendWaText = sendWaText;
+exports.getWaMediaUrl = getWaMediaUrl;
+exports.uploadWaMedia = uploadWaMedia;
+exports.sendWaImage = sendWaImage;
+exports.sendWaAudio = sendWaAudio;
+exports.sendBoutiqueVenteNotif = sendBoutiqueVenteNotif;
+exports.sendOrderNotifications = sendOrderNotifications;
+const admin_db_1 = require("@/lib/admin-db");
+const WA_API = "https://graph.facebook.com/v19.0";
+function cleanPhone(num) {
+    return num.replace(/[\s+\-()]/g, "");
+}
+/* ── Send a template message ──────────────────────────────────────────────── */
+async function sendWaTemplate({ to, templateName, languageCode = "fr", bodyParams, }) {
+    try {
+        const phoneId = await (0, admin_db_1.getSetting)("wa_phone_number_id");
+        const token = await (0, admin_db_1.getSetting)("wa_access_token");
+        if (!phoneId || !token) {
+            return { success: false, error: "Credentials WhatsApp non configurés" };
+        }
+        const payload = {
+            messaging_product: "whatsapp",
+            to: cleanPhone(to),
+            type: "template",
+            template: {
+                name: templateName,
+                language: { code: languageCode },
+                components: bodyParams.length > 0 ? [{
+                        type: "body",
+                        parameters: bodyParams.map(text => ({ type: "text", text })),
+                    }] : [],
+            },
+        };
+        const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+        }
+        return { success: true };
+    }
+    catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+    }
+}
+/* ── Send a free-form text message (24h session window) ───────────────────── */
+async function sendWaText({ to, body, }) {
+    try {
+        const phoneId = await (0, admin_db_1.getSetting)("wa_phone_number_id");
+        const token = await (0, admin_db_1.getSetting)("wa_access_token");
+        if (!phoneId || !token) {
+            return { success: false, error: "Credentials WhatsApp non configurés" };
+        }
+        const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: cleanPhone(to),
+                type: "text",
+                text: { body },
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+        }
+        return { success: true };
+    }
+    catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+    }
+}
+/* ── Get temporary download URL for a media ID ───────────────────────────── */
+async function getWaMediaUrl(mediaId) {
+    try {
+        const token = await (0, admin_db_1.getSetting)("wa_access_token");
+        const res = await fetch(`${WA_API}/${mediaId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok)
+            return null;
+        const data = await res.json();
+        return data.url ?? null;
+    }
+    catch {
+        return null;
+    }
+}
+/* ── Upload media to Meta and return the media_id ────────────────────────── */
+async function uploadWaMedia(buffer, mimeType, filename) {
+    try {
+        const phoneId = await (0, admin_db_1.getSetting)("wa_phone_number_id");
+        const token = await (0, admin_db_1.getSetting)("wa_access_token");
+        if (!phoneId || !token)
+            return { success: false, error: "Credentials manquants" };
+        const form = new FormData();
+        form.append("messaging_product", "whatsapp");
+        form.append("type", mimeType);
+        form.append("file", new Blob([new Uint8Array(buffer)], { type: mimeType }), filename);
+        const res = await fetch(`${WA_API}/${phoneId}/media`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: form,
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+        }
+        const data = await res.json();
+        return { success: true, mediaId: data.id };
+    }
+    catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+    }
+}
+/* ── Send an image message by media_id ───────────────────────────────────── */
+async function sendWaImage({ to, mediaId, caption = "", }) {
+    try {
+        const phoneId = await (0, admin_db_1.getSetting)("wa_phone_number_id");
+        const token = await (0, admin_db_1.getSetting)("wa_access_token");
+        if (!phoneId || !token)
+            return { success: false, error: "Credentials manquants" };
+        const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: cleanPhone(to),
+                type: "image",
+                image: { id: mediaId, caption },
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+        }
+        return { success: true };
+    }
+    catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+    }
+}
+/* ── Send an audio message by media_id ───────────────────────────────────── */
+async function sendWaAudio({ to, mediaId, }) {
+    try {
+        const phoneId = await (0, admin_db_1.getSetting)("wa_phone_number_id");
+        const token = await (0, admin_db_1.getSetting)("wa_access_token");
+        if (!phoneId || !token)
+            return { success: false, error: "Credentials manquants" };
+        const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: cleanPhone(to),
+                type: "audio",
+                audio: { id: mediaId },
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+        }
+        return { success: true };
+    }
+    catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+    }
+}
+/* ── Boutique vente notification ─────────────────────────────────────────── */
+async function sendBoutiqueVenteNotif({ telephone, nom, reference, total, montant_acompte, statut_paiement, items, }) {
+    try {
+        const [enabled, templateFull, templateAcompte, lang, siteUrl] = await Promise.all([
+            (0, admin_db_1.getSetting)("wa_boutique_vente_enabled"),
+            (0, admin_db_1.getSetting)("wa_boutique_vente_template_full"),
+            (0, admin_db_1.getSetting)("wa_boutique_vente_template_acompte"),
+            (0, admin_db_1.getSetting)("wa_order_lang"),
+            (0, admin_db_1.getSetting)("site_url"),
+        ]);
+        if (enabled !== "1" || !telephone)
+            return;
+        const languageCode = lang || "fr";
+        const baseUrl = (siteUrl || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://togolese.tg").replace(/\/$/, "");
+        const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+        const articlesList = items.map(i => `${i.qty}x ${i.nom} - ${fmt(i.total)}`).join("\n");
+        if (statut_paiement === "acompte" && templateAcompte) {
+            const acompte = montant_acompte ?? 0;
+            const resteAPayer = total - acompte;
+            await sendWaTemplate({
+                to: telephone,
+                templateName: templateAcompte,
+                languageCode,
+                bodyParams: [nom, reference, articlesList, fmt(acompte), fmt(resteAPayer), baseUrl],
+            });
+        }
+        else if (templateFull) {
+            await sendWaTemplate({
+                to: telephone,
+                templateName: templateFull,
+                languageCode,
+                bodyParams: [nom, reference, articlesList, fmt(total), baseUrl],
+            });
+        }
+    }
+    catch (e) {
+        console.error("[WA] sendBoutiqueVenteNotif error:", e);
+    }
+}
+/* ── Order notifications ──────────────────────────────────────────────────── */
+async function sendOrderNotifications({ id, reference, nom, telephone, items, total, }) {
+    try {
+        const [clientEnabled, adminEnabled, clientTemplate, adminTemplate, adminNumber, lang, siteUrl,] = await Promise.all([
+            (0, admin_db_1.getSetting)("wa_order_client_enabled"),
+            (0, admin_db_1.getSetting)("wa_order_admin_enabled"),
+            (0, admin_db_1.getSetting)("wa_order_client_template"),
+            (0, admin_db_1.getSetting)("wa_order_admin_template"),
+            (0, admin_db_1.getSetting)("wa_order_admin_number"),
+            (0, admin_db_1.getSetting)("wa_order_lang"),
+            (0, admin_db_1.getSetting)("site_url"),
+        ]);
+        if (process.env.NODE_ENV !== "production")
+            console.log(`[WA] sendOrderNotifications — ref=${reference} tel=${telephone}`);
+        const languageCode = lang || "fr";
+        const baseUrl = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
+        const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+        const articlesStr = items.map(item => {
+            const name = item.nom || item.nom_produit || "Produit";
+            const qty = item.qty ?? item.quantite ?? 1;
+            const prix = item.total ?? (item.prix ? item.prix * qty : null);
+            return prix ? `${qty}x ${name} - ${fmt(prix)}` : `${qty}x ${name}`;
+        }).join(", ");
+        const totalStr = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
+        const trackingUrl = `${baseUrl}/suivi-commande?ref=${encodeURIComponent(reference)}`;
+        const adminUrl = `${baseUrl}/admin/orders`;
+        // Client
+        if (clientEnabled === "1" && clientTemplate && telephone) {
+            const result = await sendWaTemplate({
+                to: telephone,
+                templateName: clientTemplate,
+                languageCode,
+                bodyParams: [nom, reference, articlesStr, totalStr, trackingUrl],
+            });
+            if (process.env.NODE_ENV !== "production")
+                console.log(`[WA] Client notif result (${reference}):`, result);
+        }
+        // Admin
+        if (adminEnabled === "1" && adminTemplate && adminNumber) {
+            const result = await sendWaTemplate({
+                to: adminNumber,
+                templateName: adminTemplate,
+                languageCode,
+                bodyParams: [reference, nom, telephone, articlesStr, totalStr, adminUrl],
+            });
+            if (process.env.NODE_ENV !== "production")
+                console.log(`[WA] Admin notif result (${reference}):`, result);
+        }
+    }
+    catch (e) {
+        console.error("[WA] sendOrderNotifications error:", e);
+    }
+}

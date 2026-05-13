@@ -1,0 +1,53 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Backend Express",
+			"type": "shell",
+			"command": "cd backend && npm run dev",
+			"isBackground": true
+		},
+		{
+			"label": "Backend Server",
+			"type": "shell",
+			"command": "cd backend && npm run dev",
+			"isBackground": true
+		},
+		{
+			"label": "Backend Dev Server",
+			"type": "shell",
+			"command": "cd backend && npm run dev",
+			"isBackground": true
+		},
+		{
+			"label": "Backend Compiled",
+			"type": "shell",
+			"command": "cd backend && npm run build && node dist/index.js",
+			"isBackground": true
+		},
+		{
+			"label": "Backend Production",
+			"type": "shell",
+			"command": "cd backend && npm run build && node dist/index.js",
+			"isBackground": true
+		},
+		{
+			"label": "Backend Start",
+			"type": "shell",
+			"command": "cd backend && npm run build && node dist/index.js",
+			"isBackground": true
+		},
+		{
+			"label": "Backend Clean",
+			"type": "shell",
+			"command": "cd backend && rm -rf dist && npm run build && node dist/index.js",
+			"isBackground": true
+		},
+		{
+			"label": "Backend Final",
+			"type": "shell",
+			"command": "cd backend && npm run build && npm start",
+			"isBackground": true
+		}
+	]
+}
