@@ -37,7 +37,7 @@ async function uploadToCloudinary(buffer: Buffer, _clientType: string): Promise<
 
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: "togolese-shop", resource_type: "image" },
+      { folder: "togolese-shop", resource_type: "image", format: "webp", quality: "auto" },
       (error, result) => {
         if (error || !result) reject(error ?? new Error("Upload échoué"));
         else resolve(result.secure_url);
