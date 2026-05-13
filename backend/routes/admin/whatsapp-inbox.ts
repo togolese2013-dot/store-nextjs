@@ -1,5 +1,5 @@
 import express from "express";
-import type mysql from "mysql2";
+import mysql from "mysql2/promise";
 import { getSession } from "../../lib/auth";
 import { db } from "@/lib/db";
 import { sendWaText } from "../../lib/whatsapp";
@@ -80,7 +80,7 @@ router.post("/api/admin/whatsapp/threads/:phone/send", async (req, res) => {
   const { body }     = req.body as { body?: string };
   if (!body?.trim()) return res.status(400).json({ error: "Message vide" });
 
-  const result = await sendWaText(phone, body.trim());
+  const result = await sendWaText({ to: phone, body: body.trim() });
   if (!result.success) {
     return res.status(502).json({ error: result.error ?? "Erreur envoi WA" });
   }
