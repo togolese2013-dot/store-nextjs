@@ -175,7 +175,7 @@ export default function WhatsappChatPage() {
             onKeyDown={handleKeyDown}
             placeholder="Écrivez un message… (Entrée pour envoyer, Maj+Entrée pour saut de ligne)"
             rows={2}
-            className="flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+            className="flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
           />
           <button
             onClick={handleSend}

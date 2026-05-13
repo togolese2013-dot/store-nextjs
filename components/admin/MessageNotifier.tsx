@@ -11,9 +11,35 @@ interface WaToast {
   body: string;
 }
 
-function playMessageSound() {
+type ACtx = AudioContext & { webkitAudioContext?: never };
+const AudioCtxClass: typeof AudioContext | undefined =
+  typeof window !== "undefined"
+    ? (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)
+    : undefined;
+
+// Singleton AudioContext — créé une fois au premier geste utilisateur
+let _audioCtx: ACtx | null = null;
+
+function getAudioCtx(): ACtx | null {
+  if (!AudioCtxClass) return null;
+  if (!_audioCtx) {
+    try { _audioCtx = new AudioCtxClass() as ACtx; } catch { return null; }
+  }
+  return _audioCtx;
+}
+
+// Initialise l'AudioContext lors du premier geste (obligatoire sur mobile)
+function initAudioOnGesture() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+}
+
+async function playMessageSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
   try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    // Resume nécessaire sur iOS/Android après suspension
+    if (ctx.state === "suspended") await ctx.resume();
     const playBeep = (freq: number, start: number, duration: number) => {
       const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -29,7 +55,7 @@ function playMessageSound() {
     playBeep(660,  0,    0.12);
     playBeep(880,  0.15, 0.12);
     playBeep(1100, 0.30, 0.18);
-  } catch { /* AudioContext blocked */ }
+  } catch { /* blocked */ }
 }
 
 function showNativeNotification(nom: string, body: string, phone: string) {
@@ -56,16 +82,21 @@ export default function MessageNotifier() {
   const toastIdRef            = useRef(0);
   const { subscribe }         = useAdminSSE();
 
-  // Request notification permission on first interaction
+  // Initialise AudioContext + demande permission notification au premier geste
   useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission === "default") {
-      const ask = () => {
-        Notification.requestPermission();
-        window.removeEventListener("click", ask);
-      };
+    const onGesture = () => initAudioOnGesture();
+    window.addEventListener("click",      onGesture, { once: true, passive: true });
+    window.addEventListener("touchstart", onGesture, { once: true, passive: true });
+
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      const ask = () => { Notification.requestPermission(); };
       window.addEventListener("click", ask, { once: true });
     }
+
+    return () => {
+      window.removeEventListener("click",      onGesture);
+      window.removeEventListener("touchstart", onGesture);
+    };
   }, []);
 
   // Badge on title
