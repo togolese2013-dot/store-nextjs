@@ -9,7 +9,9 @@ import type mysql from "mysql2/promise";
 
 const router = express.Router();
 
+let _paymentTablesReady = false;
 async function ensurePaymentTables() {
+  if (_paymentTablesReady) return;
   const pool = db as mysql.Pool;
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS payment_plans (
@@ -42,6 +44,7 @@ async function ensurePaymentTables() {
   try {
     await pool.execute(`ALTER TABLE payment_tranches ADD COLUMN mode_paiement VARCHAR(30) NULL`);
   } catch (e: any) { if (e?.code !== "ER_DUP_FIELDNAME") throw e; }
+  _paymentTablesReady = true;
 }
 
 // List all payment plans

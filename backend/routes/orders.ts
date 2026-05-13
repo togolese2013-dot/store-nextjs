@@ -15,7 +15,9 @@ function normalizeTogoPhone(raw: string): string | null {
   return local.length === 8 ? `+228 ${local}` : null;
 }
 
+let _orderColsReady = false;
 async function ensureOrderCols() {
+  if (_orderColsReady) return;
   const pool = db as mysql.Pool;
   for (const ddl of [
     "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
@@ -27,6 +29,7 @@ async function ensureOrderCols() {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
     }
   }
+  _orderColsReady = true;
 }
 
 // POST /api/orders  — public, no auth required

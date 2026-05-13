@@ -6,7 +6,9 @@ import type mysql from "mysql2/promise";
 const router = express.Router();
 
 /** Ensure the product_variants table exists and has all columns */
+let _variantsReady = false;
 async function ensureTable() {
+  if (_variantsReady) return;
   await (db as mysql.Pool).execute(`
     CREATE TABLE IF NOT EXISTS product_variants (
       id            INT AUTO_INCREMENT PRIMARY KEY,
@@ -30,6 +32,7 @@ async function ensureTable() {
   } catch (err: any) {
     if (err?.code !== "ER_DUP_FIELDNAME") throw err;
   }
+  _variantsReady = true;
 }
 
 // GET /api/admin/products/:productId/variants  (public — used by storefront too)

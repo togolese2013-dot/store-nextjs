@@ -1,6 +1,7 @@
 import { apiGet } from "@/lib/api";
 import type { LivraisonAdmin, Livreur } from "@/lib/admin-db";
-import LivraisonsManager from "@/components/admin/LivraisonsManager";
+import dynamic from "next/dynamic";
+const LivraisonsManager = dynamic(() => import("@/components/admin/LivraisonsManager"), { ssr: false });
 
 export const dynamic = "force-dynamic";
 

@@ -372,7 +372,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
   const [showTrf,    setShowTrf]    = useState(false);
   const [delItem,    setDelItem]    = useState<FinanceEntry | null>(null);
   const [loading,    setLoading]    = useState(false);
-  const [showReset,  setShowReset]  = useState(false);
 
   const [, setTotal] = useState(initialTotal);
 
@@ -392,12 +391,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
   async function handleDelete(item: FinanceEntry) {
     await fetch(`/api/admin/finance/${item.id}`, { method: "DELETE" });
     setDelItem(null);
-    reload();
-  }
-
-  async function handleReset() {
-    await fetch("/api/admin/finance", { method: "DELETE" });
-    setShowReset(false);
     reload();
   }
 
@@ -425,13 +418,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
         onRefresh={reload}
         extra={
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowReset(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-bold transition-colors whitespace-nowrap"
-            >
-              <Trash2 className="w-4 h-4" />
-              Tout vider
-            </button>
             <button
               onClick={() => setShowTrf(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors whitespace-nowrap"
@@ -634,27 +620,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           onConfirm={() => handleDelete(delItem)}
           onClose={() => setDelItem(null)}
         />
-      )}
-      {showReset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center">
-            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6 text-red-600" />
-            </div>
-            <h2 className="font-bold text-lg text-slate-900">Vider toutes les écritures ?</h2>
-            <p className="text-slate-500 text-sm">Toutes les dépenses, rentrées et transferts seront supprimés. Les produits et factures ne sont pas affectés.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowReset(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-                Annuler
-              </button>
-              <button onClick={handleReset}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-sm font-bold text-white transition-colors">
-                Tout vider
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

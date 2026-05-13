@@ -193,7 +193,7 @@ export default function Header() {
 
             {/* Logo centré */}
             <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-              <img src="/logo-togolese-shop.svg" alt="Togolese Shop" className="h-7 w-auto" />
+              <Image src="/logo-togolese-shop.svg" alt="Togolese Shop" width={120} height={28} className="h-7 w-auto" priority />
             </Link>
 
             <div className="flex items-center gap-0.5 ml-auto">
@@ -227,7 +227,7 @@ export default function Header() {
 
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0 mr-3">
-              <img src="/logo-togolese-shop.svg" alt="Togolese Shop" className="h-7 w-auto" />
+              <Image src="/logo-togolese-shop.svg" alt="Togolese Shop" width={120} height={28} className="h-7 w-auto" priority />
             </Link>
 
             {/* Search */}

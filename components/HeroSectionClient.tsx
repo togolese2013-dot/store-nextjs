@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -56,14 +57,15 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
         <div className="relative rounded-[20px] overflow-hidden">
           <SlideWrapper href={slide.href} className="block w-full">
             {(slide.image_mobile || slide.image) ? (
-              <img
-                src={slide.image_mobile || slide.image}
-                alt={slide.nom ?? ""}
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-                className="w-full h-auto block"
-              />
+              <div className="relative w-full aspect-[3/2]">
+                <Image
+                  src={slide.image_mobile || slide.image}
+                  alt={slide.nom ?? ""}
+                  fill
+                  priority
+                  className="object-cover"
+                />
+              </div>
             ) : (
               <div className={clsx("w-full aspect-[3/2] bg-gradient-to-br", slide.gradient)} />
             )}
@@ -96,13 +98,12 @@ export default function HeroSectionClient({ slides }: { slides: HeroSlide[] }) {
             {/* Neutral dark fallback — no color flash before image loads */}
             <div className="absolute inset-0 bg-slate-900" />
             {s.image && (
-              <img
+              <Image
                 src={s.image}
                 alt={s.nom ?? ""}
-                loading={i === 0 ? "eager" : "lazy"}
-                fetchPriority={i === 0 ? "high" : "low"}
-                decoding="async"
-                className="absolute inset-0 w-full h-full object-cover"
+                fill
+                priority={i === 0}
+                className="object-cover"
               />
             )}
           </SlideWrapper>

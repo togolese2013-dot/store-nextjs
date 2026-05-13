@@ -9,7 +9,9 @@ import {
   applyOrderDeliveredEffects, ensureOrderVente,
 } from "@/lib/admin-db";
 
+let _paymentColReady = false;
 async function ensurePaymentColumn() {
+  if (_paymentColReady) return;
   try {
     await (db as mysql.Pool).execute(
       "ALTER TABLE orders ADD COLUMN statut_paiement VARCHAR(50) NULL DEFAULT 'non_paye'"
@@ -17,6 +19,7 @@ async function ensurePaymentColumn() {
   } catch (err: unknown) {
     if ((err as { code?: string }).code !== "ER_DUP_FIELDNAME") throw err;
   }
+  _paymentColReady = true;
 }
 
 const router = express.Router();
