@@ -2,10 +2,55 @@ import express from "express";
 import mysql from "mysql2/promise";
 import { getSession } from "../../lib/auth";
 import { db } from "@/lib/db";
+import { getSetting } from "@/lib/admin-db";
 import { sendWaText } from "../../lib/whatsapp";
 import { emitAdminEvent } from "../../lib/admin-events";
 
 const router = express.Router();
+
+/* ── GET /api/admin/whatsapp/webhook — vérification Meta ──────────────── */
+router.get("/api/admin/whatsapp/webhook", async (req, res) => {
+  const mode      = req.query["hub.mode"];
+  const token     = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  const savedToken = await getSetting("wa_webhook_verify_token").catch(() => null);
+  const expected   = savedToken || process.env.WA_VERIFY_TOKEN || "";
+
+  if (mode === "subscribe" && token === expected && expected) {
+    return res.status(200).send(challenge);
+  }
+  return res.status(403).end();
+});
+
+/* ── POST /api/admin/whatsapp/webhook — réception messages entrants ───── */
+router.post("/api/admin/whatsapp/webhook", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const value = req.body?.entry?.[0]?.changes?.[0]?.value;
+    if (!value?.messages?.length) return;
+
+    const contactName: string | null = value.contacts?.[0]?.profile?.name ?? null;
+
+    for (const msg of value.messages as Record<string, unknown>[]) {
+      if (msg.type !== "text") continue;
+      const from = String(msg.from ?? "");
+      const body = String((msg.text as Record<string, unknown>)?.body ?? "");
+      const waId = String(msg.id ?? "");
+      if (!from || !body) continue;
+
+      await db.execute(
+        `INSERT IGNORE INTO wa_messages (telephone, direction, body, wa_message_id, contact_name)
+         VALUES (?, 'inbound', ?, ?, ?)`,
+        [from, body, waId, contactName],
+      );
+
+      emitAdminEvent("message", { from, body, nom: contactName ?? from });
+    }
+  } catch (err) {
+    console.error("[webhook/whatsapp/inbound]", err);
+  }
+});
 
 /* ── GET /api/admin/whatsapp/threads ──────────────────────────────────── */
 router.get("/api/admin/whatsapp/threads", async (req, res) => {
