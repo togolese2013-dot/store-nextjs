@@ -19,7 +19,7 @@ export default function ParrainagePage() {
   const [error,   setError]   = useState("");
   const [copied,  setCopied]  = useState(false);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-nextjs-production.up.railway.app";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

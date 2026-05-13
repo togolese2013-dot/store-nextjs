@@ -14,7 +14,7 @@ interface DnsRecord {
 }
 
 export default function DomainSettingsForm({ settings }: { settings: Record<string, string> }) {
-  const [siteUrl,    setSiteUrl]    = useState(settings.site_url      ?? "https://store.togolese.net");
+  const [siteUrl,    setSiteUrl]    = useState(settings.site_url      ?? "https://togolese.tg");
   const [customDomain, setCustomDomain] = useState(settings.custom_domain ?? "");
   const [serverIp,   setServerIp]   = useState(settings.server_ip    ?? "");
   const [loading,    setLoading]    = useState(false);

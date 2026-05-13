@@ -105,7 +105,7 @@ export default async function ProductPage({ params }: PageProps) {
   ];
 
   /* JSON-LD — Schema.org Product */
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-nextjs-production.up.railway.app";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
   const jsonLd = {
     "@context": "https://schema.org",
     "@type":    "Product",

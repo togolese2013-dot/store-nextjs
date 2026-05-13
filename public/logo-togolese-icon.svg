@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background -->
+  <rect width="100" height="100" rx="13" fill="#F05A00"/>
+
+  <!-- t: stem (taller, crossbar positioned in upper third) -->
+  <rect x="24" y="16" width="13" height="67" rx="6.5" fill="white"/>
+  <!-- t: crossbar — plus haut, plus court -->
+  <rect x="13" y="34" width="35" height="12" rx="6" fill="white"/>
+
+  <!-- o: ring — centre x=70, y=41, outer r=20, inner r=10 -->
+  <path fill-rule="evenodd" fill="white"
+    d="M70,21 m-20,0 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0
+       M70,21 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0"/>
+
+  <!-- smile: centré sous le o -->
+  <path d="M54,68 Q70,83 86,68" stroke="white" stroke-width="10" stroke-linecap="round" fill="none"/>
+</svg>

@@ -69,6 +69,7 @@ export function setAuthCookie(res: Response, token: string) {
     sameSite: "strict",
     maxAge:   TTL * 1000,
     path:     "/",
+    domain:   process.env.NODE_ENV === "production" ? ".togolese.tg" : undefined,
     secure:   process.env.NODE_ENV === "production",
   });
 }
