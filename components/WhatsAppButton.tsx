@@ -264,6 +264,9 @@ const WIDGET_CSS = `
 
 /* ── Mobile ────────────────────────────────────────────────── */
 @media (max-width: 480px) {
+  #serena-input {
+    font-size: 16px;
+  }
   #serena-btn {
     bottom: 16px;
     right: 16px;
