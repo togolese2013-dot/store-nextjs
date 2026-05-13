@@ -1,6 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
+import { hasPageAccess } from "@/lib/admin-permissions";
 import { getProducts, getProductCount, getProductStatusCounts, getCategories, db, produitCols, invalidateProduitColsCache } from "@/lib/db";
 import { getStockStats } from "@/lib/admin-db";
 import type mysql from "mysql2/promise";
@@ -65,7 +66,8 @@ router.get("/api/admin/products", async (req, res) => {
 router.post("/api/admin/products", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "products")) {
     return res.status(403).json({ error: "Accès refusé." });
   }
 
@@ -302,7 +304,8 @@ router.patch("/api/admin/products/:id", async (req, res) => {
 router.delete("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "products")) {
     return res.status(403).json({ error: "Accès refusé." });
   }
   await (db as import("mysql2/promise").Pool).execute(
