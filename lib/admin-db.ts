@@ -1471,6 +1471,8 @@ export interface Entrepot {
 export async function listEntrepots(): Promise<Entrepot[]> { return []; }
 export async function getEntrepots():  Promise<Entrepot[]> { return []; }
 export async function upsertEntrepot(_e: unknown): Promise<void> {}
+export async function createEntrepot(_e: unknown): Promise<number> { return 1; }
+export async function updateEntrepot(_id: number, _e: unknown): Promise<void> {}
 export async function deleteEntrepot(_id: number): Promise<void> {}
 
 export interface ProduitStock {
@@ -3486,6 +3488,10 @@ export async function addLoyaltyPointsManual(telephone: string, points: number, 
   );
 }
 
+export async function addFidelitePoints(telephone: string, points: number, reason: string) {
+  return addLoyaltyPointsManual(telephone, points, reason);
+}
+
 export async function listReferrals() {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT * FROM referrals ORDER BY uses_count DESC, created_at DESC`
@@ -3501,6 +3507,13 @@ export async function listNewsletterSubscribers() {
     `SELECT * FROM newsletter_subscribers ORDER BY subscribed_at DESC`
   );
   return rows as { id: number; email: string; subscribed_at: string }[];
+}
+
+export async function subscribeNewsletter(email: string) {
+  await db.execute(
+    `INSERT IGNORE INTO newsletter_subscribers (email, subscribed_at) VALUES (?, NOW())`,
+    [email]
+  );
 }
 
 export async function deleteNewsletterSubscriber(id: number) {

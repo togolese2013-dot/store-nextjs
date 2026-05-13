@@ -1,5 +1,7 @@
 import { config } from "dotenv";
 import { resolve } from "path";
+config({ path: resolve(process.cwd(), "../.env.local") });
+config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(__dirname, "../.env.local") });
 config({ path: resolve(__dirname, "../.env") });
 
@@ -7,7 +9,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import { rateLimit } from "express-rate-limit";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 
 import adminAuthRoutes      from "./routes/admin/auth";
 import adminProductsRoutes  from "./routes/admin/products";
@@ -50,11 +52,39 @@ import waWebhookRoutes, { ensureWaMessagesTable } from "./routes/whatsapp-webhoo
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  "http://localhost:3000",
-  "http://localhost:3003",
-].filter(Boolean) as string[];
+function splitEnvList(value: string | undefined): string[] {
+  return value?.split(",").map(v => v.trim()).filter(Boolean) ?? [];
+}
+
+function originFromUrl(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+const allowedOrigins = new Set(
+  [
+    ...splitEnvList(process.env.FRONTEND_URL),
+    ...splitEnvList(process.env.NEXT_PUBLIC_SITE_URL),
+    ...splitEnvList(process.env.CORS_ORIGINS),
+    "https://togolese.tg",
+    "https://www.togolese.tg",
+    "https://store.togolese.fr",
+    "http://localhost:3000",
+    "http://localhost:3003",
+  ]
+    .map(originFromUrl)
+    .filter(Boolean) as string[]
+);
+
+function isAllowedOrigin(origin: string): boolean {
+  const parsed = originFromUrl(origin);
+  if (!parsed) return false;
+  if (allowedOrigins.has(parsed)) return true;
+  return /^https:\/\/([a-z0-9-]+\.)?togolese\.(tg|fr)$/i.test(parsed);
+}
 
 // ── Security middlewares ─────────────────────────────────────────────────────
 app.use(helmet({
@@ -77,7 +107,7 @@ app.use(cors({
     if (!origin) return cb(null, true);
     // Allow any local network IP (192.168.x.x, 10.x.x.x) on any port — for mobile dev
     if (/^http:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(origin)) return cb(null, true);
-    if (allowedOrigins.some(o => origin.startsWith(o))) return cb(null, true);
+    if (isAllowedOrigin(origin)) return cb(null, true);
     cb(new Error(`CORS: origine non autorisée — ${origin}`));
   },
   credentials: true,
@@ -90,7 +120,7 @@ const loginLimiter = rateLimit({
   standardHeaders:  true,
   legacyHeaders:    false,
   message:          { error: "Trop de tentatives. Réessayez dans 15 minutes." },
-  keyGenerator:     (req) => req.ip ?? "unknown",
+  keyGenerator:     (req) => ipKeyGenerator(req.ip ?? "unknown"),
 });
 app.use("/api/admin/auth/login", loginLimiter);
 

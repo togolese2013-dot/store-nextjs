@@ -5,7 +5,7 @@ import {
   listFinanceEntries, getFinanceStats, createFinanceEntry,
   updateFinanceEntry, deleteFinanceEntry,
 } from "@/lib/admin-db";
-import db from "@/lib/db";
+import { db } from "@/lib/db";
 
 const router = express.Router();
 

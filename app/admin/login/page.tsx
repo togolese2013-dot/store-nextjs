@@ -22,9 +22,13 @@ export default function AdminLoginPage() {
       const res  = await fetch("/api/admin/auth/login", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body:    JSON.stringify({ username, password }),
       });
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") ?? "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: "API admin indisponible. Vérifiez la configuration BACKEND_URL." };
       if (!res.ok) { setError(data.error || "Identifiants incorrects"); return; }
       const dest = (data.role === "staff" && data.poste === "Livreur") || data.role === "livreur"
         ? "/livreur"

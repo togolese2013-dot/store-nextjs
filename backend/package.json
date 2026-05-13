@@ -2,10 +2,10 @@
   "name": "store-backend",
   "version": "1.0.0",
   "description": "API backend Express — Railway",
-  "main": "dist/index.js",
+  "main": "dist/backend/index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "esbuild index.ts --bundle --platform=node --target=node20 --format=cjs --packages=external --outfile=dist/backend/index.js",
+    "start": "node dist/backend/index.js",
     "dev": "ts-node index.ts"
   },
   "dependencies": {
@@ -30,6 +30,7 @@
     "@types/express-rate-limit": "^5.1.3",
     "@types/multer": "^1.4.11",
     "@types/node": "^22",
+    "esbuild": "^0.27.7",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.21.0",

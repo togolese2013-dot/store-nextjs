@@ -15,6 +15,24 @@ const SECRET = new TextEncoder().encode(jwtSecret);
 export const COOKIE_NAME = "ts_admin_token";
 const TTL = 60 * 60 * 8; // 8 hours
 
+function cookieDomain(): string | undefined {
+  if (process.env.NODE_ENV !== "production") return undefined;
+  if (process.env.AUTH_COOKIE_DOMAIN) return process.env.AUTH_COOKIE_DOMAIN;
+
+  const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (siteUrl) {
+    try {
+      const host = new URL(siteUrl).hostname;
+      if (host === "togolese.tg" || host.endsWith(".togolese.tg")) return ".togolese.tg";
+      if (host === "togolese.fr" || host.endsWith(".togolese.fr")) return ".togolese.fr";
+    } catch {
+      // Fall back to host-only cookies if the configured URL is malformed.
+    }
+  }
+
+  return undefined;
+}
+
 export interface AdminPayload {
   id:                   number;
   username:             string;
@@ -64,16 +82,21 @@ export async function getSession(req: Request): Promise<AdminPayload | null> {
 }
 
 export function setAuthCookie(res: Response, token: string) {
+  const domain = cookieDomain();
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "strict",
     maxAge:   TTL * 1000,
     path:     "/",
-    domain:   process.env.NODE_ENV === "production" ? ".togolese.tg" : undefined,
+    domain,
     secure:   process.env.NODE_ENV === "production",
   });
 }
 
 export function clearAuthCookie(res: Response) {
-  res.clearCookie(COOKIE_NAME, { path: "/" });
+  res.clearCookie(COOKIE_NAME, {
+    path:   "/",
+    domain: cookieDomain(),
+    secure: process.env.NODE_ENV === "production",
+  });
 }
