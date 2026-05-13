@@ -272,16 +272,16 @@ const WIDGET_CSS = `
   }
   #serena-window {
     position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    max-height: 100%;
-    bottom: 0;
+    left: 0;
     right: 0;
-    border-radius: 0;
+    bottom: 0;
+    width: 100%;
+    height: 82dvh;
+    max-height: 82dvh;
     border-radius: 20px 20px 0 0;
     transform: translateY(100%);
     opacity: 1;
+    overflow: hidden;
   }
   #serena-window.open {
     transform: translateY(0);

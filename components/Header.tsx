@@ -197,17 +197,6 @@ export default function Header() {
             </Link>
 
             <div className="flex items-center gap-0.5 ml-auto">
-              <Link href="/wishlist"
-                className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
-                aria-label={`Favoris (${wishlistCount})`}
-              >
-                <Heart className="w-5 h-5" />
-                {wishlistCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">
-                    {wishlistCount > 9 ? "9+" : wishlistCount}
-                  </span>
-                )}
-              </Link>
               <Link href="/cart"
                 className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
                 aria-label={`Panier (${cartCount})`}
@@ -218,6 +207,12 @@ export default function Header() {
                     {cartCount > 9 ? "9+" : cartCount}
                   </span>
                 )}
+              </Link>
+              <Link href="/account"
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+                aria-label="Mon compte"
+              >
+                <User className="w-5 h-5" />
               </Link>
             </div>
           </div>
