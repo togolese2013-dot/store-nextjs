@@ -72,11 +72,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   const defaultStatus = { total: 0, disponible: 0, faible: 0, epuise: 0 };
   const defaultMovCounts = { total: 0, entrees: 0, sorties: 0, ajustements: 0 };
 
-  const [categoriesRes, marquesRes, statsRes] = await Promise.all([
+  const [categoriesRes, marquesRes, statsRes, movCountsRes] = await Promise.all([
     apiGet<{ data: Category[] }>("/api/admin/categories").catch(() => ({ data: [] })),
     apiGet<{ data: AdminMarque[] }>("/api/admin/marques").catch(() => ({ data: [] })),
     apiGet<{ stockStats: typeof defaultStats; statusCounts: typeof defaultStatus }>("/api/admin/products/stats")
       .catch(() => ({ stockStats: defaultStats, statusCounts: defaultStatus })),
+    apiGet<{ items: StockMovement[]; total: number; counts: typeof defaultMovCounts }>(
+      "/api/admin/stock/mouvements?type=tous&limit=1&offset=0"
+    ).catch(() => ({ items: [], total: 0, counts: defaultMovCounts })),
   ]);
 
   const categories   = categoriesRes.data ?? [];
@@ -88,7 +91,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   let total = 0;
   let movements: StockMovement[] = [];
   let movTotal = 0;
-  let movCounts = defaultMovCounts;
+  let movCounts = movCountsRes.counts;
   let fetchError: string | null = null;
 
   if (isStockView) {
@@ -273,7 +276,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                 </option>
               ))}
             </select>
-            <button type="submit" className="px-4 py-2 rounded-2xl bg-slate-700 text-white font-bold text-sm hover:bg-slate-600 transition-colors">
+            <button type="submit" className="px-4 self-stretch rounded-2xl bg-slate-700 text-white font-bold text-sm hover:bg-slate-600 transition-colors">
               OK
             </button>
           </form>
