@@ -139,6 +139,7 @@ export default function MessageNotifier() {
             </button>
             <a
               href={`/admin/whatsapp/${encodeURIComponent(from)}`}
+              onClick={() => removeToast(id)}
               className="text-[10px] font-bold text-amber-600 hover:underline"
             >
               Répondre →
