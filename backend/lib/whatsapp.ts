@@ -286,8 +286,7 @@ export async function sendOrderNotifications({
       getSetting("site_url"),
     ]);
 
-    console.log(`[WA] sendOrderNotifications — ref=${reference} tel=${telephone}`);
-    console.log(`[WA] settings: clientEnabled=${clientEnabled} adminEnabled=${adminEnabled} clientTemplate=${clientTemplate} adminTemplate=${adminTemplate} adminNumber=${adminNumber} lang=${lang}`);
+    if (process.env.NODE_ENV !== "production") console.log(`[WA] sendOrderNotifications — ref=${reference} tel=${telephone}`);
 
     const languageCode = lang || "fr";
     const baseUrl      = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
@@ -306,30 +305,24 @@ export async function sendOrderNotifications({
 
     // Client
     if (clientEnabled === "1" && clientTemplate && telephone) {
-      console.log(`[WA] Sending client notif to ${telephone} via template "${clientTemplate}"`);
       const result = await sendWaTemplate({
         to:           telephone,
         templateName: clientTemplate,
         languageCode,
         bodyParams:   [nom, reference, articlesStr, totalStr, trackingUrl],
       });
-      console.log(`[WA] Client notif result (${reference}):`, result);
-    } else {
-      console.log(`[WA] Client notif SKIPPED — enabled=${clientEnabled} template="${clientTemplate}" tel="${telephone}"`);
+      if (process.env.NODE_ENV !== "production") console.log(`[WA] Client notif result (${reference}):`, result);
     }
 
     // Admin
     if (adminEnabled === "1" && adminTemplate && adminNumber) {
-      console.log(`[WA] Sending admin notif to ${adminNumber} via template "${adminTemplate}"`);
       const result = await sendWaTemplate({
         to:           adminNumber,
         templateName: adminTemplate,
         languageCode,
         bodyParams:   [reference, nom, telephone, articlesStr, totalStr, adminUrl],
       });
-      console.log(`[WA] Admin notif result (${reference}):`, result);
-    } else {
-      console.log(`[WA] Admin notif SKIPPED — enabled=${adminEnabled} template="${adminTemplate}" number="${adminNumber}"`);
+      if (process.env.NODE_ENV !== "production") console.log(`[WA] Admin notif result (${reference}):`, result);
     }
   } catch (e) {
     console.error("[WA] sendOrderNotifications error:", e);

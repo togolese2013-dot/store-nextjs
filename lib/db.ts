@@ -22,7 +22,7 @@ function createPool() {
     return mysql.createPool({
       uri:                url,
       waitForConnections: true,
-      connectionLimit:    6,
+      connectionLimit:    3,
       charset:            "utf8mb4",
       timezone:           "+00:00",
       ssl: isProduction ? { rejectUnauthorized: false } : undefined,

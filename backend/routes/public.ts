@@ -18,9 +18,12 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return result;
 }
 
-// ── Bestsellers cache — 10 min TTL ───────────────────────────────────────────
-async function loadBestsellerProducts(limit: number) {
+// ── Bestsellers cache — 60s TTL ──────────────────────────────────────────────
+let _bsCache: { data: unknown[]; ts: number } | null = null;
+const BS_TTL = 60_000;
 
+async function loadBestsellerProducts(limit: number) {
+  if (_bsCache && Date.now() - _bsCache.ts < BS_TTL) return _bsCache.data;
 
   const pool = db as import("mysql2/promise").Pool;
 
@@ -105,6 +108,7 @@ async function loadBestsellerProducts(limit: number) {
     products = topPool.slice(0, limit);
   }
 
+  _bsCache = { data: products, ts: Date.now() };
   return products;
 }
 

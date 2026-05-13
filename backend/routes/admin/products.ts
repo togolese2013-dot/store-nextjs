@@ -7,6 +7,22 @@ import type mysql from "mysql2/promise";
 
 const router = express.Router();
 
+function validateImageUrl(url: unknown): string | null {
+  if (!url || typeof url !== "string" || url.trim() === "") return null;
+  const u = url.trim();
+  if (!u.startsWith("http")) return u; // relative path — OK
+  if (u.includes("cloudinary.com")) return u;
+  throw new Error(`Image externe non autorisée : ${u}. Utilisez uniquement Cloudinary.`);
+}
+
+function validateImages(imgs: unknown): string[] {
+  if (!Array.isArray(imgs)) return [];
+  return imgs.map(u => {
+    const v = validateImageUrl(u);
+    return v ?? "";
+  }).filter(Boolean);
+}
+
 router.get("/api/admin/products/stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
@@ -63,6 +79,13 @@ router.post("/api/admin/products", async (req, res) => {
 
     if (!nom || prix_unitaire == null) {
       return res.status(400).json({ error: "Champs obligatoires manquants." });
+    }
+
+    try {
+      validateImageUrl(image_url);
+      validateImages(images);
+    } catch (e) {
+      return res.status(400).json({ error: e instanceof Error ? e.message : "Image invalide." });
     }
 
     const cleanImages = Array.isArray(images) ? images.filter((u: unknown) => typeof u === "string" && u.trim() !== "") : [];
@@ -224,20 +247,25 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }
-    // Handle image column: body always sends "image_url", but DB may use "image" instead
-    if ("image_url" in body || "image" in body) {
-      const imgVal = ("image_url" in body ? body.image_url : body.image) as string | null;
-      const imgCol = cols.image_url ? "image_url" : cols.image ? "image" : null;
-      if (imgCol) { sets.push(`${imgCol} = ?`); vals.push(imgVal ?? null); }
-    }
-    if (cols.stock_minimum && "stock_minimum" in body) { sets.push("stock_minimum = ?"); vals.push(body.stock_minimum); }
-    if (cols.marque_id     && "marque_id"     in body) { sets.push("marque_id = ?");     vals.push(body.marque_id); }
-    if (cols.images_json   && "images_json"   in body) { sets.push("images_json = ?");   vals.push(body.images_json); }
-    if ("images" in body) {
-      const rawImgs   = Array.isArray(body.images) ? body.images : [];
-      const cleanImgs = rawImgs.filter((u: unknown) => typeof u === "string" && (u as string).trim() !== "");
-      sets.push("images_json = ?");
-      vals.push(cleanImgs.length > 0 ? JSON.stringify(cleanImgs) : null);
+    // Validate & handle image column
+    try {
+      if ("image_url" in body || "image" in body) {
+        const imgVal = ("image_url" in body ? body.image_url : body.image) as string | null;
+        const safe   = validateImageUrl(imgVal);
+        const imgCol = cols.image_url ? "image_url" : cols.image ? "image" : null;
+        if (imgCol) { sets.push(`${imgCol} = ?`); vals.push(safe ?? null); }
+      }
+      if (cols.images_json && "images_json" in body) {
+        const parsed = typeof body.images_json === "string" ? JSON.parse(body.images_json) : body.images_json;
+        const safe   = validateImages(parsed);
+        sets.push("images_json = ?"); vals.push(safe.length > 0 ? JSON.stringify(safe) : null);
+      }
+      if ("images" in body) {
+        const safe = validateImages(body.images);
+        sets.push("images_json = ?"); vals.push(safe.length > 0 ? JSON.stringify(safe) : null);
+      }
+    } catch (e) {
+      return res.status(400).json({ error: e instanceof Error ? e.message : "Image invalide." });
     }
     if (!sets.length) return res.json({ ok: true });
     vals.push(req.params.id);
