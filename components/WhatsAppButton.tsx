@@ -279,8 +279,8 @@ const WIDGET_CSS = `
     right: 0;
     bottom: 0;
     width: 100%;
-    height: 82dvh;
-    max-height: 82dvh;
+    height: 65dvh;
+    max-height: 65dvh;
     border-radius: 20px 20px 0 0;
     transform: translateY(100%);
     opacity: 1;
@@ -305,6 +305,25 @@ export default function WhatsAppButton() {
     // so only our custom theme applies
     script.onload = () => {
       document.querySelectorAll('link[href*="widget.css"]').forEach(el => el.remove());
+
+      // On mobile: blur input when widget opens to avoid keyboard popping up immediately
+      if (window.innerWidth < 480) {
+        const observer = new MutationObserver(() => {
+          const win = document.getElementById("serena-window");
+          if (win?.classList.contains("open")) {
+            const input = document.getElementById("serena-input") as HTMLInputElement | null;
+            if (input) {
+              input.setAttribute("readonly", "true");
+              setTimeout(() => {
+                input.blur();
+                input.removeAttribute("readonly");
+              }, 100);
+            }
+          }
+        });
+        const target = document.getElementById("serena-window");
+        if (target) observer.observe(target, { attributes: true, attributeFilter: ["class"] });
+      }
     };
     document.body.appendChild(script);
 
