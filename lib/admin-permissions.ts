@@ -37,6 +37,7 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
       { id: "finance",               label: "Finance" },
       { id: "boutique-clients",      label: "Clients boutique" },
       { id: "boutique-segmentation", label: "Segmentation" },
+      { id: "whatsapp",              label: "WhatsApp" },
     ],
   },
   store: {
@@ -59,7 +60,7 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
     pages: [
       { id: "crm",             label: "Clients" },
       { id: "messages",        label: "Messages" },
-      { id: "whatsapp",        label: "Diffusion WhatsApp" },
+      { id: "serena",          label: "Conversations Séréna" },
       { id: "fidelite",        label: "Fidélité" },
       { id: "parrainage",      label: "Parrainage" },
       { id: "newsletter",      label: "Newsletter" },

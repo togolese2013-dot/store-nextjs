@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { RefreshCw, Menu } from "lucide-react";
 import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
+import MessageNotifier from "./MessageNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
 
 import type { AdminPermissions } from "@/lib/admin-permissions";
@@ -90,6 +91,7 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
         </main>
       </div>
       <OrderNotifier />
+      <MessageNotifier />
     </div>
   );
 }

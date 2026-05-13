@@ -44,6 +44,8 @@ import { ensureSecurityLogsTable } from "./lib/security-log";
 import adminRapportsRoutes  from "./routes/admin/rapports";
 import adminTendancesRoutes        from "./routes/admin/tendances";
 import adminPerfProduitsRoutes     from "./routes/admin/performance-produits";
+import adminWhatsappInboxRoutes    from "./routes/admin/whatsapp-inbox";
+import waWebhookRoutes, { ensureWaMessagesTable } from "./routes/whatsapp-webhook";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -140,6 +142,8 @@ app.use(publicRoutes);
 app.use(accountRoutes);
 app.use(ordersRoutes);
 app.use(mobileMoneyRoutes);
+app.use(adminWhatsappInboxRoutes);
+app.use(waWebhookRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);
@@ -190,6 +194,12 @@ try {
     console.log("[backend] indexes OK");
   } catch (e) {
     console.error("[backend] ensureIndexes failed:", e);
+  }
+  try {
+    await ensureWaMessagesTable();
+    console.log("[backend] wa_messages table OK");
+  } catch (e) {
+    console.error("[backend] ensureWaMessagesTable failed:", e);
   }
 });
 

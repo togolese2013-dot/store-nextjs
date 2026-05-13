@@ -50,6 +50,7 @@ const MODULES: Record<string, {
       { label: "Segmentation",   href: "/admin/boutique-segmentation", icon: PieChart },
       { label: "Commerciaux",    href: "/admin/commerciaux",           icon: UserCheck },
       { label: "Statistiques",   href: "/admin/boutique-stats",        icon: BarChart2 },
+      { label: "WhatsApp",       href: "/admin/whatsapp",              icon: MessageCircle },
     ],
   },
   store: {
@@ -75,7 +76,7 @@ const MODULES: Record<string, {
     dot:    "bg-indigo-400",
     items: [
       { label: "Clients",            href: "/admin/crm",             icon: Users },
-      { label: "Conversations Séréna", href: "/admin/whatsapp",      icon: MessageCircle },
+      { label: "Conversations Séréna", href: "/admin/serena",        icon: MessageCircle },
       { label: "Fidélité",           href: "/admin/fidelite",        icon: Gift },
       { label: "Parrainage",         href: "/admin/parrainage",      icon: Link2 },
       { label: "Newsletter",         href: "/admin/newsletter",      icon: Mail },
@@ -115,6 +116,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/finance",               "boutique"],
   ["/admin/commerciaux",           "boutique"],
   ["/admin/boutique-stats",        "boutique"],
+  ["/admin/whatsapp",              "boutique"],
   ["/admin/store",                 "store"],
   ["/admin/orders",                "store"],
   ["/admin/coupons",               "store"],
@@ -128,7 +130,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/rapports",              "admin"],
   ["/admin/tendances",             "admin"],
   ["/admin/crm",                   "crm"],
-  ["/admin/whatsapp",              "crm"],
+  ["/admin/serena",                "crm"],
   ["/admin/fidelite",              "crm"],
   ["/admin/parrainage",            "crm"],
   ["/admin/newsletter",            "crm"],
