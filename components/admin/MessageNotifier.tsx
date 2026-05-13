@@ -11,50 +11,56 @@ interface WaToast {
   body: string;
 }
 
-type ACtx = AudioContext & { webkitAudioContext?: never };
-const AudioCtxClass: typeof AudioContext | undefined =
+const AudioCtxClass =
   typeof window !== "undefined"
     ? (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)
     : undefined;
 
-// Singleton AudioContext — créé une fois au premier geste utilisateur
-let _audioCtx: ACtx | null = null;
+let _ctx: AudioContext | null = null;
+let _unlocked = false;
 
-function getAudioCtx(): ACtx | null {
+function getCtx(): AudioContext | null {
   if (!AudioCtxClass) return null;
-  if (!_audioCtx) {
-    try { _audioCtx = new AudioCtxClass() as ACtx; } catch { return null; }
-  }
-  return _audioCtx;
+  if (!_ctx) { try { _ctx = new AudioCtxClass(); } catch { return null; } }
+  return _ctx;
 }
 
-// Initialise l'AudioContext lors du premier geste (obligatoire sur mobile)
-function initAudioOnGesture() {
-  const ctx = getAudioCtx();
-  if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+// iOS/Android : jouer un buffer silencieux PENDANT le geste déverrouille l'audio
+// pour tous les appels futurs (même hors geste).
+function unlockAudioOnGesture() {
+  if (_unlocked) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+  ctx.resume().then(() => {
+    const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    _unlocked = true;
+  }).catch(() => {});
 }
 
 async function playMessageSound() {
-  const ctx = getAudioCtx();
+  const ctx = getCtx();
   if (!ctx) return;
   try {
-    // Resume nécessaire sur iOS/Android après suspension
     if (ctx.state === "suspended") await ctx.resume();
-    const playBeep = (freq: number, start: number, duration: number) => {
+    const beep = (freq: number, t: number, dur: number) => {
       const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.type = "sine";
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + duration);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + dur);
     };
-    playBeep(660,  0,    0.12);
-    playBeep(880,  0.15, 0.12);
-    playBeep(1100, 0.30, 0.18);
+    beep(660,  0,    0.12);
+    beep(880,  0.15, 0.12);
+    beep(1100, 0.30, 0.18);
   } catch { /* blocked */ }
 }
 
@@ -82,15 +88,15 @@ export default function MessageNotifier() {
   const toastIdRef            = useRef(0);
   const { subscribe }         = useAdminSSE();
 
-  // Initialise AudioContext + demande permission notification au premier geste
+  // Déverrouille l'audio + demande permission notification au premier geste
   useEffect(() => {
-    const onGesture = () => initAudioOnGesture();
-    window.addEventListener("click",      onGesture, { once: true, passive: true });
-    window.addEventListener("touchstart", onGesture, { once: true, passive: true });
+    // `once: false` — on écoute plusieurs gestes au cas où le premier échoue
+    const onGesture = () => unlockAudioOnGesture();
+    window.addEventListener("click",      onGesture, { passive: true });
+    window.addEventListener("touchstart", onGesture, { passive: true });
 
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-      const ask = () => { Notification.requestPermission(); };
-      window.addEventListener("click", ask, { once: true });
+      window.addEventListener("click", () => Notification.requestPermission(), { once: true });
     }
 
     return () => {
