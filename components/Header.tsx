@@ -317,7 +317,7 @@ export default function Header() {
                 >
                   <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0">
                     {avatarPhoto ? (
-                      <Image src={avatarPhoto} alt={avatarNom ?? "Avatar"} width={32} height={32} className="w-full h-full object-cover" />
+                      <img src={avatarPhoto} alt={avatarNom ?? "Avatar"} width={32} height={32} className="w-full h-full object-cover" onError={() => setAvatarPhoto(null)} />
                     ) : avatarNom ? (
                       <div className="w-full h-full bg-brand-900 text-white flex items-center justify-center text-xs font-bold">
                         {avatarNom.charAt(0).toUpperCase()}

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   User, Package, Heart, Star, Users, MapPin,
   CreditCard, Bell, Settings, ChevronRight,
@@ -380,12 +379,13 @@ export default function AccountDropdown({ open, onClose, onUserChange }: Props) 
         className="px-4 py-4 border-b border-slate-50 flex items-center gap-3 hover:bg-slate-50 transition-colors"
       >
         {user?.photo_url ? (
-          <Image
+          <img
             src={user.photo_url}
             alt={user.nom}
             width={40}
             height={40}
             className="w-10 h-10 rounded-full object-cover shrink-0"
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         ) : (
           <div className="w-10 h-10 rounded-full bg-brand-900 flex items-center justify-center text-white text-sm font-800 shrink-0">
