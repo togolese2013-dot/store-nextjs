@@ -237,7 +237,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
 
       const payload: Record<string, unknown> = {
         reference:          form.reference,
-        slug:               form.slug || null,
+        slug:               form.slug.replace(/^_+|_+$/g, "") || null,
         nom:                form.nom,
         description:        form.description,
         description_longue: form.description_longue || null,
@@ -400,7 +400,10 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                   value={form.slug}
                   onChange={e => {
                     setSlugEdited(true);
-                    set("slug", e.target.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, ""));
+                    set("slug", e.target.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_"));
+                  }}
+                  onBlur={() => {
+                    set("slug", form.slug.replace(/^_+|_+$/g, ""));
                   }}
                   placeholder="gelatine_vegetale_500g"
                   className={inputCls}
