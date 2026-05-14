@@ -5,6 +5,7 @@ import ProductForm from "@/components/admin/ProductForm";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Modifier un produit" };
 
 interface PageProps { params: Promise<{ id: string }> }

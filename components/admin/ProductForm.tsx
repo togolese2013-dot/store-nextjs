@@ -94,6 +94,19 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     images:             secondaryImages,
   });
 
+  // Always fetch the latest slug from API on mount (bypasses all Next.js/Vercel caching)
+  useEffect(() => {
+    if (!isEdit || !initial?.id) return;
+    fetch(`/api/admin/products/${initial.id}`)
+      .then(r => r.json())
+      .then(d => {
+        const slug = ((d.product?.slug ?? "") as string);
+        if (slug) { setForm(f => ({ ...f, slug })); setSlugEdited(true); }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.id]);
+
   const [loading,        setLoading]        = useState(false);
   const [uploadingMain,  setUploadingMain]  = useState(false);
   const [uploadingSecond,setUploadingSecond]= useState(false);
