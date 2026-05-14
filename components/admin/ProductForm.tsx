@@ -73,6 +73,14 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
 
   const [slugEdited, setSlugEdited] = useState(!!initial?.id);
 
+  // Resync slug from server after router.refresh() or navigation
+  const initialSlug = (initial as Record<string, unknown>)?.slug as string ?? "";
+  useEffect(() => {
+    setForm(f => ({ ...f, slug: initialSlug }));
+    if (initialSlug) setSlugEdited(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSlug]);
+
   const [form, setForm] = useState<ProductData>({
     reference:          initial?.reference          ?? "",
     slug:               (initial as Record<string, unknown>)?.slug as string ?? "",
@@ -237,7 +245,9 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
 
       const payload: Record<string, unknown> = {
         reference:          form.reference,
-        slug:               form.slug.replace(/^_+|_+$/g, "") || null,
+        ...(form.slug.replace(/^_+|_+$/g, "")
+          ? { slug: form.slug.replace(/^_+|_+$/g, "") }
+          : isEdit ? {} : { slug: null }),
         nom:                form.nom,
         description:        form.description,
         description_longue: form.description_longue || null,
