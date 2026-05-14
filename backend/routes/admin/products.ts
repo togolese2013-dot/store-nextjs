@@ -158,6 +158,58 @@ router.post("/api/admin/products", async (req, res) => {
   }
 });
 
+// ── Auto-generate slugs for products that have none ───────────────────────────
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9_\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+router.post("/api/admin/products/generate-slugs", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+
+  const pool = db as import("mysql2/promise").Pool;
+  try {
+    try { await pool.execute(`ALTER TABLE produits ADD COLUMN slug VARCHAR(255) NULL`); } catch { /* exists */ }
+    try { await pool.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_slug (slug)`); } catch { /* exists */ }
+
+    const [rows] = await pool.query<mysql.RowDataPacket[]>(
+      "SELECT id, nom, reference FROM produits WHERE slug IS NULL OR slug = ''"
+    );
+
+    let updated = 0;
+    for (const row of rows as mysql.RowDataPacket[]) {
+      const base = toSlug((row.nom as string) || (row.reference as string));
+      if (!base) continue;
+
+      let slug = base;
+      let attempt = 0;
+      for (;;) {
+        const candidate = attempt === 0 ? slug : `${base}_${attempt}`;
+        const [dup] = await pool.execute<mysql.RowDataPacket[]>(
+          "SELECT id FROM produits WHERE slug = ? AND id != ? LIMIT 1", [candidate, row.id]
+        );
+        if ((dup as mysql.RowDataPacket[]).length === 0) { slug = candidate; break; }
+        attempt++;
+      }
+      await pool.execute("UPDATE produits SET slug = ? WHERE id = ?", [slug, row.id]);
+      updated++;
+    }
+
+    emitAdminEvent("produit");
+    res.json({ ok: true, updated });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 // ── Export CSV ────────────────────────────────────────────────────────────────
 router.get("/api/admin/products/export", async (req, res) => {
   const session = await getSession(req);
