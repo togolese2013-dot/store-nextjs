@@ -49,7 +49,11 @@ export default async function EditProductPage({ params }: PageProps) {
           <p className="text-slate-400 text-sm font-mono">{product.reference as string}</p>
         </div>
       </div>
-      <ProductForm categories={categories} initial={initial} />
+      <ProductForm
+        key={`${product.id as number}-${String(product.slug ?? "")}`}
+        categories={categories}
+        initial={initial}
+      />
     </div>
   );
 }
