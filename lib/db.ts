@@ -259,7 +259,7 @@ export async function getProducts(opts?: {
   // Use query() to avoid LIMIT/OFFSET issues with server-side prepared statements
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT
-       p.id, p.reference, p.nom, p.description, p.categorie_id,
+       p.id, p.reference, ${cols.slug ? "p.slug" : "NULL"} AS slug, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                          AS prix_unitaire,
        ${stockBoutiqueCol}                                                       AS stock_boutique,
        ${stockMagasinCol}                                                        AS stock_magasin,
@@ -316,7 +316,7 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
   const placeholders = ids.map(() => "?").join(",");
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT
-       p.id, p.reference, p.nom, p.description, p.categorie_id,
+       p.id, p.reference, ${cols.slug ? "p.slug" : "NULL"} AS slug, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                          AS prix_unitaire,
        ${stockBoutiqueCol}                                                       AS stock_boutique,
        ${stockMagasinCol}                                                        AS stock_magasin,

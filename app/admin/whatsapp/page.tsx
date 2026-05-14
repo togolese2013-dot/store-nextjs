@@ -12,9 +12,25 @@ type Thread = {
   dernier_direction: "inbound" | "outbound";
   dernier_type:      string;
   last_at:           string;
+  notre_numero:      string | null;
   total_messages:    number;
   unread:            number;
 };
+
+function NumeroBadge({ numero, allNumeros }: { numero: string | null; allNumeros: string[] }) {
+  if (!numero) return null;
+  const idx = allNumeros.indexOf(numero);
+  const configs = [
+    { label: "Commande de colis", cls: "bg-violet-100 text-violet-700" },
+    { label: "Boutique",          cls: "bg-amber-100  text-amber-700"  },
+  ];
+  const cfg = configs[idx] ?? { label: numero.slice(-4), cls: "bg-slate-100 text-slate-600" };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+}
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -88,6 +104,11 @@ export default function WhatsappInboxPage() {
   }
 
   const totalUnread = threads.reduce((s, t) => s + t.unread, 0);
+
+  // Numéros distincts triés par première apparition (oldest thread = Commande de colis)
+  const allNumeros = Array.from(
+    new Set([...threads].reverse().map(t => t.notre_numero).filter(Boolean) as string[])
+  );
 
   return (
     <div className="space-y-6">
@@ -179,11 +200,12 @@ export default function WhatsappInboxPage() {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <span className={`text-sm ${t.unread > 0 ? "font-bold text-slate-900" : "font-semibold text-slate-700"}`}>
                         {t.contact_name || t.telephone}
                       </span>
                       {t.contact_name && <span className="text-xs text-slate-400">{t.telephone}</span>}
+                      <NumeroBadge numero={t.notre_numero} allNumeros={allNumeros} />
                     </div>
                     <p className={`text-sm truncate ${t.unread > 0 ? "text-slate-800 font-medium" : "text-slate-500"}`}>
                       {t.dernier_direction === "outbound" && <span className="text-slate-400 mr-1">Vous :</span>}

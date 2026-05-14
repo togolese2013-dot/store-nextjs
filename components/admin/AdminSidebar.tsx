@@ -11,6 +11,7 @@ import {
   Truck, Building2, PieChart, FileText, BarChart2,
   Gift, Mail, UserCheck, Home, ShieldCheck,
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
 import { hasPageAccess } from "@/lib/admin-permissions";
 
@@ -162,6 +163,21 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
   const moduleKey = getActiveModule(pathname);
   const activeModule = moduleKey ? MODULES[moduleKey] : null;
 
+  const [waUnread, setWaUnread] = useState(0);
+  useEffect(() => {
+    async function fetchWaUnread() {
+      try {
+        const res  = await fetch("/api/admin/whatsapp/threads");
+        const data = await res.json();
+        const total = (data.threads ?? []).reduce((s: number, t: { unread: number }) => s + (t.unread ?? 0), 0);
+        setWaUnread(total);
+      } catch { /* ignore */ }
+    }
+    fetchWaUnread();
+    const id = setInterval(fetchWaUnread, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Filter items by permissions (super_admin sees everything)
   const visibleItems = activeModule
     ? activeModule.items.filter(item =>
@@ -227,6 +243,11 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
               >
                 <item.icon className="w-4 h-4 shrink-0 opacity-80" />
                 <span className="flex-1 leading-none">{item.label}</span>
+                {item.href === "/admin/whatsapp" && waUnread > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {waUnread > 99 ? "99+" : waUnread}
+                  </span>
+                )}
                 {isActive(item.href) && <ChevronRight className="w-3 h-3 opacity-60 shrink-0" />}
               </Link>
             ))}

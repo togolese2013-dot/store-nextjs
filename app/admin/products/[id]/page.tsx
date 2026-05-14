@@ -33,6 +33,7 @@ export default async function EditProductPage({ params }: PageProps) {
     actif:          Boolean(product.actif),
     image_url:      ((product.image_url || product.image) as string) ?? "",
     images:         (() => { try { return JSON.parse((product.images_json as string) || "[]"); } catch { return []; } })(),
+    slug:           (product.slug as string) ?? "",
   };
 
   return (

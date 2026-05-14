@@ -13,9 +13,10 @@ const WA_GRAPH = "https://graph.facebook.com/v18.0";
 /* ── Migration colonnes media ─────────────────────────────────────────── */
 export async function ensureWaMessagesCols() {
   const alters = [
-    "ALTER TABLE wa_messages ADD COLUMN media_id   VARCHAR(100) NULL",
-    "ALTER TABLE wa_messages ADD COLUMN media_type VARCHAR(30)  NOT NULL DEFAULT 'text'",
-    "ALTER TABLE wa_messages ADD COLUMN mime_type  VARCHAR(100) NULL",
+    "ALTER TABLE wa_messages ADD COLUMN media_id    VARCHAR(100) NULL",
+    "ALTER TABLE wa_messages ADD COLUMN media_type  VARCHAR(30)  NOT NULL DEFAULT 'text'",
+    "ALTER TABLE wa_messages ADD COLUMN mime_type   VARCHAR(100) NULL",
+    "ALTER TABLE wa_messages ADD COLUMN notre_numero VARCHAR(30) NULL",
   ];
   for (const sql of alters) {
     try { await db.execute(sql); } catch { /* already exists */ }
@@ -42,6 +43,9 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
     if (!value?.messages?.length) return;
     const contactName: string | null = value.contacts?.[0]?.profile?.name ?? null;
+    const notreNumero: string | null = (value.metadata as Record<string,unknown>)?.display_phone_number
+      ? String((value.metadata as Record<string,unknown>).display_phone_number)
+      : null;
 
     for (const msg of value.messages as Record<string, unknown>[]) {
       const from  = String(msg.from ?? "");
@@ -77,9 +81,9 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
 
       await db.execute(
         `INSERT IGNORE INTO wa_messages
-           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type)
-         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?)`,
-        [from, body, waId, contactName, mediaId || null, type, mimeType || null],
+           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type, notre_numero)
+         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?)`,
+        [from, body, waId, contactName, mediaId || null, type, mimeType || null, notreNumero],
       );
       emitAdminEvent("message", { from, body, nom: contactName ?? from });
     }
@@ -101,6 +105,7 @@ router.get("/api/admin/whatsapp/threads", async (req, res) => {
         m.direction      AS dernier_direction,
         m.media_type     AS dernier_type,
         m.created_at     AS last_at,
+        m.notre_numero,
         t.total_messages,
         t.unread
       FROM wa_messages m
