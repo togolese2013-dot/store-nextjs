@@ -8,6 +8,7 @@ const MAX_ITEMS   = 10;
 export interface RecentItem {
   id:        number;
   reference: string;
+  slug?:     string | null;
   nom:       string;
   image_url: string | null;
   prix:      number;

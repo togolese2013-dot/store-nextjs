@@ -49,7 +49,7 @@ function RecentCard({
 
       {/* Image */}
       <Link
-        href={`/products/${item.reference}`}
+        href={`/products/${item.slug ?? item.reference}`}
         className="block relative aspect-square bg-slate-50 overflow-hidden"
       >
         {imgSrc ? (

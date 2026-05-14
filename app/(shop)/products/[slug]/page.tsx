@@ -154,6 +154,7 @@ export default async function ProductPage({ params }: PageProps) {
   const recentItem = {
     id:        product.id,
     reference: product.reference,
+    slug:      product.slug ?? null,
     nom:       product.nom,
     image_url: product.image_url,
     prix:      product.prix_unitaire,

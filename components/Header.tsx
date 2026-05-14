@@ -134,7 +134,7 @@ export default function Header() {
       : null;
     return (
       <Link
-        href={`/products/${p.reference}`}
+        href={`/products/${p.slug ?? p.reference}`}
         onClick={() => { setShowSug(false); setSearch(""); }}
         className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
       >

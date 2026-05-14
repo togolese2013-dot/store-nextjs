@@ -27,7 +27,7 @@ function SuggestionCard({ product }: { product: Product }) {
     <div className="bg-white rounded-2xl border border-slate-100 p-3 flex gap-3 hover:border-brand-200 hover:shadow-sm transition-all group">
       {/* Image */}
       <Link
-        href={`/products/${product.reference}`}
+        href={`/products/${product.slug ?? product.reference}`}
         className="w-16 h-16 rounded-xl bg-slate-50 overflow-hidden relative shrink-0"
       >
         {imgSrc ? (
@@ -47,7 +47,7 @@ function SuggestionCard({ product }: { product: Product }) {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <Link href={`/products/${product.reference}`}>
+        <Link href={`/products/${product.slug ?? product.reference}`}>
           <p className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug mb-1 group-hover:text-brand-800 transition-colors">
             {product.nom}
           </p>

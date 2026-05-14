@@ -145,7 +145,7 @@ export default function CartPage() {
                   </button>
 
                   {/* Thumbnail */}
-                  <Link href={`/products/${item.reference}`}
+                  <Link href={`/products/${item.slug ?? item.reference}`}
                     className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-50 overflow-hidden shrink-0 relative"
                   >
                     {imgSrc ? (
@@ -164,7 +164,7 @@ export default function CartPage() {
                         {item.categorie_nom}
                       </p>
                     )}
-                    <Link href={`/products/${item.reference}`}>
+                    <Link href={`/products/${item.slug ?? item.reference}`}>
                       <h3 className="font-display font-700 text-slate-900 text-base leading-snug mb-2 line-clamp-2 hover:text-brand-900 transition-colors">
                         {item.nom}
                       </h3>

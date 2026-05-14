@@ -394,7 +394,7 @@ export default function CheckoutPage() {
             </p>
             <div className="flex flex-col gap-2">
               {orderedItems.map(item => (
-                <Link key={item.id} href={`/products/${item.reference}#avis`}
+                <Link key={item.id} href={`/products/${item.slug ?? item.reference}#avis`}
                   className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all group"
                 >
                   <span className="text-sm text-slate-800 font-medium line-clamp-1">{item.nom}</span>
