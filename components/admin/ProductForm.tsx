@@ -282,7 +282,6 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       setSuccess(true);
       if (onSuccess) { onSuccess(); return; }
       if (!isEdit) router.push(`/admin/products/${data.id}`);
-      else router.refresh();
     } catch { setError("Erreur réseau."); }
     finally   { setLoading(false); }
   }
