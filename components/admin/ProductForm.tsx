@@ -73,13 +73,6 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
 
   const [slugEdited, setSlugEdited] = useState(!!initial?.id);
 
-  // Resync slug from server after router.refresh() or navigation
-  const initialSlug = (initial as Record<string, unknown>)?.slug as string ?? "";
-  useEffect(() => {
-    setForm(f => ({ ...f, slug: initialSlug }));
-    if (initialSlug) setSlugEdited(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSlug]);
 
   const [form, setForm] = useState<ProductData>({
     reference:          initial?.reference          ?? "",
@@ -280,10 +273,15 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
         }));
       }
 
+      // Update slug from the server response (reliable regardless of router.refresh behavior)
+      if (isEdit && data.slug !== undefined) {
+        const savedSlug = (data.slug as string) ?? "";
+        setForm(f => ({ ...f, slug: savedSlug }));
+        if (savedSlug) setSlugEdited(true);
+      }
       setSuccess(true);
       if (onSuccess) { onSuccess(); return; }
       if (!isEdit) router.push(`/admin/products/${data.id}`);
-      else         router.refresh();
     } catch { setError("Erreur réseau."); }
     finally   { setLoading(false); }
   }

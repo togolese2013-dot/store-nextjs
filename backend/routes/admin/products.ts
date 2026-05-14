@@ -304,7 +304,11 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     }
 
     emitAdminEvent("produit");
-    res.json({ ok: true });
+    // Re-read slug from DB so the client can update its state reliably
+    const [refreshed] = await (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>(
+      "SELECT slug FROM produits WHERE id = ? LIMIT 1", [req.params.id]
+    );
+    res.json({ ok: true, slug: (refreshed as mysql.RowDataPacket[])[0]?.slug ?? null });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
