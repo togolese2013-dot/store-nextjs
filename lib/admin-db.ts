@@ -2138,6 +2138,11 @@ export async function deleteFacture(id: number) {
       [`%${ref}%`]
     ).catch(() => {});
   }
+  // Catch entries created by livraison confirmation — description uses facture ID, not reference
+  await db.execute(
+    "DELETE FROM finance_entries WHERE description LIKE ?",
+    [`%facture #${id}%`]
+  ).catch(() => {});
   invalidateVentesStats();
 }
 
