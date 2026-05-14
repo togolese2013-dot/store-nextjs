@@ -2,4 +2,4 @@
 buildCommand = "npm install mysql2 && cd backend && npm install --include=dev && npm run build"
 
 [deploy]
-startCommand = "cd backend && npm start"
+startCommand = "cd backend && node dist/backend/index.js"
