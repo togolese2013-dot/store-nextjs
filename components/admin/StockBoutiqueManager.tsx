@@ -18,6 +18,7 @@ interface Props {
   initialItems:     BoutiqueStockItem[];
   initialTotal:     number;
   initialMovements: BoutiqueMouvement[];
+  canAjustement?:   boolean;
 }
 
 /* ─── Constants ─── */
@@ -54,6 +55,7 @@ export default function StockBoutiqueManager({
   initialItems,
   initialTotal,
   initialMovements,
+  canAjustement = true,
 }: Props) {
   /* ── State principal ── */
   const [stats,     setStats]     = useState<BoutiqueStats>(initialStats);
@@ -240,7 +242,7 @@ export default function StockBoutiqueManager({
         refreshLoading={loading}
         ctaLabel="Retrait"
         ctaIcon={ArrowDownLeft}
-        onCtaClick={() => openModal("retrait")}
+        onCtaClick={canAjustement ? () => openModal("retrait") : undefined}
       />
 
       {/* ══════════════════════════════════════

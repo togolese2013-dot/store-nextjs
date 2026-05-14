@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Wand2, Loader2, CheckCircle } from "lucide-react";
 
-export default function GenerateSlugsButton() {
+export default function GenerateSlugsButton({ canGenerateSlugs = true }: { canGenerateSlugs?: boolean }) {
+  if (!canGenerateSlugs) return null;
   const [loading, setLoading] = useState(false);
   const [result,  setResult]  = useState<{ updated: number } | null>(null);
 

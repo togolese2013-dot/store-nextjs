@@ -174,6 +174,10 @@ function toSlug(name: string): string {
 router.post("/api/admin/products/generate-slugs", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "generate_slugs")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
 
   const pool = db as import("mysql2/promise").Pool;
   try {
@@ -214,6 +218,10 @@ router.post("/api/admin/products/generate-slugs", async (req, res) => {
 router.get("/api/admin/products/export", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "export_csv")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
 
   try {
     const q       = (req.query.q as string) || undefined;
@@ -371,7 +379,7 @@ router.delete("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   if (!["super_admin", "admin"].includes(session.role) &&
-      !hasPageAccess(session.role, session.permissions, "magasin", "products")) {
+      !hasPageAccess(session.role, session.permissions, "magasin", "delete_product")) {
     return res.status(403).json({ error: "Accès refusé." });
   }
   await (db as import("mysql2/promise").Pool).execute(

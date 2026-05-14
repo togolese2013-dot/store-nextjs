@@ -1,5 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
+import { hasPageAccess } from "@/lib/admin-permissions";
 import { emitAdminEvent } from "../../lib/admin-events";
 import { sendBoutiqueVenteNotif } from "../../lib/whatsapp";
 import {
@@ -47,6 +48,10 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
 router.post("/api/admin/ventes/factures", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "boutique", "create_vente")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
   try {
     const body = req.body;
     if (!body.client_nom || !body.items?.length) {
@@ -87,6 +92,10 @@ router.get("/api/admin/ventes/factures/:id", async (req, res) => {
 router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "boutique", "edit_vente")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
   try {
     const { statut, statut_paiement, mode_paiement, montant_acompte, montant_paiement } = req.body;
     if (statut && !statut_paiement && !mode_paiement && montant_acompte === undefined) {
@@ -108,6 +117,10 @@ router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
 router.delete("/api/admin/ventes/factures/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "boutique", "delete_vente")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
   await deleteFacture(Number(req.params.id));
   res.json({ ok: true });
 });

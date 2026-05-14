@@ -8,9 +8,11 @@ interface Props {
   catId?: number;
   brandId?: number;
   statut?: string;
+  canExport?: boolean;
 }
 
-export default function ExportProductsButton({ q, catId, brandId, statut }: Props) {
+export default function ExportProductsButton({ q, catId, brandId, statut, canExport = true }: Props) {
+  if (!canExport) return null;
   const [loading, setLoading] = useState(false);
 
   async function handleExport() {

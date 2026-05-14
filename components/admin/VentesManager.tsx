@@ -34,6 +34,9 @@ interface Props {
   initialStats:      Stats;
   totalFactures:     number;
   totalLivraisons:   number;
+  canCreate?:        boolean;
+  canEdit?:          boolean;
+  canDelete?:        boolean;
 }
 
 interface VenteItem {
@@ -166,6 +169,7 @@ const emptyModal = (): NewVenteModal => ({
 export default function VentesManager({
   initialFactures, initialLivraisons,
   initialStats, totalFactures, totalLivraisons,
+  canCreate = true, canEdit = true, canDelete = true,
 }: Props) {
 
   /* ── State principal ── */
@@ -493,7 +497,7 @@ export default function VentesManager({
         onRefresh={() => fetchTab(search, offset)}
         refreshLoading={loading}
         ctaLabel="Nouvelle vente"
-        onCtaClick={openModal}
+        onCtaClick={canCreate ? openModal : undefined}
       />
 
       {/* KPI Dashboard */}
@@ -655,9 +659,9 @@ export default function VentesManager({
                         <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleView(f)} title="Voir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>
-                            <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>
+                            {canEdit && <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>}
                             <button onClick={() => handlePrint(f)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
-                            {f.source !== "site_order" && (
+                            {canDelete && f.source !== "site_order" && (
                               <button onClick={() => handleDelete(f.id)} title="Supprimer" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                             )}
                           </div>

@@ -20,10 +20,13 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
     label: "Magasin",
     color: "brand",
     pages: [
-      { id: "products",     label: "Produits" },
-      { id: "categories",   label: "Catégories" },
-      { id: "fournisseurs", label: "Fournisseurs" },
-      { id: "achats",       label: "Achats" },
+      { id: "products",        label: "Produits" },
+      { id: "categories",      label: "Catégories" },
+      { id: "fournisseurs",    label: "Fournisseurs" },
+      { id: "achats",          label: "Achats" },
+      { id: "delete_product",  label: "Supprimer un produit" },
+      { id: "generate_slugs",  label: "Générer les slugs" },
+      { id: "export_csv",      label: "Exporter CSV" },
     ],
   },
   boutique: {
@@ -38,6 +41,10 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
       { id: "boutique-clients",      label: "Clients boutique" },
       { id: "boutique-segmentation", label: "Segmentation" },
       { id: "whatsapp",              label: "WhatsApp" },
+      { id: "delete_vente",          label: "Supprimer une vente" },
+      { id: "create_vente",          label: "Créer une vente" },
+      { id: "edit_vente",            label: "Modifier / paiement" },
+      { id: "stock_ajustement",      label: "Ajuster le stock boutique" },
     ],
   },
   store: {

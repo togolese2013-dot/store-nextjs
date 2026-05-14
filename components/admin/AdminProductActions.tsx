@@ -20,7 +20,7 @@ interface Product {
   images:         string[];
 }
 
-export default function AdminProductActions({ product }: { product: Product }) {
+export default function AdminProductActions({ product, canDelete = true }: { product: Product; canDelete?: boolean }) {
   const [showView, setShowView] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -66,14 +66,16 @@ export default function AdminProductActions({ product }: { product: Product }) {
         </button>
 
         {/* Delete */}
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          title="Supprimer"
-          className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-40"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Supprimer"
+            className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-40"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {showView && (

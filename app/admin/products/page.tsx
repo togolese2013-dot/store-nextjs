@@ -14,6 +14,7 @@ import {
 import PageHeader from "@/components/admin/PageHeader";
 import ExportProductsButton from "@/components/admin/ExportProductsButton";
 import GenerateSlugsButton  from "@/components/admin/GenerateSlugsButton";
+import { adminCan }         from "@/lib/admin-session";
 
 export const metadata = { title: "Tous les produits" };
 
@@ -122,6 +123,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
     await apiGet<{ total: number }>("/api/admin/products?limit=1&offset=0")
       .then(r => r.total).catch(() => 0);
 
+  const [canDelete, canGenerateSlugs, canExportCSV] = await Promise.all([
+    adminCan("magasin", "delete_product"),
+    adminCan("magasin", "generate_slugs"),
+    adminCan("magasin", "export_csv"),
+  ]);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewTabs: { key: View; label: string; icon: any; count: number }[] = [
     { key: "stock",      label: "Produits",   icon: Package,  count: prodTotal },
@@ -159,13 +166,15 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
         extra={
           view === "stock" ? (
             <div className="flex items-center gap-2">
-              <GenerateSlugsButton />
-              <ExportProductsButton
-                q={q}
-                catId={catId}
-                brandId={brandId}
-                statut={statut !== "all" ? statut : undefined}
-              />
+              {canGenerateSlugs && <GenerateSlugsButton />}
+              {canExportCSV && (
+                <ExportProductsButton
+                  q={q}
+                  catId={catId}
+                  brandId={brandId}
+                  statut={statut !== "all" ? statut : undefined}
+                />
+              )}
               <AddProductModal categories={categories} marques={marques} />
             </div>
           ) : (
@@ -352,7 +361,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             }`} />
                             Stock {p.stock_magasin} · {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
                           </span>
-                          <AdminProductActions product={p} />
+                          <AdminProductActions product={p} canDelete={canDelete} />
                         </div>
                       </div>
                     </div>
@@ -429,7 +438,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <AdminProductActions product={p} />
+                            <AdminProductActions product={p} canDelete={canDelete} />
                           </td>
                         </tr>
                       );

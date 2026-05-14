@@ -1,11 +1,18 @@
 import { apiGet } from "@/lib/api";
 import VentesManager from "@/components/admin/VentesManagerClient";
 import type VentesManagerType from "@/components/admin/VentesManager";
+import { adminCan } from "@/lib/admin-session";
 
 export const metadata = { title: "Ventes" };
 export const dynamic  = "force-dynamic";
 
 export default async function VentesPage() {
+  const [canCreate, canEdit, canDelete] = await Promise.all([
+    adminCan("boutique", "create_vente"),
+    adminCan("boutique", "edit_vente"),
+    adminCan("boutique", "delete_vente"),
+  ]);
+
   try {
     const [facturesRes, livraisonsRes, stats] = await Promise.all([
       apiGet<{ items: unknown[]; total: number }>("/api/admin/ventes/factures?limit=50"),
@@ -22,6 +29,9 @@ export default async function VentesPage() {
         initialStats={stats}
         totalFactures={facturesRes.total}
         totalLivraisons={livraisonsRes.total}
+        canCreate={canCreate}
+        canEdit={canEdit}
+        canDelete={canDelete}
       />
     );
   } catch {

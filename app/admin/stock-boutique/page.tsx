@@ -4,10 +4,15 @@ import {
   getRecentBoutiqueMovements,
 } from "@/lib/admin-db";
 import StockBoutiqueManager from "@/components/admin/StockBoutiqueManager";
+import { adminCan } from "@/lib/admin-session";
 
 export const metadata = { title: "Stock Boutique" };
 
+export const dynamic = "force-dynamic";
+
 export default async function StockBoutiquePage() {
+  const canAjustement = await adminCan("boutique", "stock_ajustement");
+
   let stats        = { total_produits: 0, valeur_boutique: 0, stock_faible: 0, epuises: 0 };
   let items:       Awaited<ReturnType<typeof getStockBoutiqueList>>["items"] = [];
   let total        = 0;
@@ -50,6 +55,7 @@ export default async function StockBoutiquePage() {
       initialItems={items}
       initialTotal={total}
       initialMovements={movements}
+      canAjustement={canAjustement}
     />
   );
 }

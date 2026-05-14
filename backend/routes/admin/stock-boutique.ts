@@ -1,5 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
+import { hasPageAccess } from "@/lib/admin-permissions";
 import {
   getStockBoutiqueStats, getStockBoutiqueList, getRecentBoutiqueMovements,
   createBoutiqueMouvement,
@@ -38,6 +39,10 @@ router.get("/api/admin/stock-boutique", async (req, res) => {
 router.post("/api/admin/stock-boutique/mouvement", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "boutique", "stock_ajustement")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
   try {
     const { produit_id, type, quantite, motif, ref_commande } = req.body;
     if (!produit_id || !type || !quantite) {
