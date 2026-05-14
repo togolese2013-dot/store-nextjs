@@ -258,6 +258,7 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }
+    console.log("[PATCH products] id=", req.params.id, "| body.slug=", body.slug, "| slug in sets=", sets.some(s => s.startsWith("slug")));
     // Validate & handle image column
     try {
       if ("image_url" in body || "image" in body) {
