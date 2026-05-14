@@ -19,6 +19,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   images: {
+    unoptimized: true,
     remotePatterns: [
       { protocol: "http",  hostname: "localhost" },
       { protocol: "https", hostname: "res.cloudinary.com" },
