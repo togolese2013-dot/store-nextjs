@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { apiGet } from "@/lib/api";
 import type { Product } from "@/lib/utils";
 import ProductCard from "@/components/ProductCard";
+import ShuffledProductGrid from "@/components/ShuffledProductGrid";
 import HeroSection from "@/components/HeroSection";
 import TestimonialsSlider from "@/components/TestimonialsSlider";
 import Link from "next/link";
@@ -284,7 +285,7 @@ export default async function HomePage() {
           viewAll={{ label: "Toutes les promos", href: "/products?promo=true" }}
           bg="bg-white"
         >
-          <ProductGrid products={promos} />
+          <ShuffledProductGrid products={promos} />
         </Section>
       )}
 
