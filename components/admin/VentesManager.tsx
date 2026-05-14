@@ -14,6 +14,7 @@ import PageHeader from "@/components/admin/PageHeader";
 import type { Facture, Livraison, BoutiqueStockItem } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
+import { useAdminSSE } from "@/components/admin/useAdminSSE";
 
 /* ─── Types ─── */
 
@@ -199,7 +200,8 @@ export default function VentesManager({
   const [loadingStock,   setLoadingStock]   = useState(false);
   const [prodSearch,     setProdSearch]     = useState("");
   const [showDropdown,   setShowDropdown]   = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const searchRef    = useRef<HTMLDivElement>(null);
+  const submittingRef = useRef(false);
 
   /* ── Totaux calculés ── */
   const sousTotal   = items.reduce((s, i) => s + i.prix_unitaire * i.qty, 0);
@@ -340,6 +342,13 @@ export default function VentesManager({
     setLoading(false);
   }, []);
 
+  const { subscribe } = useAdminSSE();
+  useEffect(() => {
+    return subscribe((e) => {
+      if (e.type === "vente") fetchTab(search, offset);
+    });
+  }, [subscribe, fetchTab, search, offset]);
+
   function applySearch(q: string) { setSearch(q); setOffset(0); fetchTab(q, 0); }
   function paginate(off: number)  { setOffset(off); fetchTab(search, off); }
 
@@ -353,6 +362,8 @@ export default function VentesManager({
   /* ── Créer la vente ── */
   async function submitVente() {
     if (!modal) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     if (!modal.clientNom.trim()) {
       setModal(m => m ? { ...m, error: "Le nom du client est requis." } : m);
       return;
@@ -400,10 +411,12 @@ export default function VentesManager({
     const data = await res.json();
 
     if (res.ok) {
+      submittingRef.current = false;
       closeModal();
       showFlash("Vente enregistrée ✓");
       fetchTab(search, offset);
     } else {
+      submittingRef.current = false;
       setModal(m => m ? { ...m, saving: false, error: data.error ?? "Erreur" } : m);
     }
   }
@@ -729,7 +742,7 @@ export default function VentesManager({
                             <Package className="w-4 h-4 text-slate-400" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-slate-800 truncate">{p.nom}</p>
+                            <p className="font-semibold text-sm text-slate-800 break-words">{p.nom}</p>
                             <p className="text-xs text-slate-400 font-mono">{p.reference}</p>
                           </div>
                           <div className="text-right shrink-0">
@@ -774,7 +787,7 @@ export default function VentesManager({
                           <X className="w-3 h-3" />
                         </button>
                         <div className="min-w-0">
-                          <p className="font-semibold text-sm text-slate-800 truncate">{item.nom}</p>
+                          <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
                           <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
                         </div>
                         <div className="flex items-center gap-1 justify-center">
