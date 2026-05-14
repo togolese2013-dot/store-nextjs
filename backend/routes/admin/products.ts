@@ -258,7 +258,6 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }
-    console.log("[PATCH products] id=", req.params.id, "| body.slug=", body.slug, "| slug in sets=", sets.some(s => s.startsWith("slug")));
     // Validate & handle image column
     try {
       if ("image_url" in body || "image" in body) {
@@ -310,7 +309,6 @@ router.patch("/api/admin/products/:id", async (req, res) => {
       "SELECT slug FROM produits WHERE id = ? LIMIT 1", [req.params.id]
     );
     const savedSlug = (refreshed as mysql.RowDataPacket[])[0]?.slug ?? null;
-    console.log("[PATCH products] slug in DB after UPDATE =", savedSlug);
     res.json({ ok: true, slug: savedSlug });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
