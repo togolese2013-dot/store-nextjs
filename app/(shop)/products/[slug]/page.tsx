@@ -25,12 +25,14 @@ interface PageProps {
 
 async function fetchProductBySlug(slug: string): Promise<Product | null> {
   try {
+    // 1. Try numeric ID (legacy URLs like /products/199)
     const id = Number(slug);
     if (!isNaN(id) && id > 0) {
       const res = await apiGet<{ data: Product[] }>(`/api/products?ids=${id}`, { noAuth: true });
       return res.data?.[0] ?? null;
     }
-    const res = await apiGet<{ data: Product[] }>(`/api/products?reference=${encodeURIComponent(slug)}&limit=1`, { noAuth: true });
+    // 2. Try slug field first, then reference fallback (handled server-side)
+    const res = await apiGet<{ data: Product[] }>(`/api/products?slug=${encodeURIComponent(slug)}&limit=1`, { noAuth: true });
     return res.data?.[0] ?? null;
   } catch {
     return null;

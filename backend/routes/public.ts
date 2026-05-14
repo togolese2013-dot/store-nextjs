@@ -141,6 +141,7 @@ router.get("/api/products", async (req, res) => {
     const categoryId     = req.query.category  ? Number(req.query.category) : undefined;
     const search         = (req.query.q as string)         || undefined;
     const referenceExact = (req.query.reference as string) || undefined;
+    const slugExact      = (req.query.slug as string)      || undefined;
     const promoOnly      = req.query.promo   === "true";
     const newOnly        = req.query.new     === "true";
     const bestOnly       = req.query.best    === "true";
@@ -153,6 +154,13 @@ router.get("/api/products", async (req, res) => {
     if (bestOnly) {
       const products = await loadBestsellerProducts(limit);
       return res.json({ success: true, data: products, total: products.length });
+    }
+
+    // Lookup by slug — search slug column then fallback to reference
+    if (slugExact) {
+      const { getProductBySlug } = await import("@/lib/db");
+      const product = await getProductBySlug(slugExact);
+      return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
 
     const [products, total] = await Promise.all([

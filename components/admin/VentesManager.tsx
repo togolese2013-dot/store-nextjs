@@ -276,8 +276,9 @@ export default function VentesManager({
   /* ── Produits filtrés pour le dropdown ── */
   const filteredProducts = boutiqueStock.filter(p => {
     if (!prodSearch.trim()) return true;
-    const q = prodSearch.toLowerCase();
-    return p.nom.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q);
+    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const q = normalize(prodSearch);
+    return normalize(p.nom).includes(q) || normalize(p.reference).includes(q);
   });
 
   /* ── Ajouter un produit au panier ── */

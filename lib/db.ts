@@ -115,6 +115,21 @@ export async function produitCols() {
     )`);
   } catch { /* already exists */ }
 
+  // Auto-migrate: add slug column if missing
+  if (!names.has("slug")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN slug VARCHAR(255) NULL`);
+      names.add("slug");
+      // Best-effort unique index — ignore if already exists
+      try { await db.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_slug (slug)`); } catch { /* ignore */ }
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("slug");
+      }
+    }
+  }
+
   // Auto-migrate: add stock_magasin column directly on produits if missing
   if (!names.has("stock_magasin")) {
     try {
@@ -154,6 +169,7 @@ export async function produitCols() {
     date_creation:   names.has("date_creation"),
     created_at:      names.has("created_at"),
     marque_id:       names.has("marque_id"),
+    slug:            names.has("slug"),
   };
   return _cols;
 }
@@ -268,6 +284,7 @@ export async function getProducts(opts?: {
   return rows.map((r) => ({
     id:             Number(r.id),
     reference:      r.reference as string,
+    slug:           (r.slug ?? null) as string | null,
     nom:            r.nom as string,
     description:    (r.description ?? null) as string | null,
     categorie_id:   r.categorie_id ? Number(r.categorie_id) : null,
@@ -322,6 +339,7 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
   return rows.map((r) => ({
     id:             Number(r.id),
     reference:      r.reference as string,
+    slug:           (r.slug ?? null) as string | null,
     nom:            r.nom as string,
     description:    (r.description ?? null) as string | null,
     categorie_id:   r.categorie_id ? Number(r.categorie_id) : null,
@@ -340,16 +358,15 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
   })) as Product[];
 }
 
-export async function getProductBySlug(reference: string): Promise<Product | null> {
+export async function getProductBySlug(slugOrRef: string): Promise<Product | null> {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
   const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol  = cols.stock_magasin  ? "COALESCE(p.stock_magasin, 0)"    : "0";
 
-  const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT
-       p.id, p.reference, p.nom, p.description, p.categorie_id,
+  const selectSql = `SELECT
+       p.id, p.reference, ${cols.slug ? "p.slug" : "NULL"} AS slug, p.nom, p.description, p.categorie_id,
        CAST(p.prix_unitaire AS SIGNED)                                        AS prix_unitaire,
        ${stockBoutiqueCol}                                                     AS stock_boutique,
        ${stockMagasinCol}                                                      AS stock_magasin,
@@ -364,17 +381,30 @@ export async function getProductBySlug(reference: string): Promise<Product | nul
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
-     ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
-     WHERE p.reference = ? AND p.actif = 1
-     LIMIT 1`,
-    [reference]
-  );
+     ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}`;
+
+  // 1. Try slug column first (if it exists)
+  let rows: mysql.RowDataPacket[] = [];
+  if (cols.slug) {
+    const [r1] = await db.execute<mysql.RowDataPacket[]>(
+      `${selectSql} WHERE p.slug = ? AND p.actif = 1 LIMIT 1`, [slugOrRef]
+    );
+    rows = r1;
+  }
+  // 2. Fallback: try reference
+  if (!rows.length) {
+    const [r2] = await db.execute<mysql.RowDataPacket[]>(
+      `${selectSql} WHERE p.reference = ? AND p.actif = 1 LIMIT 1`, [slugOrRef]
+    );
+    rows = r2;
+  }
 
   if (!rows.length) return null;
   const r = rows[0];
   return {
     id:             Number(r.id),
     reference:      r.reference as string,
+    slug:           (r.slug ?? null) as string | null,
     nom:            r.nom as string,
     description:    (r.description ?? null) as string | null,
     categorie_id:   r.categorie_id ? Number(r.categorie_id) : null,

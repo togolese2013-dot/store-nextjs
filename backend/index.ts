@@ -113,6 +113,9 @@ app.use(cors({
   credentials: true,
 }));
 
+// Trust Railway's reverse proxy so X-Forwarded-For is read correctly by rate-limit
+app.set("trust proxy", 1);
+
 // Rate limiter — login endpoint: 10 attempts per 15 min per IP
 const loginLimiter = rateLimit({
   windowMs:         15 * 60 * 1000,

@@ -86,7 +86,7 @@ export default function ProductCard({ product, className, floatingCart = false }
       )}
     >
       {/* ── Image ── */}
-      <Link href={`/products/${product.id}`} className="block relative" tabIndex={-1}>
+      <Link href={`/products/${product.slug ?? product.id}`} className="block relative" tabIndex={-1}>
         <div className="relative overflow-hidden bg-white aspect-square">
 
           {/* Skeleton */}
@@ -198,7 +198,7 @@ export default function ProductCard({ product, className, floatingCart = false }
         )}
 
         {/* Nom */}
-        <Link href={`/products/${product.id}`}>
+        <Link href={`/products/${product.slug ?? product.id}`}>
           <h3 className="font-sans text-[13px] font-medium text-slate-800 leading-snug mb-1.5 line-clamp-2 hover:text-brand-800 transition-colors">
             {product.nom}
           </h3>

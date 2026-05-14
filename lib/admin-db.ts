@@ -3654,23 +3654,23 @@ export async function incrementTokenVersion(table: "admin_users" | "utilisateurs
 export async function ensureIndexes(): Promise<void> {
   const indexes: [string, string][] = [
     // factures — filtres fréquents sur statut, date, order_id et statut_paiement
-    ["CREATE INDEX IF NOT EXISTS idx_fac_statut     ON factures (statut)",          "factures.statut"],
-    ["CREATE INDEX IF NOT EXISTS idx_fac_created    ON factures (created_at)",       "factures.created_at"],
-    ["CREATE INDEX IF NOT EXISTS idx_fac_order_id   ON factures (order_id)",         "factures.order_id"],
-    ["CREATE INDEX IF NOT EXISTS idx_fac_statut_pmt ON factures (statut_paiement)",  "factures.statut_paiement"],
-    ["CREATE INDEX IF NOT EXISTS idx_fac_source     ON factures (source(20))",       "factures.source"],
+    ["CREATE INDEX idx_fac_statut     ON factures (statut)",          "factures.statut"],
+    ["CREATE INDEX idx_fac_created    ON factures (created_at)",       "factures.created_at"],
+    ["CREATE INDEX idx_fac_order_id   ON factures (order_id)",         "factures.order_id"],
+    ["CREATE INDEX idx_fac_statut_pmt ON factures (statut_paiement)",  "factures.statut_paiement"],
+    ["CREATE INDEX idx_fac_source     ON factures (source(20))",       "factures.source"],
     // orders — LEFT JOIN + filtre status/updated_at
-    ["CREATE INDEX IF NOT EXISTS idx_ord_status     ON orders (status)",             "orders.status"],
-    ["CREATE INDEX IF NOT EXISTS idx_ord_status_upd ON orders (status, updated_at)", "orders.status+updated_at"],
+    ["CREATE INDEX idx_ord_status     ON orders (status)",             "orders.status"],
+    ["CREATE INDEX idx_ord_status_upd ON orders (status, updated_at)", "orders.status+updated_at"],
     // finance_entries — GROUP BY type + filtre date + ORDER BY date_entree
-    ["CREATE INDEX IF NOT EXISTS idx_fe_type_date   ON finance_entries (type, date_entree)", "finance_entries.type+date_entree"],
-    ["CREATE INDEX IF NOT EXISTS idx_fe_created     ON finance_entries (date_entree)",        "finance_entries.date_entree"],
+    ["CREATE INDEX idx_fe_type_date   ON finance_entries (type, date_entree)", "finance_entries.type+date_entree"],
+    ["CREATE INDEX idx_fe_created     ON finance_entries (date_entree)",        "finance_entries.date_entree"],
     // devis — ORDER BY / filtre date
-    ["CREATE INDEX IF NOT EXISTS idx_dev_created    ON devis (created_at)",                  "devis.created_at"],
+    ["CREATE INDEX idx_dev_created    ON devis (created_at)",                  "devis.created_at"],
     // livraisons_ventes — ORDER BY / filtre date
-    ["CREATE INDEX IF NOT EXISTS idx_liv_created    ON livraisons_ventes (created_at)",      "livraisons_ventes.created_at"],
+    ["CREATE INDEX idx_liv_created    ON livraisons_ventes (created_at)",      "livraisons_ventes.created_at"],
     // orders — recherche par téléphone (suivi commande public)
-    ["CREATE INDEX IF NOT EXISTS idx_ord_telephone  ON orders (telephone)",                  "orders.telephone"],
+    ["CREATE INDEX idx_ord_telephone  ON orders (telephone)",                  "orders.telephone"],
   ];
   for (const [sql, label] of indexes) {
     try {

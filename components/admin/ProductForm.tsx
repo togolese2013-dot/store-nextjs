@@ -7,9 +7,22 @@ import { Loader2, Save, Plus, Trash2, ImagePlus, Package } from "lucide-react";
 import { clsx } from "clsx";
 import VariantsManager from "./VariantsManager";
 
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9_\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
 interface ProductData {
   id?:                number;
   reference:          string;
+  slug:               string;
   nom:                string;
   description:        string;
   description_longue: string;
@@ -58,8 +71,11 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
   // Secondary images = images_json WITHOUT image_url (strip duplicates)
   const secondaryImages = (initial?.images ?? []).filter(url => url !== initial?.image_url);
 
+  const [slugEdited, setSlugEdited] = useState(!!initial?.id);
+
   const [form, setForm] = useState<ProductData>({
     reference:          initial?.reference          ?? "",
+    slug:               (initial as Record<string, unknown>)?.slug as string ?? "",
     nom:                initial?.nom                ?? "",
     description:        initial?.description        ?? "",
     description_longue: initial?.description_longue ?? "",
@@ -99,7 +115,14 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
   }, []);
 
   function set(field: keyof ProductData, value: unknown) {
-    setForm(f => ({ ...f, [field]: value }));
+    setForm(f => {
+      const next = { ...f, [field]: value };
+      // Auto-generate slug from name when not manually edited
+      if (field === "nom" && !slugEdited) {
+        next.slug = toSlug(value as string);
+      }
+      return next;
+    });
   }
 
   // ── Image compression ─────────────────────────────────────────────────────
@@ -214,6 +237,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
 
       const payload: Record<string, unknown> = {
         reference:          form.reference,
+        slug:               form.slug || null,
         nom:                form.nom,
         description:        form.description,
         description_longue: form.description_longue || null,
@@ -354,14 +378,36 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                 <div>
                   <label className={labelCls}>Nom du produit *</label>
                   <input type="text" value={form.nom} onChange={e => set("nom", e.target.value)}
-                    placeholder="Ex: Casque Audio Premium" required className={inputCls} />
+                    placeholder="Ex: Gélatine Végétale 500g" required className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Référence (slug) *</label>
+                  <label className={labelCls}>Référence *</label>
                   <input type="text" value={form.reference}
-                    onChange={e => set("reference", e.target.value.replace(/\s+/g, "-").toLowerCase())}
-                    placeholder="casque-audio-premium" required className={inputCls} />
+                    onChange={e => set("reference", e.target.value.replace(/\s+/g, "_").toLowerCase())}
+                    placeholder="gelatine_vegetale_500g" required className={inputCls} />
                 </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>
+                  Slug URL
+                  <span className="ml-1 text-slate-400 font-normal normal-case tracking-normal">
+                    — togolese.tg/products/<span className="text-brand-600">{form.slug || "…"}</span>
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={form.slug}
+                  onChange={e => {
+                    setSlugEdited(true);
+                    set("slug", e.target.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, ""));
+                  }}
+                  placeholder="gelatine_vegetale_500g"
+                  className={inputCls}
+                />
+                {!slugEdited && (
+                  <p className="mt-1 text-[11px] text-slate-400">Auto-généré depuis le nom. Modifiable.</p>
+                )}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">

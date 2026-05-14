@@ -79,6 +79,11 @@ router.post("/api/admin/products", async (req, res) => {
     const reference = body.reference?.trim() || "";
     const autoRef = !reference;
 
+    const rawSlug = (body.slug as string | undefined)?.trim() || "";
+    const autoSlug = rawSlug
+      ? rawSlug.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")
+      : "";
+
     if (!nom || prix_unitaire == null) {
       return res.status(400).json({ error: "Champs obligatoires manquants." });
     }
@@ -97,6 +102,8 @@ router.post("/api/admin/products", async (req, res) => {
     // Guarantee optional columns exist before INSERT
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN images_json TEXT NULL`); } catch { /* already exists */ }
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN description_longue TEXT NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN slug VARCHAR(255) NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_slug (slug)`); } catch { /* already exists */ }
     invalidateProduitColsCache();
     const cols = await produitCols();
 
@@ -118,6 +125,8 @@ router.post("/api/admin/products", async (req, res) => {
     if (cols.marque_id && marque_id) { columns.push("marque_id"); values.push(Number(marque_id)); }
     // images_json is guaranteed to exist at this point
     columns.push("images_json"); values.push(imagesJson);
+    // slug
+    columns.push("slug"); values.push(autoSlug || null);
 
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await (db as import("mysql2/promise").Pool).execute<mysql.ResultSetHeader>(
@@ -245,7 +254,7 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     const vals: (string | number | boolean | null)[] = [];
     // Only include columns that exist in the DB schema
     const alwaysAllowed = ["nom","description","description_longue","categorie_id","prix_unitaire",
-                           "stock_magasin","stock_boutique","remise","neuf","actif","reference"];
+                           "stock_magasin","stock_boutique","remise","neuf","actif","reference","slug"];
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }
