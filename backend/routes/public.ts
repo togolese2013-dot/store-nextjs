@@ -1,7 +1,7 @@
 import express from "express";
 import { getProducts, getProductsByIds, getProductCount, getCategories, checkReviewsTable, db } from "@/lib/db";
 import {
-  subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings,
+  subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings, getDeliveryZones,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -367,6 +367,16 @@ router.get("/api/orders/track", async (req, res) => {
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+
+// GET /api/public/delivery-zones — zones actives pour le checkout (pas d'auth)
+router.get("/api/public/delivery-zones", async (_req, res) => {
+  try {
+    const zones = await getDeliveryZones(true); // activeOnly = true
+    res.json(zones);
+  } catch {
+    res.json([]);
   }
 });
 

@@ -25,16 +25,7 @@ const PHONE_PREFIXES = [
   { code: "+1",   flag: "🇺🇸", label: "USA / Canada" },
 ];
 
-const ZONES = [
-  { label: "Lomé (Tokoin / Adidogomé / Bè)",     fee: 1000  },
-  { label: "Lomé (Agoè / Cacaveli / Wété)",       fee: 1500  },
-  { label: "Kpalimé",                              fee: 5000  },
-  { label: "Atakpamé",                             fee: 6000  },
-  { label: "Sokodé",                               fee: 8000  },
-  { label: "Kara",                                 fee: 9000  },
-  { label: "Dapaong",                              fee: 12000 },
-  { label: "Autre ville / À préciser",             fee: 0     },
-];
+interface DeliveryZone { id: number; nom: string; fee: number; actif: boolean; sort_order: number; }
 
 interface Form {
   nom:               string;
@@ -152,6 +143,7 @@ export default function CheckoutPage() {
   const [orderedItems, setOrderedItems] = useState<typeof items>([]);
   const [orderedTotal, setOrderedTotal] = useState(0);
   const [orderRef,     setOrderRef]     = useState("");
+  const [zones,        setZones]        = useState<DeliveryZone[]>([]);
   const [refCode,      setRefCode]      = useState<string | null>(null);
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
   const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
@@ -164,6 +156,13 @@ export default function CheckoutPage() {
   const [selectedAddrId,   setSelectedAddrId]   = useState<number | "new" | null>(null);
   const [showNewAddrForm,  setShowNewAddrForm]   = useState(false);
   const [savingAddr,       setSavingAddr]        = useState(false);
+
+  useEffect(() => {
+    fetch("/api/public/delivery-zones")
+      .then(r => r.json())
+      .then(d => Array.isArray(d) && setZones(d))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/account/verification", { credentials: "include" })
@@ -196,7 +195,7 @@ export default function CheckoutPage() {
     if (match) setRefCode(decodeURIComponent(match[1]));
   }, []);
 
-  const selectedZone     = ZONES.find(z => z.label === form.zone);
+  const selectedZone     = zones.find(z => z.nom === form.zone);
   const deliveryFee      = selectedZone?.fee ?? 0;
   const referralDiscount = refCode ? Math.round(selectedTotal * 0.10) : 0;
   const grandTotal       = selectedTotal + deliveryFee - referralDiscount;
@@ -644,9 +643,9 @@ export default function CheckoutPage() {
                         className={clsx(inputCls(errors.zone), "appearance-none pr-10 cursor-pointer")}
                       >
                         <option value="">-- Choisir une zone --</option>
-                        {ZONES.map(z => (
-                          <option key={z.label} value={z.label}>
-                            {z.label}{z.fee > 0 ? ` — ${formatPrice(z.fee)}` : " — Frais à confirmer"}
+                        {zones.map(z => (
+                          <option key={z.id} value={z.nom}>
+                            {z.nom}{z.fee > 0 ? ` — ${formatPrice(z.fee)}` : " — Frais à confirmer"}
                           </option>
                         ))}
                       </select>
