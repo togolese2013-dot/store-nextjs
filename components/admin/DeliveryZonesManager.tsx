@@ -64,18 +64,18 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
-          <div className="grid grid-cols-[1fr_110px_100px_70px_auto] gap-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+          <div className="grid grid-cols-[1fr_130px_120px_90px_auto] gap-3 text-xs font-bold uppercase tracking-widest text-slate-400">
             <span>Nom de la zone</span>
-            <span>Frais (FCFA)</span>
-            <span>À confirmer</span>
-            <span>Actif</span>
+            <span className="text-center">Frais (FCFA)</span>
+            <span className="text-center">À confirmer</span>
+            <span className="text-center">Actif</span>
             <span />
           </div>
         </div>
 
         <div className="divide-y divide-slate-50">
           {zones.map(zone => (
-            <div key={zone.id} className="px-5 py-3 grid grid-cols-[1fr_110px_100px_70px_auto] gap-3 items-center">
+            <div key={zone.id} className="px-5 py-3 grid grid-cols-[1fr_130px_120px_90px_auto] gap-3 items-center">
               <input type="text" value={zone.nom}
                 onChange={e => updateLocal(zone.id, "nom", e.target.value)}
                 className={`${inputCls} w-full`}
@@ -128,7 +128,7 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
 
         {/* Add new */}
         {newZone ? (
-          <div className="px-5 py-3 border-t border-dashed border-slate-200 grid grid-cols-[1fr_110px_100px_70px_auto] gap-3 items-center bg-brand-50/30">
+          <div className="px-5 py-3 border-t border-dashed border-slate-200 grid grid-cols-[1fr_130px_120px_90px_auto] gap-3 items-center bg-brand-50/30">
             <input type="text" value={newZone.nom}
               onChange={e => setNewZone(n => n ? { ...n, nom: e.target.value } : n)}
               placeholder="Nom de la nouvelle zone" autoFocus
