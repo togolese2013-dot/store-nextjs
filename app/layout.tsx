@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import Script from "next/script";
 import ThemeVars from "@/components/ThemeVars";
 import { getSettings } from "@/lib/admin-db";
 import "./globals.css";
@@ -52,6 +53,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="min-h-screen flex flex-col">
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-LBCJQRWZT6" strategy="afterInteractive" />
+        <Script id="gtag-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-LBCJQRWZT6');
+        `}</Script>
         {children}
       </body>
     </html>
