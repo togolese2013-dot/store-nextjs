@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   ChevronLeft, Facebook, Loader2, CheckCircle2,
-  AlertCircle, ChevronDown, ExternalLink,
+  AlertCircle, ChevronDown, ExternalLink, Search, X,
 } from "lucide-react";
 
 interface Product {
@@ -22,13 +22,16 @@ const POST_TYPES = [
 ];
 
 export default function SocialPage() {
-  const [products, setProducts]       = useState<Product[]>([]);
-  const [selected, setSelected]       = useState<number[]>([]);
-  const [postType, setPostType]       = useState("promotion");
-  const [status, setStatus]           = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [feedback, setFeedback]       = useState("");
+  const [products, setProducts]         = useState<Product[]>([]);
+  const [selected, setSelected]         = useState<Product[]>([]);
+  const [postType, setPostType]         = useState("promotion");
+  const [status, setStatus]             = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [feedback, setFeedback]         = useState("");
   const [loadingProds, setLoadingProds] = useState(true);
   const [loadError, setLoadError]       = useState("");
+  const [query, setQuery]               = useState("");
+  const [showResults, setShowResults]   = useState(false);
+  const searchRef                       = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/admin/products?limit=200&includeInactive=false", { credentials: "include" })
@@ -38,13 +41,34 @@ export default function SocialPage() {
       .finally(() => setLoadingProds(false));
   }, []);
 
-  const toggleProduct = useCallback((id: number) => {
-    setSelected(prev =>
-      prev.includes(id)
-        ? prev.filter(x => x !== id)
-        : prev.length < 3 ? [...prev, id] : prev
-    );
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
   }, []);
+
+  const filtered = query.trim().length === 0 ? [] : products.filter(p =>
+    !selected.find(s => s.id === p.id) &&
+    p.nom.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 8);
+
+  function addProduct(p: Product) {
+    if (selected.length >= 3) return;
+    setSelected(prev => [...prev, p]);
+    setQuery("");
+    setShowResults(false);
+    reset();
+  }
+
+  function removeProduct(id: number) {
+    setSelected(prev => prev.filter(p => p.id !== id));
+    reset();
+  }
 
   async function handlePublish() {
     if (selected.length === 0) { setFeedback("Sélectionnez au moins un produit."); return; }
@@ -53,9 +77,7 @@ export default function SocialPage() {
 
     const payload = {
       type: postType,
-      products: products
-        .filter(p => selected.includes(p.id))
-        .map(({ nom, slug, prix_unitaire }) => ({ nom, slug, prix_unitaire })),
+      products: selected.map(({ nom, slug, prix_unitaire }) => ({ nom, slug, prix_unitaire })),
     };
 
     try {
@@ -101,7 +123,6 @@ export default function SocialPage() {
         </div>
       </div>
 
-
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
 
         {/* Type de post */}
@@ -125,52 +146,77 @@ export default function SocialPage() {
         <div className="px-6 pb-4">
           <label className="text-sm font-semibold text-slate-700 block mb-2">
             Produits à mettre en avant{" "}
-            <span className="text-slate-400 font-normal">(1 à 3)</span>
+            <span className="text-slate-400 font-normal">({selected.length}/3)</span>
           </label>
 
+          {/* Tags des produits sélectionnés */}
+          {selected.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {selected.map(p => (
+                <span key={p.id} className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-xl">
+                  {p.nom}
+                  <button onClick={() => removeProduct(p.id)} className="text-blue-400 hover:text-blue-700 transition-colors ml-0.5">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Barre de recherche */}
           {loadingProds ? (
-            <div className="flex items-center gap-2 text-slate-400 text-sm py-6 justify-center">
+            <div className="flex items-center gap-2 text-slate-400 text-sm py-4 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Chargement des produits…
             </div>
           ) : loadError ? (
-            <div className="flex items-center gap-2 text-red-500 text-sm py-6 justify-center bg-red-50 rounded-xl px-4">
+            <div className="flex items-center gap-2 text-red-500 text-sm py-4 justify-center bg-red-50 rounded-xl px-4">
               <AlertCircle className="w-4 h-4 shrink-0" /> {loadError}
             </div>
-          ) : products.length === 0 ? (
-            <div className="text-center text-slate-400 text-sm py-6">Aucun produit disponible.</div>
-          ) : (
-            <div className="space-y-1.5 max-h-72 overflow-y-auto">
-              {products.map(p => {
-                const checked  = selected.includes(p.id);
-                const disabled = !checked && selected.length >= 3;
-                return (
-                  <label
-                    key={p.id}
-                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all select-none ${
-                      checked
-                        ? "border-blue-400 bg-blue-50"
-                        : disabled
-                        ? "border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed"
-                        : "border-slate-200 hover:border-blue-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={disabled}
-                      onChange={() => { toggleProduct(p.id); reset(); }}
-                      className="accent-blue-600 w-4 h-4 shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{p.nom}</p>
-                    </div>
-                    <span className="text-xs text-slate-400 shrink-0 tabular-nums">
-                      {Number(p.prix_unitaire).toLocaleString("fr-FR")} F
-                    </span>
-                  </label>
-                );
-              })}
+          ) : selected.length < 3 ? (
+            <div ref={searchRef} className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setShowResults(true); }}
+                  onFocus={() => setShowResults(true)}
+                  placeholder="Rechercher un produit…"
+                  className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {query && (
+                  <button onClick={() => { setQuery(""); setShowResults(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown résultats */}
+              {showResults && filtered.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                  {filtered.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => addProduct(p)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors text-left"
+                    >
+                      <span className="font-medium text-slate-800 truncate">{p.nom}</span>
+                      <span className="text-xs text-slate-400 shrink-0 ml-3 tabular-nums">
+                        {Number(p.prix_unitaire).toLocaleString("fr-FR")} F
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {showResults && query.trim().length > 0 && filtered.length === 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 text-sm text-slate-400">
+                  Aucun résultat pour « {query} »
+                </div>
+              )}
             </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">Maximum 3 produits atteint. Retirez-en un pour en ajouter un autre.</p>
           )}
         </div>
 
