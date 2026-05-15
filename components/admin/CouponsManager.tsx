@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Coupon } from "@/lib/admin-db";
-import { Plus, Trash2, Save, Tag, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, Tag, Loader2, Pencil } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 
 const inputCls = "px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-colors font-sans";
@@ -41,10 +41,11 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
   async function add() {
     if (!form?.code.trim()) return;
     setSaving("new");
+    const payload = { ...(form as any) };
     const res = await fetch("/api/admin/coupons", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     });
     setSaving(null);
     if (!res.ok) {
@@ -105,6 +106,11 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
                 <span className={`ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold ${c.actif ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
                   {c.actif ? "Actif" : "Inactif"}
                 </span>
+                <button onClick={() => setForm({ code: c.code, type: c.type, valeur: c.valeur, min_order: c.min_order, max_uses: c.max_uses, expires_at: c.expires_at, actif: c.actif, id: c.id } as any)}
+                  className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors" title="Modifier"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
                 <button onClick={() => del(c.id)} disabled={saving === c.id}
                   className="p-2 rounded-xl text-red-500 hover:bg-red-50 transition-colors"
                 >
@@ -116,10 +122,12 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
         )}
       </div>
 
-      {/* New coupon form */}
+      {/* New / Edit coupon form */}
       {form && (
         <div className="bg-white rounded-2xl border border-emerald-100 p-6 space-y-4">
-          <h3 className="font-display font-700 text-slate-900">Nouveau coupon</h3>
+          <h3 className="font-display font-700 text-slate-900">
+            {(form as any).id ? "Modifier le coupon" : "Nouveau coupon"}
+          </h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1.5">Code *</label>
