@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, ShieldCheck, Activity,
+  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
@@ -91,6 +91,7 @@ const MODULES: Record<string, {
     dot:    "bg-violet-400",
     items: [
       { label: "Analytics site",        href: "/admin/analytics",         icon: Activity },
+      { label: "Réseaux Sociaux",       href: "/admin/social",            icon: Share2 },
       { label: "Rapports",             href: "/admin/rapports",          icon: FileText },
       { label: "Tendances des ventes", href: "/admin/tendances",         icon: BarChart2 },
       { label: "Réglages généraux",    href: "/admin/settings",          icon: Settings },
@@ -132,6 +133,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/rapports",              "admin"],
   ["/admin/tendances",             "admin"],
   ["/admin/analytics",             "admin"],
+  ["/admin/social",                "admin"],
   ["/admin/crm",                   "crm"],
   ["/admin/serena",                "crm"],
   ["/admin/fidelite",              "crm"],

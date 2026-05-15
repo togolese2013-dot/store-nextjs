@@ -1,0 +1,118 @@
+{
+  "name": "Facebook Publisher — Togolese Shop",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "facebook-publisher",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "togolese-facebook-publisher"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { products, type } = $input.first().json;\n\nconst typeLabels = {\n  promotion:   'une promotion spéciale',\n  nouveaute:   'de nouveaux produits',\n  top_ventes:  'nos meilleures ventes'\n};\n\nconst productList = (products || []).map(p =>\n  `- ${p.nom} : ${Number(p.prix_unitaire || 0).toLocaleString('fr-FR')} FCFA`\n).join('\\n');\n\nconst firstProduct = (products || [])[0];\nconst siteLink = firstProduct?.slug\n  ? `https://togolese.tg/products/${firstProduct.slug}`\n  : 'https://togolese.tg';\n\nconst prompt = `Tu es le community manager de Togolese Shop, boutique premium au Togo.\\n\\nCrée un post Facebook engageant pour mettre en avant ${typeLabels[type] || 'nos produits'}.\\n\\nProduits :\\n${productList}\\n\\nConsignes :\\n- Français naturel et chaleureux\\n- 3-4 lignes max\\n- 2-3 emojis bien placés\\n- Appel à l'action vers togolese.tg\\n- Pas de hashtags\\n\\nRéponds uniquement avec le texte du post.`;\n\nreturn [{ json: { prompt, siteLink } }];"
+      },
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Formater le prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 500,\n  \"messages\": [{ \"role\": \"user\", \"content\": \"{{ $json.prompt }}\" }]\n}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "Claude AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResponse = $input.first().json;\nconst postText = claudeResponse?.content?.[0]?.text || 'Découvrez nos produits sur togolese.tg !';\nconst siteLink = $('Formater le prompt').first().json.siteLink;\nreturn [{ json: { message: postText, link: siteLink } }];"
+      },
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "Extraire le texte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/1110500725482756/feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"{{ $json.message }}\",\n  \"link\": \"{{ $json.link }}\",\n  \"access_token\": \"{{ $env.FB_PAGE_ACCESS_TOKEN }}\"\n}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "name": "Publier sur Facebook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"post_id\": \"{{ $json.id }}\" }",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0006-0006-0006-000000000006",
+      "name": "Réponse",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Formater le prompt", "type": "main", "index": 0 }]]
+    },
+    "Formater le prompt": {
+      "main": [[{ "node": "Claude AI", "type": "main", "index": 0 }]]
+    },
+    "Claude AI": {
+      "main": [[{ "node": "Extraire le texte", "type": "main", "index": 0 }]]
+    },
+    "Extraire le texte": {
+      "main": [[{ "node": "Publier sur Facebook", "type": "main", "index": 0 }]]
+    },
+    "Publier sur Facebook": {
+      "main": [[{ "node": "Réponse", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "togolese-shop" }],
+  "triggerCount": 0,
+  "versionId": "1"
+}

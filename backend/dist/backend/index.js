@@ -3863,7 +3863,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express36 = __toESM(require("express"));
+var import_express37 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -8033,7 +8033,8 @@ async function ensureOrderCols() {
     "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
     "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
-    "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL"
+    "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
+    "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL"
   ]) {
     try {
       await pool2.execute(ddl);
@@ -8060,7 +8061,8 @@ router27.post("/api/orders", async (req, res) => {
       total,
       payment_mode,
       nb_tranches,
-      mm_transaction_ref
+      mm_transaction_ref,
+      ref_code
     } = req.body;
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "T\xE9l\xE9phone et articles requis." });
@@ -8093,6 +8095,13 @@ router27.post("/api/orders", async (req, res) => {
         [clientSession.id, id]
       );
     }
+    if (ref_code) {
+      pool2.execute(
+        `UPDATE referrals SET uses_count = uses_count + 1 WHERE code = ?`,
+        [String(ref_code).trim().toUpperCase()]
+      ).catch(() => {
+      });
+    }
     const extraUpdates = [];
     const extraValues = [];
     if (lien_localisation) {
@@ -8106,6 +8115,10 @@ router27.post("/api/orders", async (req, res) => {
     if (mm_transaction_ref) {
       extraUpdates.push("mm_transaction_ref = ?");
       extraValues.push(mm_transaction_ref);
+    }
+    if (ref_code) {
+      extraUpdates.push("ref_code = ?");
+      extraValues.push(String(ref_code).trim().toUpperCase());
     }
     if (extraUpdates.length > 0) {
       await pool2.execute(
@@ -9693,12 +9706,110 @@ router35.get("/api/admin/analytics", async (req, res) => {
 });
 var analytics_default = router35;
 
+// routes/referrals.ts
+var import_express36 = __toESM(require("express"));
+init_db();
+var router36 = import_express36.default.Router();
+async function ensureReferralsTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS referrals (
+      id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom         VARCHAR(100) NOT NULL,
+      telephone   VARCHAR(30)  NOT NULL,
+      code        VARCHAR(20)  NOT NULL UNIQUE,
+      uses_count  INT UNSIGNED NOT NULL DEFAULT 0,
+      created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_code      (code),
+      INDEX idx_telephone (telephone)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+}
+ensureReferralsTable().catch(console.error);
+function generateCode2(nom) {
+  const base = nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${base}${suffix}`;
+}
+async function uniqueCode(nom) {
+  for (let i = 0; i < 10; i++) {
+    const code = generateCode2(nom);
+    const [[row]] = await db.execute(
+      `SELECT id FROM referrals WHERE code = ? LIMIT 1`,
+      [code]
+    );
+    if (!row) return code;
+  }
+  return generateCode2(nom) + Date.now().toString(36).slice(-3).toUpperCase();
+}
+router36.post("/api/referrals", async (req, res) => {
+  try {
+    const { nom, telephone } = req.body;
+    if (!nom?.trim() || !telephone?.trim()) {
+      return res.status(400).json({ error: "Nom et t\xE9l\xE9phone obligatoires." });
+    }
+    const safeName = String(nom).trim().slice(0, 100);
+    const safePhone = String(telephone).trim().replace(/\s+/g, "").slice(0, 30);
+    const [[existing]] = await db.execute(
+      `SELECT code, nom, uses_count FROM referrals WHERE telephone = ? LIMIT 1`,
+      [safePhone]
+    );
+    if (existing) {
+      return res.json({
+        code: existing.code,
+        nom: existing.nom,
+        uses_count: existing.uses_count,
+        already: true
+      });
+    }
+    const code = await uniqueCode(safeName);
+    await db.execute(
+      `INSERT INTO referrals (nom, telephone, code) VALUES (?, ?, ?)`,
+      [safeName, safePhone, code]
+    );
+    res.json({ code, nom: safeName, uses_count: 0, already: false });
+  } catch (err) {
+    console.error("[referrals/post]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+router36.get("/api/referrals", async (req, res) => {
+  try {
+    const code = String(req.query.code ?? "").trim().toUpperCase();
+    if (!code) return res.status(400).json({ error: "Code manquant." });
+    const [[row]] = await db.execute(
+      `SELECT nom, uses_count FROM referrals WHERE code = ? LIMIT 1`,
+      [code]
+    );
+    if (!row) return res.status(404).json({ error: "Code introuvable." });
+    res.json({ nom: String(row.nom), uses_count: Number(row.uses_count) });
+  } catch (err) {
+    console.error("[referrals/get]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+router36.get("/api/referrals/validate", async (req, res) => {
+  try {
+    const code = String(req.query.code ?? "").trim().toUpperCase();
+    if (!code) return res.status(400).json({ valid: false });
+    const [[row]] = await db.execute(
+      `SELECT nom, uses_count FROM referrals WHERE code = ? LIMIT 1`,
+      [code]
+    );
+    if (!row) return res.json({ valid: false });
+    res.json({ valid: true, nom: String(row.nom), uses_count: Number(row.uses_count) });
+  } catch (err) {
+    console.error("[referrals/validate]", err);
+    res.status(500).json({ valid: false });
+  }
+});
+var referrals_default = router36;
+
 // index.ts
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express36.default)();
+var app = (0, import_express37.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -9771,8 +9882,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express36.default.json({ limit: "5mb" }));
-app.use(import_express36.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express37.default.json({ limit: "5mb" }));
+app.use(import_express37.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -9809,6 +9920,7 @@ app.use(mobile_money_default);
 app.use(whatsapp_inbox_default);
 app.use(whatsapp_webhook_default);
 app.use(analytics_default);
+app.use(referrals_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {
