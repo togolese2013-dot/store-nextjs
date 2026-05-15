@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, ShieldCheck,
+  Gift, Mail, UserCheck, Home, ShieldCheck, Activity,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
@@ -90,6 +90,7 @@ const MODULES: Record<string, {
     ring:   "border-violet-500",
     dot:    "bg-violet-400",
     items: [
+      { label: "Analytics site",        href: "/admin/analytics",         icon: Activity },
       { label: "Rapports",             href: "/admin/rapports",          icon: FileText },
       { label: "Tendances des ventes", href: "/admin/tendances",         icon: BarChart2 },
       { label: "Réglages généraux",    href: "/admin/settings",          icon: Settings },
