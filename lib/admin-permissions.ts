@@ -78,6 +78,7 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
     label: "Admin",
     color: "violet",
     pages: [
+      { id: "analytics",         label: "Analytics site" },
       { id: "rapports",          label: "Rapports" },
       { id: "tendances",         label: "Tendances ventes" },
       { id: "settings",          label: "Réglages généraux" },
