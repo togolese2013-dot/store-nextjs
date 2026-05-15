@@ -72,6 +72,7 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
       { id: "parrainage",      label: "Parrainage" },
       { id: "newsletter",      label: "Newsletter" },
       { id: "comptes-clients", label: "Comptes clients" },
+      { id: "social",          label: "Réseaux Sociaux" },
     ],
   },
   admin: {
@@ -79,7 +80,6 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
     color: "violet",
     pages: [
       { id: "analytics",         label: "Analytics site" },
-      { id: "social",            label: "Réseaux Sociaux" },
       { id: "rapports",          label: "Rapports" },
       { id: "tendances",         label: "Tendances ventes" },
       { id: "settings",          label: "Réglages généraux" },

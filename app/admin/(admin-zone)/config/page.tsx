@@ -2,7 +2,7 @@ import { getAdminSession } from "@/lib/auth";
 import Link from "next/link";
 import {
   BarChart2, Settings, Megaphone, Palette,
-  Globe, MessageCircle, Users, ArrowRight, ChevronLeft, Activity, Share2,
+  Globe, MessageCircle, Users, ArrowRight, ChevronLeft, Activity,
 } from "lucide-react";
 
 export const metadata = { title: "Admin — Configuration" };
@@ -56,13 +56,6 @@ const ITEMS = [
     href:  "/admin/settings/whatsapp",
     icon:  MessageCircle,
     color: "bg-emerald-100 text-emerald-700",
-  },
-  {
-    label: "Réseaux Sociaux",
-    desc:  "Publiez sur Facebook avec Claude AI en un clic",
-    href:  "/admin/social",
-    icon:  Share2,
-    color: "bg-blue-100 text-blue-700",
   },
   {
     label: "Utilisateurs",
