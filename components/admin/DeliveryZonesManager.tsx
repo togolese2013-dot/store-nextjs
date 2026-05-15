@@ -15,19 +15,23 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
 
   async function saveZone(zone: DeliveryZone) {
     setSaving(zone.id);
-    await fetch("/api/admin/delivery-zones", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(zone),
+    const res = await fetch("/api/admin/delivery-zones", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(zone),
     });
     setSaving(null);
+    if (!res.ok) { alert(`Erreur ${res.status} — vérifiez que le backend est bien déployé.`); return; }
     router.refresh();
   }
 
   async function deleteZone(id: number) {
     if (!confirm("Supprimer cette zone ?")) return;
     setSaving(id);
-    await fetch("/api/admin/delivery-zones", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, _delete: true }),
+    const res = await fetch("/api/admin/delivery-zones", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, _delete: true }),
     });
+    if (!res.ok) { setSaving(null); alert(`Erreur ${res.status}`); return; }
     setZones(z => z.filter(x => x.id !== id));
     setSaving(null);
   }
@@ -35,11 +39,13 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
   async function addZone() {
     if (!newZone?.nom.trim()) return;
     setSaving("new");
-    await fetch("/api/admin/delivery-zones", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await fetch("/api/admin/delivery-zones", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nom: newZone.nom, fee: newZone.fee || 0, actif: true, sort_order: zones.length }),
     });
     setSaving(null);
+    if (!res.ok) { alert(`Erreur ${res.status} — vérifiez que le backend est bien déployé.`); return; }
     setNewZone(null);
     router.refresh();
   }

@@ -5,7 +5,7 @@ import { Tag } from "lucide-react";
 export const metadata = { title: "Coupons" };
 
 export default async function CouponsPage() {
-  const coupons = await listCoupons();
+  const coupons = await listCoupons().catch(() => [] as Awaited<ReturnType<typeof listCoupons>>);
   return (
     <div className="space-y-6">
       {/* Header */}
