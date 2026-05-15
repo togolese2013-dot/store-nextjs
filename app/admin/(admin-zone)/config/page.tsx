@@ -2,12 +2,19 @@ import { getAdminSession } from "@/lib/auth";
 import Link from "next/link";
 import {
   BarChart2, Settings, Megaphone, Palette,
-  Globe, MessageCircle, Users, ArrowRight, ChevronLeft,
+  Globe, MessageCircle, Users, ArrowRight, ChevronLeft, Activity,
 } from "lucide-react";
 
 export const metadata = { title: "Admin — Configuration" };
 
 const ITEMS = [
+  {
+    label: "Analytics site",
+    desc:  "Trafic visiteurs, heures de pointe, pays, nouveaux vs récurrents",
+    href:  "/admin/analytics",
+    icon:  Activity,
+    color: "bg-emerald-100 text-emerald-700",
+  },
   {
     label: "Rapports",
     desc:  "Statistiques de ventes, tendances, performances",
