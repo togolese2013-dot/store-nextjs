@@ -1,5 +1,5 @@
 import express from "express";
-import { getSession } from "./lib/auth";
+import { getSession } from "../lib/auth";
 import { db as pool } from "@/lib/db";
 import mysql from "mysql2/promise";
 import https from "https";
