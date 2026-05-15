@@ -47,7 +47,11 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
       body: JSON.stringify(form),
     });
     setSaving(null);
-    if (!res.ok) { alert(`Erreur ${res.status}`); return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(`Erreur ${res.status} : ${err.error ?? "inconnue"}`);
+      return;
+    }
     setForm(null);
     await fetchAll();
   }
