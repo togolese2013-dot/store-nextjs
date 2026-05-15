@@ -3,9 +3,33 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DeliveryZone } from "@/lib/admin-db";
-import { Plus, Trash2, Save, GripVertical, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, Loader2 } from "lucide-react";
 
 const inputCls = "px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-emerald-500 outline-none transition-all font-sans";
+
+const COL = {
+  nom:      { width: "1fr"   },
+  fee:      { width: "130px" },
+  confirm:  { width: "120px" },
+  actif:    { width: "90px"  },
+  actions:  { width: "80px"  },
+};
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: `${COL.nom.width} ${COL.fee.width} ${COL.confirm.width} ${COL.actif.width} ${COL.actions.width}`,
+  gap: "12px",
+  alignItems: "center",
+};
+
+function Toggle({ checked, onChange, color }: { checked: boolean; onChange: (v: boolean) => void; color: string }) {
+  return (
+    <div className="relative cursor-pointer" onClick={() => onChange(!checked)}>
+      <div className={`w-9 h-5 rounded-full transition-colors ${checked ? color : "bg-slate-200"}`} />
+      <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : ""}`} />
+    </div>
+  );
+}
 
 export default function DeliveryZonesManager({ initialZones }: { initialZones: DeliveryZone[] }) {
   const router  = useRouter();
@@ -47,12 +71,9 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
     setSaving(null);
     if (!res.ok) { alert(`Erreur ${res.status} — vérifiez que le backend est bien déployé.`); return; }
 
-    // Fetch the updated list to get the real ID assigned by the DB
     const updated = await fetch("/api/admin/delivery-zones", { credentials: "include" })
       .then(r => r.ok ? r.json() : null).catch(() => null);
-    if (Array.isArray(updated)) {
-      setZones(updated);
-    }
+    if (Array.isArray(updated)) setZones(updated);
     setNewZone(null);
   }
 
@@ -63,52 +84,41 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
-          <div className="grid grid-cols-[1fr_130px_120px_90px_auto] gap-3 text-xs font-bold uppercase tracking-widest text-slate-400">
-            <span>Nom de la zone</span>
-            <span className="text-center">Frais (FCFA)</span>
-            <span className="text-center">À confirmer</span>
-            <span className="text-center">Actif</span>
-            <span />
-          </div>
+
+        {/* Header */}
+        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50" style={gridStyle}>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Nom de la zone</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400 text-center">Frais (FCFA)</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400 text-center">À confirmer</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400 text-center">Actif</span>
+          <span />
         </div>
 
+        {/* Rows */}
         <div className="divide-y divide-slate-50">
           {zones.map(zone => (
-            <div key={zone.id} className="px-5 py-3 grid grid-cols-[1fr_130px_120px_90px_auto] gap-3 items-center">
+            <div key={zone.id} className="px-5 py-3" style={gridStyle}>
               <input type="text" value={zone.nom}
                 onChange={e => updateLocal(zone.id, "nom", e.target.value)}
                 className={`${inputCls} w-full`}
               />
-              <div>
+              <div className="text-center">
                 <input type="number" value={zone.fee}
                   onChange={e => updateLocal(zone.id, "fee", Number(e.target.value))}
-                  className={`${inputCls} w-full`} min="0"
+                  className={`${inputCls} w-full text-center`} min="0"
                   disabled={zone.prix_libre}
                 />
-                {!zone.prix_libre && <p className="text-[10px] text-slate-400 mt-0.5 text-center">0 = gratuit</p>}
+                {!zone.prix_libre && <p className="text-[10px] text-slate-400 mt-0.5">0 = gratuit</p>}
               </div>
-              <label className="flex items-center justify-center gap-1.5 cursor-pointer">
-                <div className="relative">
-                  <input type="checkbox" className="sr-only peer"
-                    checked={zone.prix_libre}
-                    onChange={e => updateLocal(zone.id, "prix_libre", e.target.checked)}
-                  />
-                  <div className="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-amber-400 transition-colors" />
-                  <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-                </div>
-              </label>
-              <label className="flex items-center justify-center">
-                <div className="relative">
-                  <input type="checkbox" className="sr-only peer"
-                    checked={zone.actif}
-                    onChange={e => updateLocal(zone.id, "actif", e.target.checked)}
-                  />
-                  <div className="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-green-500 transition-colors" />
-                  <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-                </div>
-              </label>
-              <div className="flex gap-1.5">
+              <div className="flex justify-center">
+                <Toggle checked={zone.prix_libre} color="bg-amber-400"
+                  onChange={v => updateLocal(zone.id, "prix_libre", v)} />
+              </div>
+              <div className="flex justify-center">
+                <Toggle checked={zone.actif} color="bg-green-500"
+                  onChange={v => updateLocal(zone.id, "actif", v)} />
+              </div>
+              <div className="flex gap-1.5 justify-center">
                 <button onClick={() => saveZone(zone)} disabled={saving === zone.id}
                   className="p-2 rounded-xl bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors"
                   title="Sauvegarder"
@@ -128,7 +138,7 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
 
         {/* Add new */}
         {newZone ? (
-          <div className="px-5 py-3 border-t border-dashed border-slate-200 grid grid-cols-[1fr_130px_120px_90px_auto] gap-3 items-center bg-brand-50/30">
+          <div className="px-5 py-3 border-t border-dashed border-slate-200 bg-brand-50/30" style={gridStyle}>
             <input type="text" value={newZone.nom}
               onChange={e => setNewZone(n => n ? { ...n, nom: e.target.value } : n)}
               placeholder="Nom de la nouvelle zone" autoFocus
@@ -136,21 +146,15 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
             />
             <input type="number" value={newZone.fee}
               onChange={e => setNewZone(n => n ? { ...n, fee: Number(e.target.value) } : n)}
-              placeholder="Frais" min="0" className={`${inputCls} w-full`}
+              placeholder="Frais" min="0" className={`${inputCls} w-full text-center`}
               disabled={newZone.prix_libre}
             />
-            <label className="flex items-center justify-center cursor-pointer">
-              <div className="relative">
-                <input type="checkbox" className="sr-only peer"
-                  checked={newZone.prix_libre}
-                  onChange={e => setNewZone(n => n ? { ...n, prix_libre: e.target.checked } : n)}
-                />
-                <div className="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-amber-400 transition-colors" />
-                <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-              </div>
-            </label>
+            <div className="flex justify-center">
+              <Toggle checked={newZone.prix_libre} color="bg-amber-400"
+                onChange={v => setNewZone(n => n ? { ...n, prix_libre: v } : n)} />
+            </div>
             <span />
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 justify-center">
               <button onClick={addZone} disabled={saving === "new"}
                 className="p-2 rounded-xl bg-green-500 text-white hover:bg-green-600 transition-colors"
               >
