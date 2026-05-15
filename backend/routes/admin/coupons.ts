@@ -20,6 +20,18 @@ async function ensureCouponsTable() {
       created_at DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  // Migrate existing table — add missing columns
+  for (const ddl of [
+    "ALTER TABLE coupons ADD COLUMN max_uses   INT UNSIGNED  NOT NULL DEFAULT 0",
+    "ALTER TABLE coupons ADD COLUMN uses_count INT UNSIGNED  NOT NULL DEFAULT 0",
+    "ALTER TABLE coupons ADD COLUMN min_order  DECIMAL(10,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE coupons ADD COLUMN expires_at DATETIME      NULL",
+    "ALTER TABLE coupons ADD COLUMN actif      TINYINT(1)    NOT NULL DEFAULT 1",
+  ]) {
+    try { await db.execute(ddl); } catch (e: any) {
+      if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+    }
+  }
 }
 ensureCouponsTable().catch(console.error);
 
