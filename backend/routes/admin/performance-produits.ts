@@ -34,30 +34,36 @@ router.get("/api/admin/performance-produits", async (req, res) => {
       const [rows] = await pool.execute<mysql.RowDataPacket[]>(
         `SELECT
            jt.nom,
-           jt.ref       AS reference,
-           COALESCE(p.prix, jt.prix_u, 0) AS prix,
-           p.prix_achat,
-           SUM(jt.qty)  AS quantite,
-           SUM(jt.total) AS ca,
-           COUNT(DISTINCT f.id) AS nb_ventes
+           jt.ref AS reference,
+           COALESCE(
+             (SELECT p.prix_unitaire FROM products p WHERE p.reference = jt.ref LIMIT 1),
+             jt.prix_u,
+             0
+           ) AS prix,
+           (SELECT p.prix_achat FROM products p WHERE p.reference = jt.ref LIMIT 1) AS prix_achat,
+           SUM(jt.qty)           AS quantite,
+           SUM(jt.total)         AS ca,
+           COUNT(DISTINCT f.id)  AS nb_ventes
          FROM factures f,
          JSON_TABLE(
            f.items, '$[*]'
            COLUMNS (
-             nom   VARCHAR(255)   PATH '$.nom',
-             ref   VARCHAR(100)   PATH '$.reference',
-             qty   INT            PATH '$.qty',
-             prix_u DECIMAL(12,2) PATH '$.prix',
-             total DECIMAL(12,2)  PATH '$.total'
+             nom    VARCHAR(255)   PATH '$.nom',
+             ref    VARCHAR(100)   PATH '$.reference',
+             qty    INT            PATH '$.qty',
+             prix_u DECIMAL(12,2)  PATH '$.prix',
+             total  DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         LEFT JOIN products p  ON p.reference  = jt.ref
-         LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
          WHERE f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND jt.nom IS NOT NULL
-           AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)
-         GROUP BY jt.nom, jt.ref, p.prix_unitaire, p.prix_achat
+           AND (
+             f.source IS NULL
+             OR f.source != 'site_order'
+             OR EXISTS (SELECT 1 FROM orders _so WHERE _so.id = f.order_id AND _so.status = 'delivered')
+           )
+         GROUP BY jt.nom, jt.ref
          ORDER BY ca DESC
          LIMIT ${top}`,
         [dateDebut, dateFin]
@@ -110,10 +116,13 @@ router.get("/api/admin/performance-produits", async (req, res) => {
              total DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
          WHERE f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
-           AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)
+           AND (
+             f.source IS NULL
+             OR f.source != 'site_order'
+             OR EXISTS (SELECT 1 FROM orders _so WHERE _so.id = f.order_id AND _so.status = 'delivered')
+           )
          GROUP BY DATE(f.created_at)
          ORDER BY date`,
         [dateDebut, dateFin]
