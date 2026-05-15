@@ -14,6 +14,7 @@ interface Product {
   reference: string;
   prix_unitaire: number;
   image_url: string | null;
+  images: string[];
 }
 
 const POST_TYPES = [
@@ -79,7 +80,7 @@ export default function SocialPage() {
 
     const payload = {
       type: postType,
-      products: selected.map(({ nom, slug, reference, prix_unitaire, image_url }) => ({ nom, slug, reference, prix_unitaire, image_url })),
+      products: selected.map(({ nom, slug, reference, prix_unitaire, image_url, images }) => ({ nom, slug, reference, prix_unitaire, image_url, images })),
     };
 
     try {
