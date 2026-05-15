@@ -25,7 +25,7 @@ const PHONE_PREFIXES = [
   { code: "+1",   flag: "🇺🇸", label: "USA / Canada" },
 ];
 
-interface DeliveryZone { id: number; nom: string; fee: number; actif: boolean; sort_order: number; }
+interface DeliveryZone { id: number; nom: string; fee: number; actif: boolean; sort_order: number; prix_libre: boolean; }
 
 interface Form {
   nom:               string;
@@ -670,7 +670,7 @@ export default function CheckoutPage() {
                         <option value="">-- Choisir une zone --</option>
                         {zones.map(z => (
                           <option key={z.id} value={z.nom}>
-                            {z.nom}{z.fee > 0 ? ` — ${formatPrice(z.fee)}` : " — Frais à confirmer"}
+                            {z.nom}{z.prix_libre ? " — Prix à confirmer" : z.fee > 0 ? ` — ${formatPrice(z.fee)}` : " — Gratuit"}
                           </option>
                         ))}
                       </select>
@@ -680,7 +680,13 @@ export default function CheckoutPage() {
                     {selectedZone && (
                       <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1">
                         <Truck className="w-3 h-3 text-brand-500" />
-                        Frais de livraison : {selectedZone.fee > 0 ? formatPrice(selectedZone.fee) : "sera confirmé par notre équipe"}
+                        Frais de livraison :{" "}
+                        {selectedZone.prix_libre
+                          ? "sera confirmé par notre équipe"
+                          : selectedZone.fee > 0
+                          ? formatPrice(selectedZone.fee)
+                          : <span className="text-green-600 font-semibold">Livraison gratuite 🎉</span>
+                        }
                       </p>
                     )}
                   </div>
@@ -1071,7 +1077,7 @@ export default function CheckoutPage() {
                     <span className="text-slate-500">Livraison</span>
                     <span className={deliveryFee > 0 ? "font-semibold" : "text-slate-400"}>
                       {selectedZone
-                        ? deliveryFee > 0 ? formatPrice(deliveryFee) : "À confirmer"
+                        ? selectedZone.prix_libre ? "À confirmer" : deliveryFee > 0 ? formatPrice(deliveryFee) : "Gratuit 🎉"
                         : "—"}
                     </span>
                   </div>

@@ -11,7 +11,7 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
   const router  = useRouter();
   const [zones,   setZones]   = useState<DeliveryZone[]>(initialZones);
   const [saving,  setSaving]  = useState<number | "new" | null>(null);
-  const [newZone, setNewZone] = useState<{ nom: string; fee: number } | null>(null);
+  const [newZone, setNewZone] = useState<{ nom: string; fee: number; prix_libre: boolean } | null>(null);
 
   async function saveZone(zone: DeliveryZone) {
     setSaving(zone.id);
@@ -42,7 +42,7 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
     const res = await fetch("/api/admin/delivery-zones", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nom: newZone.nom, fee: newZone.fee || 0, actif: true, sort_order: zones.length }),
+      body: JSON.stringify({ nom: newZone.nom, fee: newZone.fee || 0, prix_libre: newZone.prix_libre, actif: true, sort_order: zones.length }),
     });
     setSaving(null);
     if (!res.ok) { alert(`Erreur ${res.status} — vérifiez que le backend est bien déployé.`); return; }
@@ -64,9 +64,10 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
-          <div className="grid grid-cols-[1fr_120px_80px_auto] gap-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+          <div className="grid grid-cols-[1fr_110px_100px_70px_auto] gap-3 text-xs font-bold uppercase tracking-widest text-slate-400">
             <span>Nom de la zone</span>
             <span>Frais (FCFA)</span>
+            <span>À confirmer</span>
             <span>Actif</span>
             <span />
           </div>
@@ -74,15 +75,29 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
 
         <div className="divide-y divide-slate-50">
           {zones.map(zone => (
-            <div key={zone.id} className="px-5 py-3 grid grid-cols-[1fr_120px_80px_auto] gap-3 items-center">
+            <div key={zone.id} className="px-5 py-3 grid grid-cols-[1fr_110px_100px_70px_auto] gap-3 items-center">
               <input type="text" value={zone.nom}
                 onChange={e => updateLocal(zone.id, "nom", e.target.value)}
                 className={`${inputCls} w-full`}
               />
-              <input type="number" value={zone.fee}
-                onChange={e => updateLocal(zone.id, "fee", Number(e.target.value))}
-                className={`${inputCls} w-full`} min="0"
-              />
+              <div>
+                <input type="number" value={zone.fee}
+                  onChange={e => updateLocal(zone.id, "fee", Number(e.target.value))}
+                  className={`${inputCls} w-full`} min="0"
+                  disabled={zone.prix_libre}
+                />
+                {!zone.prix_libre && <p className="text-[10px] text-slate-400 mt-0.5 text-center">0 = gratuit</p>}
+              </div>
+              <label className="flex items-center justify-center gap-1.5 cursor-pointer">
+                <div className="relative">
+                  <input type="checkbox" className="sr-only peer"
+                    checked={zone.prix_libre}
+                    onChange={e => updateLocal(zone.id, "prix_libre", e.target.checked)}
+                  />
+                  <div className="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-amber-400 transition-colors" />
+                  <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                </div>
+              </label>
               <label className="flex items-center justify-center">
                 <div className="relative">
                   <input type="checkbox" className="sr-only peer"
@@ -113,7 +128,7 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
 
         {/* Add new */}
         {newZone ? (
-          <div className="px-5 py-3 border-t border-dashed border-slate-200 grid grid-cols-[1fr_120px_80px_auto] gap-3 items-center bg-brand-50/30">
+          <div className="px-5 py-3 border-t border-dashed border-slate-200 grid grid-cols-[1fr_110px_100px_70px_auto] gap-3 items-center bg-brand-50/30">
             <input type="text" value={newZone.nom}
               onChange={e => setNewZone(n => n ? { ...n, nom: e.target.value } : n)}
               placeholder="Nom de la nouvelle zone" autoFocus
@@ -122,7 +137,18 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
             <input type="number" value={newZone.fee}
               onChange={e => setNewZone(n => n ? { ...n, fee: Number(e.target.value) } : n)}
               placeholder="Frais" min="0" className={`${inputCls} w-full`}
+              disabled={newZone.prix_libre}
             />
+            <label className="flex items-center justify-center cursor-pointer">
+              <div className="relative">
+                <input type="checkbox" className="sr-only peer"
+                  checked={newZone.prix_libre}
+                  onChange={e => setNewZone(n => n ? { ...n, prix_libre: e.target.checked } : n)}
+                />
+                <div className="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-amber-400 transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+              </div>
+            </label>
             <span />
             <div className="flex gap-1.5">
               <button onClick={addZone} disabled={saving === "new"}
@@ -138,7 +164,7 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
             </div>
           </div>
         ) : (
-          <button onClick={() => setNewZone({ nom: "", fee: 0 })}
+          <button onClick={() => setNewZone({ nom: "", fee: 0, prix_libre: false })}
             className="w-full flex items-center justify-center gap-2 py-4 text-sm font-semibold text-slate-500 hover:text-brand-700 hover:bg-brand-50/50 transition-colors border-t border-dashed border-slate-200"
           >
             <Plus className="w-4 h-4" /> Ajouter une zone

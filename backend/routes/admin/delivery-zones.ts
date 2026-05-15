@@ -12,9 +12,12 @@ async function ensureDeliveryZonesTable() {
       nom        VARCHAR(100) NOT NULL,
       fee        INT UNSIGNED NOT NULL DEFAULT 0,
       actif      TINYINT(1)   NOT NULL DEFAULT 1,
-      sort_order INT UNSIGNED NOT NULL DEFAULT 0
+      sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+      prix_libre TINYINT(1)   NOT NULL DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  try { await db.execute("ALTER TABLE delivery_zones ADD COLUMN prix_libre TINYINT(1) NOT NULL DEFAULT 0"); }
+  catch (e: any) { if (e?.code !== "ER_DUP_FIELDNAME") throw e; }
 }
 ensureDeliveryZonesTable().catch(console.error);
 
@@ -56,6 +59,7 @@ router.post("/api/admin/delivery-zones", async (req, res) => {
       fee:        Number(body.fee ?? 0),
       actif:      body.actif !== false && body.actif !== 0,
       sort_order: Number(body.sort_order ?? 0),
+      prix_libre: Boolean(body.prix_libre),
     });
 
     res.json({ ok: true });

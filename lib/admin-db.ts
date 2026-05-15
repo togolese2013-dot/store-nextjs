@@ -608,11 +608,12 @@ export async function setSettings(entries: Record<string, string>) {
 
 /* ─── Delivery Zones ─── */
 export interface DeliveryZone {
-  id:         number;
-  nom:        string;
-  fee:        number;
-  actif:      boolean;
-  sort_order: number;
+  id:          number;
+  nom:         string;
+  fee:         number;
+  actif:       boolean;
+  sort_order:  number;
+  prix_libre:  boolean;
 }
 
 export async function getDeliveryZones(activeOnly = false): Promise<DeliveryZone[]> {
@@ -620,19 +621,19 @@ export async function getDeliveryZones(activeOnly = false): Promise<DeliveryZone
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT * FROM delivery_zones ${where} ORDER BY sort_order ASC, id ASC`
   );
-  return rows.map(r => ({ ...r, actif: Boolean(r.actif) })) as DeliveryZone[];
+  return rows.map(r => ({ ...r, actif: Boolean(r.actif), prix_libre: Boolean(r.prix_libre) })) as DeliveryZone[];
 }
 
 export async function upsertDeliveryZone(zone: Omit<DeliveryZone, "id"> & { id?: number }) {
   if (zone.id) {
     await db.execute(
-      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=? WHERE id=?",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.id]
+      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=?",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id]
     );
   } else {
     await db.execute(
-      "INSERT INTO delivery_zones (nom, fee, actif, sort_order) VALUES (?,?,?,?)",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order]
+      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre) VALUES (?,?,?,?,?)",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0]
     );
   }
 }

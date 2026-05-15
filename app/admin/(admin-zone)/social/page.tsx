@@ -18,9 +18,9 @@ const POST_TYPES = [
   { value: "promotion",  label: "🏷️ Promotion spéciale" },
   { value: "nouveaute",  label: "✨ Nouveauté" },
   { value: "top_ventes", label: "🔥 Top ventes" },
+  { value: "ordinaire",  label: "📦 Produit ordinaire" },
 ];
 
-const API            = process.env.NEXT_PUBLIC_API_URL ?? "";
 const N8N_WEBHOOK    = "https://n8n.togolese.fr/webhook/facebook-publisher";
 
 export default function SocialPage() {
@@ -31,14 +31,15 @@ export default function SocialPage() {
   const [status, setStatus]           = useState<"idle" | "loading" | "success" | "error">("idle");
   const [feedback, setFeedback]       = useState("");
   const [loadingProds, setLoadingProds] = useState(true);
+  const [loadError, setLoadError]       = useState("");
 
   useEffect(() => {
-    fetch(`${API}/api/admin/products?limit=50`, { credentials: "include" })
-      .then(r => r.json())
+    fetch("/api/admin/products?limit=200&includeInactive=false", { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(d => setProducts(Array.isArray(d?.products) ? d.products : []))
-      .catch(() => {})
+      .catch(e => setLoadError(`Impossible de charger les produits (${e})`))
       .finally(() => setLoadingProds(false));
-  }, [API]);
+  }, []);
 
   const toggleProduct = useCallback((id: number) => {
     setSelected(prev =>
@@ -138,6 +139,12 @@ export default function SocialPage() {
             <div className="flex items-center gap-2 text-slate-400 text-sm py-6 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Chargement des produits…
             </div>
+          ) : loadError ? (
+            <div className="flex items-center gap-2 text-red-500 text-sm py-6 justify-center bg-red-50 rounded-xl px-4">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {loadError}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center text-slate-400 text-sm py-6">Aucun produit disponible.</div>
           ) : (
             <div className="space-y-1.5 max-h-72 overflow-y-auto">
               {products.map(p => {
