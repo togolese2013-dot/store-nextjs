@@ -48,7 +48,8 @@ import adminTendancesRoutes        from "./routes/admin/tendances";
 import adminPerfProduitsRoutes     from "./routes/admin/performance-produits";
 import adminWhatsappInboxRoutes, { ensureWaMessagesCols } from "./routes/admin/whatsapp-inbox";
 import waWebhookRoutes, { ensureWaMessagesTable } from "./routes/whatsapp-webhook";
-import analyticsRoutes from "./routes/analytics";
+import analyticsRoutes  from "./routes/analytics";
+import referralsRoutes  from "./routes/referrals";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -179,6 +180,7 @@ app.use(mobileMoneyRoutes);
 app.use(adminWhatsappInboxRoutes);
 app.use(waWebhookRoutes);
 app.use(analyticsRoutes);
+app.use(referralsRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);

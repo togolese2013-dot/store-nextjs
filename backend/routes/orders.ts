@@ -24,6 +24,7 @@ async function ensureOrderCols() {
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
     "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
     "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
+    "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL",
   ]) {
     try { await pool.execute(ddl); } catch (e: any) {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
@@ -41,7 +42,7 @@ router.post("/api/orders", async (req, res) => {
     const {
       nom, telephone, adresse, zone_livraison, delivery_fee,
       note, lien_localisation, items, subtotal, total,
-      payment_mode, nb_tranches, mm_transaction_ref,
+      payment_mode, nb_tranches, mm_transaction_ref, ref_code,
     } = req.body;
 
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
@@ -82,12 +83,21 @@ router.post("/api/orders", async (req, res) => {
       );
     }
 
+    // Increment referral uses_count if a valid ref_code was applied
+    if (ref_code) {
+      pool.execute(
+        `UPDATE referrals SET uses_count = uses_count + 1 WHERE code = ?`,
+        [String(ref_code).trim().toUpperCase()]
+      ).catch(() => {});
+    }
+
     // Save extra fields
     const extraUpdates: string[] = [];
     const extraValues: unknown[] = [];
     if (lien_localisation)    { extraUpdates.push("lien_localisation = ?");    extraValues.push(lien_localisation); }
     if (payment_mode)         { extraUpdates.push("payment_mode = ?");         extraValues.push(payment_mode); }
     if (mm_transaction_ref)   { extraUpdates.push("mm_transaction_ref = ?");   extraValues.push(mm_transaction_ref); }
+    if (ref_code)             { extraUpdates.push("ref_code = ?");             extraValues.push(String(ref_code).trim().toUpperCase()); }
     if (extraUpdates.length > 0) {
       await pool.execute(
         `UPDATE orders SET ${extraUpdates.join(", ")} WHERE id = ?`,

@@ -196,10 +196,11 @@ export default function CheckoutPage() {
     if (match) setRefCode(decodeURIComponent(match[1]));
   }, []);
 
-  const selectedZone   = ZONES.find(z => z.label === form.zone);
-  const deliveryFee    = selectedZone?.fee ?? 0;
-  const grandTotal     = selectedTotal + deliveryFee;
-  const montantTranche = nbTranches > 0
+  const selectedZone     = ZONES.find(z => z.label === form.zone);
+  const deliveryFee      = selectedZone?.fee ?? 0;
+  const referralDiscount = refCode ? Math.round(selectedTotal * 0.10) : 0;
+  const grandTotal       = selectedTotal + deliveryFee - referralDiscount;
+  const montantTranche   = nbTranches > 0
     ? Math.round((grandTotal / nbTranches) * 100) / 100
     : grandTotal;
 
@@ -1007,6 +1008,12 @@ export default function CheckoutPage() {
                         : "—"}
                     </span>
                   </div>
+                  {referralDiscount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-emerald-600 font-semibold">Remise parrainage −10%</span>
+                      <span className="text-emerald-600 font-bold">−{formatPrice(referralDiscount)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3 mb-5">
