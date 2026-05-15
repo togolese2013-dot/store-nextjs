@@ -25,6 +25,8 @@ async function ensureOrderCols() {
     "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
     "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
     "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL",
+    "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) NULL",
+    "ALTER TABLE orders ADD COLUMN coupon_remise INT NULL",
   ]) {
     try { await pool.execute(ddl); } catch (e: any) {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
@@ -43,6 +45,7 @@ router.post("/api/orders", async (req, res) => {
       nom, telephone, adresse, zone_livraison, delivery_fee,
       note, lien_localisation, items, subtotal, total,
       payment_mode, nb_tranches, mm_transaction_ref, ref_code,
+      coupon_code, coupon_remise,
     } = req.body;
 
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
@@ -91,6 +94,14 @@ router.post("/api/orders", async (req, res) => {
       ).catch(() => {});
     }
 
+    // Increment coupon uses_count
+    if (coupon_code) {
+      pool.execute(
+        `UPDATE coupons SET uses_count = uses_count + 1 WHERE code = ?`,
+        [String(coupon_code).trim().toUpperCase()]
+      ).catch(() => {});
+    }
+
     // Save extra fields
     const extraUpdates: string[] = [];
     const extraValues: unknown[] = [];
@@ -98,6 +109,8 @@ router.post("/api/orders", async (req, res) => {
     if (payment_mode)         { extraUpdates.push("payment_mode = ?");         extraValues.push(payment_mode); }
     if (mm_transaction_ref)   { extraUpdates.push("mm_transaction_ref = ?");   extraValues.push(mm_transaction_ref); }
     if (ref_code)             { extraUpdates.push("ref_code = ?");             extraValues.push(String(ref_code).trim().toUpperCase()); }
+    if (coupon_code)          { extraUpdates.push("coupon_code = ?");          extraValues.push(String(coupon_code).trim().toUpperCase()); }
+    if (coupon_remise)        { extraUpdates.push("coupon_remise = ?");        extraValues.push(Number(coupon_remise)); }
     if (extraUpdates.length > 0) {
       await pool.execute(
         `UPDATE orders SET ${extraUpdates.join(", ")} WHERE id = ?`,

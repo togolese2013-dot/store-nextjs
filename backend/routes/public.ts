@@ -370,6 +370,33 @@ router.get("/api/orders/track", async (req, res) => {
   }
 });
 
+// GET /api/public/coupons/validate?code=XXX&total=XXXXX
+router.get("/api/public/coupons/validate", async (req, res) => {
+  try {
+    const code  = String(req.query.code ?? "").trim().toUpperCase();
+    const total = Number(req.query.total ?? 0);
+    if (!code) return res.status(400).json({ valid: false, error: "Code manquant." });
+
+    const [rows] = await (db as import("mysql2/promise").Pool).execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif
+       FROM coupons WHERE code = ? LIMIT 1`, [code]
+    );
+    const c = rows[0];
+    if (!c || !c.actif)                                    return res.json({ valid: false, error: "Code invalide ou inactif." });
+    if (c.expires_at && new Date(c.expires_at) < new Date()) return res.json({ valid: false, error: "Ce code a expiré." });
+    if (c.max_uses > 0 && c.uses_count >= c.max_uses)     return res.json({ valid: false, error: "Ce code a atteint sa limite d'utilisation." });
+    if (total > 0 && total < Number(c.min_order))         return res.json({ valid: false, error: `Commande minimum requise : ${Number(c.min_order).toLocaleString("fr-FR")} FCFA.` });
+
+    const remise = c.type === "fixed"
+      ? Math.min(Number(c.valeur), total)
+      : Math.round(total * Number(c.valeur) / 100);
+
+    res.json({ valid: true, type: c.type, valeur: Number(c.valeur), remise, code: c.code });
+  } catch (err) {
+    res.status(500).json({ valid: false, error: "Erreur serveur." });
+  }
+});
+
 // GET /api/public/delivery-zones — zones actives pour le checkout (pas d'auth)
 router.get("/api/public/delivery-zones", async (_req, res) => {
   try {

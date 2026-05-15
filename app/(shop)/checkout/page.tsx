@@ -145,6 +145,10 @@ export default function CheckoutPage() {
   const [orderRef,     setOrderRef]     = useState("");
   const [zones,        setZones]        = useState<DeliveryZone[]>([]);
   const [refCode,      setRefCode]      = useState<string | null>(null);
+  const [couponInput,  setCouponInput]  = useState("");
+  const [coupon,       setCoupon]       = useState<{ code: string; type: string; valeur: number; remise: number } | null>(null);
+  const [couponError,  setCouponError]  = useState("");
+  const [couponLoading,setCouponLoading]= useState(false);
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
   const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
   const [payMode,      setPayMode]      = useState<"livraison" | "flooz" | "yas" | "echelonne">("livraison");
@@ -198,7 +202,8 @@ export default function CheckoutPage() {
   const selectedZone     = zones.find(z => z.nom === form.zone);
   const deliveryFee      = selectedZone?.fee ?? 0;
   const referralDiscount = refCode ? Math.round(selectedTotal * 0.10) : 0;
-  const grandTotal       = selectedTotal + deliveryFee - referralDiscount;
+  const couponDiscount   = coupon?.remise ?? 0;
+  const grandTotal       = selectedTotal + deliveryFee - referralDiscount - couponDiscount;
   const montantTranche   = nbTranches > 0
     ? Math.round((grandTotal / nbTranches) * 100) / 100
     : grandTotal;
@@ -228,6 +233,24 @@ export default function CheckoutPage() {
       }
     } catch { /* ignore */ } finally {
       setSavingAddr(false);
+    }
+  }
+
+  async function applyCoupon() {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError("");
+    setCoupon(null);
+    try {
+      const res  = await fetch(`/api/public/coupons/validate?code=${encodeURIComponent(code)}&total=${selectedTotal}`);
+      const data = await res.json();
+      if (!data.valid) { setCouponError(data.error ?? "Code invalide."); }
+      else             { setCoupon(data); }
+    } catch {
+      setCouponError("Erreur réseau.");
+    } finally {
+      setCouponLoading(false);
     }
   }
 
@@ -284,6 +307,8 @@ export default function CheckoutPage() {
           subtotal:          selectedTotal,
           total:             grandTotal,
           ref_code:          refCode ?? undefined,
+          coupon_code:       coupon?.code ?? undefined,
+          coupon_remise:     couponDiscount > 0 ? couponDiscount : undefined,
           payment_mode:      payMode === "flooz" ? "moov_direct" : payMode === "yas" ? "yas_direct" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
           mm_transaction_ref: (payMode === "flooz" || payMode === "yas") ? mmRef.trim() : null,
@@ -676,10 +701,53 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Mode de paiement — 4 cartes horizontales */}
+              {/* Coupon */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
                 <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">3</div>
+                  Code promo
+                </h2>
+                {coupon ? (
+                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                    <div>
+                      <p className="text-sm font-bold text-emerald-800">{coupon.code}</p>
+                      <p className="text-xs text-emerald-600">
+                        {coupon.type === "percent" ? `−${coupon.valeur}%` : `−${formatPrice(coupon.valeur)}`}
+                        {" → "}remise de <span className="font-bold">{formatPrice(couponDiscount)}</span>
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => { setCoupon(null); setCouponInput(""); }}
+                      className="text-xs text-emerald-600 hover:text-red-500 font-semibold transition-colors">
+                      Retirer
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
+                      onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCoupon())}
+                      placeholder="Code promo"
+                      className="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyCoupon}
+                      disabled={couponLoading || !couponInput.trim()}
+                      className="px-5 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Appliquer"}
+                    </button>
+                  </div>
+                )}
+                {couponError && <p className="text-xs text-red-500 mt-2">{couponError}</p>}
+              </div>
+
+              {/* Mode de paiement — 4 cartes horizontales */}
+              <div className="bg-white rounded-3xl border border-slate-100 p-6">
+                <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">4</div>
                   Mode de paiement
                 </h2>
 
@@ -1011,6 +1079,12 @@ export default function CheckoutPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-emerald-600 font-semibold">Remise parrainage −10%</span>
                       <span className="text-emerald-600 font-bold">−{formatPrice(referralDiscount)}</span>
+                    </div>
+                  )}
+                  {couponDiscount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-emerald-600 font-semibold">Code promo {coupon?.code}</span>
+                      <span className="text-emerald-600 font-bold">−{formatPrice(couponDiscount)}</span>
                     </div>
                   )}
                 </div>
