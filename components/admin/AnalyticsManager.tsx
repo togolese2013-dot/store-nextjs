@@ -225,7 +225,7 @@ export default function AnalyticsManager() {
                     ))}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: 10, fontSize: 12 }}
-                    formatter={(v: number) => [`${v} visiteurs`, ""]} />
+                    formatter={(v) => [`${v} visiteurs`, ""]} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-4">
