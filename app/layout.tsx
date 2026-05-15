@@ -22,6 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: tagline,
     authors:     [{ name }],
     robots:      { index: true, follow: true },
+    verification: { google: "06319e170dac5f7a" },
     openGraph: {
       type:        "website",
       locale:      "fr_TG",
