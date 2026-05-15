@@ -44,6 +44,8 @@ router.post("/api/admin/coupons", async (req, res) => {
       return res.status(403).json({ error: "Accès refusé." });
     }
 
+    await ensureCouponsTable();
+
     const body = req.body;
 
     if (body._delete && body.id) {
