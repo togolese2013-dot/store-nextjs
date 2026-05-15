@@ -11,7 +11,9 @@ interface Product {
   id: number;
   nom: string;
   slug: string | null;
+  reference: string;
   prix_unitaire: number;
+  image_url: string | null;
 }
 
 const POST_TYPES = [
@@ -77,7 +79,7 @@ export default function SocialPage() {
 
     const payload = {
       type: postType,
-      products: selected.map(({ nom, slug, prix_unitaire }) => ({ nom, slug, prix_unitaire })),
+      products: selected.map(({ nom, slug, reference, prix_unitaire, image_url }) => ({ nom, slug, reference, prix_unitaire, image_url })),
     };
 
     try {
