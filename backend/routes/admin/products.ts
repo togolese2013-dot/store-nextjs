@@ -49,7 +49,7 @@ router.get("/api/admin/products", async (req, res) => {
   const brandId = req.query.brand    ? Number(req.query.brand)    : undefined;
   const statut  = (req.query.statut as string) || undefined;
   const page    = Math.max(1, Number(req.query.page) || 1);
-  const limit   = Math.min(100, Number(req.query.limit) || 20);
+  const limit   = Math.min(500, Number(req.query.limit) || 20);
   const offset  = req.query.offset !== undefined ? Number(req.query.offset) : (page - 1) * limit;
   const statutFilter = ["disponible","faible","epuise"].includes(statut ?? "")
     ? statut as "disponible" | "faible" | "epuise"
