@@ -163,7 +163,7 @@ export default function AnalyticsManager() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} labelFormatter={fmtDate} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} labelFormatter={(label) => fmtDate(String(label))} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Area type="monotone" dataKey="vues"     name="Pages vues" stroke="#8b5cf6" fill="url(#gVues)" strokeWidth={2} dot={false} />
               <Area type="monotone" dataKey="sessions" name="Sessions"   stroke="#3b82f6" fill="url(#gSess)" strokeWidth={2} dot={false} />

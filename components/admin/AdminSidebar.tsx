@@ -131,6 +131,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/users",                 "admin"],
   ["/admin/rapports",              "admin"],
   ["/admin/tendances",             "admin"],
+  ["/admin/analytics",             "admin"],
   ["/admin/crm",                   "crm"],
   ["/admin/serena",                "crm"],
   ["/admin/fidelite",              "crm"],
