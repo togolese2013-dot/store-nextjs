@@ -21,13 +21,10 @@ const POST_TYPES = [
   { value: "ordinaire",  label: "📦 Produit ordinaire" },
 ];
 
-const N8N_WEBHOOK    = "https://n8n.togolese.fr/webhook/facebook-publisher";
-
 export default function SocialPage() {
   const [products, setProducts]       = useState<Product[]>([]);
   const [selected, setSelected]       = useState<number[]>([]);
   const [postType, setPostType]       = useState("promotion");
-  const [webhookUrl, setWebhookUrl]   = useState(N8N_WEBHOOK);
   const [status, setStatus]           = useState<"idle" | "loading" | "success" | "error">("idle");
   const [feedback, setFeedback]       = useState("");
   const [loadingProds, setLoadingProds] = useState(true);
@@ -51,11 +48,6 @@ export default function SocialPage() {
 
   async function handlePublish() {
     if (selected.length === 0) { setFeedback("Sélectionnez au moins un produit."); return; }
-    if (!webhookUrl) {
-      setFeedback("URL webhook n8n non configurée. Ajoutez la clé « n8n_facebook_webhook » dans les Réglages généraux.");
-      return;
-    }
-
     setStatus("loading");
     setFeedback("");
 
@@ -67,8 +59,9 @@ export default function SocialPage() {
     };
 
     try {
-      const res  = await fetch(webhookUrl, {
+      const res  = await fetch("/api/admin/social/publish", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
