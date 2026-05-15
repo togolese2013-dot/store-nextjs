@@ -21,33 +21,48 @@ export default function CouponsManager({ initialCoupons }: { initialCoupons: Cou
     setForm(f => f ? { ...f, [k]: v } : null);
   }
 
+  async function fetchAll() {
+    const res = await fetch("/api/admin/coupons", { credentials: "include" });
+    if (res.ok) setCoupons(await res.json());
+  }
+
   async function save(coupon: Coupon) {
     setSaving(coupon.id);
-    await fetch("/api/admin/coupons", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await fetch("/api/admin/coupons", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(coupon),
     });
-    setSaving(null); router.refresh();
+    setSaving(null);
+    if (!res.ok) { alert(`Erreur ${res.status}`); return; }
+    await fetchAll();
   }
 
   async function add() {
     if (!form?.code.trim()) return;
     setSaving("new");
-    await fetch("/api/admin/coupons", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await fetch("/api/admin/coupons", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    setSaving(null); setForm(null); router.refresh();
+    setSaving(null);
+    if (!res.ok) { alert(`Erreur ${res.status}`); return; }
+    setForm(null);
+    await fetchAll();
   }
 
   async function del(id: number) {
     if (!confirm("Supprimer ce coupon ?")) return;
     setSaving(id);
-    await fetch("/api/admin/coupons", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await fetch("/api/admin/coupons", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, _delete: true }),
     });
-    setCoupons(c => c.filter(x => x.id !== id)); setSaving(null);
+    if (!res.ok) { setSaving(null); alert(`Erreur ${res.status}`); return; }
+    setCoupons(c => c.filter(x => x.id !== id));
+    setSaving(null);
   }
 
   return (
