@@ -46,8 +46,14 @@ export default function DeliveryZonesManager({ initialZones }: { initialZones: D
     });
     setSaving(null);
     if (!res.ok) { alert(`Erreur ${res.status} — vérifiez que le backend est bien déployé.`); return; }
+
+    // Fetch the updated list to get the real ID assigned by the DB
+    const updated = await fetch("/api/admin/delivery-zones", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+    if (Array.isArray(updated)) {
+      setZones(updated);
+    }
     setNewZone(null);
-    router.refresh();
   }
 
   function updateLocal(id: number, field: keyof DeliveryZone, value: unknown) {
