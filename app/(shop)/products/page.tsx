@@ -6,11 +6,27 @@ import ProductCard from "@/components/ProductCard";
 import CatalogueFilters from "@/components/CatalogueFilters";
 import Link from "next/link";
 import { SlidersHorizontal, Search, Tag, Sparkles, LayoutGrid } from "lucide-react";
+import { getSiteUrl, getSiteName } from "@/lib/site-settings";
 
-export const metadata: Metadata = {
-  title: "Catalogue — Tous les produits",
-  description: "Parcourez notre catalogue complet : électronique, accessoires, audio, gaming et plus encore. Livraison rapide au Togo.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const [siteUrl, siteName] = await Promise.all([getSiteUrl(), getSiteName()]);
+  const title       = `Catalogue — ${siteName}`;
+  const description = `Parcourez le catalogue complet de ${siteName} : électronique, accessoires, audio, gaming et plus encore. Livraison rapide au Togo.`;
+  const canonical   = `${siteUrl}/products`;
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type:        "website",
+      url:         canonical,
+      siteName,
+      title,
+      description,
+      locale:      "fr_TG",
+    },
+  };
+}
 
 const PER_PAGE = 24;
 

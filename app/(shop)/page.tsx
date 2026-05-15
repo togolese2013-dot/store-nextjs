@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import { apiGet } from "@/lib/api";
 import type { Product } from "@/lib/utils";
+import { getSiteUrl, getSiteName } from "@/lib/site-settings";
 import ProductCard from "@/components/ProductCard";
 import ShuffledProductGrid from "@/components/ShuffledProductGrid";
 import HeroSection from "@/components/HeroSection";
@@ -11,6 +13,29 @@ import {
   ArrowRight, Star, TrendingUp, Sparkles, Tag,
   MessageCircle, Truck, CreditCard, RefreshCw, ShieldCheck,
 } from "lucide-react";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const [siteUrl, siteName] = await Promise.all([getSiteUrl(), getSiteName()]);
+  const description = "Boutique en ligne au Togo — électronique, accessoires, audio, gaming. Livraison rapide à Lomé et partout au Togo.";
+  return {
+    title:       siteName,
+    description,
+    alternates:  { canonical: siteUrl },
+    openGraph: {
+      type:        "website",
+      url:         siteUrl,
+      siteName,
+      title:       siteName,
+      description,
+      locale:      "fr_TG",
+    },
+    twitter: {
+      card:        "summary_large_image",
+      title:       siteName,
+      description,
+    },
+  };
+}
 
 /* ─── Trust bar ─── */
 function TrustBar() {
@@ -246,10 +271,12 @@ export default async function HomePage() {
   let promos:      Product[] = [];
   let newItems:    Product[] = [];
 
-  const [bsRes, promoRes, newRes] = await Promise.allSettled([
+  const [bsRes, promoRes, newRes, siteUrl, siteName] = await Promise.allSettled([
     apiGet<{ data: Product[] }>("/api/products/bestsellers?limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
+    getSiteUrl(),
+    getSiteName(),
   ]);
   if (bsRes.status    === "fulfilled") bestsellers = bsRes.value;
   if (promoRes.status === "fulfilled") promos      = promoRes.value;
@@ -258,8 +285,49 @@ export default async function HomePage() {
   if (promoRes.status === "rejected")  console.error("[HomePage] promos:",      promoRes.reason);
   if (newRes.status   === "rejected")  console.error("[HomePage] new:",         newRes.reason);
 
+  const base = siteUrl.status === "fulfilled" ? siteUrl.value : "https://togolese.tg";
+  const name = siteName.status === "fulfilled" ? siteName.value : "Togolese Shop";
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type":  "WebSite",
+        "@id":    `${base}/#website`,
+        url:      base,
+        name,
+        inLanguage: "fr",
+        potentialAction: {
+          "@type":       "SearchAction",
+          target:        `${base}/products?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type":  "Organization",
+        "@id":    `${base}/#organization`,
+        name,
+        url:      base,
+        logo: {
+          "@type": "ImageObject",
+          url:     `${base}/logo-togolese-shop.svg`,
+        },
+        contactPoint: {
+          "@type":             "ContactPoint",
+          contactType:         "customer service",
+          availableLanguage:   "French",
+          areaServed:          "TG",
+        },
+      },
+    ],
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <HeroSection />
       <TrustBar />
 

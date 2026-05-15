@@ -21,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const { data } = await apiGet<{ data: Product[] }>("/api/products?limit=500", { noAuth: true });
     productPages = data.map(p => ({
-      url:             `${BASE}/products/${p.reference}`,
+      url:             `${BASE}/products/${p.slug ?? p.reference}`,
       lastModified:    new Date(p.date_creation || new Date()),
       changeFrequency: "weekly" as const,
       priority:        0.8,

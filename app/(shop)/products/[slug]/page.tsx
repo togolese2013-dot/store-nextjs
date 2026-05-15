@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const price       = finalPrice(product);
   const description = product.description
     ?? `${product.nom} — ${formatPrice(price)} FCFA — Livraison rapide au Togo.`;
-  const canonicalUrl = `${siteUrl}/products/${product.reference ?? slug}`;
+  const canonicalUrl = `${siteUrl}/products/${product.slug ?? product.reference ?? slug}`;
   const ogImage = product.image_url
     ? { url: product.image_url, width: 800, height: 800, alt: product.nom }
     : undefined;
@@ -118,7 +118,7 @@ export default async function ProductPage({ params }: PageProps) {
     image:       rawUrl ? (rawUrl.startsWith("http") ? rawUrl : `${siteUrl}${rawUrl}`) : undefined,
     offers: {
       "@type":          "Offer",
-      url:              `${siteUrl}/products/${product.reference}`,
+      url:              `${siteUrl}/products/${product.slug ?? product.reference}`,
       priceCurrency:    "XOF",
       price:            price,
       availability:     outOf
