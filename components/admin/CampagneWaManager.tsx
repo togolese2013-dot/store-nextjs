@@ -146,7 +146,7 @@ function ProductSearch({ selected, onAdd, onRemove }: {
     try {
       const res  = await fetch(`/api/admin/products?q=${encodeURIComponent(q)}&limit=8`, { credentials: "include" });
       const data = await res.json();
-      const list: Product[] = (data.data ?? data ?? []).map((p: any) => ({
+      const list: Product[] = (data.products ?? data.data ?? []).map((p: any) => ({
         id:            p.id,
         nom:           p.nom,
         slug:          p.slug ?? null,
