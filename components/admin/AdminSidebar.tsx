@@ -193,7 +193,7 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
 
   function isActive(href: string) {
     if (href === "/admin") return pathname === "/admin";
-    return pathname.startsWith(href);
+    return pathname === href || pathname.startsWith(href + "/");
   }
 
   function buildContent(showHeader: boolean) { return (
