@@ -45,6 +45,7 @@ router.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
 
 // Send campaign
 router.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
+  console.log("[campagne] POST /send received, body:", JSON.stringify(req.body).slice(0, 200));
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
