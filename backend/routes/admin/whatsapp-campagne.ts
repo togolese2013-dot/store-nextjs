@@ -13,6 +13,21 @@ function formatTgPhone(num: string): string {
   return `228${digits}`;
 }
 
+// Test credentials
+router.get("/api/admin/whatsapp-campagne/test-credentials", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const { getSetting } = await import("@/lib/admin-db");
+  const phoneId = await getSetting("wa_phone_number_id");
+  const token   = await getSetting("wa_access_token");
+  if (!phoneId || !token) return res.json({ ok: false, error: "Credentials manquants en DB" });
+  const r = await fetch(`https://graph.facebook.com/v19.0/${phoneId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await r.json();
+  res.json({ status: r.status, phoneId, tokenPreview: token.slice(0, 20) + "...", data });
+});
+
 // Preview — count recipients
 router.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
   const session = await getSession(req);
