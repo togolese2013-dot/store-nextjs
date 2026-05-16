@@ -5,6 +5,7 @@ import { getAccessibleModules } from "@/lib/admin-permissions";
 import Link from "next/link";
 import { Package, ShoppingBag, Settings, Users, ArrowRight, BarChart2 } from "lucide-react";
 import AdminUserChip from "@/components/admin/AdminUserChip";
+import DashboardKpis from "@/components/admin/DashboardKpis";
 
 export const metadata = { title: "Accueil Admin" };
 
@@ -106,12 +107,14 @@ export default async function AdminHomePage() {
       <div className="flex-1 flex flex-col items-center px-6 sm:px-10 pt-[10vh] pb-16">
         <div className="w-full max-w-3xl">
 
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <h1 className="font-display font-800 text-3xl sm:text-4xl text-slate-900 mb-2">
               Que souhaitez-vous gérer ?
             </h1>
             <p className="text-slate-400 text-sm">Sélectionnez un espace de travail</p>
           </div>
+
+          <DashboardKpis />
 
           {MODULES.length === 0 ? (
             <div className="text-center py-16 text-slate-400">

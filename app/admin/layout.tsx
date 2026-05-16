@@ -4,7 +4,10 @@ import { getAdminById, getUtilisateurById } from "@/lib/admin-db";
 import AdminShell from "@/components/admin/AdminShell";
 import type { AdminPermissions } from "@/lib/admin-permissions";
 
-export const metadata = { title: { template: "%s — Admin", default: "Admin — Togolese Shop" } };
+export const metadata = {
+  title: { template: "%s — Admin", default: "Admin — Togolese Shop" },
+  manifest: "/site.webmanifest",
+};
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getAdminSession();

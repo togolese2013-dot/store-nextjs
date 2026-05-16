@@ -53,6 +53,8 @@ import referralsRoutes       from "./routes/referrals";
 import adminDeliveryZonesRoutes from "./routes/admin/delivery-zones";
 import adminCouponsRoutes       from "./routes/admin/coupons";
 import adminSocialRoutes        from "./routes/admin/social";
+import adminDashboardRoutes      from "./routes/admin/dashboard";
+import adminWaCampagneRoutes     from "./routes/admin/whatsapp-campagne";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -187,6 +189,8 @@ app.use(referralsRoutes);
 app.use(adminDeliveryZonesRoutes);
 app.use(adminCouponsRoutes);
 app.use(adminSocialRoutes);
+app.use(adminDashboardRoutes);
+app.use(adminWaCampagneRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);

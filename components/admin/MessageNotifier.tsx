@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MessageCircle, X } from "lucide-react";
+import { MessageCircle, ShoppingBag, X } from "lucide-react";
 import { useAdminSSE } from "./useAdminSSE";
 
 interface WaToast {
-  id:   number;
-  from: string;
-  nom:  string;
-  body: string;
+  id:        number;
+  type:      "message" | "order";
+  from:      string;
+  nom:       string;
+  body:      string;
+  reference?: string;
+  total?:    number;
 }
 
 const AudioCtxClass =
@@ -82,6 +85,24 @@ function showNativeNotification(nom: string, body: string, phone: string) {
   } catch { /* blocked */ }
 }
 
+function showOrderNotification(reference: string, nom: string, total: number) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  try {
+    const n = new Notification("🛍️ Nouvelle commande !", {
+      body:     `${reference} — ${nom} — ${total.toLocaleString("fr-FR")} F CFA`,
+      icon:     "/icons/icon-192.png",
+      tag:      `order-${reference}`,
+      renotify: true,
+    } as NotificationOptions);
+    n.onclick = () => {
+      window.focus();
+      window.location.href = "/admin/orders";
+      n.close();
+    };
+  } catch { /* blocked */ }
+}
+
 export default function MessageNotifier() {
   const [toasts,  setToasts]  = useState<WaToast[]>([]);
   const [unread,  setUnread]  = useState(0);
@@ -136,22 +157,36 @@ export default function MessageNotifier() {
 
   useEffect(() => {
     return subscribe((data) => {
-      // Only inbound messages (not "sent" confirmations)
-      if (data.type !== "message" || !data.from || data.type_action === "sent") return;
+      // Inbound WhatsApp message
+      if (data.type === "message" && data.from && data.type_action !== "sent") {
+        const from = String(data.from ?? "");
+        const nom  = String(data.nom  ?? from);
+        const body = String(data.body ?? "");
 
-      const from = String(data.from ?? "");
-      const nom  = String(data.nom  ?? from);
-      const body = String(data.body ?? "");
+        playMessageSound();
+        showNativeNotification(nom, body, from);
 
-      playMessageSound();
-      showNativeNotification(nom, body, from);
+        if (document.visibilityState !== "visible") setUnread(prev => prev + 1);
 
-      if (document.visibilityState !== "visible") {
-        setUnread(prev => prev + 1);
+        const toastId = ++toastIdRef.current;
+        setToasts(prev => [...prev, { id: toastId, type: "message", from, nom, body }]);
       }
 
-      const toastId = ++toastIdRef.current;
-      setToasts(prev => [...prev, { id: toastId, from, nom, body }]);
+      // New order
+      if (data.type === "commande" && data.reference) {
+        const reference = String(data.reference ?? "");
+        const nom       = String(data.nom   ?? "Client");
+        const total     = Number(data.total ?? 0);
+
+        playMessageSound();
+        showOrderNotification(reference, nom, total);
+
+        if (document.visibilityState !== "visible") setUnread(prev => prev + 1);
+
+        const toastId = ++toastIdRef.current;
+        setToasts(prev => [...prev, { id: toastId, type: "order", from: reference, nom, body: `${total.toLocaleString("fr-FR")} F CFA`, reference, total }]);
+        setTimeout(() => removeToast(toastId), 8000);
+      }
     });
   }, [subscribe, removeToast]);
 
@@ -162,37 +197,58 @@ export default function MessageNotifier() {
       aria-live="polite"
       className="fixed bottom-20 right-5 z-[9999] flex flex-col gap-3 pointer-events-none"
     >
-      {toasts.map(({ id, from, nom, body }) => (
+      {toasts.map((toast) => (
         <div
-          key={id}
+          key={toast.id}
           className="pointer-events-auto flex items-start gap-3 bg-white border border-slate-200 shadow-xl rounded-2xl px-4 py-3.5 w-80 animate-fade-up"
         >
-          <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center">
-            <MessageCircle className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-0.5">
-              Message WhatsApp
-            </p>
-            <p className="text-sm font-bold text-slate-900 truncate">{nom}</p>
-            <p className="text-xs text-slate-500 truncate">{body}</p>
-          </div>
-          <div className="flex flex-col gap-1 shrink-0 items-end">
-            <button
-              onClick={() => removeToast(id)}
-              aria-label="Fermer"
-              className="w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-            <a
-              href={`/admin/whatsapp/${encodeURIComponent(from)}`}
-              onClick={() => removeToast(id)}
-              className="text-[10px] font-bold text-amber-600 hover:underline"
-            >
-              Répondre →
-            </a>
-          </div>
+          {toast.type === "order" ? (
+            <>
+              <div className="shrink-0 w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
+                <ShoppingBag className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-0.5">
+                  Nouvelle commande !
+                </p>
+                <p className="text-sm font-bold text-slate-900 truncate">{toast.reference}</p>
+                <p className="text-xs text-slate-500 truncate">{toast.nom} — {toast.body}</p>
+              </div>
+              <div className="flex flex-col gap-1 shrink-0 items-end">
+                <button onClick={() => removeToast(toast.id)} aria-label="Fermer"
+                  className="w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <a href="/admin/orders" onClick={() => removeToast(toast.id)}
+                  className="text-[10px] font-bold text-emerald-600 hover:underline">
+                  Voir →
+                </a>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-0.5">
+                  Message WhatsApp
+                </p>
+                <p className="text-sm font-bold text-slate-900 truncate">{toast.nom}</p>
+                <p className="text-xs text-slate-500 truncate">{toast.body}</p>
+              </div>
+              <div className="flex flex-col gap-1 shrink-0 items-end">
+                <button onClick={() => removeToast(toast.id)} aria-label="Fermer"
+                  className="w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <a href={`/admin/whatsapp/${encodeURIComponent(toast.from)}`} onClick={() => removeToast(toast.id)}
+                  className="text-[10px] font-bold text-amber-600 hover:underline">
+                  Répondre →
+                </a>
+              </div>
+            </>
+          )}
         </div>
       ))}
     </div>
