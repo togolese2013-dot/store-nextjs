@@ -5,6 +5,7 @@ import {
   getBoutiqueClientsStats, updateBoutiqueClient, deleteBoutiqueClient,
   getBoutiqueClientById, getClientFacturesByNom,
 } from "@/lib/admin-db";
+import { db } from "@/lib/db";
 
 const router = express.Router();
 
@@ -60,6 +61,9 @@ router.post("/api/admin/boutique-clients", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   if (!req.body.nom?.trim()) return res.status(400).json({ error: "Nom requis." });
+  if (!req.body.telephone?.trim()) return res.status(400).json({ error: "Téléphone requis." });
+  const [[existing]] = await db.execute<any[]>("SELECT id FROM boutique_clients WHERE telephone = ? LIMIT 1", [req.body.telephone.trim()]);
+  if (existing) return res.status(400).json({ error: "Un client avec ce numéro existe déjà." });
   const id = await createBoutiqueClient(req.body);
   res.json({ success: true, id });
 });

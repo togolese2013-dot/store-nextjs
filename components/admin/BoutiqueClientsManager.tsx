@@ -43,6 +43,7 @@ function FormModal({ client, onClose, onSaved }: FormModalProps) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.nom.trim()) { setError("Nom requis"); return; }
+    if (!isEdit && !form.telephone.trim()) { setError("Téléphone requis"); return; }
     setSaving(true);
     setError("");
     const url    = isEdit ? `/api/admin/boutique-clients/${client!.id}` : "/api/admin/boutique-clients";
@@ -72,7 +73,7 @@ function FormModal({ client, onClose, onSaved }: FormModalProps) {
                 value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder="Nom du client" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Téléphone</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Téléphone *</label>
               <input className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-400"
                 value={form.telephone} onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))} placeholder="Ex : 90123456" />
             </div>
