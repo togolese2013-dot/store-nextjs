@@ -74,15 +74,20 @@ router.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
     // Upload image once for all recipients
     let mediaId: string | null = null;
     if (image_url?.trim()) {
-      const imgRes = await fetch(image_url).catch(() => null);
+      console.log("[campagne] fetching image:", image_url.slice(0, 80));
+      const imgRes = await fetch(image_url).catch((e) => { console.log("[campagne] fetch image error:", e); return null; });
+      console.log("[campagne] image fetch status:", imgRes?.status, imgRes?.ok);
       if (imgRes?.ok) {
         const buffer   = Buffer.from(await imgRes.arrayBuffer());
         const mime     = imgRes.headers.get("content-type") ?? "image/jpeg";
         const filename = image_url.split("/").pop()?.split("?")[0] ?? "product.jpg";
+        console.log("[campagne] uploading to WA media, mime:", mime, "size:", buffer.length);
         const upload   = await uploadWaMedia(buffer, mime, filename);
+        console.log("[campagne] upload result:", JSON.stringify(upload));
         if (upload.success && upload.mediaId) mediaId = upload.mediaId;
       }
     }
+    console.log("[campagne] mediaId:", mediaId, "rows:", rows.length);
 
     let sent = 0;
     let failed = 0;
