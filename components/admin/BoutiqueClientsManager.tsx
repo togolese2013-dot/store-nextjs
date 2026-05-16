@@ -46,8 +46,8 @@ function FormModal({ client, onClose, onSaved }: FormModalProps) {
     setSaving(true);
     setError("");
     const url    = isEdit ? `/api/admin/boutique-clients/${client!.id}` : "/api/admin/boutique-clients";
-    const method = isEdit ? "PUT" : "POST";
-    const res    = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const method = isEdit ? "PATCH" : "POST";
+    const res    = await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     const data   = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error ?? "Erreur"); return; }
@@ -144,7 +144,7 @@ export default function BoutiqueClientsManager() {
   const load = useCallback(async () => {
     setLoading(true);
     const qs = new URLSearchParams({ page: String(page), q: query, filtre });
-    const res = await fetch(`/api/admin/boutique-clients?${qs}`);
+    const res = await fetch(`/api/admin/boutique-clients?${qs}`, { credentials: "include" });
     const data = await res.json();
     if (res.ok) {
       setClients(data.data);
@@ -157,9 +157,9 @@ export default function BoutiqueClientsManager() {
   // Load counts for tabs
   const loadCounts = useCallback(async () => {
     const [r1, r2, r3] = await Promise.all([
-      fetch("/api/admin/boutique-clients?filtre=tous&page=1&q=").then(r => r.json()),
-      fetch("/api/admin/boutique-clients?filtre=debiteurs&page=1&q=").then(r => r.json()),
-      fetch("/api/admin/boutique-clients?filtre=dettes&page=1&q=").then(r => r.json()),
+      fetch("/api/admin/boutique-clients?filtre=tous&page=1&q=", { credentials: "include" }).then(r => r.json()),
+      fetch("/api/admin/boutique-clients?filtre=debiteurs&page=1&q=", { credentials: "include" }).then(r => r.json()),
+      fetch("/api/admin/boutique-clients?filtre=dettes&page=1&q=", { credentials: "include" }).then(r => r.json()),
     ]);
     setCounts({ tous: r1.total ?? 0, debiteurs: r2.total ?? 0, dettes: r3.total ?? 0 });
   }, []);
@@ -180,7 +180,7 @@ export default function BoutiqueClientsManager() {
 
   async function handleDelete(id: number, nom: string) {
     if (!confirm(`Supprimer le client "${nom}" ?`)) return;
-    await fetch(`/api/admin/boutique-clients/${id}`, { method: "DELETE" });
+    await fetch(`/api/admin/boutique-clients/${id}`, { method: "DELETE", credentials: "include" });
     load();
     loadCounts();
   }
