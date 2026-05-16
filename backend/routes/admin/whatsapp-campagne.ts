@@ -5,6 +5,14 @@ import { sendWaText, sendWaImage, uploadWaMedia } from "../../lib/whatsapp";
 
 const router = express.Router();
 
+// Ensure full international format for Togo numbers (228XXXXXXXX)
+function formatTgPhone(num: string): string {
+  const digits = num.replace(/[\s+\-()]/g, "");
+  if (digits.startsWith("228")) return digits;
+  if (digits.startsWith("0")) return `228${digits.slice(1)}`;
+  return `228${digits}`;
+}
+
 // Preview — count recipients
 router.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
   const session = await getSession(req);
@@ -77,18 +85,22 @@ router.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
 
     let sent = 0;
     let failed = 0;
+    const errors: string[] = [];
 
     for (const client of rows) {
       await new Promise(r => setTimeout(r, 600));
-      const to = String(client.telephone);
+      const to = formatTgPhone(String(client.telephone));
       const result = mediaId
         ? await sendWaImage({ to, mediaId, caption: message })
         : await sendWaText({ to, body: message });
       if (result.success) sent++;
-      else failed++;
+      else {
+        failed++;
+        if (result.error && !errors.includes(result.error)) errors.push(result.error);
+      }
     }
 
-    res.json({ success: true, sent, failed, total: rows.length });
+    res.json({ success: true, sent, failed, total: rows.length, errors });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }

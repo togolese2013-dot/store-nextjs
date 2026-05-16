@@ -5,7 +5,7 @@ import { Send, Users, Loader2, CheckCircle2, AlertTriangle, Search, X, Package, 
 import PageHeader from "@/components/admin/PageHeader";
 import { formatPrice } from "@/lib/utils";
 
-interface Result { sent: number; failed: number; total: number }
+interface Result { sent: number; failed: number; total: number; errors?: string[] }
 
 interface Product {
   id:            number;
@@ -377,11 +377,18 @@ export default function CampagneWaManager() {
         )}
 
         {result && (
-          <div className="flex items-start gap-3 px-4 py-3 bg-emerald-50 text-emerald-700 rounded-xl text-sm">
+          <div className={`flex items-start gap-3 px-4 py-3 rounded-xl text-sm ${result.failed === 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
             <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">Campagne envoyée !</p>
+            <div className="space-y-1">
+              <p className="font-bold">Campagne terminée</p>
               <p>{result.sent} envoyé(s) · {result.failed} échec(s) · {result.total} total</p>
+              {result.errors && result.errors.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {result.errors.map((e, i) => (
+                    <p key={i} className="text-xs font-mono bg-white/60 rounded px-2 py-1">{e}</p>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
