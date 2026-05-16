@@ -168,9 +168,10 @@ export async function sendWaImage({
       }),
     });
 
+    const responseData = await res.json().catch(() => ({}));
+    console.log("[sendWaImage] to:", cleanPhone(to), "status:", res.status, "response:", JSON.stringify(responseData));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: (err as any)?.error?.message ?? `HTTP ${res.status}` };
+      return { success: false, error: (responseData as any)?.error?.message ?? `HTTP ${res.status}` };
     }
     return { success: true };
   } catch (e) {
