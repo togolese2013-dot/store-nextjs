@@ -94,7 +94,7 @@ export async function recoverMixByYasEntries() {
         date_entree:   new Date(row.created_at).toISOString().slice(0, 10),
       });
     }
-    if (rows.length > 0) console.log(`[finance] ${rows.length} entrée(s) Mix by Yas récupérée(s).`);
+    console.log(`[finance] recoverMixByYas: ${rows.length} entrée(s) trouvée(s) et récupérée(s).`);
   } catch (err) {
     console.error("[finance/recoverMixByYas]", err);
   }
