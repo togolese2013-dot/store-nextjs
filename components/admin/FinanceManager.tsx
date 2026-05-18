@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import {
   TrendingUp, TrendingDown, Wallet, Banknote, Smartphone,
   ArrowLeftRight, Pencil, Trash2, X, Plus,
-  Loader2, User,
+  Loader2, User, CreditCard,
 } from "lucide-react";
 import type { FinanceEntry, FinanceStats } from "@/lib/admin-db";
 import PageHeader from "@/components/admin/PageHeader";
@@ -29,7 +29,7 @@ function fmtDate(dateEntree: string, createdAt?: string) {
 const MODES = [
   { value: "especes",           label: "Espèces",           icon: Banknote,       color: "text-emerald-600" },
   { value: "moov_money",        label: "Moov Money",        icon: Smartphone,     color: "text-blue-600"    },
-  { value: "tmoney",            label: "TMoney",            icon: Smartphone,     color: "text-purple-600"  },
+  { value: "mix_by_yas",        label: "Mix by Yas",        icon: CreditCard,     color: "text-amber-600"   },
   { value: "virement_bancaire", label: "Virement bancaire", icon: ArrowLeftRight, color: "text-slate-600"   },
 ] as const;
 
@@ -381,7 +381,7 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
       const res  = await fetch("/api/admin/finance?limit=200");
       const data = await res.json();
       setItems(data.items ?? []);
-      setStats(data.stats ?? { total_recettes: 0, total_depenses: 0, solde_net: 0, especes: 0, moov_money: 0, tmoney: 0, virement_bancaire: 0 });
+      setStats(data.stats ?? { total_recettes: 0, total_depenses: 0, solde_net: 0, especes: 0, moov_money: 0, virement_bancaire: 0, mix_by_yas: 0 });
       setTotal(data.total ?? 0);
     } finally {
       setLoading(false);
@@ -463,20 +463,20 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           iconColor="text-blue-500"
         />
         <StatCard
-          title="TMoney"
-          amount={stats.tmoney}
-          badge="Mobile Money"
-          badgeColor="bg-indigo-50 text-indigo-700 border border-indigo-100"
-          icon={Smartphone}
-          iconColor="text-indigo-500"
-        />
-        <StatCard
           title="Virement Bancaire"
           amount={stats.virement_bancaire}
           badge="Virement"
           badgeColor="bg-slate-100 text-slate-600 border border-slate-200"
           icon={ArrowLeftRight}
           iconColor="text-slate-500"
+        />
+        <StatCard
+          title="Mix by Yas"
+          amount={stats.mix_by_yas}
+          badge="Mix by Yas"
+          badgeColor="bg-amber-50 text-amber-700 border border-amber-100"
+          icon={CreditCard}
+          iconColor="text-amber-500"
         />
       </div>
 

@@ -2421,8 +2421,8 @@ export interface FinanceStats {
   solde_net:        number;
   especes:          number;
   moov_money:       number;
-  tmoney:           number;
   virement_bancaire: number;
+  mix_by_yas:       number;
 }
 
 export async function listFinanceEntries(opts: {
@@ -2547,17 +2547,17 @@ export async function getFinanceStats(): Promise<FinanceStats> {
 
   const especes           = modeMap["especes"]           ?? 0;
   const moov_money        = modeMap["moov_money"]        ?? 0;
-  const tmoney            = modeMap["tmoney"]            ?? 0;
   const virement_bancaire = modeMap["virement_bancaire"] ?? 0;
+  const mix_by_yas        = (modeMap["mix_by_yas"] ?? 0) + (modeMap["tmoney"] ?? 0);
 
   return {
     total_recettes:    Number(summaryRow?.recettes ?? 0),
     total_depenses:    Number(summaryRow?.depenses ?? 0),
-    solde_net:         especes + moov_money + tmoney + virement_bancaire,
+    solde_net:         especes + moov_money + virement_bancaire + mix_by_yas,
     especes,
     moov_money,
-    tmoney,
     virement_bancaire,
+    mix_by_yas,
   };
 }
 
