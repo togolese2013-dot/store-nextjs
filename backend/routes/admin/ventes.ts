@@ -92,8 +92,10 @@ router.get("/api/admin/ventes/factures/:id", async (req, res) => {
 router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const isPayment = req.body?.montant_paiement !== undefined;
+  const requiredPerm = isPayment ? "add_paiement" : "edit_vente";
   if (!["super_admin", "admin"].includes(session.role) &&
-      !hasPageAccess(session.role, session.permissions, "boutique", "edit_vente")) {
+      !hasPageAccess(session.role, session.permissions, "boutique", requiredPerm)) {
     return res.status(403).json({ error: "Accès refusé." });
   }
   try {

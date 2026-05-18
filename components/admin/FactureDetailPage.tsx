@@ -65,7 +65,7 @@ interface PaymentModal {
   error:     string;
 }
 
-export default function FactureDetailPage({ facture: initial }: { facture: Facture }) {
+export default function FactureDetailPage({ facture: initial, canAddPaiement = true }: { facture: Facture; canAddPaiement?: boolean }) {
   const router   = useRouter();
   const [facture, setFacture] = useState<Facture>(initial);
   const [paiements, setPaiements] = useState<FacturePaiement[]>(initial.paiements ?? []);
@@ -460,7 +460,7 @@ export default function FactureDetailPage({ facture: initial }: { facture: Factu
               </div>
 
               {/* CTA */}
-              {resteAPayer > 0 && facture.statut !== "annule" && (
+              {resteAPayer > 0 && facture.statut !== "annule" && canAddPaiement && (
                 <button
                   onClick={openPayModal}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors"
