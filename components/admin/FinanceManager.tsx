@@ -455,6 +455,14 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           iconColor="text-green-500"
         />
         <StatCard
+          title="Mix by Yas"
+          amount={stats.mix_by_yas}
+          badge="Mix by Yas"
+          badgeColor="bg-amber-50 text-amber-700 border border-amber-100"
+          icon={CreditCard}
+          iconColor="text-amber-500"
+        />
+        <StatCard
           title="Moov Money"
           amount={stats.moov_money}
           badge="Mobile Money"
@@ -469,14 +477,6 @@ export default function FinanceManager({ initialItems, initialStats, initialTota
           badgeColor="bg-slate-100 text-slate-600 border border-slate-200"
           icon={ArrowLeftRight}
           iconColor="text-slate-500"
-        />
-        <StatCard
-          title="Mix by Yas"
-          amount={stats.mix_by_yas}
-          badge="Mix by Yas"
-          badgeColor="bg-amber-50 text-amber-700 border border-amber-100"
-          icon={CreditCard}
-          iconColor="text-amber-500"
         />
       </div>
 
