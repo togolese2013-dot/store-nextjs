@@ -6,6 +6,7 @@ import {
   getUtilisateurByUsername,
   updateAdminPassword, updateUtilisateurPassword,
   getTokenVersion, incrementTokenVersion,
+  getAdminById, getUtilisateurById,
 } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 import { signToken, getSession, setAuthCookie, clearAuthCookie } from "../../lib/auth";
@@ -309,6 +310,40 @@ router.get("/api/admin/auth/me", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   res.json({ ok: true, ...session });
+});
+
+/* ── Refresh token — re-signe le JWT avec les permissions fraîches de la DB ── */
+router.post("/api/admin/auth/refresh", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+
+  try {
+    let freshPermissions: AdminPermissions | null = null;
+
+    if (session.role === "staff") {
+      const user = await getUtilisateurById(Number(session.id));
+      if (!user) return res.status(401).json({ error: "Utilisateur introuvable." });
+      if (user.permissions) {
+        try { freshPermissions = JSON.parse(user.permissions as unknown as string) as AdminPermissions; } catch { /* ignore */ }
+      }
+    } else {
+      const user = await getAdminById(Number(session.id));
+      if (!user) return res.status(401).json({ error: "Utilisateur introuvable." });
+      if (user.permissions) {
+        try { freshPermissions = JSON.parse(user.permissions as unknown as string) as AdminPermissions; } catch { /* ignore */ }
+      }
+    }
+
+    const token = await signToken({
+      ...session,
+      permissions: freshPermissions,
+    });
+    setAuthCookie(res, token);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[auth/refresh]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
 });
 
 export default router;

@@ -27,6 +27,10 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
   const { subscribe } = useAdminSSE();
 
   useEffect(() => {
+    fetch("/api/admin/auth/refresh", { method: "POST", credentials: "include" }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     return subscribe((event) => {
       if (event.type === "connected" || event.type === "reconnect" || event.type === "message") return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
