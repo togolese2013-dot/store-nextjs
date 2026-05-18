@@ -743,7 +743,7 @@ export async function deleteOrder(id: number) {
   // Clean up all finance entries linked to this order reference
   if (order?.reference) {
     await db.execute(
-      "DELETE FROM finance_entries WHERE description LIKE ?",
+      "DELETE FROM finance_entries WHERE CONVERT(description USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ?",
       [`%${order.reference}%`]
     ).catch(() => {});
   }
@@ -2161,13 +2161,13 @@ export async function deleteFacture(id: number) {
 
   if (ref) {
     await db.execute(
-      "DELETE FROM finance_entries WHERE description LIKE ?",
+      "DELETE FROM finance_entries WHERE CONVERT(description USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ?",
       [`%${ref}%`]
     ).catch(() => {});
   }
   // Catch entries created by livraison confirmation — description uses facture ID, not reference
   await db.execute(
-    "DELETE FROM finance_entries WHERE description LIKE ?",
+    "DELETE FROM finance_entries WHERE CONVERT(description USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ?",
     [`%facture #${id}%`]
   ).catch(() => {});
   invalidateVentesStats();
