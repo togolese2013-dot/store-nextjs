@@ -60,7 +60,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const isAdminRoute      = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
-  const isLivreurRoute    = pathname.startsWith("/livreur");
+  const isLivreurRoute    = pathname.startsWith("/livreur") &&
+                            !pathname.startsWith("/livreur/login") &&
+                            !pathname.startsWith("/livreur/inscription");
   const isChangePassRoute = pathname.startsWith("/change-password");
 
   const isProtected = isAdminRoute || isLivreurRoute || isChangePassRoute;
