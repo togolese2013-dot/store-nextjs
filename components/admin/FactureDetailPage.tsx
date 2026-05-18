@@ -83,12 +83,18 @@ export default function FactureDetailPage({ facture: initial, canAddPaiement = t
   })();
 
   /* ── Payment calculations ── */
+  const isSiteOrder  = facture.source === "site_order";
+  const couponRemise = isSiteOrder ? Number(facture.coupon_remise ?? 0) : 0;
+  // For site orders, payment base = sous_total (delivery fee excluded) minus coupon
+  const baseAmount   = isSiteOrder
+    ? Math.max(0, Number(facture.sous_total > 0 ? facture.sous_total : facture.total) - couponRemise)
+    : Number(facture.total);
   const isPaidFull  = facture.statut_paiement === "paye_total" || facture.statut_paiement === "paye";
   const montantPaye = isPaidFull
-    ? Number(facture.total)
+    ? baseAmount
     : Number(facture.montant_acompte ?? 0);
-  const resteAPayer = Math.max(0, Number(facture.total) - montantPaye);
-  const pct = facture.total > 0 ? Math.round((montantPaye / facture.total) * 100) : 0;
+  const resteAPayer = Math.max(0, baseAmount - montantPaye);
+  const pct = baseAmount > 0 ? Math.round((montantPaye / baseAmount) * 100) : 0;
 
 
   /* ── Payment modal handlers ── */
@@ -268,6 +274,12 @@ export default function FactureDetailPage({ facture: initial, canAddPaiement = t
                   <span className="font-semibold text-emerald-600 tabular-nums">−{formatPrice(facture.remise)}</span>
                 </div>
               )}
+              {couponRemise > 0 && (
+                <div className="px-6 py-3 flex justify-between text-sm">
+                  <span className="text-slate-500">Coupon</span>
+                  <span className="font-semibold text-emerald-600 tabular-nums">−{formatPrice(couponRemise)}</span>
+                </div>
+              )}
               {montantPaye > 0 && (
                 <div className="px-6 py-3 flex justify-between text-sm">
                   <span className="font-semibold text-slate-700">Montant Payé</span>
@@ -319,11 +331,7 @@ export default function FactureDetailPage({ facture: initial, canAddPaiement = t
             <div className="px-6 py-4 border-b border-slate-100">
               <h2 className="font-bold text-slate-900 text-base">Historique des Paiements</h2>
             </div>
-            {paiements.length === 0 ? (
-              <div className="px-6 py-10 text-center text-slate-400 text-sm">
-                Aucun paiement enregistré
-              </div>
-            ) : (
+            {(paiements.length > 0 || (isSiteOrder && isPaidFull)) ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-100">
@@ -335,6 +343,14 @@ export default function FactureDetailPage({ facture: initial, canAddPaiement = t
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
+                    {isSiteOrder && isPaidFull && paiements.length === 0 && (
+                      <tr className="hover:bg-slate-50/60">
+                        <td className="px-6 py-3.5 text-slate-600 text-xs whitespace-nowrap">{formatDate(facture.created_at)}</td>
+                        <td className="px-4 py-3.5 text-slate-700">{modeLabel(facture.mode_paiement)}</td>
+                        <td className="px-4 py-3.5 text-right font-semibold text-emerald-600 tabular-nums">{formatPrice(baseAmount)}</td>
+                        <td className="px-6 py-3.5 text-slate-400 italic">Site web</td>
+                      </tr>
+                    )}
                     {paiements.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50/60">
                         <td className="px-6 py-3.5 text-slate-600 text-xs whitespace-nowrap">{formatDate(p.created_at)}</td>
@@ -345,6 +361,10 @@ export default function FactureDetailPage({ facture: initial, canAddPaiement = t
                     ))}
                   </tbody>
                 </table>
+              </div>
+            ) : (
+              <div className="px-6 py-10 text-center text-slate-400 text-sm">
+                Aucun paiement enregistré
               </div>
             )}
           </div>
@@ -444,7 +464,7 @@ export default function FactureDetailPage({ facture: initial, canAddPaiement = t
               <div className="space-y-2 text-sm divide-y divide-slate-50">
                 <div className="flex justify-between pt-1">
                   <span className="text-slate-500">Total</span>
-                  <span className="font-bold text-slate-900 tabular-nums">{formatPrice(facture.total)}</span>
+                  <span className="font-bold text-slate-900 tabular-nums">{formatPrice(baseAmount)}</span>
                 </div>
                 {resteAPayer > 0 ? (
                   <div className="flex justify-between pt-2.5">

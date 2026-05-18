@@ -277,13 +277,14 @@ export async function sendOrderNotifications({
     const [
       clientEnabled, adminEnabled,
       clientTemplate, adminTemplate,
-      adminNumber, lang, siteUrl,
+      adminNumber, adminNumber2, lang, siteUrl,
     ] = await Promise.all([
       getSetting("wa_order_client_enabled"),
       getSetting("wa_order_admin_enabled"),
       getSetting("wa_order_client_template"),
       getSetting("wa_order_admin_template"),
       getSetting("wa_order_admin_number"),
+      getSetting("wa_order_admin_number_2"),
       getSetting("wa_order_lang"),
       getSetting("site_url"),
     ]);
@@ -325,6 +326,15 @@ export async function sendOrderNotifications({
         bodyParams:   [reference, nom, telephone, articlesStr, totalStr, adminUrl],
       });
       if (process.env.NODE_ENV !== "production") console.log(`[WA] Admin notif result (${reference}):`, result);
+
+      if (adminNumber2 && adminNumber2 !== adminNumber) {
+        await sendWaTemplate({
+          to:           adminNumber2,
+          templateName: adminTemplate,
+          languageCode,
+          bodyParams:   [reference, nom, telephone, articlesStr, totalStr, adminUrl],
+        }).catch(e => console.error(`[WA] Admin notif #2 error (${reference}):`, e));
+      }
     }
   } catch (e) {
     console.error("[WA] sendOrderNotifications error:", e);

@@ -17,7 +17,8 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
   const [adminEnabled,   setAdminEnabled]   = useState(settings.wa_order_admin_enabled   === "1");
   const [clientTemplate, setClientTemplate] = useState(settings.wa_order_client_template ?? "");
   const [adminTemplate,  setAdminTemplate]  = useState(settings.wa_order_admin_template  ?? "");
-  const [adminNumber,    setAdminNumber]    = useState(settings.wa_order_admin_number     ?? "");
+  const [adminNumber,    setAdminNumber]    = useState(settings.wa_order_admin_number      ?? "");
+  const [adminNumber2,   setAdminNumber2]   = useState(settings.wa_order_admin_number_2    ?? "");
   const [lang,           setLang]           = useState(settings.wa_order_lang             ?? "fr");
 
   // Notifications ventes boutique physique
@@ -48,6 +49,7 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
         wa_order_client_template: clientTemplate,
         wa_order_admin_template:  adminTemplate,
         wa_order_admin_number:    adminNumber,
+        wa_order_admin_number_2:  adminNumber2,
         wa_order_lang:            lang,
         wa_boutique_vente_enabled:          venteEnabled ? "1" : "0",
         wa_boutique_vente_template_full:    venteTemplateFull,
@@ -196,6 +198,11 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
               <div>
                 <label className={labelCls}>Numéro WhatsApp admin (avec indicatif, sans +)</label>
                 <input type="text" value={adminNumber} onChange={e => setAdminNumber(e.target.value)}
+                  placeholder="ex : 22890123456" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Numéro supplémentaire (optionnel)</label>
+                <input type="text" value={adminNumber2} onChange={e => setAdminNumber2(e.target.value)}
                   placeholder="ex : 22890123456" className={inputCls} />
               </div>
               <div>

@@ -1861,8 +1861,10 @@ export async function getFacturePaiements(facture_id: number): Promise<FacturePa
 
 export async function getFactureById(id: number): Promise<Facture | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
+    `SELECT f.*, COALESCE(o.coupon_remise, 0) AS coupon_remise,
+            CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
+     LEFT JOIN orders o ON o.id = f.order_id
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
      WHERE f.id = ? LIMIT 1`,
