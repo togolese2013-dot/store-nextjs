@@ -70,6 +70,36 @@ router.delete("/api/admin/finance/:id", async (req, res) => {
   }
 });
 
+/* ── Migration one-shot : récupère les finance_entries Mix by Yas manquantes */
+export async function recoverMixByYasEntries() {
+  try {
+    const [rows] = await db.execute<import("mysql2/promise").RowDataPacket[]>(`
+      SELECT fp.montant, fp.created_at, f.reference, f.client_nom
+      FROM facture_paiements fp
+      JOIN factures f ON f.id = fp.facture_id
+      WHERE fp.mode_paiement = 'mix_by_yas'
+        AND NOT EXISTS (
+          SELECT 1 FROM finance_entries fe
+          WHERE fe.description LIKE CONCAT('%', f.reference, '%')
+            AND fe.mode_paiement = 'mix_by_yas'
+        )
+    `);
+    for (const row of rows) {
+      await createFinanceEntry({
+        type:          "vente",
+        mode_paiement: "mix_by_yas",
+        categorie:     "Vente boutique",
+        description:   `Paiement ${row.reference} – ${row.client_nom}`,
+        montant:       Number(row.montant),
+        date_entree:   new Date(row.created_at).toISOString().slice(0, 10),
+      });
+    }
+    if (rows.length > 0) console.log(`[finance] ${rows.length} entrée(s) Mix by Yas récupérée(s).`);
+  } catch (err) {
+    console.error("[finance/recoverMixByYas]", err);
+  }
+}
+
 router.delete("/api/admin/finance", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });

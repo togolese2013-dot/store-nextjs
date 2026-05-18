@@ -2480,6 +2480,14 @@ async function financeEntrieCols() {
       `ALTER TABLE finance_entries MODIFY COLUMN type ENUM('caisse','depense','rentree','vente','transfert') NOT NULL`
     );
   } catch { /* already correct or DB doesn't support */ }
+  // Ensure 'mix_by_yas' is in the mode_paiement ENUM
+  if (names.has("mode_paiement")) {
+    try {
+      await db.execute(
+        `ALTER TABLE finance_entries MODIFY COLUMN mode_paiement ENUM('especes','moov_money','tmoney','virement_bancaire','mix_by_yas') NULL`
+      );
+    } catch { /* already correct */ }
+  }
   _finCols = {
     mode_paiement:      names.has("mode_paiement"),
     admin_id:           names.has("admin_id"),
