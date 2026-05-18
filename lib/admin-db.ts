@@ -897,7 +897,7 @@ export async function ensureOrderVente(
   // Create vente finance entry once when order is delivered
   const isDelivered = ["delivered", "livree", "livre", "livré"].includes(String(order.status ?? ""));
   if (isDelivered && !order.finance_entry_id) {
-    const montant = Number(order.subtotal ?? 0);
+    const montant = Math.max(0, Number(order.total ?? 0) - Number(order.coupon_remise ?? 0));
     if (montant > 0) {
       const entryId = await createFinanceEntry({
         type:          "vente",
@@ -991,7 +991,7 @@ export async function applyOrderDeliveredEffects(orderId: number, actor?: string
 export async function applyOrderPaidEffects(orderId: number, actor?: string): Promise<void> {
   await ensureOrderLifecycleCols();
   const [[order]] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT id, reference, nom, telephone, total, payment_mode, finance_entry_id
+    `SELECT id, reference, nom, telephone, total, coupon_remise, payment_mode, finance_entry_id
      FROM orders WHERE id = ? LIMIT 1`,
     [orderId]
   );
@@ -1002,7 +1002,7 @@ export async function applyOrderPaidEffects(orderId: number, actor?: string): Pr
     mode_paiement: orderPaymentModeToFinanceMode(order.payment_mode as string | null) ?? "especes",
     categorie:     "Commande site",
     description:   `Commande site ${order.reference} – ${order.nom ?? order.telephone}`,
-    montant:       Number(order.total ?? 0),
+    montant:       Math.max(0, Number(order.total ?? 0) - Number(order.coupon_remise ?? 0)),
     date_entree:   new Date().toISOString().slice(0, 10),
   });
   await db.execute("UPDATE orders SET finance_entry_id = ? WHERE id = ?", [entryId, orderId]);

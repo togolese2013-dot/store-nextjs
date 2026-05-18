@@ -100,6 +100,27 @@ export async function recoverMixByYasEntries() {
   }
 }
 
+/* ── Migration one-shot : corrige les montants finance des commandes avec coupon */
+export async function recoverCouponFinanceEntries() {
+  try {
+    const [rows] = await db.execute<import("mysql2/promise").RowDataPacket[]>(`
+      SELECT o.id, o.reference, o.total, o.coupon_remise, o.finance_entry_id,
+             fe.montant AS entry_montant
+      FROM orders o
+      JOIN finance_entries fe ON fe.id = o.finance_entry_id
+      WHERE o.coupon_remise > 0
+        AND ABS(fe.montant - (o.total - o.coupon_remise)) > 0.01
+    `);
+    for (const row of rows) {
+      const correct = Number(row.total) - Number(row.coupon_remise);
+      await db.execute("UPDATE finance_entries SET montant = ? WHERE id = ?", [correct, row.finance_entry_id]);
+    }
+    console.log(`[finance] recoverCoupon: ${rows.length} entrée(s) corrigée(s).`);
+  } catch (err) {
+    console.error("[finance/recoverCoupon]", err);
+  }
+}
+
 router.delete("/api/admin/finance", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });

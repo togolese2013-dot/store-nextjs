@@ -54,7 +54,7 @@ import adminDeliveryZonesRoutes from "./routes/admin/delivery-zones";
 import adminCouponsRoutes       from "./routes/admin/coupons";
 import adminSocialRoutes        from "./routes/admin/social";
 import adminWaCampagneRoutes     from "./routes/admin/whatsapp-campagne";
-import { recoverMixByYasEntries } from "./routes/admin/finance";
+import { recoverMixByYasEntries, recoverCouponFinanceEntries } from "./routes/admin/finance";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -254,6 +254,7 @@ try {
     console.error("[backend] ensureWaMessagesCols failed:", e);
   }
   recoverMixByYasEntries();
+  recoverCouponFinanceEntries();
 });
 
 export default app;
