@@ -30,27 +30,32 @@ export async function middleware(request: NextRequest) {
   // ── Subdomain routing: livraison.togolese.tg → /livreur ────────────────────
   const hostname = request.headers.get("host") ?? "";
   if (hostname.startsWith("livraison.")) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-nonce", nonce);
+
+    const url = request.nextUrl.clone();
+    url.pathname = pathname === "/" ? "/livreur" : `/livreur${pathname}`;
+
+    // Public pages: rewrite without auth check
+    if (
+      pathname === "/login" || pathname === "/livreur/login" ||
+      pathname === "/inscription" || pathname === "/livreur/inscription"
+    ) {
+      url.pathname = pathname.startsWith("/livreur") ? pathname : `/livreur${pathname}`;
+      return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+    }
+
+    // All other pages: check auth, redirect to subdomain login if missing/invalid
     const token = request.cookies.get(COOKIE_NAME)?.value;
-    // Redirect to main site login if not authenticated
     if (!token) {
-      const mainOrigin = request.nextUrl.origin.replace(/^https?:\/\/livraison\./, "https://");
-      const login = new URL("/admin/login", mainOrigin);
-      login.searchParams.set("redirect", "/livreur");
-      return NextResponse.redirect(login);
+      return NextResponse.redirect(new URL("/login", request.url));
     }
     try { await jwtVerify(token, SECRET); } catch {
-      const mainOrigin = request.nextUrl.origin.replace(/^https?:\/\/livraison\./, "https://");
-      const login = new URL("/admin/login", mainOrigin);
-      login.searchParams.set("redirect", "/livreur");
-      const res = NextResponse.redirect(login);
+      const res = NextResponse.redirect(new URL("/login", request.url));
       res.cookies.delete(COOKIE_NAME);
       return res;
     }
-    // Rewrite to /livreur path transparently
-    const url = request.nextUrl.clone();
-    url.pathname = pathname === "/" ? "/livreur" : `/livreur${pathname}`;
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-nonce", nonce);
+
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 

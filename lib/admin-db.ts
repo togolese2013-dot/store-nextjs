@@ -3087,6 +3087,71 @@ export async function deleteLivreur(id: number) {
   await db.execute("DELETE FROM livreurs WHERE id = ?", [id]);
 }
 
+// ─── Livreur Inscriptions ──────────────────────────────────────────────────────
+
+export interface LivreurInscription {
+  id:            number;
+  nom:           string;
+  telephone:     string;
+  numero_plaque: string | null;
+  password_hash: string;
+  statut:        "en_attente" | "approuve" | "rejete";
+  note_admin:    string | null;
+  created_at:    string;
+}
+
+export async function ensureLivreurInscriptionsTable(): Promise<void> {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS livreur_inscriptions (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      nom           VARCHAR(100) NOT NULL,
+      telephone     VARCHAR(30)  NOT NULL,
+      numero_plaque VARCHAR(30)  NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      statut        ENUM('en_attente','approuve','rejete') NOT NULL DEFAULT 'en_attente',
+      note_admin    TEXT         NULL,
+      created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+}
+
+export async function createLivreurInscription(data: {
+  nom: string; telephone: string; numero_plaque?: string; password_hash: string;
+}): Promise<number> {
+  await ensureLivreurInscriptionsTable();
+  const [res] = await db.execute<mysql.ResultSetHeader>(
+    "INSERT INTO livreur_inscriptions (nom, telephone, numero_plaque, password_hash) VALUES (?,?,?,?)",
+    [data.nom, data.telephone, data.numero_plaque ?? null, data.password_hash]
+  );
+  return res.insertId;
+}
+
+export async function listLivreurInscriptions(statut?: string): Promise<LivreurInscription[]> {
+  await ensureLivreurInscriptionsTable();
+  const where = statut ? "WHERE statut = ?" : "";
+  const params = statut ? [statut] : [];
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT id, nom, telephone, numero_plaque, statut, note_admin, created_at FROM livreur_inscriptions ${where} ORDER BY created_at DESC LIMIT 200`,
+    params
+  );
+  return rows as LivreurInscription[];
+}
+
+export async function getLivreurInscriptionById(id: number): Promise<LivreurInscription | null> {
+  await ensureLivreurInscriptionsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM livreur_inscriptions WHERE id = ? LIMIT 1", [id]
+  );
+  return (rows[0] as LivreurInscription) ?? null;
+}
+
+export async function updateLivreurInscriptionStatut(id: number, statut: "approuve" | "rejete", note?: string): Promise<void> {
+  await db.execute(
+    "UPDATE livreur_inscriptions SET statut = ?, note_admin = ? WHERE id = ?",
+    [statut, note ?? null, id]
+  );
+}
+
 // ─── Livraisons (enrichi) ──────────────────────────────────────────────────────
 
 export interface LivraisonAdmin {
