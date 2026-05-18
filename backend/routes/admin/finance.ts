@@ -80,7 +80,7 @@ export async function recoverMixByYasEntries() {
       WHERE fp.mode_paiement = 'mix_by_yas'
         AND NOT EXISTS (
           SELECT 1 FROM finance_entries fe
-          WHERE fe.description LIKE CONCAT('%', f.reference, '%')
+          WHERE fe.description LIKE CONCAT('%', CONVERT(f.reference USING utf8mb4) COLLATE utf8mb4_unicode_ci, '%')
             AND fe.mode_paiement = 'mix_by_yas'
         )
     `);
