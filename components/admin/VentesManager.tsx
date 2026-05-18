@@ -639,7 +639,7 @@ export default function VentesManager({
                           <div className="font-semibold text-slate-900">{f.client_nom}</div>
                         </td>
                         <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">
-                          {formatPrice(f.source === "site_order" ? (f.sous_total ?? f.total) : f.total)}
+                          {formatPrice(f.source === "site_order" ? Math.max(0, (f.sous_total ?? f.total) - (f.coupon_remise ?? 0)) : f.total)}
                         </td>
                         <td className="px-5 py-4 text-center">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>{s.label}</span>

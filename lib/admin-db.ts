@@ -1788,6 +1788,7 @@ export interface Facture {
   note:              string | null;
   source:            string | null;
   order_id:          number | null;
+  coupon_remise?:    number;
   admin_id:          number | null;
   vendeur:           string | null;
   created_at:        string;
@@ -1804,7 +1805,8 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
+    `SELECT f.*, COALESCE(_so.coupon_remise, 0) AS coupon_remise,
+            CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
      LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
      LEFT JOIN admin_users au ON au.id = f.admin_id
@@ -2684,7 +2686,7 @@ export async function getVentesStats(): Promise<{
        WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
          AND (lv.id IS NULL OR lv.statut = 'livre')`),
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(subtotal), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+      `SELECT COALESCE(SUM(total - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
   ]);
 
