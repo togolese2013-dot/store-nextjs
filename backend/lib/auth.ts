@@ -85,7 +85,7 @@ export function setAuthCookie(res: Response, token: string) {
   const domain = cookieDomain();
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge:   TTL * 1000,
     path:     "/",
     domain,
