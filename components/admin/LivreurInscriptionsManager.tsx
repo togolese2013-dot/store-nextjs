@@ -3,8 +3,6 @@
 import { useState, useCallback } from "react";
 import type { LivreurInscription } from "@/lib/admin-db";
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? "";
-
 function formatDate(d: string) {
   return new Date(d).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
@@ -45,7 +43,7 @@ export default function LivreurInscriptionsManager({ initialItems, onItemsChange
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const res  = await fetch(`${BACKEND}/api/admin/livreur-inscriptions`, { credentials: "include" });
+      const res  = await fetch(`/api/admin/livreur-inscriptions`);
       const data = await res.json();
       if (res.ok) updateItems(data.items ?? []);
     } catch { /* ignore */ } finally {
@@ -68,13 +66,12 @@ export default function LivreurInscriptionsManager({ initialItems, onItemsChange
     setError("");
     try {
       const endpoint = modal.action === "approve"
-        ? `${BACKEND}/api/admin/livreur-inscriptions/${modal.id}/approve`
-        : `${BACKEND}/api/admin/livreur-inscriptions/${modal.id}/reject`;
+        ? `/api/admin/livreur-inscriptions/${modal.id}/approve`
+        : `/api/admin/livreur-inscriptions/${modal.id}/reject`;
       const res = await fetch(endpoint, {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
-        credentials: "include",
-        body:        JSON.stringify({ note }),
+body:        JSON.stringify({ note }),
       });
       const data = await res.json();
       if (!res.ok) {
