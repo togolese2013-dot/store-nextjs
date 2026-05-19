@@ -340,3 +340,61 @@ export async function sendOrderNotifications({
     console.error("[WA] sendOrderNotifications error:", e);
   }
 }
+
+/* ── Delivery confirmation to client ─────────────────────────────────────── */
+export async function sendWaDeliveryConfirmation(order: {
+  nom:            string;
+  telephone:      string | null;
+  reference:      string;
+  items:          string | unknown[];
+  zone_livraison: string | null;
+  delivery_fee:   number;
+  total:          number;
+}): Promise<void> {
+  try {
+    const [enabled, templateName, lang] = await Promise.all([
+      getSetting("wa_delivery_template_enabled"),
+      getSetting("wa_delivery_template"),
+      getSetting("wa_order_lang"),
+    ]);
+
+    if (enabled !== "1" || !templateName || !order.telephone) return;
+
+    const languageCode = lang || "fr";
+    const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+
+    // Parse items
+    let items: { nom?: string; qty?: number; quantite?: number; total?: number; prix?: number; prix_unitaire?: number }[] = [];
+    try {
+      items = typeof order.items === "string" ? JSON.parse(order.items) : (order.items as typeof items);
+    } catch { items = []; }
+
+    const articlesStr = items.map(item => {
+      const name = item.nom || "Produit";
+      const qty  = item.qty ?? item.quantite ?? 1;
+      const prix = item.total ?? (item.prix_unitaire ?? item.prix ?? 0) * qty;
+      return `• ${qty}x ${name} — ${fmt(prix)}`;
+    }).join("\n");
+
+    const livraisonStr = order.delivery_fee > 0
+      ? `${order.zone_livraison || "Livraison"} — ${fmt(order.delivery_fee)}`
+      : `${order.zone_livraison || "Livraison"} — Gratuit`;
+
+    const result = await sendWaTemplate({
+      to:           order.telephone,
+      templateName,
+      languageCode,
+      bodyParams:   [
+        order.nom,
+        order.reference,
+        articlesStr,
+        livraisonStr,
+        fmt(order.total),
+      ],
+    });
+
+    if (!result.success) console.error("[WA] delivery confirmation failed:", result.error);
+  } catch (e) {
+    console.error("[WA] sendWaDeliveryConfirmation error:", e);
+  }
+}

@@ -1,6 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
+import { sendWaDeliveryConfirmation } from "../../lib/whatsapp";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
 import {
@@ -149,6 +150,22 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
         [id]
       ).catch(() => {});
       invalidateVentesStats();
+      // WhatsApp delivery confirmation
+      const [[orderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+        "SELECT nom, telephone, reference, items, zone_livraison, delivery_fee, total FROM orders WHERE id = ? LIMIT 1",
+        [id]
+      );
+      if (orderRow) {
+        sendWaDeliveryConfirmation({
+          nom:            orderRow.nom,
+          telephone:      orderRow.telephone,
+          reference:      orderRow.reference,
+          items:          orderRow.items,
+          zone_livraison: orderRow.zone_livraison,
+          delivery_fee:   Number(orderRow.delivery_fee ?? 0),
+          total:          Number(orderRow.total ?? 0),
+        }).catch(() => {});
+      }
       emitAdminEvent("stock");
     }
     emitAdminEvent("commande");

@@ -904,7 +904,7 @@ export async function ensureOrderVente(
   // Create vente finance entry once when order is delivered
   const isDelivered = ["delivered", "livree", "livre", "livré"].includes(String(order.status ?? ""));
   if (isDelivered && !order.finance_entry_id) {
-    const montant = Math.max(0, Number(order.total ?? 0) - Number(order.coupon_remise ?? 0));
+    const montant = Math.max(0, Number(order.subtotal ?? 0) - Number(order.coupon_remise ?? 0));
     if (montant > 0) {
       const entryId = await createFinanceEntry({
         type:          "vente",
@@ -1046,7 +1046,7 @@ export async function getOrderEvents(order_id: number): Promise<OrderEvent[]> {
 /* ─── Stats for dashboard ─── */
 export async function getDashboardStats() {
   const [ordersRow] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as revenue FROM orders WHERE DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"
+    "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as revenue FROM orders WHERE DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"
   );
   const [productsRow] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT COUNT(*) as cnt FROM produits WHERE actif = 1"
@@ -1094,16 +1094,16 @@ export async function getOrdersStats(): Promise<OrdersStats> {
     recentRows,
   ] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(
-      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders"
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as rev FROM orders"
     ),
     db.execute<mysql.RowDataPacket[]>(
       "SELECT COUNT(*) as cnt FROM orders WHERE DATE(created_at) = CURDATE()"
     ),
     db.execute<mysql.RowDataPacket[]>(
-      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
     ),
     db.execute<mysql.RowDataPacket[]>(
-      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
     ),
     db.execute<mysql.RowDataPacket[]>(
       "SELECT status, COUNT(*) as cnt FROM orders GROUP BY status"
@@ -1111,7 +1111,7 @@ export async function getOrdersStats(): Promise<OrdersStats> {
     db.execute<mysql.RowDataPacket[]>(
       `SELECT DATE(created_at) as date,
               COUNT(*) as count,
-              COALESCE(SUM(total),0) as revenue
+              COALESCE(SUM(subtotal),0) as revenue
        FROM orders
        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
        GROUP BY DATE(created_at)
@@ -2698,7 +2698,7 @@ export async function getVentesStats(): Promise<{
        WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
          AND (lv.id IS NULL OR lv.statut = 'livre')`),
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(total - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
   ]);
 
@@ -3809,4 +3809,26 @@ export async function ensureIndexes(): Promise<void> {
       if (code !== "ER_DUP_KEYNAME") console.warn(`[indexes] ${label}:`, (e as Error).message);
     }
   }
+}
+
+// ─── Correct delivery-fee in existing site order finance entries ──────────────
+export async function fixSiteOrderFinanceEntries(): Promise<void> {
+  return runOnce("fix_site_order_finance_delivery", async () => {
+    try {
+      const [result] = await db.execute<mysql.ResultSetHeader>(
+        `UPDATE finance_entries fe
+         JOIN orders o ON fe.description LIKE CONCAT('%', o.reference, '%')
+         SET fe.montant = fe.montant - o.delivery_fee
+         WHERE fe.description LIKE 'Commande site livrée%'
+           AND o.delivery_fee > 0
+           AND fe.montant > o.delivery_fee`
+      );
+      if (result.affectedRows > 0) {
+        console.log(\`[migration] fixed delivery_fee in \${result.affectedRows} finance_entries\`);
+        invalidateVentesStats();
+      }
+    } catch (e) {
+      console.error("[migration] fixSiteOrderFinanceEntries failed:", e);
+    }
+  });
 }

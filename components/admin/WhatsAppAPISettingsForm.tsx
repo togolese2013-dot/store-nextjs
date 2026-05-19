@@ -26,6 +26,10 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
   const [venteTemplateFull,     setVenteTemplateFull]     = useState(settings.wa_boutique_vente_template_full    ?? "");
   const [venteTemplateAcompte,  setVenteTemplateAcompte]  = useState(settings.wa_boutique_vente_template_acompte ?? "");
 
+  // Confirmation livraison commandes site
+  const [deliveryEnabled,  setDeliveryEnabled]  = useState(settings.wa_delivery_template_enabled === "1");
+  const [deliveryTemplate, setDeliveryTemplate] = useState(settings.wa_delivery_template ?? "");
+
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState("");
   const [copied,  setCopied]  = useState(false);
@@ -54,6 +58,8 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
         wa_boutique_vente_enabled:          venteEnabled ? "1" : "0",
         wa_boutique_vente_template_full:    venteTemplateFull,
         wa_boutique_vente_template_acompte: venteTemplateAcompte,
+        wa_delivery_template_enabled: deliveryEnabled ? "1" : "0",
+        wa_delivery_template:         deliveryTemplate,
       }),
     });
     setLoading(false);
@@ -271,6 +277,44 @@ export default function WhatsAppAPISettingsForm({ settings }: { settings: Record
                   <p><span className="text-emerald-600">{"{{4}}"}</span> → Acompte versé</p>
                   <p><span className="text-emerald-600">{"{{5}}"}</span> → Reste à payer</p>
                   <p><span className="text-emerald-600">{"{{6}}"}</span> → URL du site</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Confirmation livraison commandes site */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
+        <h2 className="font-display font-700 text-slate-900 border-b border-slate-100 pb-3">
+          Confirmation de livraison (commandes site)
+        </h2>
+        <div className="rounded-2xl border border-slate-100 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">Activer la confirmation de livraison</p>
+              <p className="text-xs text-slate-400 mt-0.5">Envoie un message WhatsApp au client quand vous confirmez la livraison dans les ventes</p>
+            </div>
+            <button onClick={() => setDeliveryEnabled(v => !v)}
+              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${deliveryEnabled ? "bg-emerald-500" : "bg-slate-200"}`}>
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${deliveryEnabled ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+
+          {deliveryEnabled && (
+            <div className="space-y-4 pt-1">
+              <div>
+                <label className={labelCls}>Nom du template Meta approuvé</label>
+                <input type="text" value={deliveryTemplate} onChange={e => setDeliveryTemplate(e.target.value)}
+                  placeholder="ex : livraison_confirmee" className={inputCls} />
+                <div className="mt-2 bg-slate-50 rounded-xl p-3 text-xs text-slate-500 space-y-1 font-mono">
+                  <p className="font-sans font-semibold text-slate-600 mb-1.5">Corps du template :</p>
+                  <p className="font-sans text-slate-500 italic mb-2">Bonjour {"{{"+"1"+"}}"} ! 🎉<br />✅ Votre commande {"{{"+"2"+"}}"} a bien été livrée !<br />🛒 Articles :<br />{"{{"+"3"+"}}"}<br />🚚 Livraison : {"{{"+"4"+"}}"}<br />💰 Total : {"{{"+"5"+"}}"}</p>
+                  <p><span className="text-emerald-600">{"{{1}}"}</span> → Nom du client</p>
+                  <p><span className="text-emerald-600">{"{{2}}"}</span> → Référence commande</p>
+                  <p><span className="text-emerald-600">{"{{3}}"}</span> → Articles (un par ligne)</p>
+                  <p><span className="text-emerald-600">{"{{4}}"}</span> → Zone + frais de livraison</p>
+                  <p><span className="text-emerald-600">{"{{5}}"}</span> → Total TTC (produits + livraison)</p>
                 </div>
               </div>
             </div>

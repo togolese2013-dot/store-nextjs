@@ -40,7 +40,7 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
-import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes } from "@/lib/admin-db";
+import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes, fixSiteOrderFinanceEntries } from "@/lib/admin-db";
 import adminSecurityLogsRoutes from "./routes/admin/security-logs";
 import { ensureSecurityLogsTable } from "./lib/security-log";
 import adminRapportsRoutes  from "./routes/admin/rapports";
@@ -242,6 +242,12 @@ try {
     console.log("[backend] indexes OK");
   } catch (e) {
     console.error("[backend] ensureIndexes failed:", e);
+  }
+  try {
+    await fixSiteOrderFinanceEntries();
+    console.log("[backend] site order finance entries OK");
+  } catch (e) {
+    console.error("[backend] fixSiteOrderFinanceEntries failed:", e);
   }
   try {
     await ensureWaMessagesTable();
