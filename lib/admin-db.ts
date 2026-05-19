@@ -3824,7 +3824,7 @@ export async function fixSiteOrderFinanceEntries(): Promise<void> {
            AND fe.montant > o.delivery_fee`
       );
       if (result.affectedRows > 0) {
-        console.log(\`[migration] fixed delivery_fee in \${result.affectedRows} finance_entries\`);
+        console.log("[migration] fixed delivery_fee in " + result.affectedRows + " finance_entries");
         invalidateVentesStats();
       }
     } catch (e) {
