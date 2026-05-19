@@ -36,15 +36,14 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = pathname === "/" ? "/livreur" : `/livreur${pathname}`;
 
-    // Public pages: rewrite without auth check
+    // Public pages served as-is (no /livreur prefix, no auth check)
     if (pathname === "/login" || pathname === "/livreur/login") {
       url.pathname = "/livreur/login";
       return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
     }
-    // Inscription page lives outside /livreur — redirect subdomain to main domain
-    if (pathname === "/inscription" || pathname === "/livreur-inscription") {
-      const mainHost = hostname.replace(/^livraison\./, "");
-      return NextResponse.redirect(new URL("/livreur-inscription", `https://${mainHost}`));
+    if (pathname === "/livreur-inscription") {
+      url.pathname = "/livreur-inscription";
+      return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
     }
 
     // All other pages: check auth, redirect to subdomain login if missing/invalid

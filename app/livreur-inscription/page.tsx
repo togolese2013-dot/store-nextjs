@@ -77,7 +77,7 @@ export default function LivreurInscriptionPage() {
             Votre demande a bien été reçue. Un administrateur examinera votre dossier et vous contactera sur votre numéro de téléphone.
           </p>
           <a
-            href="/livreur/login"
+            href="/login"
             style={{
               display: "block", padding: "13px",
               borderRadius: 12, background: "var(--lv-g-800)",
@@ -223,7 +223,7 @@ export default function LivreurInscriptionPage() {
         {/* Back to login */}
         <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "var(--lv-ink-400)" }}>
           Déjà livreur ?{" "}
-          <a href="/livreur/login" style={{ color: "var(--lv-g-700)", fontWeight: 600, textDecoration: "none" }}>
+          <a href="/login" style={{ color: "var(--lv-g-700)", fontWeight: 600, textDecoration: "none" }}>
             Se connecter
           </a>
         </p>
