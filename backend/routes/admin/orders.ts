@@ -99,7 +99,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     await updateOrderStatus(id, status);
     await addOrderEvent(id, status, note ?? "", session.nom);
 
-    /* When confirmed: create livraison entry so it appears in BOUTIQUE livraisons + livreur platform */
+    /* PAUSE LIVRAISON — livraison auto désactivée, gestion locale uniquement
     if (String(status) === "confirmed") {
       try {
         const [[orderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
@@ -107,7 +107,6 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
           [id]
         );
         if (orderRow) {
-          /* Idempotent — don't create duplicate for same order */
           const [[existing]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
             "SELECT id FROM livraisons_ventes WHERE order_id = ? LIMIT 1", [id]
           );
@@ -134,6 +133,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
         console.error("[orders] livraison creation failed:", e);
       }
     }
+    */
 
     // Create/sync facture at any status change — first admin to confirm = vendeur
     const actor = { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom };

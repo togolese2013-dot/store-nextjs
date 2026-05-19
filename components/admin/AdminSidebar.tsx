@@ -43,7 +43,7 @@ const MODULES: Record<string, {
     dot:    "bg-amber-300",
     items: [
       { label: "Ventes",         href: "/admin/ventes",                icon: TrendingUp },
-      { label: "Livraisons",     href: "/admin/livraisons",            icon: Truck },
+      // PAUSE LIVRAISON — { label: "Livraisons", href: "/admin/livraisons", icon: Truck },
       { label: "Stock boutique", href: "/admin/stock-boutique",        icon: Archive },
       { label: "Proforma",       href: "/admin/proforma",              icon: FilePlus },
       { label: "Finance",        href: "/admin/finance",               icon: DollarSign },
