@@ -49,11 +49,12 @@ function formatDate(d: string) {
    COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 export default function LivraisonsManager({ initialLivraisons, initialTotal, initialLivreurs, initialStats, initialInscriptions }: Props) {
-  const [activeTab,   setActiveTab]   = useState<"livraisons" | "livreurs">("livraisons");
-  const [livraisons,  setLivraisons]  = useState<LivraisonAdmin[]>(initialLivraisons);
-  const [total,       setTotal]       = useState(initialTotal);
-  const [livreurs,    setLivreurs]    = useState<Livreur[]>(initialLivreurs);
-  const [stats,       setStats]       = useState<LivStats>(initialStats);
+  const [activeTab,    setActiveTab]    = useState<"livraisons" | "livreurs">("livraisons");
+  const [livraisons,   setLivraisons]   = useState<LivraisonAdmin[]>(initialLivraisons);
+  const [total,        setTotal]        = useState(initialTotal);
+  const [livreurs,     setLivreurs]     = useState<Livreur[]>(initialLivreurs);
+  const [stats,        setStats]        = useState<LivStats>(initialStats);
+  const [inscriptions, setInscriptions] = useState<LivreurInscription[]>(initialInscriptions);
   const [loading,     setLoading]     = useState(false);
   const [flash,       setFlash]       = useState("");
   const [search,      setSearch]      = useState("");
@@ -206,8 +207,8 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
       )}
 
       <PageHeader
-        title={activeTab === "livraisons" ? "Livraisons" : "Livreurs inscrits"}
-        subtitle={activeTab === "livraisons" ? "Gérez les livraisons et les livreurs" : "Demandes d'inscription en attente d'approbation"}
+        title="Livraisons"
+        subtitle="Gérez les livraisons et les livreurs"
         accent="amber"
         searchValue={search}
         onSearchChange={v => applySearch(v)}
@@ -241,7 +242,7 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
         {([
           { key: "livraisons", label: "Livraisons", count: stats.total },
-          { key: "livreurs",   label: "Livreurs",   count: initialInscriptions.filter(i => i.statut === "en_attente").length },
+          { key: "livreurs",   label: "Livreurs",   count: inscriptions.filter(i => i.statut === "en_attente").length },
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -267,9 +268,56 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
       </div>
 
       {/* Contenu onglet Livreurs */}
-      {activeTab === "livreurs" && (
-        <LivreurInscriptionsManager initialItems={initialInscriptions} />
-      )}
+      {activeTab === "livreurs" && (() => {
+        const nbActifs    = livreurs.length;
+        const nbAttente   = inscriptions.filter(i => i.statut === "en_attente").length;
+        const nbApprouves = inscriptions.filter(i => i.statut === "approuve").length;
+        const nbRejetes   = inscriptions.filter(i => i.statut === "rejete").length;
+        return (
+          <div className="space-y-6">
+            {/* KPI livreurs */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Livreurs actifs</p>
+                  <User className="w-8 h-8 text-indigo-500 opacity-20" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">{nbActifs}</p>
+                <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">Comptes actifs</span>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">En attente</p>
+                  <AlertCircle className="w-8 h-8 text-amber-500 opacity-20" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">{nbAttente}</p>
+                <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">À examiner</span>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Approuvés</p>
+                  <Check className="w-8 h-8 text-emerald-500 opacity-20" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">{nbApprouves}</p>
+                <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Acceptés</span>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rejetés</p>
+                  <X className="w-8 h-8 text-red-500 opacity-20" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">{nbRejetes}</p>
+                <span className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-100">Refusés</span>
+              </div>
+            </div>
+
+            <LivreurInscriptionsManager
+              initialItems={inscriptions}
+              onItemsChange={setInscriptions}
+            />
+          </div>
+        );
+      })()}
 
       {/* Contenu onglet Livraisons */}
       {activeTab === "livraisons" && <>

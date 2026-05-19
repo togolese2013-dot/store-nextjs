@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { LivreurInscription } from "@/lib/admin-db";
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -24,16 +24,35 @@ function Badge({ statut }: { statut: LivreurInscription["statut"] }) {
 }
 
 interface Props {
-  initialItems: LivreurInscription[];
+  initialItems:   LivreurInscription[];
+  onItemsChange?: (items: LivreurInscription[]) => void;
 }
 
-export default function LivreurInscriptionsManager({ initialItems }: Props) {
-  const [items,    setItems]    = useState<LivreurInscription[]>(initialItems);
-  const [filter,   setFilter]   = useState<string>("en_attente");
-  const [loading,  setLoading]  = useState<number | null>(null);
-  const [modal,    setModal]    = useState<{ id: number; action: "approve" | "reject" } | null>(null);
-  const [note,     setNote]     = useState("");
-  const [error,    setError]    = useState("");
+export default function LivreurInscriptionsManager({ initialItems, onItemsChange }: Props) {
+  const [items,      setItems]      = useState<LivreurInscription[]>(initialItems);
+  const [filter,     setFilter]     = useState<string>("en_attente");
+  const [loading,    setLoading]    = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [modal,      setModal]      = useState<{ id: number; action: "approve" | "reject" } | null>(null);
+  const [note,       setNote]       = useState("");
+  const [error,      setError]      = useState("");
+
+  function updateItems(next: LivreurInscription[]) {
+    setItems(next);
+    onItemsChange?.(next);
+  }
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res  = await fetch(`${BACKEND}/api/admin/livreur-inscriptions`, { credentials: "include" });
+      const data = await res.json();
+      if (res.ok) updateItems(data.items ?? []);
+    } catch { /* ignore */ } finally {
+      setRefreshing(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = filter === "all" ? items : items.filter(i => i.statut === filter);
 
@@ -62,7 +81,7 @@ export default function LivreurInscriptionsManager({ initialItems }: Props) {
         setError(data.error ?? "Erreur.");
         return;
       }
-      setItems(prev => prev.map(i =>
+      updateItems(items.map(i =>
         i.id === modal.id
           ? { ...i, statut: modal.action === "approve" ? "approuve" : "rejete", note_admin: note || null }
           : i
@@ -91,7 +110,7 @@ export default function LivreurInscriptionsManager({ initialItems }: Props) {
   return (
     <div>
       {/* Filters */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         {[
           { key: "en_attente", label: `En attente (${counts.en_attente})` },
           { key: "approuve",   label: `Approuvés (${counts.approuve})` },
@@ -102,7 +121,24 @@ export default function LivreurInscriptionsManager({ initialItems }: Props) {
             {f.label}
           </button>
         ))}
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          style={{
+            marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 13,
+            fontWeight: 500, cursor: "pointer", border: "1px solid #e5e7eb",
+            background: "#fff", color: "#374151", display: "flex", alignItems: "center", gap: 6,
+            opacity: refreshing ? 0.6 : 1,
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+            style={{ animation: refreshing ? "spin 0.8s linear infinite" : "none" }}>
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          {refreshing ? "Chargement…" : "Rafraîchir"}
+        </button>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Table */}
       {filtered.length === 0 ? (
