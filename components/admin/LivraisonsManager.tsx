@@ -79,6 +79,16 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
   /* ── Copied link flash ── */
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
+  // Initial data load on mount (client-side — page shell renders instantly)
+  useEffect(() => {
+    fetchLivraisons("", "", 0);
+    fetch("/api/admin/livreurs")
+      .then(r => r.json())
+      .then(d => { if (d.items) setLivreurs(d.items); })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Load inscriptions lazily when the Livreurs tab is opened for the first time
   useEffect(() => {
     if (activeTab !== "livreurs" || inscriptionsLoaded) return;

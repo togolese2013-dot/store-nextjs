@@ -18,26 +18,31 @@ function createPool() {
     ? rawUrl
     : undefined;
 
+  const shared = {
+    waitForConnections:    true,
+    connectionLimit:       5,
+    charset:               "utf8mb4",
+    timezone:              "+00:00",
+    connectTimeout:        10_000,
+    // Prevent ECONNRESET from Railway/MySQL idle-connection timeouts
+    enableKeepAlive:       true,
+    keepAliveInitialDelay: 30_000,
+  };
+
   if (url) {
     return mysql.createPool({
-      uri:                url,
-      waitForConnections: true,
-      connectionLimit:    3,
-      charset:            "utf8mb4",
-      timezone:           "+00:00",
+      uri: url,
+      ...shared,
       ssl: isProduction ? { rejectUnauthorized: false } : undefined,
     });
   }
   return mysql.createPool({
-    host:               process.env.DB_HOST     || "127.0.0.1",
-    port:               Number(process.env.DB_PORT) || 3306,
-    user:               process.env.DB_USER     || "root",
-    password:           process.env.DB_PASSWORD || "",
-    database:           process.env.DB_NAME     || "togol2600657",
-    waitForConnections: true,
-    connectionLimit:    6,
-    charset:            "utf8mb4",
-    timezone:           "+00:00",
+    host:     process.env.DB_HOST     || "127.0.0.1",
+    port:     Number(process.env.DB_PORT) || 3306,
+    user:     process.env.DB_USER     || "root",
+    password: process.env.DB_PASSWORD || "",
+    database: process.env.DB_NAME     || "togol2600657",
+    ...shared,
   });
 }
 
