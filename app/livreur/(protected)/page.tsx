@@ -1,11 +1,7 @@
-"use client";
-
-import LivreurDashboard from "@/components/livreur-app/LivreurDashboard";
-import { createApi } from "@/components/livreur-app/api";
-import { realAdapter } from "@/lib/livreur-adapter";
-
-const api = createApi(realAdapter);
-
 export default function LivreurPage() {
-  return <LivreurDashboard api={api} />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100dvh", fontFamily: "sans-serif", color: "#525252" }}>
+      <p style={{ fontSize: 15, fontWeight: 600 }}>Service temporairement indisponible.</p>
+    </div>
+  );
 }

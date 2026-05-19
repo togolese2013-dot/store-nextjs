@@ -436,7 +436,7 @@ export default function VentesManager({
       body: JSON.stringify({ status: "delivered" }),
       credentials: "include",
     });
-    fetchAll();
+    fetchTab();
   }
 
   /* ── Voir détail ── */
