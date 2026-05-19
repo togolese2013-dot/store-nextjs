@@ -23,8 +23,17 @@ const STEPS = [
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; icon: string }> = {
   pending:   { bg: "bg-amber-50",  text: "text-amber-700",  border: "border-amber-300",  icon: "text-amber-500" },
   confirmed: { bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-300",   icon: "text-blue-500" },
+  shipped:   { bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-300",   icon: "text-blue-500" },
   delivered: { bg: "bg-green-50",  text: "text-green-700",  border: "border-green-300",  icon: "text-green-500" },
   cancelled: { bg: "bg-red-50",    text: "text-red-700",    border: "border-red-300",    icon: "text-red-500" },
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending:   "En attente",
+  confirmed: "Confirmée",
+  shipped:   "Confirmée",
+  delivered: "Livrée",
+  cancelled: "Annulée",
 };
 
 function fmtDate(d: string | Date) {
@@ -34,7 +43,8 @@ function fmtDate(d: string | Date) {
 }
 
 export default function OrderTimeline({ events, currentStatus }: Props) {
-  const isCancelled = currentStatus === "cancelled";
+  const normalizedStatus = currentStatus === "shipped" ? "confirmed" : currentStatus;
+  const isCancelled = normalizedStatus === "cancelled";
 
   // Map event statuses to a set for quick lookup
   const doneStatuses = new Set(events.map(e => e.status));
@@ -46,7 +56,7 @@ export default function OrderTimeline({ events, currentStatus }: Props) {
         <div className="flex items-center gap-0">
           {STEPS.map((step, idx) => {
             const done    = doneStatuses.has(step.key);
-            const current = step.key === currentStatus;
+            const current = step.key === normalizedStatus;
             const colors  = STATUS_COLORS[step.key];
             const { Icon } = step;
 
@@ -104,7 +114,7 @@ export default function OrderTimeline({ events, currentStatus }: Props) {
                     <div className={`flex-1 rounded-2xl border px-4 py-3 ${idx === 0 ? `${colors.bg} ${colors.border}` : "bg-slate-50 border-slate-100"}`}>
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         <span className={`text-sm font-bold ${idx === 0 ? colors.text : "text-slate-600"}`}>
-                          {STEPS.find(s => s.key === ev.status)?.label ?? ev.status}
+                          {STATUS_LABELS[ev.status] ?? ev.status}
                         </span>
                         <span className="text-xs text-slate-400">{fmtDate(ev.created_at)}</span>
                       </div>
