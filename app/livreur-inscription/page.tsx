@@ -1,17 +1,34 @@
 "use client";
 
 import "@/components/livreur-app/livreur.css";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export default function LivreurInscriptionPage() {
-  const [nom,           setNom]           = useState("");
-  const [telephone,     setTelephone]     = useState("");
-  const [numeroPlaque,  setNumeroPlaque]  = useState("");
-  const [password,      setPassword]      = useState("");
-  const [confirm,       setConfirm]       = useState("");
-  const [loading,       setLoading]       = useState(false);
-  const [error,         setError]         = useState("");
-  const [success,       setSuccess]       = useState(false);
+  const [nom,          setNom]          = useState("");
+  const [telephone,    setTelephone]    = useState("");
+  const [numeroPlaque, setNumeroPlaque] = useState("");
+  const [password,     setPassword]     = useState("");
+  const [confirm,      setConfirm]      = useState("");
+  const [carteFile,    setCarteFile]    = useState<File | null>(null);
+  const [cartePreview, setCartePreview] = useState<string>("");
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [success,      setSuccess]      = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("La photo ne doit pas dépasser 10 Mo.");
+      return;
+    }
+    setError("");
+    setCarteFile(file);
+    const reader = new FileReader();
+    reader.onload = ev => setCartePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,12 +41,27 @@ export default function LivreurInscriptionPage() {
       setError("Le mot de passe doit contenir au moins 6 caractères.");
       return;
     }
+    if (!carteFile) {
+      setError("La photo de la carte d'identité est obligatoire.");
+      return;
+    }
+
     setLoading(true);
     try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload  = ev => resolve(ev.target?.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(carteFile);
+      });
+
       const res = await fetch("/api/livreur/inscription", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ nom, telephone, numero_plaque: numeroPlaque, password }),
+        body:    JSON.stringify({
+          nom, telephone, numero_plaque: numeroPlaque, password,
+          carte_identite: base64,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -167,6 +199,68 @@ export default function LivreurInscriptionPage() {
                 onFocus={e => e.currentTarget.style.borderColor = "var(--lv-g-600)"}
                 onBlur={e  => e.currentTarget.style.borderColor = "var(--lv-ink-200)"}
               />
+            </div>
+
+            {/* Carte d'identité */}
+            <div>
+              <label style={labelStyle}>
+                Photo de la carte d&apos;identité <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic"
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
+              {cartePreview ? (
+                <div style={{ position: "relative" }}>
+                  <img
+                    src={cartePreview}
+                    alt="Aperçu CNI"
+                    style={{
+                      width: "100%", borderRadius: 12, objectFit: "cover",
+                      maxHeight: 180, border: "1px solid var(--lv-ink-200)",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setCarteFile(null); setCartePreview(""); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                    style={{
+                      position: "absolute", top: 8, right: 8,
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: "rgba(0,0,0,0.55)", border: "none",
+                      color: "#fff", cursor: "pointer", fontSize: 14,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: "100%", padding: "20px 14px",
+                    borderRadius: 12, border: "2px dashed var(--lv-ink-200)",
+                    background: "transparent", cursor: "pointer",
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--lv-ink-400)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                  <span style={{ fontSize: 13, color: "var(--lv-ink-400)" }}>
+                    Appuyer pour choisir une photo
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--lv-ink-300)" }}>
+                    JPEG, PNG ou WEBP · max 10 Mo
+                  </span>
+                </button>
+              )}
             </div>
 
             <div>

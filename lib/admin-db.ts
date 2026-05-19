@@ -3090,38 +3090,42 @@ export async function deleteLivreur(id: number) {
 // ─── Livreur Inscriptions ──────────────────────────────────────────────────────
 
 export interface LivreurInscription {
-  id:            number;
-  nom:           string;
-  telephone:     string;
-  numero_plaque: string | null;
-  password_hash: string;
-  statut:        "en_attente" | "approuve" | "rejete";
-  note_admin:    string | null;
-  created_at:    string;
+  id:                 number;
+  nom:                string;
+  telephone:          string;
+  numero_plaque:      string | null;
+  carte_identite_url: string | null;
+  password_hash:      string;
+  statut:             "en_attente" | "approuve" | "rejete";
+  note_admin:         string | null;
+  created_at:         string;
 }
 
 export async function ensureLivreurInscriptionsTable(): Promise<void> {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS livreur_inscriptions (
-      id            INT AUTO_INCREMENT PRIMARY KEY,
-      nom           VARCHAR(100) NOT NULL,
-      telephone     VARCHAR(30)  NOT NULL,
-      numero_plaque VARCHAR(30)  NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      statut        ENUM('en_attente','approuve','rejete') NOT NULL DEFAULT 'en_attente',
-      note_admin    TEXT         NULL,
-      created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+      id                 INT AUTO_INCREMENT PRIMARY KEY,
+      nom                VARCHAR(100) NOT NULL,
+      telephone          VARCHAR(30)  NOT NULL,
+      numero_plaque      VARCHAR(30)  NULL,
+      carte_identite_url TEXT         NULL,
+      password_hash      VARCHAR(255) NOT NULL,
+      statut             ENUM('en_attente','approuve','rejete') NOT NULL DEFAULT 'en_attente',
+      note_admin         TEXT         NULL,
+      created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await db.execute("ALTER TABLE livreur_inscriptions ADD COLUMN IF NOT EXISTS carte_identite_url TEXT NULL AFTER numero_plaque").catch(() => {});
 }
 
 export async function createLivreurInscription(data: {
-  nom: string; telephone: string; numero_plaque?: string; password_hash: string;
+  nom: string; telephone: string; numero_plaque?: string;
+  carte_identite_url?: string; password_hash: string;
 }): Promise<number> {
   await ensureLivreurInscriptionsTable();
   const [res] = await db.execute<mysql.ResultSetHeader>(
-    "INSERT INTO livreur_inscriptions (nom, telephone, numero_plaque, password_hash) VALUES (?,?,?,?)",
-    [data.nom, data.telephone, data.numero_plaque ?? null, data.password_hash]
+    "INSERT INTO livreur_inscriptions (nom, telephone, numero_plaque, carte_identite_url, password_hash) VALUES (?,?,?,?,?)",
+    [data.nom, data.telephone, data.numero_plaque ?? null, data.carte_identite_url ?? null, data.password_hash]
   );
   return res.insertId;
 }
@@ -3131,7 +3135,7 @@ export async function listLivreurInscriptions(statut?: string): Promise<LivreurI
   const where = statut ? "WHERE statut = ?" : "";
   const params = statut ? [statut] : [];
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT id, nom, telephone, numero_plaque, statut, note_admin, created_at FROM livreur_inscriptions ${where} ORDER BY created_at DESC LIMIT 200`,
+    `SELECT id, nom, telephone, numero_plaque, carte_identite_url, statut, note_admin, created_at FROM livreur_inscriptions ${where} ORDER BY created_at DESC LIMIT 200`,
     params
   );
   return rows as LivreurInscription[];

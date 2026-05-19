@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2, Megaphone, UserPlus,
+  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2, Megaphone,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
@@ -44,7 +44,6 @@ const MODULES: Record<string, {
     items: [
       { label: "Ventes",         href: "/admin/ventes",                icon: TrendingUp },
       { label: "Livraisons",     href: "/admin/livraisons",            icon: Truck },
-      { label: "Livreurs",       href: "/admin/livreurs",              icon: UserPlus },
       { label: "Stock boutique", href: "/admin/stock-boutique",        icon: Archive },
       { label: "Proforma",       href: "/admin/proforma",              icon: FilePlus },
       { label: "Finance",        href: "/admin/finance",               icon: DollarSign },
@@ -114,7 +113,6 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/boutique-clients",      "boutique"],
   ["/admin/boutique-segmentation", "boutique"],
   ["/admin/livraisons",            "boutique"],
-  ["/admin/livreurs",              "boutique"],
   ["/admin/stock-boutique",        "boutique"],
   ["/admin/ventes",                "boutique"],
   ["/admin/factures",              "boutique"],

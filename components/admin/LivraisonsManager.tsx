@@ -7,8 +7,9 @@ import {
   ChevronLeft, ChevronRight, Copy, UserPlus,
   Package, AlertCircle,
 } from "lucide-react";
-import type { LivraisonAdmin, Livreur } from "@/lib/admin-db";
+import type { LivraisonAdmin, Livreur, LivreurInscription } from "@/lib/admin-db";
 import PageHeader from "@/components/admin/PageHeader";
+import LivreurInscriptionsManager from "@/components/admin/LivreurInscriptionsManager";
 
 /* ─── Types ─── */
 const STATUTS: { value: LivraisonAdmin["statut"]; label: string; color: string }[] = [
@@ -22,10 +23,11 @@ const STATUTS: { value: LivraisonAdmin["statut"]; label: string; color: string }
 interface LivStats { total: number; en_attente: number; en_cours: number; livre: number }
 
 interface Props {
-  initialLivraisons: LivraisonAdmin[];
-  initialTotal:      number;
-  initialLivreurs:   Livreur[];
-  initialStats:      LivStats;
+  initialLivraisons:  LivraisonAdmin[];
+  initialTotal:       number;
+  initialLivreurs:    Livreur[];
+  initialStats:       LivStats;
+  initialInscriptions: LivreurInscription[];
 }
 
 const LIMIT = 50;
@@ -46,7 +48,8 @@ function formatDate(d: string) {
 /* ══════════════════════════════════════════════════════════════════
    COMPONENT
 ══════════════════════════════════════════════════════════════════ */
-export default function LivraisonsManager({ initialLivraisons, initialTotal, initialLivreurs, initialStats }: Props) {
+export default function LivraisonsManager({ initialLivraisons, initialTotal, initialLivreurs, initialStats, initialInscriptions }: Props) {
+  const [activeTab,   setActiveTab]   = useState<"livraisons" | "livreurs">("livraisons");
   const [livraisons,  setLivraisons]  = useState<LivraisonAdmin[]>(initialLivraisons);
   const [total,       setTotal]       = useState(initialTotal);
   const [livreurs,    setLivreurs]    = useState<Livreur[]>(initialLivreurs);
@@ -203,8 +206,8 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
       )}
 
       <PageHeader
-        title="Livraisons"
-        subtitle="Gérez les livraisons et les livreurs"
+        title={activeTab === "livraisons" ? "Livraisons" : "Livreurs inscrits"}
+        subtitle={activeTab === "livraisons" ? "Gérez les livraisons et les livreurs" : "Demandes d'inscription en attente d'approbation"}
         accent="amber"
         searchValue={search}
         onSearchChange={v => applySearch(v)}
@@ -233,6 +236,43 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
           </>
         }
       />
+
+      {/* Onglets */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {([
+          { key: "livraisons", label: "Livraisons", count: stats.total },
+          { key: "livreurs",   label: "Livreurs",   count: initialInscriptions.filter(i => i.statut === "en_attente").length },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === tab.key
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.label}
+            {tab.count > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                activeTab === tab.key
+                  ? tab.key === "livreurs" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
+                  : "bg-slate-200 text-slate-500"
+              }`}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenu onglet Livreurs */}
+      {activeTab === "livreurs" && (
+        <LivreurInscriptionsManager initialItems={initialInscriptions} />
+      )}
+
+      {/* Contenu onglet Livraisons */}
+      {activeTab === "livraisons" && <>
 
       {/* KPI dashboard */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -588,6 +628,8 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
           </div>
         </div>
       )}
+
+      </>}
     </div>
   );
 }

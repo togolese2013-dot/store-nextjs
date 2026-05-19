@@ -1,40 +1,24 @@
 import { apiGet } from "@/lib/api";
-import type { LivraisonAdmin, Livreur } from "@/lib/admin-db";
+import type { LivraisonAdmin, Livreur, LivreurInscription } from "@/lib/admin-db";
 import LivraisonsManager from "@/components/admin/LivraisonsManagerClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function LivraisonsPage() {
-  let items:    LivraisonAdmin[] = [];
-  let total     = 0;
-  let livreurs: Livreur[]        = [];
-  let livStats  = { total: 0, en_attente: 0, en_cours: 0, livre: 0 };
-  let errMsg    = "";
+  let items:         LivraisonAdmin[]    = [];
+  let total          = 0;
+  let livreurs:      Livreur[]           = [];
+  let livStats       = { total: 0, en_attente: 0, en_cours: 0, livre: 0 };
+  let inscriptions:  LivreurInscription[] = [];
 
-  try {
-    const [livRes, livrRes] = await Promise.all([
-      apiGet<{ items: LivraisonAdmin[]; total: number; stats: typeof livStats }>("/api/admin/livraisons?limit=50"),
-      apiGet<{ items: Livreur[] }>("/api/admin/livreurs"),
-    ]);
-    items    = livRes.items;
-    total    = livRes.total;
-    livreurs = livrRes.items;
-    livStats = livRes.stats;
-  } catch (err) {
-    errMsg = err instanceof Error ? err.message : String(err);
-    console.error("[LivraisonsPage]", err);
-  }
-
-  if (errMsg) {
-    return (
-      <div className="p-6 lg:p-8">
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
-          <p className="font-bold mb-2">Erreur lors du chargement</p>
-          <code className="text-xs font-mono bg-red-100 px-2 py-1 rounded">{errMsg}</code>
-        </div>
-      </div>
-    );
-  }
+  await Promise.allSettled([
+    apiGet<{ items: LivraisonAdmin[]; total: number; stats: typeof livStats }>("/api/admin/livraisons?limit=50")
+      .then(r => { items = r.items; total = r.total; livStats = r.stats; }),
+    apiGet<{ items: Livreur[] }>("/api/admin/livreurs")
+      .then(r => { livreurs = r.items; }),
+    apiGet<{ items: LivreurInscription[] }>("/api/admin/livreur-inscriptions")
+      .then(r => { inscriptions = r.items; }),
+  ]);
 
   return (
     <LivraisonsManager
@@ -42,6 +26,7 @@ export default async function LivraisonsPage() {
       initialTotal={total}
       initialLivreurs={livreurs}
       initialStats={livStats}
+      initialInscriptions={inscriptions}
     />
   );
 }
