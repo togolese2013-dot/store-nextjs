@@ -138,12 +138,7 @@ export default function LivreurLoginPage() {
       <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "var(--lv-ink-400)" }}>
         Nouveau livreur ?{" "}
         <a
-          href="#"
-          onClick={e => {
-            e.preventDefault();
-            const isSubdomain = window.location.hostname.startsWith("livraison.");
-            window.location.href = isSubdomain ? "/inscription" : "/livreur/inscription";
-          }}
+          href="/livreur-inscription"
           style={{ color: "var(--lv-g-700)", fontWeight: 600, textDecoration: "none" }}
         >
           Faire une demande

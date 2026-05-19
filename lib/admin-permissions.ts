@@ -35,6 +35,7 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
     pages: [
       { id: "ventes",                label: "Ventes" },
       { id: "livraisons",            label: "Livraisons" },
+      { id: "livreurs",              label: "Livreurs (demandes)" },
       { id: "stock-boutique",        label: "Stock boutique" },
       { id: "proforma",              label: "Proforma" },
       { id: "finance",               label: "Finance" },

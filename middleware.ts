@@ -37,12 +37,14 @@ export async function middleware(request: NextRequest) {
     url.pathname = pathname === "/" ? "/livreur" : `/livreur${pathname}`;
 
     // Public pages: rewrite without auth check
-    if (
-      pathname === "/login" || pathname === "/livreur/login" ||
-      pathname === "/inscription" || pathname === "/livreur/inscription"
-    ) {
-      url.pathname = pathname.startsWith("/livreur") ? pathname : `/livreur${pathname}`;
+    if (pathname === "/login" || pathname === "/livreur/login") {
+      url.pathname = "/livreur/login";
       return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+    }
+    // Inscription page lives outside /livreur — redirect subdomain to main domain
+    if (pathname === "/inscription" || pathname === "/livreur-inscription") {
+      const mainHost = hostname.replace(/^livraison\./, "");
+      return NextResponse.redirect(new URL("/livreur-inscription", `https://${mainHost}`));
     }
 
     // All other pages: check auth, redirect to subdomain login if missing/invalid
@@ -61,8 +63,7 @@ export async function middleware(request: NextRequest) {
 
   const isAdminRoute      = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
   const isLivreurRoute    = pathname.startsWith("/livreur") &&
-                            !pathname.startsWith("/livreur/login") &&
-                            !pathname.startsWith("/livreur/inscription");
+                            !pathname.startsWith("/livreur/login");
   const isChangePassRoute = pathname.startsWith("/change-password");
 
   const isProtected = isAdminRoute || isLivreurRoute || isChangePassRoute;
