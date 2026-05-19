@@ -39,20 +39,22 @@ interface Order {
   mm_transaction_ref?: string | null;
 }
 
-/* ── Payment status options ── */
-const PAYMENT_OPTIONS = [
-  { value: "non_paye",  label: "Non payé",   cls: "bg-slate-100 text-slate-600" },
-  { value: "paye",      label: "Payé",        cls: "bg-green-100 text-green-700" },
-  { value: "rembourse", label: "Remboursé",   cls: "bg-red-100 text-red-600" },
+/* ── Delivery status options ── */
+const DELIVERY_OPTIONS = [
+  { value: "pending",   label: "En attente", cls: "bg-slate-100 text-slate-600" },
+  { value: "confirmed", label: "Confirmée",  cls: "bg-blue-100 text-blue-700" },
+  { value: "shipped",   label: "Expédiée",   cls: "bg-amber-100 text-amber-700" },
+  { value: "delivered", label: "Livrée",     cls: "bg-green-100 text-green-700" },
+  { value: "cancelled", label: "Annulée",    cls: "bg-red-100 text-red-600" },
 ];
 
-/* ── Payment status selector ── */
-function PaymentStatusSelect({ orderId, current }: { orderId: number; current: string | null }) {
+/* ── Delivery status selector ── */
+function DeliveryStatusSelect({ orderId, current }: { orderId: number; current: string }) {
   const router  = useRouter();
-  const [val,    setVal]    = useState(current ?? "non_paye");
+  const [val,    setVal]    = useState(current ?? "pending");
   const [saving, setSaving] = useState(false);
 
-  const opt = PAYMENT_OPTIONS.find(o => o.value === val) ?? PAYMENT_OPTIONS[0];
+  const opt = DELIVERY_OPTIONS.find(o => o.value === val) ?? DELIVERY_OPTIONS[0];
 
   async function change(v: string) {
     setSaving(true);
@@ -60,7 +62,7 @@ function PaymentStatusSelect({ orderId, current }: { orderId: number; current: s
     await fetch(`/api/admin/orders/${orderId}`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ field: "payment", payment_status: v }),
+      body:    JSON.stringify({ status: v }),
       credentials: "include",
     });
     setSaving(false);
@@ -74,7 +76,7 @@ function PaymentStatusSelect({ orderId, current }: { orderId: number; current: s
       disabled={saving}
       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border-0 outline-none cursor-pointer w-full ${opt.cls}`}
     >
-      {PAYMENT_OPTIONS.map(o => (
+      {DELIVERY_OPTIONS.map(o => (
         <option key={o.value} value={o.value}>{o.label}</option>
       ))}
     </select>
@@ -620,12 +622,6 @@ export default function OrderDetailActions({ order }: { order: Order }) {
       {/* Confirm MM payment */}
       <ConfirmMMPayment order={order} />
 
-      {/* Statut paiement */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
-        <h2 className="font-bold text-slate-700">Statut du paiement</h2>
-        <PaymentStatusSelect orderId={order.id} current={order.statut_paiement} />
-        <p className="text-xs text-slate-400">Enregistré automatiquement à la sélection.</p>
-      </div>
 
       {/* Modifier + Supprimer */}
       <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">

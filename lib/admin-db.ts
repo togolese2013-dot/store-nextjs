@@ -1817,13 +1817,13 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
     `SELECT f.*, COALESCE(_so.coupon_remise, 0) AS coupon_remise,
             CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
-     LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
+     LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered')
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
      ${where} ORDER BY f.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
   const [cnt] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT COUNT(*) AS cnt FROM factures f LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered' ${where}`, params
+    `SELECT COUNT(*) AS cnt FROM factures f LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered') ${where}`, params
   );
   return { items: rows as Facture[], total: Number(cnt[0]?.cnt ?? 0) };
 }
