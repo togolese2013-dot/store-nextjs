@@ -1,6 +1,13 @@
 import { db } from "./db";
 import type mysql from "mysql2/promise";
 
+// Each ensure* function runs at most once per process — eliminates per-request DDL overhead
+const _ensurePromises = new Map<string, Promise<void>>();
+function runOnce(key: string, fn: () => Promise<void>): Promise<void> {
+  if (!_ensurePromises.has(key)) _ensurePromises.set(key, fn());
+  return _ensurePromises.get(key)!;
+}
+
 // ─── Stock Operations ─────────────────────────────────────────────────────────
 
 export interface ProduitStock {
@@ -1261,7 +1268,7 @@ export interface Coupon {
 }
 
 async function ensureCouponsTable() {
-  await db.execute(`
+  return runOnce("coupons", () => db.execute(`
     CREATE TABLE IF NOT EXISTS coupons (
       id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       code       VARCHAR(50)  NOT NULL UNIQUE,
@@ -1274,7 +1281,7 @@ async function ensureCouponsTable() {
       actif      TINYINT(1)    NOT NULL DEFAULT 1,
       created_at DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
+  `).then(() => {}));
 }
 
 export async function listCoupons(): Promise<Coupon[]> {
@@ -1575,6 +1582,7 @@ async function getProduitColsAdmin() {
 }
 
 async function ensureBoutiqueStockPopulated(): Promise<void> {
+  return runOnce("boutique_stock", async () => {
   // Create table if missing
   await db.execute(`
     CREATE TABLE IF NOT EXISTS boutique_stock (
@@ -1618,6 +1626,7 @@ async function ensureBoutiqueStockPopulated(): Promise<void> {
       `)
     );
   }
+  }); // end runOnce
 }
 
 export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
@@ -1820,7 +1829,7 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
 }
 
 async function ensureFacturePaiementsTable() {
-  await db.execute(`
+  return runOnce("facture_paiements", () => db.execute(`
     CREATE TABLE IF NOT EXISTS facture_paiements (
       id            INT AUTO_INCREMENT PRIMARY KEY,
       facture_id    INT NOT NULL,
@@ -1830,7 +1839,7 @@ async function ensureFacturePaiementsTable() {
       created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_fp_facture (facture_id)
     )
-  `);
+  `).then(() => {}));
 }
 
 async function createFacturePaiement(data: {
@@ -3029,11 +3038,11 @@ export interface Livreur {
 }
 
 async function ensureLivreurCols(): Promise<void> {
-  try {
+  return runOnce("livreur_cols", async () => {
     await db.execute(
       "ALTER TABLE livreurs ADD COLUMN numero_plaque VARCHAR(30) NULL AFTER telephone"
-    );
-  } catch { /* column already exists */ }
+    ).catch(() => {});
+  });
 }
 
 export async function listLivreurs(): Promise<Livreur[]> {
@@ -3102,20 +3111,23 @@ export interface LivreurInscription {
 }
 
 export async function ensureLivreurInscriptionsTable(): Promise<void> {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS livreur_inscriptions (
-      id                 INT AUTO_INCREMENT PRIMARY KEY,
-      nom                VARCHAR(100) NOT NULL,
-      telephone          VARCHAR(30)  NOT NULL,
-      numero_plaque      VARCHAR(30)  NULL,
-      carte_identite_url TEXT         NULL,
-      password_hash      VARCHAR(255) NOT NULL,
-      statut             ENUM('en_attente','approuve','rejete') NOT NULL DEFAULT 'en_attente',
-      note_admin         TEXT         NULL,
-      created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  await db.execute("ALTER TABLE livreur_inscriptions ADD COLUMN IF NOT EXISTS carte_identite_url TEXT NULL AFTER numero_plaque").catch(() => {});
+  return runOnce("livreur_inscriptions", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS livreur_inscriptions (
+        id                 INT AUTO_INCREMENT PRIMARY KEY,
+        nom                VARCHAR(100) NOT NULL,
+        telephone          VARCHAR(30)  NOT NULL,
+        numero_plaque      VARCHAR(30)  NULL,
+        carte_identite_url TEXT         NULL,
+        password_hash      VARCHAR(255) NOT NULL,
+        statut             ENUM('en_attente','approuve','rejete') NOT NULL DEFAULT 'en_attente',
+        note_admin         TEXT         NULL,
+        created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    // Plain ALTER TABLE (no IF NOT EXISTS — MySQL-compatible, error = column exists = OK)
+    await db.execute("ALTER TABLE livreur_inscriptions ADD COLUMN carte_identite_url TEXT NULL AFTER numero_plaque").catch(() => {});
+  });
 }
 
 export async function createLivreurInscription(data: {
@@ -3177,23 +3189,21 @@ export interface LivraisonAdmin {
 }
 
 export async function ensureLivraisonCols(): Promise<void> {
-  // Each ALTER is independent — a missing column must not block the others
-  const alters: string[] = [
-    "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN livree_le DATETIME NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN note TEXT NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN livreur VARCHAR(255) NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN order_id INT NULL",
-    // Prevent duplicate livraison for the same online order (race condition guard)
-    "ALTER TABLE livraisons_ventes ADD UNIQUE KEY uk_order_id (order_id)",
-    // Fix ENUM to include all required values
-    "ALTER TABLE livraisons_ventes MODIFY COLUMN statut ENUM('en_attente','acceptee','en_cours','livre','echoue') NOT NULL DEFAULT 'en_attente'",
-    // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id
-    "ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibfk_2",
-  ];
-  for (const sql of alters) {
-    try { await db.execute(sql); } catch { /* already applied */ }
-  }
+  return runOnce("livraison_cols", async () => {
+    const alters: string[] = [
+      "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN livree_le DATETIME NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN note TEXT NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN livreur VARCHAR(255) NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN order_id INT NULL",
+      "ALTER TABLE livraisons_ventes ADD UNIQUE KEY uk_order_id (order_id)",
+      "ALTER TABLE livraisons_ventes MODIFY COLUMN statut ENUM('en_attente','acceptee','en_cours','livre','echoue') NOT NULL DEFAULT 'en_attente'",
+      "ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibfk_2",
+    ];
+    for (const sql of alters) {
+      await db.execute(sql).catch(() => {});
+    }
+  });
 }
 
 export async function listLivraisonsAdmin(opts: {
@@ -3368,35 +3378,35 @@ export interface BoutiqueClientStats {
 }
 
 async function ensureBoutiqueClientsTable(): Promise<void> {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS boutique_clients (
-      id           INT AUTO_INCREMENT PRIMARY KEY,
-      nom          VARCHAR(255) NOT NULL,
-      telephone    VARCHAR(20),
-      email        VARCHAR(150),
-      localisation VARCHAR(255),
-      type_client  ENUM('particulier','professionnel') NOT NULL DEFAULT 'particulier',
-      solde        DECIMAL(15,2) NOT NULL DEFAULT 0,
-      notes        TEXT,
-      created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_nom       (nom),
-      INDEX idx_telephone (telephone)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  // Import from clients table if boutique_clients is empty
-  const [[cnt]] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT COUNT(*) AS n FROM boutique_clients"
-  );
-  if (Number((cnt as mysql.RowDataPacket).n ?? 0) === 0) {
+  return runOnce("boutique_clients", async () => {
     await db.execute(`
-      INSERT INTO boutique_clients (nom, telephone, email, type_client)
-      SELECT nom, telephone, email, 'particulier'
-      FROM clients
-      WHERE telephone IS NOT NULL AND telephone != ''
-    `).catch(() => {});
-  }
+      CREATE TABLE IF NOT EXISTS boutique_clients (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        nom          VARCHAR(255) NOT NULL,
+        telephone    VARCHAR(20),
+        email        VARCHAR(150),
+        localisation VARCHAR(255),
+        type_client  ENUM('particulier','professionnel') NOT NULL DEFAULT 'particulier',
+        solde        DECIMAL(15,2) NOT NULL DEFAULT 0,
+        notes        TEXT,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_nom       (nom),
+        INDEX idx_telephone (telephone)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    const [[cnt]] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) AS n FROM boutique_clients"
+    );
+    if (Number((cnt as mysql.RowDataPacket).n ?? 0) === 0) {
+      await db.execute(`
+        INSERT INTO boutique_clients (nom, telephone, email, type_client)
+        SELECT nom, telephone, email, 'particulier'
+        FROM clients
+        WHERE telephone IS NOT NULL AND telephone != ''
+      `).catch(() => {});
+    }
+  });
 }
 
 export async function listBoutiqueClients(
@@ -3680,24 +3690,25 @@ export interface AdminMarque {
 }
 
 async function ensureMarquesTable() {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS marques (
-      id          INT AUTO_INCREMENT PRIMARY KEY,
-      nom         VARCHAR(255) NOT NULL,
-      description TEXT,
-      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  // Check column existence before ALTER to support MySQL < 8.0.3
-  const [cols] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME   = 'produits'
-       AND COLUMN_NAME  = 'marque_id'`
-  );
-  if (Number((cols as mysql.RowDataPacket[])[0]?.cnt ?? 0) === 0) {
-    await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`).catch(() => {});
-  }
+  return runOnce("marques", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS marques (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        nom         VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    const [cols] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME   = 'produits'
+         AND COLUMN_NAME  = 'marque_id'`
+    );
+    if (Number((cols as mysql.RowDataPacket[])[0]?.cnt ?? 0) === 0) {
+      await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`).catch(() => {});
+    }
+  });
 }
 
 export async function listAdminMarques(): Promise<AdminMarque[]> {

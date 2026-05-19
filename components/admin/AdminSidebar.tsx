@@ -180,7 +180,7 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
       } catch { /* ignore */ }
     }
     fetchWaUnread();
-    const id = setInterval(fetchWaUnread, 30_000);
+    const id = setInterval(fetchWaUnread, 120_000);
     return () => clearInterval(id);
   }, []);
 
