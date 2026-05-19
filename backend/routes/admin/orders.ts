@@ -6,7 +6,7 @@ import type mysql from "mysql2/promise";
 import {
   listOrders, countOrders, createOrder, addOrderEvent,
   updateOrderStatus, updateOrderFields, deleteOrder, getOrderById,
-  applyOrderDeliveredEffects, ensureOrderVente,
+  applyOrderDeliveredEffects, ensureOrderVente, invalidateVentesStats,
 } from "@/lib/admin-db";
 
 let _paymentColReady = false;
@@ -140,8 +140,15 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     await ensureOrderVente(id, actor).catch(e => console.error("[orders] ensureOrderVente failed:", e));
 
     if (["delivered", "livree", "livrée", "livre", "livré"].includes(String(status))) {
-      await applyOrderDeliveredEffects(id, session.nom);
+      await applyOrderDeliveredEffects(id, session.nom).catch(e => console.error("[orders] applyDelivered failed:", e));
       await ensureOrderVente(id, actor);
+      // Mark facture as paid + invalidate stats cache
+      await (db as mysql.Pool).execute(
+        `UPDATE factures SET statut_paiement = 'paye_total', statut = 'paye'
+         WHERE order_id = ? AND statut != 'annule'`,
+        [id]
+      ).catch(() => {});
+      invalidateVentesStats();
       emitAdminEvent("stock");
     }
     emitAdminEvent("commande");
