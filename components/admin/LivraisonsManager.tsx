@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Truck, Plus, X, Check, Loader2,
   MapPin, User, Clock, Pencil, Trash2,
@@ -23,11 +23,10 @@ const STATUTS: { value: LivraisonAdmin["statut"]; label: string; color: string }
 interface LivStats { total: number; en_attente: number; en_cours: number; livre: number }
 
 interface Props {
-  initialLivraisons:  LivraisonAdmin[];
-  initialTotal:       number;
-  initialLivreurs:    Livreur[];
-  initialStats:       LivStats;
-  initialInscriptions: LivreurInscription[];
+  initialLivraisons: LivraisonAdmin[];
+  initialTotal:      number;
+  initialLivreurs:   Livreur[];
+  initialStats:      LivStats;
 }
 
 const LIMIT = 50;
@@ -48,13 +47,14 @@ function formatDate(d: string) {
 /* ══════════════════════════════════════════════════════════════════
    COMPONENT
 ══════════════════════════════════════════════════════════════════ */
-export default function LivraisonsManager({ initialLivraisons, initialTotal, initialLivreurs, initialStats, initialInscriptions }: Props) {
+export default function LivraisonsManager({ initialLivraisons, initialTotal, initialLivreurs, initialStats }: Props) {
   const [activeTab,    setActiveTab]    = useState<"livraisons" | "livreurs">("livraisons");
   const [livraisons,   setLivraisons]   = useState<LivraisonAdmin[]>(initialLivraisons);
   const [total,        setTotal]        = useState(initialTotal);
   const [livreurs,     setLivreurs]     = useState<Livreur[]>(initialLivreurs);
   const [stats,        setStats]        = useState<LivStats>(initialStats);
-  const [inscriptions, setInscriptions] = useState<LivreurInscription[]>(initialInscriptions);
+  const [inscriptions,      setInscriptions]      = useState<LivreurInscription[]>([]);
+  const [inscriptionsLoaded, setInscriptionsLoaded] = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [flash,       setFlash]       = useState("");
   const [search,      setSearch]      = useState("");
@@ -78,6 +78,16 @@ export default function LivraisonsManager({ initialLivraisons, initialTotal, ini
 
   /* ── Copied link flash ── */
   const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  // Load inscriptions lazily when the Livreurs tab is opened for the first time
+  useEffect(() => {
+    if (activeTab !== "livreurs" || inscriptionsLoaded) return;
+    setInscriptionsLoaded(true);
+    fetch("/api/admin/livreur-inscriptions")
+      .then(r => r.json())
+      .then(d => { if (d.items) setInscriptions(d.items); })
+      .catch(() => {});
+  }, [activeTab, inscriptionsLoaded]);
 
   function showFlash(msg: string) { setFlash(msg); setTimeout(() => setFlash(""), 3000); }
 

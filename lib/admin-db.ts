@@ -3216,21 +3216,23 @@ export async function listLivraisonsAdmin(opts: {
   if (search) { conditions.push("(lv.client_nom LIKE ? OR lv.reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("lv.statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT lv.*, li.nom AS livreur_nom
-     FROM livraisons_ventes lv
-     LEFT JOIN utilisateurs li ON li.id = lv.livreur_id
-     ${where}
-     ORDER BY lv.created_at DESC
-     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
-    params
-  );
-  const [cnt] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT COUNT(*) AS cnt FROM livraisons_ventes lv ${where}`, params
-  );
+  const [[rows], [cnt]] = await Promise.all([
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT lv.*, li.nom AS livreur_nom
+       FROM livraisons_ventes lv
+       LEFT JOIN utilisateurs li ON li.id = lv.livreur_id
+       ${where}
+       ORDER BY lv.created_at DESC
+       LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+      params
+    ),
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM livraisons_ventes lv ${where}`, params
+    ),
+  ]);
   return {
     items: (rows as mysql.RowDataPacket[]).map(r => ({ ...r, livreur: r.livreur_nom ?? r.livreur })) as LivraisonAdmin[],
-    total: Number(cnt[0]?.cnt ?? 0),
+    total: Number((cnt as mysql.RowDataPacket[])[0]?.cnt ?? 0),
   };
 }
 

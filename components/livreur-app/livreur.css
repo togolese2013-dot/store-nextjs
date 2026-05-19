@@ -100,63 +100,74 @@
 /* ─── Layout ─────────────────────────────────────────────────────────────── */
 
 .lv-header {
-  padding: 18px 18px 14px;
+  padding: 20px 18px 16px;
   background: var(--lv-paper);
   border-bottom: 1px solid var(--lv-ink-100);
 }
-.lv-header__top { display: flex; align-items: center; gap: 12px; }
+.lv-header__top { display: flex; align-items: center; gap: 14px; }
 
 .lv-avatar {
-  width: 40px; height: 40px; border-radius: 999px;
+  width: 48px; height: 48px; border-radius: 999px;
   background: var(--lv-g-tint); color: var(--lv-g-800);
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 600; letter-spacing: -0.02em;
+  font-size: 16px; font-weight: 700; letter-spacing: -0.02em;
   flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(22,101,52,.10);
 }
-.lv-avatar--lg { width: 56px; height: 56px; font-size: 20px; }
+.lv-avatar--lg { width: 60px; height: 60px; font-size: 22px; }
 
-.lv-header__name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
-.lv-header__sub  { font-size: 11.5px; color: var(--lv-ink-400); margin-top: 1px; }
+.lv-header__name { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; color: var(--lv-ink-900); }
+.lv-header__sub  { font-size: 12px; color: var(--lv-ink-400); margin-top: 2px; }
 
 .lv-bell {
-  position: relative; width: 36px; height: 36px; border-radius: 50%;
-  border: 1px solid var(--lv-ink-100); background: var(--lv-paper);
+  position: relative; width: 40px; height: 40px; border-radius: 50%;
+  border: 1.5px solid var(--lv-ink-100); background: var(--lv-paper);
   color: var(--lv-ink-500); flex-shrink: 0;
+  box-shadow: var(--lv-shadow-1);
+  display: flex; align-items: center; justify-content: center;
 }
 .lv-bell__dot {
-  position: absolute; top: 8px; right: 9px; width: 7px; height: 7px;
-  border-radius: 50%; background: var(--lv-g-600); border: 1.5px solid var(--lv-paper);
+  position: absolute; top: 7px; right: 8px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--lv-g-600); border: 2px solid var(--lv-paper);
   animation: lv-pulse-dot 1.4s ease-in-out infinite;
 }
 
 .lv-online {
   width: 100%; margin-top: 14px;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px; border-radius: 14px;
-  border: 1px solid var(--lv-ink-100); background: var(--lv-paper);
+  padding: 15px 16px; border-radius: 16px;
+  border: 1.5px solid var(--lv-ink-100); background: var(--lv-paper);
   text-align: left; transition: background .2s, border-color .2s;
+  box-shadow: var(--lv-shadow-1);
 }
-.lv-online--on { background: var(--lv-g-50); border-color: var(--lv-g-tint); }
-.lv-online__left { display: flex; align-items: center; gap: 12px; }
-.lv-online__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--lv-ink-300); transition: background .2s, box-shadow .2s; }
-.lv-online--on .lv-online__dot { background: var(--lv-g-600); box-shadow: 0 0 0 4px rgba(22,128,61,.15); }
-.lv-online__label { font-size: 13.5px; font-weight: 600; color: var(--lv-ink-700); letter-spacing: -0.01em; }
-.lv-online--on .lv-online__label { color: var(--lv-g-800); }
-.lv-online__sub { font-size: 11.5px; color: var(--lv-ink-400); margin-top: 1px; }
-
-.lv-toggle {
-  width: 36px; height: 22px; border-radius: 22px;
-  background: var(--lv-ink-200); position: relative; transition: background .2s;
+.lv-online--on { background: var(--lv-g-50); border-color: rgba(22,101,52,.18); }
+.lv-online__left { display: flex; align-items: center; gap: 13px; }
+.lv-online__dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--lv-ink-300); transition: background .2s, box-shadow .2s;
   flex-shrink: 0;
 }
-.lv-toggle--on { background: var(--lv-g-700); }
-.lv-toggle__dot {
-  position: absolute; top: 2px; left: 2px;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--lv-paper); box-shadow: 0 1px 2px rgba(0,0,0,.15);
-  transition: left .18s;
+.lv-online--on .lv-online__dot {
+  background: var(--lv-g-500);
+  box-shadow: 0 0 0 4px rgba(22,163,74,.18);
 }
-.lv-toggle--on .lv-toggle__dot { left: 16px; }
+.lv-online__label { font-size: 14px; font-weight: 700; color: var(--lv-ink-800, #1a1a1a); letter-spacing: -0.02em; }
+.lv-online--on .lv-online__label { color: var(--lv-g-900); }
+.lv-online__sub { font-size: 12px; color: var(--lv-ink-400); margin-top: 2px; }
+
+.lv-toggle {
+  width: 44px; height: 26px; border-radius: 26px;
+  background: var(--lv-ink-200); position: relative; transition: background .22s;
+  flex-shrink: 0;
+}
+.lv-toggle--on { background: var(--lv-g-600); }
+.lv-toggle__dot {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--lv-paper); box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  transition: left .18s cubic-bezier(.4,0,.2,1);
+}
+.lv-toggle--on .lv-toggle__dot { left: 21px; }
 
 .lv-scroll { flex: 1; overflow-y: auto; padding: 14px 16px 80px; }
 

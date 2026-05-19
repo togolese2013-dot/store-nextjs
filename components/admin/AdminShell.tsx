@@ -53,7 +53,7 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
   if (isAdminZone) return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
       <AdminSidebar
         nom={nom}
         role={role}
@@ -61,8 +61,8 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
-      <div className="lg:pl-60 xl:pl-64">
-        <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+      <div className="lg:pl-60 xl:pl-64 min-w-0">
+        <main className="min-h-screen p-4 sm:p-6 lg:p-8 min-w-0">
           <div className="lg:hidden mb-4">
             <button
               onClick={() => setMobileOpen(true)}
