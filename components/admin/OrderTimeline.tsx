@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, Package, Truck, XCircle, Circle } from "lucide-react";
+import { CheckCircle2, Clock, Truck, XCircle, Circle } from "lucide-react";
 
 export interface OrderEvent {
   id: number;
@@ -17,14 +17,12 @@ interface Props {
 const STEPS = [
   { key: "pending",   label: "En attente",  Icon: Clock },
   { key: "confirmed", label: "Confirmée",   Icon: CheckCircle2 },
-  { key: "shipped",   label: "Expédiée",    Icon: Package },
   { key: "delivered", label: "Livrée",      Icon: Truck },
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; icon: string }> = {
   pending:   { bg: "bg-amber-50",  text: "text-amber-700",  border: "border-amber-300",  icon: "text-amber-500" },
   confirmed: { bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-300",   icon: "text-blue-500" },
-  shipped:   { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300", icon: "text-purple-500" },
   delivered: { bg: "bg-green-50",  text: "text-green-700",  border: "border-green-300",  icon: "text-green-500" },
   cancelled: { bg: "bg-red-50",    text: "text-red-700",    border: "border-red-300",    icon: "text-red-500" },
 };

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   TrendingUp, TrendingDown, Truck, Plus, Search,
   Eye, Trash2, Printer, Loader2, ChevronLeft, ChevronRight,
-  X, Check, AlertTriangle, Pencil,
+  X, Check, AlertTriangle, Pencil, PackageCheck,
   CreditCard, Banknote, Smartphone, Building2, Package,
   ShoppingCart, Minus, MapPin, UserCheck,
   Warehouse, DollarSign,
@@ -427,6 +427,18 @@ export default function VentesManager({
 
   function handlePrint(f: Facture) { setPrintFacture(f); }
 
+  /* ── Valider livraison (site_order) ── */
+  async function handleMarkDelivered(orderId: number) {
+    if (!confirm("Marquer cette commande comme livrée ?")) return;
+    await fetch(`/api/admin/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "delivered" }),
+      credentials: "include",
+    });
+    fetchAll();
+  }
+
   /* ── Voir détail ── */
   function handleView(f: Facture) { router.push(`/admin/ventes/${f.id}`); }
 
@@ -661,6 +673,9 @@ export default function VentesManager({
                             <button onClick={() => handleView(f)} title="Voir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>
                             {canEdit && <button onClick={() => handleEdit(f)} title="Modifier" className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>}
                             <button onClick={() => handlePrint(f)} title="Imprimer" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
+                            {f.source === "site_order" && f.order_id && f.order_status !== "delivered" && f.order_status !== "cancelled" && (
+                              <button onClick={() => handleMarkDelivered(f.order_id!)} title="Valider la livraison" className="p-1.5 rounded-lg hover:bg-green-50 text-slate-500 hover:text-green-600 transition-colors"><PackageCheck className="w-4 h-4" /></button>
+                            )}
                             {canDelete && f.source !== "site_order" && (
                               <button onClick={() => handleDelete(f.id)} title="Supprimer" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                             )}

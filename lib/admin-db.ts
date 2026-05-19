@@ -1797,6 +1797,7 @@ export interface Facture {
   note:              string | null;
   source:            string | null;
   order_id:          number | null;
+  order_status?:     string | null;
   coupon_remise?:    number;
   admin_id:          number | null;
   vendeur:           string | null;
@@ -1814,7 +1815,7 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT f.*, COALESCE(_so.coupon_remise, 0) AS coupon_remise,
+    `SELECT f.*, COALESCE(_so.coupon_remise, 0) AS coupon_remise, _so.status AS order_status,
             CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
      LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered')
