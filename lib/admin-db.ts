@@ -3817,9 +3817,9 @@ export async function fixSiteOrderFinanceEntries(): Promise<void> {
     try {
       const [result] = await db.execute<mysql.ResultSetHeader>(
         `UPDATE finance_entries fe
-         JOIN orders o ON fe.description LIKE CONCAT('%', o.reference, '%')
+         JOIN orders o ON fe.description LIKE CONCAT('%', o.reference COLLATE utf8mb4_unicode_ci, '%')
          SET fe.montant = fe.montant - o.delivery_fee
-         WHERE fe.description LIKE 'Commande site livrée%'
+         WHERE fe.description LIKE 'Commande site livrée%' COLLATE utf8mb4_unicode_ci
            AND o.delivery_fee > 0
            AND fe.montant > o.delivery_fee`
       );
