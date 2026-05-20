@@ -45,18 +45,13 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
     optimization_goal: "REACH",
     targeting: {
       geo_locations: {
-        countries:      ["TG"],
-        location_types: ["home", "recent"],
+        countries: ["TG"],
       },
       age_min:             22,
       age_max:             50,
-      locales:             [7],       // French speakers
       device_platforms:    ["mobile"],
       publisher_platforms: ["facebook"],
       facebook_positions:  ["feed"],
-      behaviors: [
-        { id: 6071631541183, name: "Online shoppers" },
-      ],
     },
     start_time: now,
     end_time:   endTime,
