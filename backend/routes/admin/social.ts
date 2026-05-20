@@ -32,7 +32,7 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
 
   const campaign = await fbPost(`${AD_ACCOUNT_ID}/campaigns`, {
     name:                  `Boost — ${postId}`,
-    objective:             "POST_ENGAGEMENT",
+    objective:             "OUTCOME_ENGAGEMENT",
     status:                "ACTIVE",
     special_ad_categories: [],
   }, token);
