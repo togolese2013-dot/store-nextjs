@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   ChevronLeft, Facebook, Loader2, CheckCircle2,
-  AlertCircle, ChevronDown, ExternalLink, Search, X,
+  AlertCircle, ChevronDown, ExternalLink, Search, X, Zap,
 } from "lucide-react";
 
 interface Product {
@@ -35,6 +35,11 @@ export default function SocialPage() {
   const [query, setQuery]               = useState("");
   const [showResults, setShowResults]   = useState(false);
   const searchRef                       = useRef<HTMLDivElement>(null);
+  const [boostEnabled, setBoostEnabled] = useState(false);
+  const [boostBudget, setBoostBudget]   = useState(2000);
+  const [boostDays, setBoostDays]       = useState(3);
+  const [boostAdId, setBoostAdId]       = useState<string | null>(null);
+  const [boostError, setBoostError]     = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/products?limit=200&includeInactive=false", { credentials: "include" })
@@ -79,8 +84,11 @@ export default function SocialPage() {
     setFeedback("");
 
     const payload = {
-      type: postType,
-      products: selected.map(({ nom, slug, reference, prix_unitaire, image_url, images }) => ({ nom, slug, reference, prix_unitaire, image_url, images })),
+      type:        postType,
+      products:    selected.map(({ nom, slug, reference, prix_unitaire, image_url, images }) => ({ nom, slug, reference, prix_unitaire, image_url, images })),
+      boost:       boostEnabled,
+      boostBudget: boostEnabled ? boostBudget : undefined,
+      boostDays:   boostEnabled ? boostDays   : undefined,
     };
 
     try {
@@ -93,6 +101,8 @@ export default function SocialPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
 
+      setBoostAdId(data.boostAdId   || null);
+      setBoostError(data.boostError || null);
       setStatus("success");
       setFeedback("Publication envoyée avec succès sur votre page Facebook !");
       setSelected([]);
@@ -105,6 +115,8 @@ export default function SocialPage() {
   function reset() {
     setStatus("idle");
     setFeedback("");
+    setBoostAdId(null);
+    setBoostError(null);
   }
 
   return (
@@ -223,6 +235,77 @@ export default function SocialPage() {
           )}
         </div>
 
+        {/* Boost section */}
+        <div className="mx-6 mb-4 border border-slate-200 rounded-xl overflow-hidden">
+          {/* Toggle header */}
+          <button
+            type="button"
+            onClick={() => { setBoostEnabled(v => !v); reset(); }}
+            className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Zap className={`w-4 h-4 ${boostEnabled ? "text-amber-500" : "text-slate-400"}`} />
+              <span className="text-sm font-semibold text-slate-700">Booster cette publication</span>
+              <span className="text-xs text-slate-400 font-normal">Meta Ads</span>
+            </div>
+            {/* Toggle pill */}
+            <div className={`relative w-10 h-5.5 rounded-full transition-colors ${boostEnabled ? "bg-amber-500" : "bg-slate-200"}`}
+                 style={{ width: 40, height: 22 }}>
+              <span className={`absolute top-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform ${boostEnabled ? "translate-x-5" : "translate-x-0.5"}`}
+                    style={{ width: 18, height: 18, top: 2, left: boostEnabled ? 20 : 2, position: "absolute", transition: "left 0.2s" }} />
+            </div>
+          </button>
+
+          {/* Options (visible uniquement si activé) */}
+          {boostEnabled && (
+            <div className="px-4 py-4 space-y-3 bg-white">
+              {/* Ciblage (readonly) */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-center gap-2">
+                <span>🇹🇬</span>
+                <span>Togo · 18–55 ans · Toutes audiences</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Budget */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Budget / jour (XOF)</label>
+                  <input
+                    type="number"
+                    min={500}
+                    step={500}
+                    value={boostBudget}
+                    onChange={e => setBoostBudget(Math.max(500, Number(e.target.value)))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+
+                {/* Durée */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Durée</label>
+                  <div className="relative">
+                    <select
+                      value={boostDays}
+                      onChange={e => setBoostDays(Number(e.target.value))}
+                      className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 pr-8"
+                    >
+                      <option value={1}>1 jour</option>
+                      <option value={3}>3 jours</option>
+                      <option value={5}>5 jours</option>
+                      <option value={7}>7 jours</option>
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Estimation coût total */}
+              <p className="text-xs text-slate-400 text-right">
+                Coût estimé : <span className="font-semibold text-slate-600">{(boostBudget * boostDays).toLocaleString("fr-FR")} XOF</span>
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Info Claude */}
         <div className="mx-6 mb-4 bg-slate-50 rounded-xl px-4 py-3 text-xs text-slate-500 leading-relaxed">
           Claude AI génère le texte de la publication en français, puis n8n la publie automatiquement sur votre page Facebook.
@@ -230,7 +313,7 @@ export default function SocialPage() {
 
         {/* Feedback */}
         {feedback && (
-          <div className={`mx-6 mb-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm ${
+          <div className={`mx-6 mb-2 flex items-start gap-2 rounded-xl px-4 py-3 text-sm ${
             status === "success"
               ? "bg-emerald-50 text-emerald-700"
               : "bg-red-50 text-red-600"
@@ -240,6 +323,16 @@ export default function SocialPage() {
               : <AlertCircle  className="w-4 h-4 shrink-0 mt-0.5" />
             }
             {feedback}
+          </div>
+        )}
+
+        {/* Boost result */}
+        {status === "success" && boostEnabled && (
+          <div className={`mx-6 mb-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm ${boostAdId ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-600"}`}>
+            {boostAdId
+              ? <><Zap className="w-4 h-4 shrink-0 mt-0.5" /> Publication boostée avec succès ! Ad ID : <span className="font-mono ml-1">{boostAdId}</span></>
+              : <><AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> Boost échoué : {boostError}</>
+            }
           </div>
         )}
 

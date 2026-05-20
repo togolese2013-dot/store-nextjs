@@ -61,13 +61,20 @@ function createPool() {
   const rawUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.MYSQL_PUBLIC_URL;
   const isProduction = process.env.NODE_ENV === "production";
   const url = rawUrl?.startsWith("mysql://") || rawUrl?.startsWith("mysql2://") ? rawUrl : void 0;
+  const shared = {
+    waitForConnections: true,
+    connectionLimit: 5,
+    charset: "utf8mb4",
+    timezone: "+00:00",
+    connectTimeout: 1e4,
+    // Prevent ECONNRESET from Railway/MySQL idle-connection timeouts
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 3e4
+  };
   if (url) {
     return import_promise.default.createPool({
       uri: url,
-      waitForConnections: true,
-      connectionLimit: 3,
-      charset: "utf8mb4",
-      timezone: "+00:00",
+      ...shared,
       ssl: isProduction ? { rejectUnauthorized: false } : void 0
     });
   }
@@ -77,10 +84,7 @@ function createPool() {
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "togol2600657",
-    waitForConnections: true,
-    connectionLimit: 6,
-    charset: "utf8mb4",
-    timezone: "+00:00"
+    ...shared
   });
 }
 function getOrCreatePool() {
@@ -601,6 +605,7 @@ __export(admin_db_exports, {
   createFinanceEntry: () => createFinanceEntry,
   createFournisseur: () => createFournisseur,
   createLivreur: () => createLivreur,
+  createLivreurInscription: () => createLivreurInscription,
   createManualLivraison: () => createManualLivraison,
   createMarque: () => createMarque,
   createOrder: () => createOrder,
@@ -633,10 +638,12 @@ __export(admin_db_exports, {
   ensureAdminUsersCols: () => ensureAdminUsersCols,
   ensureIndexes: () => ensureIndexes,
   ensureLivraisonCols: () => ensureLivraisonCols,
+  ensureLivreurInscriptionsTable: () => ensureLivreurInscriptionsTable,
   ensureOrderLivreurCols: () => ensureOrderLivreurCols,
   ensureOrderVente: () => ensureOrderVente,
   ensureTokenVersionCols: () => ensureTokenVersionCols,
   ensureUtilisateursCols: () => ensureUtilisateursCols,
+  fixSiteOrderFinanceEntries: () => fixSiteOrderFinanceEntries,
   getAchatById: () => getAchatById,
   getAchatStats: () => getAchatStats,
   getAdminByEmail: () => getAdminByEmail,
@@ -659,6 +666,7 @@ __export(admin_db_exports, {
   getLivraisonsForLivreur: () => getLivraisonsForLivreur,
   getLivraisonsStats: () => getLivraisonsStats,
   getLivreurByCode: () => getLivreurByCode,
+  getLivreurInscriptionById: () => getLivreurInscriptionById,
   getLoyaltyHistory: () => getLoyaltyHistory,
   getLoyaltyStats: () => getLoyaltyStats,
   getOrderById: () => getOrderById,
@@ -696,6 +704,7 @@ __export(admin_db_exports, {
   listFournisseurs: () => listFournisseurs,
   listLivraisons: () => listLivraisons,
   listLivraisonsAdmin: () => listLivraisonsAdmin,
+  listLivreurInscriptions: () => listLivreurInscriptions,
   listLivreurs: () => listLivreurs,
   listLoyaltyClients: () => listLoyaltyClients,
   listNewsletterSubscribers: () => listNewsletterSubscribers,
@@ -733,6 +742,7 @@ __export(admin_db_exports, {
   updateLivraisonAdmin: () => updateLivraisonAdmin,
   updateLivraisonStatut: () => updateLivraisonStatut,
   updateLivreur: () => updateLivreur,
+  updateLivreurInscriptionStatut: () => updateLivreurInscriptionStatut,
   updateMarque: () => updateMarque,
   updateOrderFields: () => updateOrderFields,
   updateOrderStatus: () => updateOrderStatus,
@@ -744,6 +754,10 @@ __export(admin_db_exports, {
   upsertDeliveryZone: () => upsertDeliveryZone,
   upsertEntrepot: () => upsertEntrepot
 });
+function runOnce(key, fn) {
+  if (!_ensurePromises.has(key)) _ensurePromises.set(key, fn());
+  return _ensurePromises.get(key);
+}
 async function getProduitsWithStock() {
   const [rows] = await db.query(
     `SELECT id AS produit_id, nom, reference,
@@ -1253,18 +1267,18 @@ async function getDeliveryZones(activeOnly = false) {
   const [rows] = await db.execute(
     `SELECT * FROM delivery_zones ${where} ORDER BY sort_order ASC, id ASC`
   );
-  return rows.map((r) => ({ ...r, actif: Boolean(r.actif) }));
+  return rows.map((r) => ({ ...r, actif: Boolean(r.actif), prix_libre: Boolean(r.prix_libre) }));
 }
 async function upsertDeliveryZone(zone) {
   if (zone.id) {
     await db.execute(
-      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=? WHERE id=?",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.id]
+      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=?",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id]
     );
   } else {
     await db.execute(
-      "INSERT INTO delivery_zones (nom, fee, actif, sort_order) VALUES (?,?,?,?)",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order]
+      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre) VALUES (?,?,?,?,?)",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0]
     );
   }
 }
@@ -1370,7 +1384,7 @@ async function deleteOrder(id) {
   }
   if (order?.reference) {
     await db.execute(
-      "DELETE FROM finance_entries WHERE description LIKE ?",
+      "DELETE FROM finance_entries WHERE CONVERT(description USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ?",
       [`%${order.reference}%`]
     ).catch(() => {
     });
@@ -1508,7 +1522,7 @@ async function ensureOrderVente(orderId, actor) {
   }
   const isDelivered = ["delivered", "livree", "livre", "livr\xE9"].includes(String(order.status ?? ""));
   if (isDelivered && !order.finance_entry_id) {
-    const montant = Number(order.subtotal ?? 0);
+    const montant = Math.max(0, Number(order.subtotal ?? 0) - Number(order.coupon_remise ?? 0));
     if (montant > 0) {
       const entryId = await createFinanceEntry({
         type: "vente",
@@ -1597,7 +1611,7 @@ async function applyOrderDeliveredEffects(orderId, actor) {
 async function applyOrderPaidEffects(orderId, actor) {
   await ensureOrderLifecycleCols();
   const [[order]] = await db.execute(
-    `SELECT id, reference, nom, telephone, total, payment_mode, finance_entry_id
+    `SELECT id, reference, nom, telephone, total, coupon_remise, payment_mode, finance_entry_id
      FROM orders WHERE id = ? LIMIT 1`,
     [orderId]
   );
@@ -1607,7 +1621,7 @@ async function applyOrderPaidEffects(orderId, actor) {
     mode_paiement: orderPaymentModeToFinanceMode(order.payment_mode) ?? "especes",
     categorie: "Commande site",
     description: `Commande site ${order.reference} \u2013 ${order.nom ?? order.telephone}`,
-    montant: Number(order.total ?? 0),
+    montant: Math.max(0, Number(order.total ?? 0) - Number(order.coupon_remise ?? 0)),
     date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
   });
   await db.execute("UPDATE orders SET finance_entry_id = ? WHERE id = ?", [entryId, orderId]);
@@ -1628,7 +1642,7 @@ async function getOrderEvents(order_id) {
 }
 async function getDashboardStats() {
   const [ordersRow] = await db.execute(
-    "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as revenue FROM orders WHERE DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"
+    "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as revenue FROM orders WHERE DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"
   );
   const [productsRow] = await db.execute(
     "SELECT COUNT(*) as cnt FROM produits WHERE actif = 1"
@@ -1659,16 +1673,16 @@ async function getOrdersStats() {
     recentRows
   ] = await Promise.all([
     db.execute(
-      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders"
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as rev FROM orders"
     ),
     db.execute(
       "SELECT COUNT(*) as cnt FROM orders WHERE DATE(created_at) = CURDATE()"
     ),
     db.execute(
-      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
     ),
     db.execute(
-      "SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(subtotal),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
     ),
     db.execute(
       "SELECT status, COUNT(*) as cnt FROM orders GROUP BY status"
@@ -1676,7 +1690,7 @@ async function getOrdersStats() {
     db.execute(
       `SELECT DATE(created_at) as date,
               COUNT(*) as count,
-              COALESCE(SUM(total),0) as revenue
+              COALESCE(SUM(subtotal),0) as revenue
        FROM orders
        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
        GROUP BY DATE(created_at)
@@ -1783,7 +1797,25 @@ async function approveReview(id, approved) {
 async function deleteReview(id) {
   await db.execute("DELETE FROM reviews WHERE id = ?", [id]);
 }
+async function ensureCouponsTable() {
+  return runOnce("coupons", () => db.execute(`
+    CREATE TABLE IF NOT EXISTS coupons (
+      id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      code       VARCHAR(50)  NOT NULL UNIQUE,
+      type       ENUM('percent','fixed') NOT NULL DEFAULT 'percent',
+      valeur     DECIMAL(10,2) NOT NULL DEFAULT 0,
+      min_order  DECIMAL(10,2) NOT NULL DEFAULT 0,
+      max_uses   INT UNSIGNED  NOT NULL DEFAULT 0,
+      uses_count INT UNSIGNED  NOT NULL DEFAULT 0,
+      expires_at DATETIME      NULL,
+      actif      TINYINT(1)    NOT NULL DEFAULT 1,
+      created_at DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `).then(() => {
+  }));
+}
 async function listCoupons() {
+  await ensureCouponsTable();
   const [rows] = await db.execute(
     "SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif, created_at FROM coupons ORDER BY created_at DESC LIMIT 500"
   );
@@ -2018,7 +2050,8 @@ async function getProduitColsAdmin() {
   };
 }
 async function ensureBoutiqueStockPopulated() {
-  await db.execute(`
+  return runOnce("boutique_stock", async () => {
+    await db.execute(`
     CREATE TABLE IF NOT EXISTS boutique_stock (
       id           INT AUTO_INCREMENT PRIMARY KEY,
       produit_id   INT NOT NULL,
@@ -2028,34 +2061,35 @@ async function ensureBoutiqueStockPopulated() {
       UNIQUE KEY uq_produit (produit_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
-  const [[cnt]] = await db.execute(
-    "SELECT COUNT(*) AS n FROM boutique_stock"
-  );
-  if (Number(cnt.n ?? 0) === 0) {
-    await db.execute(`
+    const [[cnt]] = await db.execute(
+      "SELECT COUNT(*) AS n FROM boutique_stock"
+    );
+    if (Number(cnt.n ?? 0) === 0) {
+      await db.execute(`
       INSERT INTO boutique_stock (produit_id, quantite)
       SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
       FROM produits
       ON DUPLICATE KEY UPDATE quantite = VALUES(quantite)
     `).catch(
-      () => db.execute(`
+        () => db.execute(`
         INSERT INTO boutique_stock (produit_id, quantite)
         SELECT id, 0 FROM produits
         ON DUPLICATE KEY UPDATE quantite = quantite
       `)
-    );
-  } else {
-    await db.execute(`
+      );
+    } else {
+      await db.execute(`
       INSERT IGNORE INTO boutique_stock (produit_id, quantite)
       SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
       FROM produits
     `).catch(
-      () => db.execute(`
+        () => db.execute(`
         INSERT IGNORE INTO boutique_stock (produit_id, quantite)
         SELECT id, 0 FROM produits
       `)
-    );
-  }
+      );
+    }
+  });
 }
 async function getStockBoutiqueStats() {
   await ensureBoutiqueStockPopulated();
@@ -2185,22 +2219,23 @@ async function listFactures(opts = {}) {
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query(
-    `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
+    `SELECT f.*, COALESCE(_so.coupon_remise, 0) AS coupon_remise, _so.status AS order_status,
+            CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
-     LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'
+     LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered')
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
      ${where} ORDER BY f.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
     params
   );
   const [cnt] = await db.query(
-    `SELECT COUNT(*) AS cnt FROM factures f LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered' ${where}`,
+    `SELECT COUNT(*) AS cnt FROM factures f LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered') ${where}`,
     params
   );
   return { items: rows, total: Number(cnt[0]?.cnt ?? 0) };
 }
 async function ensureFacturePaiementsTable() {
-  await db.execute(`
+  return runOnce("facture_paiements", () => db.execute(`
     CREATE TABLE IF NOT EXISTS facture_paiements (
       id            INT AUTO_INCREMENT PRIMARY KEY,
       facture_id    INT NOT NULL,
@@ -2210,7 +2245,8 @@ async function ensureFacturePaiementsTable() {
       created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_fp_facture (facture_id)
     )
-  `);
+  `).then(() => {
+  }));
 }
 async function createFacturePaiement(data) {
   await ensureFacturePaiementsTable();
@@ -2233,8 +2269,10 @@ async function getFacturePaiements(facture_id) {
 }
 async function getFactureById(id) {
   const [rows] = await db.execute(
-    `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
+    `SELECT f.*, COALESCE(o.coupon_remise, 0) AS coupon_remise,
+            CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
+     LEFT JOIN orders o ON o.id = f.order_id
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
      WHERE f.id = ? LIMIT 1`,
@@ -2463,22 +2501,29 @@ async function updateFacture(id, data) {
       admin_id: data.admin_id ?? null
     }).catch(() => {
     });
+    let factureRow;
     try {
       const [[f]] = await db.execute(
         "SELECT reference, client_nom FROM factures WHERE id = ? LIMIT 1",
         [id]
       );
-      if (f) {
+      factureRow = f;
+    } catch (err) {
+      console.error("[updateFacture/select]", err);
+    }
+    if (factureRow) {
+      try {
         await createFinanceEntry({
           type: "vente",
           mode_paiement: data.mode_paiement ?? "especes",
           categorie: "Vente boutique",
-          description: `Paiement ${f.reference} \u2013 ${f.client_nom}`,
+          description: `Paiement ${factureRow.reference} \u2013 ${factureRow.client_nom}`,
           montant: data.montant_paiement,
           date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
         });
+      } catch (err) {
+        console.error("[updateFacture/createFinanceEntry]", err);
       }
-    } catch {
     }
   }
   invalidateVentesStats();
@@ -2524,13 +2569,13 @@ async function deleteFacture(id) {
   }
   if (ref) {
     await db.execute(
-      "DELETE FROM finance_entries WHERE description LIKE ?",
+      "DELETE FROM finance_entries WHERE CONVERT(description USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ?",
       [`%${ref}%`]
     ).catch(() => {
     });
   }
   await db.execute(
-    "DELETE FROM finance_entries WHERE description LIKE ?",
+    "DELETE FROM finance_entries WHERE CONVERT(description USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ?",
     [`%facture #${id}%`]
   ).catch(() => {
   });
@@ -2770,6 +2815,14 @@ async function financeEntrieCols() {
     );
   } catch {
   }
+  if (names.has("mode_paiement")) {
+    try {
+      await db.execute(
+        `ALTER TABLE finance_entries MODIFY COLUMN mode_paiement ENUM('especes','moov_money','tmoney','virement_bancaire','mix_by_yas') NULL`
+      );
+    } catch {
+    }
+  }
   _finCols = {
     mode_paiement: names.has("mode_paiement"),
     admin_id: names.has("admin_id"),
@@ -2825,16 +2878,16 @@ async function getFinanceStats() {
   });
   const especes = modeMap["especes"] ?? 0;
   const moov_money = modeMap["moov_money"] ?? 0;
-  const tmoney = modeMap["tmoney"] ?? 0;
   const virement_bancaire = modeMap["virement_bancaire"] ?? 0;
+  const mix_by_yas = (modeMap["mix_by_yas"] ?? 0) + (modeMap["tmoney"] ?? 0);
   return {
     total_recettes: Number(summaryRow?.recettes ?? 0),
     total_depenses: Number(summaryRow?.depenses ?? 0),
-    solde_net: especes + moov_money + tmoney + virement_bancaire,
+    solde_net: especes + moov_money + virement_bancaire + mix_by_yas,
     especes,
     moov_money,
-    tmoney,
-    virement_bancaire
+    virement_bancaire,
+    mix_by_yas
   };
 }
 function genFinanceRef(type) {
@@ -2946,7 +2999,7 @@ async function getVentesStats() {
          AND (lv.id IS NULL OR lv.statut = 'livre')`
     ),
     db.execute(
-      `SELECT COALESCE(SUM(subtotal), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]])
   ]);
   let depenses_jour = 0;
@@ -3226,12 +3279,12 @@ async function recevoirAchat(id) {
   }
 }
 async function ensureLivreurCols() {
-  try {
+  return runOnce("livreur_cols", async () => {
     await db.execute(
       "ALTER TABLE livreurs ADD COLUMN numero_plaque VARCHAR(30) NULL AFTER telephone"
-    );
-  } catch {
-  }
+    ).catch(() => {
+    });
+  });
 }
 async function listLivreurs() {
   await ensureLivreurCols();
@@ -3290,26 +3343,74 @@ async function updateLivreur(id, data) {
 async function deleteLivreur(id) {
   await db.execute("DELETE FROM livreurs WHERE id = ?", [id]);
 }
+async function ensureLivreurInscriptionsTable() {
+  return runOnce("livreur_inscriptions", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS livreur_inscriptions (
+        id                 INT AUTO_INCREMENT PRIMARY KEY,
+        nom                VARCHAR(100) NOT NULL,
+        telephone          VARCHAR(30)  NOT NULL,
+        numero_plaque      VARCHAR(30)  NULL,
+        carte_identite_url TEXT         NULL,
+        password_hash      VARCHAR(255) NOT NULL,
+        statut             ENUM('en_attente','approuve','rejete') NOT NULL DEFAULT 'en_attente',
+        note_admin         TEXT         NULL,
+        created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await db.execute("ALTER TABLE livreur_inscriptions ADD COLUMN carte_identite_url TEXT NULL AFTER numero_plaque").catch(() => {
+    });
+  });
+}
+async function createLivreurInscription(data) {
+  await ensureLivreurInscriptionsTable();
+  const [res] = await db.execute(
+    "INSERT INTO livreur_inscriptions (nom, telephone, numero_plaque, carte_identite_url, password_hash) VALUES (?,?,?,?,?)",
+    [data.nom, data.telephone, data.numero_plaque ?? null, data.carte_identite_url ?? null, data.password_hash]
+  );
+  return res.insertId;
+}
+async function listLivreurInscriptions(statut) {
+  await ensureLivreurInscriptionsTable();
+  const where = statut ? "WHERE statut = ?" : "";
+  const params = statut ? [statut] : [];
+  const [rows] = await db.execute(
+    `SELECT id, nom, telephone, numero_plaque, carte_identite_url, statut, note_admin, created_at FROM livreur_inscriptions ${where} ORDER BY created_at DESC LIMIT 200`,
+    params
+  );
+  return rows;
+}
+async function getLivreurInscriptionById(id) {
+  await ensureLivreurInscriptionsTable();
+  const [rows] = await db.execute(
+    "SELECT * FROM livreur_inscriptions WHERE id = ? LIMIT 1",
+    [id]
+  );
+  return rows[0] ?? null;
+}
+async function updateLivreurInscriptionStatut(id, statut, note) {
+  await db.execute(
+    "UPDATE livreur_inscriptions SET statut = ?, note_admin = ? WHERE id = ?",
+    [statut, note ?? null, id]
+  );
+}
 async function ensureLivraisonCols() {
-  const alters = [
-    "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN livree_le DATETIME NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN note TEXT NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN livreur VARCHAR(255) NULL",
-    "ALTER TABLE livraisons_ventes ADD COLUMN order_id INT NULL",
-    // Prevent duplicate livraison for the same online order (race condition guard)
-    "ALTER TABLE livraisons_ventes ADD UNIQUE KEY uk_order_id (order_id)",
-    // Fix ENUM to include all required values
-    "ALTER TABLE livraisons_ventes MODIFY COLUMN statut ENUM('en_attente','acceptee','en_cours','livre','echoue') NOT NULL DEFAULT 'en_attente'",
-    // Drop old FK referencing `livreurs` — livreur_id now stores utilisateurs.id
-    "ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibfk_2"
-  ];
-  for (const sql of alters) {
-    try {
-      await db.execute(sql);
-    } catch {
+  return runOnce("livraison_cols", async () => {
+    const alters = [
+      "ALTER TABLE livraisons_ventes ADD COLUMN montant_livraison DECIMAL(10,2) NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN livree_le DATETIME NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN note TEXT NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN livreur VARCHAR(255) NULL",
+      "ALTER TABLE livraisons_ventes ADD COLUMN order_id INT NULL",
+      "ALTER TABLE livraisons_ventes ADD UNIQUE KEY uk_order_id (order_id)",
+      "ALTER TABLE livraisons_ventes MODIFY COLUMN statut ENUM('en_attente','acceptee','en_cours','livre','echoue') NOT NULL DEFAULT 'en_attente'",
+      "ALTER TABLE livraisons_ventes DROP FOREIGN KEY livraisons_ventes_ibfk_2"
+    ];
+    for (const sql of alters) {
+      await db.execute(sql).catch(() => {
+      });
     }
-  }
+  });
 }
 async function listLivraisonsAdmin(opts = {}) {
   await ensureLivraisonCols();
@@ -3325,19 +3426,21 @@ async function listLivraisonsAdmin(opts = {}) {
     params.push(statut);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const [rows] = await db.query(
-    `SELECT lv.*, li.nom AS livreur_nom
-     FROM livraisons_ventes lv
-     LEFT JOIN utilisateurs li ON li.id = lv.livreur_id
-     ${where}
-     ORDER BY lv.created_at DESC
-     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
-    params
-  );
-  const [cnt] = await db.query(
-    `SELECT COUNT(*) AS cnt FROM livraisons_ventes lv ${where}`,
-    params
-  );
+  const [[rows], [cnt]] = await Promise.all([
+    db.query(
+      `SELECT lv.*, li.nom AS livreur_nom
+       FROM livraisons_ventes lv
+       LEFT JOIN utilisateurs li ON li.id = lv.livreur_id
+       ${where}
+       ORDER BY lv.created_at DESC
+       LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+      params
+    ),
+    db.query(
+      `SELECT COUNT(*) AS cnt FROM livraisons_ventes lv ${where}`,
+      params
+    )
+  ]);
   return {
     items: rows.map((r) => ({ ...r, livreur: r.livreur_nom ?? r.livreur })),
     total: Number(cnt[0]?.cnt ?? 0)
@@ -3453,34 +3556,36 @@ async function getLivraisonsForLivreur(livreurId) {
   return rows.map((r) => ({ ...r, livreur: r.livreur_nom ?? r.livreur }));
 }
 async function ensureBoutiqueClientsTable() {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS boutique_clients (
-      id           INT AUTO_INCREMENT PRIMARY KEY,
-      nom          VARCHAR(255) NOT NULL,
-      telephone    VARCHAR(20),
-      email        VARCHAR(150),
-      localisation VARCHAR(255),
-      type_client  ENUM('particulier','professionnel') NOT NULL DEFAULT 'particulier',
-      solde        DECIMAL(15,2) NOT NULL DEFAULT 0,
-      notes        TEXT,
-      created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_nom       (nom),
-      INDEX idx_telephone (telephone)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  const [[cnt]] = await db.execute(
-    "SELECT COUNT(*) AS n FROM boutique_clients"
-  );
-  if (Number(cnt.n ?? 0) === 0) {
+  return runOnce("boutique_clients", async () => {
     await db.execute(`
-      INSERT INTO boutique_clients (nom, telephone, email, type_client)
-      SELECT nom, telephone, email, 'particulier'
-      FROM clients
-      WHERE telephone IS NOT NULL AND telephone != ''
-    `).catch(() => {
-    });
-  }
+      CREATE TABLE IF NOT EXISTS boutique_clients (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        nom          VARCHAR(255) NOT NULL,
+        telephone    VARCHAR(20),
+        email        VARCHAR(150),
+        localisation VARCHAR(255),
+        type_client  ENUM('particulier','professionnel') NOT NULL DEFAULT 'particulier',
+        solde        DECIMAL(15,2) NOT NULL DEFAULT 0,
+        notes        TEXT,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_nom       (nom),
+        INDEX idx_telephone (telephone)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    const [[cnt]] = await db.execute(
+      "SELECT COUNT(*) AS n FROM boutique_clients"
+    );
+    if (Number(cnt.n ?? 0) === 0) {
+      await db.execute(`
+        INSERT INTO boutique_clients (nom, telephone, email, type_client)
+        SELECT nom, telephone, email, 'particulier'
+        FROM clients
+        WHERE telephone IS NOT NULL AND telephone != ''
+      `).catch(() => {
+      });
+    }
+  });
 }
 async function listBoutiqueClients(limit, offset, search, filtre) {
   await ensureBoutiqueClientsTable();
@@ -3734,24 +3839,26 @@ async function getLoyaltyStats() {
   }
 }
 async function ensureMarquesTable() {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS marques (
-      id          INT AUTO_INCREMENT PRIMARY KEY,
-      nom         VARCHAR(255) NOT NULL,
-      description TEXT,
-      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  const [cols] = await db.execute(
-    `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME   = 'produits'
-       AND COLUMN_NAME  = 'marque_id'`
-  );
-  if (Number(cols[0]?.cnt ?? 0) === 0) {
-    await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`).catch(() => {
-    });
-  }
+  return runOnce("marques", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS marques (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        nom         VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    const [cols] = await db.execute(
+      `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME   = 'produits'
+         AND COLUMN_NAME  = 'marque_id'`
+    );
+    if (Number(cols[0]?.cnt ?? 0) === 0) {
+      await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`).catch(() => {
+      });
+    }
+  });
 }
 async function listAdminMarques() {
   await ensureMarquesTable();
@@ -3844,11 +3951,32 @@ async function ensureIndexes() {
     }
   }
 }
-var _settingsCache, _finCols, _ventesStatsCache;
+async function fixSiteOrderFinanceEntries() {
+  return runOnce("fix_site_order_finance_delivery", async () => {
+    try {
+      const [result] = await db.execute(
+        `UPDATE finance_entries fe
+         JOIN orders o ON fe.description LIKE CONCAT('%', o.reference, '%')
+         SET fe.montant = fe.montant - o.delivery_fee
+         WHERE fe.description LIKE 'Commande site livr\xE9e%'
+           AND o.delivery_fee > 0
+           AND fe.montant > o.delivery_fee`
+      );
+      if (result.affectedRows > 0) {
+        console.log("[migration] fixed delivery_fee in " + result.affectedRows + " finance_entries");
+        invalidateVentesStats();
+      }
+    } catch (e) {
+      console.error("[migration] fixSiteOrderFinanceEntries failed:", e);
+    }
+  });
+}
+var _ensurePromises, _settingsCache, _finCols, _ventesStatsCache;
 var init_admin_db = __esm({
   "../lib/admin-db.ts"() {
     "use strict";
     init_db();
+    _ensurePromises = /* @__PURE__ */ new Map();
     _settingsCache = null;
     _finCols = null;
     _ventesStatsCache = null;
@@ -3863,7 +3991,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express37 = __toESM(require("express"));
+var import_express42 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -3929,7 +4057,7 @@ function setAuthCookie(res, token) {
   const domain = cookieDomain();
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge: TTL * 1e3,
     path: "/",
     domain,
@@ -4233,6 +4361,41 @@ router.get("/api/admin/auth/me", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   res.json({ ok: true, ...session });
 });
+router.post("/api/admin/auth/refresh", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    let freshPermissions = null;
+    if (session.role === "staff") {
+      const user = await getUtilisateurById(Number(session.id));
+      if (!user) return res.status(401).json({ error: "Utilisateur introuvable." });
+      if (user.permissions) {
+        try {
+          freshPermissions = JSON.parse(user.permissions);
+        } catch {
+        }
+      }
+    } else {
+      const user = await getAdminById(Number(session.id));
+      if (!user) return res.status(401).json({ error: "Utilisateur introuvable." });
+      if (user.permissions) {
+        try {
+          freshPermissions = JSON.parse(user.permissions);
+        } catch {
+        }
+      }
+    }
+    const token = await signToken({
+      ...session,
+      permissions: freshPermissions
+    });
+    setAuthCookie(res, token);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[auth/refresh]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
 var auth_default = router;
 
 // routes/admin/products.ts
@@ -4296,7 +4459,7 @@ router2.get("/api/admin/products", async (req, res) => {
   const brandId = req.query.brand ? Number(req.query.brand) : void 0;
   const statut = req.query.statut || void 0;
   const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(100, Number(req.query.limit) || 20);
+  const limit = Math.min(500, Number(req.query.limit) || 20);
   const offset = req.query.offset !== void 0 ? Number(req.query.offset) : (page - 1) * limit;
   const statutFilter = ["disponible", "faible", "epuise"].includes(statut ?? "") ? statut : void 0;
   const [products, total] = await Promise.all([
@@ -5074,9 +5237,10 @@ async function sendWaText({
         text: { body }
       })
     });
+    const responseData = await res.json().catch(() => ({}));
+    console.log("[sendWaText] to:", cleanPhone(to), "status:", res.status, "response:", JSON.stringify(responseData));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+      return { success: false, error: responseData?.error?.message ?? `HTTP ${res.status}` };
     }
     return { success: true };
   } catch (e) {
@@ -5126,9 +5290,10 @@ async function sendWaImage({
         image: { id: mediaId, caption }
       })
     });
+    const responseData = await res.json().catch(() => ({}));
+    console.log("[sendWaImage] to:", cleanPhone(to), "status:", res.status, "response:", JSON.stringify(responseData));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+      return { success: false, error: responseData?.error?.message ?? `HTTP ${res.status}` };
     }
     return { success: true };
   } catch (e) {
@@ -5220,6 +5385,7 @@ async function sendOrderNotifications({
       clientTemplate,
       adminTemplate,
       adminNumber,
+      adminNumber2,
       lang,
       siteUrl
     ] = await Promise.all([
@@ -5228,6 +5394,7 @@ async function sendOrderNotifications({
       getSetting("wa_order_client_template"),
       getSetting("wa_order_admin_template"),
       getSetting("wa_order_admin_number"),
+      getSetting("wa_order_admin_number_2"),
       getSetting("wa_order_lang"),
       getSetting("site_url")
     ]);
@@ -5261,9 +5428,57 @@ async function sendOrderNotifications({
         bodyParams: [reference, nom, telephone, articlesStr, totalStr, adminUrl]
       });
       if (process.env.NODE_ENV !== "production") console.log(`[WA] Admin notif result (${reference}):`, result);
+      if (adminNumber2 && adminNumber2 !== adminNumber) {
+        await sendWaTemplate({
+          to: adminNumber2,
+          templateName: adminTemplate,
+          languageCode,
+          bodyParams: [reference, nom, telephone, articlesStr, totalStr, adminUrl]
+        }).catch((e) => console.error(`[WA] Admin notif #2 error (${reference}):`, e));
+      }
     }
   } catch (e) {
     console.error("[WA] sendOrderNotifications error:", e);
+  }
+}
+async function sendWaDeliveryConfirmation(order) {
+  try {
+    const [enabled, templateName, lang] = await Promise.all([
+      getSetting("wa_delivery_template_enabled"),
+      getSetting("wa_delivery_template"),
+      getSetting("wa_order_lang")
+    ]);
+    if (enabled !== "1" || !templateName || !order.telephone) return;
+    const languageCode = lang || "fr";
+    const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+    let items = [];
+    try {
+      items = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+    } catch {
+      items = [];
+    }
+    const articlesStr = items.map((item) => {
+      const name = item.nom || "Produit";
+      const qty = item.qty ?? item.quantite ?? 1;
+      const prix = item.total ?? (item.prix_unitaire ?? item.prix ?? 0) * qty;
+      return `\u2022 ${qty}x ${name} \u2014 ${fmt(prix)}`;
+    }).join("\n");
+    const livraisonStr = order.delivery_fee > 0 ? `${order.zone_livraison || "Livraison"} \u2014 ${fmt(order.delivery_fee)}` : `${order.zone_livraison || "Livraison"} \u2014 Gratuit`;
+    const result = await sendWaTemplate({
+      to: order.telephone,
+      templateName,
+      languageCode,
+      bodyParams: [
+        order.nom,
+        order.reference,
+        articlesStr,
+        livraisonStr,
+        fmt(order.total)
+      ]
+    });
+    if (!result.success) console.error("[WA] delivery confirmation failed:", result.error);
+  } catch (e) {
+    console.error("[WA] sendWaDeliveryConfirmation error:", e);
   }
 }
 
@@ -5345,7 +5560,9 @@ router6.get("/api/admin/ventes/factures/:id", async (req, res) => {
 router6.patch("/api/admin/ventes/factures/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "boutique", "edit_vente")) {
+  const isPayment = req.body?.montant_paiement !== void 0;
+  const requiredPerm = isPayment ? "add_paiement" : "edit_vente";
+  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "boutique", requiredPerm)) {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
   try {
@@ -5563,6 +5780,53 @@ router8.delete("/api/admin/finance/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
+async function recoverMixByYasEntries() {
+  try {
+    const [rows] = await db.execute(`
+      SELECT fp.montant, fp.created_at, f.reference, f.client_nom
+      FROM facture_paiements fp
+      JOIN factures f ON f.id = fp.facture_id
+      WHERE fp.mode_paiement = 'mix_by_yas'
+        AND NOT EXISTS (
+          SELECT 1 FROM finance_entries fe
+          WHERE fe.description LIKE CONCAT('%', CONVERT(f.reference USING utf8mb4) COLLATE utf8mb4_unicode_ci, '%')
+            AND fe.mode_paiement = 'mix_by_yas'
+        )
+    `);
+    for (const row of rows) {
+      await createFinanceEntry({
+        type: "vente",
+        mode_paiement: "mix_by_yas",
+        categorie: "Vente boutique",
+        description: `Paiement ${row.reference} \u2013 ${row.client_nom}`,
+        montant: Number(row.montant),
+        date_entree: new Date(row.created_at).toISOString().slice(0, 10)
+      });
+    }
+    console.log(`[finance] recoverMixByYas: ${rows.length} entr\xE9e(s) trouv\xE9e(s) et r\xE9cup\xE9r\xE9e(s).`);
+  } catch (err) {
+    console.error("[finance/recoverMixByYas]", err);
+  }
+}
+async function recoverCouponFinanceEntries() {
+  try {
+    const [rows] = await db.execute(`
+      SELECT o.id, o.reference, o.total, o.coupon_remise, o.finance_entry_id,
+             fe.montant AS entry_montant
+      FROM orders o
+      JOIN finance_entries fe ON fe.id = o.finance_entry_id
+      WHERE o.coupon_remise > 0
+        AND ABS(fe.montant - (o.total - o.coupon_remise)) > 0.01
+    `);
+    for (const row of rows) {
+      const correct = Number(row.total) - Number(row.coupon_remise);
+      await db.execute("UPDATE finance_entries SET montant = ? WHERE id = ?", [correct, row.finance_entry_id]);
+    }
+    console.log(`[finance] recoverCoupon: ${rows.length} entr\xE9e(s) corrig\xE9e(s).`);
+  } catch (err) {
+    console.error("[finance/recoverCoupon]", err);
+  }
+}
 router8.delete("/api/admin/finance", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -5732,45 +5996,34 @@ router10.patch("/api/admin/orders/:id", async (req, res) => {
     const { status, note } = req.body;
     await updateOrderStatus(id, status);
     await addOrderEvent(id, status, note ?? "", session.nom);
-    if (String(status) === "confirmed") {
-      try {
-        const [[orderRow]] = await db.execute(
-          "SELECT id, reference, nom, telephone, adresse, zone_livraison, lien_localisation FROM orders WHERE id = ? LIMIT 1",
-          [id]
-        );
-        if (orderRow) {
-          const [[existing]] = await db.execute(
-            "SELECT id FROM livraisons_ventes WHERE order_id = ? LIMIT 1",
-            [id]
-          );
-          if (!existing) {
-            const livRef = `LV-${orderRow.reference}`;
-            await db.execute(
-              `INSERT IGNORE INTO livraisons_ventes
-                 (reference, facture_id, client_nom, client_tel, adresse, contact_livraison,
-                  lien_localisation, statut, note, order_id)
-               VALUES (?, NULL, ?, ?, ?, ?, ?, 'en_attente', NULL, ?)`,
-              [
-                livRef,
-                orderRow.nom ?? null,
-                orderRow.telephone ?? null,
-                orderRow.adresse ?? null,
-                orderRow.telephone ?? null,
-                orderRow.lien_localisation ?? null,
-                id
-              ]
-            );
-          }
-        }
-      } catch (e) {
-        console.error("[orders] livraison creation failed:", e);
-      }
-    }
     const actor = { id: typeof session.id === "number" ? session.id : void 0, nom: session.nom };
     await ensureOrderVente(id, actor).catch((e) => console.error("[orders] ensureOrderVente failed:", e));
     if (["delivered", "livree", "livr\xE9e", "livre", "livr\xE9"].includes(String(status))) {
-      await applyOrderDeliveredEffects(id, session.nom);
+      await applyOrderDeliveredEffects(id, session.nom).catch((e) => console.error("[orders] applyDelivered failed:", e));
       await ensureOrderVente(id, actor);
+      await db.execute(
+        `UPDATE factures SET statut_paiement = 'paye_total', statut = 'paye'
+         WHERE order_id = ? AND statut != 'annule'`,
+        [id]
+      ).catch(() => {
+      });
+      invalidateVentesStats();
+      const [[orderRow]] = await db.execute(
+        "SELECT nom, telephone, reference, items, zone_livraison, delivery_fee, total FROM orders WHERE id = ? LIMIT 1",
+        [id]
+      );
+      if (orderRow) {
+        sendWaDeliveryConfirmation({
+          nom: orderRow.nom,
+          telephone: orderRow.telephone,
+          reference: orderRow.reference,
+          items: orderRow.items,
+          zone_livraison: orderRow.zone_livraison,
+          delivery_fee: Number(orderRow.delivery_fee ?? 0),
+          total: Number(orderRow.total ?? 0)
+        }).catch(() => {
+        });
+      }
       emitAdminEvent("stock");
     }
     emitAdminEvent("commande");
@@ -6115,6 +6368,7 @@ var categories_default = router14;
 // routes/admin/boutique-clients.ts
 var import_express15 = __toESM(require("express"));
 init_admin_db();
+init_db();
 var router15 = import_express15.default.Router();
 router15.get("/api/admin/boutique-clients", async (req, res) => {
   const session = await getSession(req);
@@ -6163,6 +6417,9 @@ router15.post("/api/admin/boutique-clients", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!req.body.nom?.trim()) return res.status(400).json({ error: "Nom requis." });
+  if (!req.body.telephone?.trim()) return res.status(400).json({ error: "T\xE9l\xE9phone requis." });
+  const [[existing]] = await db.execute("SELECT id FROM boutique_clients WHERE telephone = ? LIMIT 1", [req.body.telephone.trim()]);
+  if (existing) return res.status(400).json({ error: "Un client avec ce num\xE9ro existe d\xE9j\xE0." });
   const id = await createBoutiqueClient(req.body);
   res.json({ success: true, id });
 });
@@ -7530,6 +7787,35 @@ router25.get("/api/orders/track", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
+router25.get("/api/public/coupons/validate", async (req, res) => {
+  try {
+    const code = String(req.query.code ?? "").trim().toUpperCase();
+    const total = Number(req.query.total ?? 0);
+    if (!code) return res.status(400).json({ valid: false, error: "Code manquant." });
+    const [rows] = await db.execute(
+      `SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif
+       FROM coupons WHERE code = ? LIMIT 1`,
+      [code]
+    );
+    const c = rows[0];
+    if (!c || !c.actif) return res.json({ valid: false, error: "Code invalide ou inactif." });
+    if (c.expires_at && new Date(c.expires_at) < /* @__PURE__ */ new Date()) return res.json({ valid: false, error: "Ce code a expir\xE9." });
+    if (c.max_uses > 0 && c.uses_count >= c.max_uses) return res.json({ valid: false, error: "Ce code a atteint sa limite d'utilisation." });
+    if (total > 0 && total < Number(c.min_order)) return res.json({ valid: false, error: `Commande minimum requise : ${Number(c.min_order).toLocaleString("fr-FR")} FCFA.` });
+    const remise = c.type === "fixed" ? Math.min(Number(c.valeur), total) : Math.round(total * Number(c.valeur) / 100);
+    res.json({ valid: true, type: c.type, valeur: Number(c.valeur), remise, code: c.code });
+  } catch (err) {
+    res.status(500).json({ valid: false, error: "Erreur serveur." });
+  }
+});
+router25.get("/api/public/delivery-zones", async (_req, res) => {
+  try {
+    const zones = await getDeliveryZones(true);
+    res.json(zones);
+  } catch {
+    res.json([]);
+  }
+});
 var public_default = router25;
 
 // routes/account.ts
@@ -7903,8 +8189,8 @@ router26.post("/api/account/verification", async (req, res) => {
     if (!id_card?.data || !selfie?.data) {
       return res.status(400).json({ error: "Les deux photos sont requises." });
     }
-    const { v2: cloudinary2 } = await import("cloudinary");
-    cloudinary2.config({
+    const { v2: cloudinary3 } = await import("cloudinary");
+    cloudinary3.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET
@@ -7912,7 +8198,7 @@ router26.post("/api/account/verification", async (req, res) => {
     async function uploadImg(b64) {
       const buffer = Buffer.from(b64.replace(/^data:[^;]+;base64,/, ""), "base64");
       return new Promise((resolve2, reject) => {
-        const stream = cloudinary2.uploader.upload_stream(
+        const stream = cloudinary3.uploader.upload_stream(
           { folder: "togolese-shop/verifications", resource_type: "image" },
           (err, result) => err || !result ? reject(err) : resolve2(result.secure_url)
         );
@@ -8034,7 +8320,9 @@ async function ensureOrderCols() {
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
     "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
     "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
-    "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL"
+    "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL",
+    "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) NULL",
+    "ALTER TABLE orders ADD COLUMN coupon_remise INT NULL"
   ]) {
     try {
       await pool2.execute(ddl);
@@ -8062,7 +8350,9 @@ router27.post("/api/orders", async (req, res) => {
       payment_mode,
       nb_tranches,
       mm_transaction_ref,
-      ref_code
+      ref_code,
+      coupon_code,
+      coupon_remise
     } = req.body;
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "T\xE9l\xE9phone et articles requis." });
@@ -8102,6 +8392,13 @@ router27.post("/api/orders", async (req, res) => {
       ).catch(() => {
       });
     }
+    if (coupon_code) {
+      pool2.execute(
+        `UPDATE coupons SET uses_count = uses_count + 1 WHERE code = ?`,
+        [String(coupon_code).trim().toUpperCase()]
+      ).catch(() => {
+      });
+    }
     const extraUpdates = [];
     const extraValues = [];
     if (lien_localisation) {
@@ -8119,6 +8416,14 @@ router27.post("/api/orders", async (req, res) => {
     if (ref_code) {
       extraUpdates.push("ref_code = ?");
       extraValues.push(String(ref_code).trim().toUpperCase());
+    }
+    if (coupon_code) {
+      extraUpdates.push("coupon_code = ?");
+      extraValues.push(String(coupon_code).trim().toUpperCase());
+    }
+    if (coupon_remise) {
+      extraUpdates.push("coupon_remise = ?");
+      extraValues.push(Number(coupon_remise));
     }
     if (extraUpdates.length > 0) {
       await pool2.execute(
@@ -9804,12 +10109,443 @@ router36.get("/api/referrals/validate", async (req, res) => {
 });
 var referrals_default = router36;
 
+// routes/admin/delivery-zones.ts
+var import_express37 = __toESM(require("express"));
+init_admin_db();
+init_db();
+var router37 = import_express37.default.Router();
+async function ensureDeliveryZonesTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS delivery_zones (
+      id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom        VARCHAR(100) NOT NULL,
+      fee        INT UNSIGNED NOT NULL DEFAULT 0,
+      actif      TINYINT(1)   NOT NULL DEFAULT 1,
+      sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+      prix_libre TINYINT(1)   NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  try {
+    await db.execute("ALTER TABLE delivery_zones ADD COLUMN prix_libre TINYINT(1) NOT NULL DEFAULT 0");
+  } catch (e) {
+    if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+  }
+}
+ensureDeliveryZonesTable().catch(console.error);
+router37.get("/api/admin/delivery-zones", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+    const zones = await getDeliveryZones();
+    res.json(zones);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router37.post("/api/admin/delivery-zones", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+    }
+    const body = req.body;
+    if (body._delete && body.id) {
+      await deleteDeliveryZone(Number(body.id));
+      return res.json({ ok: true, deleted: true });
+    }
+    if (!body.nom?.trim()) {
+      return res.status(400).json({ error: "Nom de zone requis." });
+    }
+    await upsertDeliveryZone({
+      id: body.id ? Number(body.id) : void 0,
+      nom: String(body.nom).trim(),
+      fee: Number(body.fee ?? 0),
+      actif: body.actif !== false && body.actif !== 0,
+      sort_order: Number(body.sort_order ?? 0),
+      prix_libre: Boolean(body.prix_libre)
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router37.delete("/api/admin/delivery-zones/:id", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+    }
+    await deleteDeliveryZone(Number(req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+var delivery_zones_default = router37;
+
+// routes/admin/coupons.ts
+var import_express38 = __toESM(require("express"));
+init_admin_db();
+init_db();
+var router38 = import_express38.default.Router();
+async function ensureCouponsTable2() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS coupons (
+      id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      code       VARCHAR(50)   NOT NULL UNIQUE,
+      type       ENUM('percent','fixed') NOT NULL DEFAULT 'percent',
+      valeur     DECIMAL(10,2) NOT NULL DEFAULT 0,
+      min_order  DECIMAL(10,2) NOT NULL DEFAULT 0,
+      max_uses   INT UNSIGNED  NOT NULL DEFAULT 0,
+      uses_count INT UNSIGNED  NOT NULL DEFAULT 0,
+      expires_at DATETIME      NULL,
+      actif      TINYINT(1)    NOT NULL DEFAULT 1,
+      created_at DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  for (const ddl of [
+    "ALTER TABLE coupons ADD COLUMN max_uses   INT UNSIGNED  NOT NULL DEFAULT 0",
+    "ALTER TABLE coupons ADD COLUMN uses_count INT UNSIGNED  NOT NULL DEFAULT 0",
+    "ALTER TABLE coupons ADD COLUMN min_order  DECIMAL(10,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE coupons ADD COLUMN expires_at DATETIME      NULL",
+    "ALTER TABLE coupons ADD COLUMN actif      TINYINT(1)    NOT NULL DEFAULT 1"
+  ]) {
+    try {
+      await db.execute(ddl);
+    } catch (e) {
+      if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+    }
+  }
+}
+ensureCouponsTable2().catch(console.error);
+router38.get("/api/admin/coupons", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+    const coupons = await listCoupons();
+    res.json(coupons);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router38.post("/api/admin/coupons", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+    }
+    await ensureCouponsTable2();
+    const body = req.body;
+    if (body._delete && body.id) {
+      await deleteCoupon(Number(body.id));
+      return res.json({ ok: true, deleted: true });
+    }
+    if (!body.code?.trim()) {
+      return res.status(400).json({ error: "Code coupon requis." });
+    }
+    await upsertCoupon({
+      id: body.id ? Number(body.id) : void 0,
+      code: String(body.code).trim().toUpperCase(),
+      type: body.type === "fixed" ? "fixed" : "percent",
+      valeur: Number(body.valeur ?? 0),
+      min_order: Number(body.min_order ?? 0),
+      max_uses: Number(body.max_uses ?? 0),
+      expires_at: body.expires_at || null,
+      actif: body.actif !== false && body.actif !== 0
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+var coupons_default = router38;
+
+// routes/admin/social.ts
+var import_express39 = __toESM(require("express"));
+var router39 = import_express39.default.Router();
+var N8N_WEBHOOK = "https://n8n.togolese.fr/webhook/facebook-publisher";
+router39.post("/api/admin/social/publish", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+    const { type, products } = req.body;
+    if (!type || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ error: "Payload invalide." });
+    }
+    const n8nRes = await fetch(N8N_WEBHOOK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, products })
+    });
+    const data = await n8nRes.json().catch(() => ({}));
+    if (!n8nRes.ok) {
+      return res.status(502).json({ error: data?.error || `n8n a retourn\xE9 HTTP ${n8nRes.status}` });
+    }
+    res.json({ ok: true, ...data });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+var social_default = router39;
+
+// routes/admin/whatsapp-campagne.ts
+var import_express40 = __toESM(require("express"));
+init_db();
+var router40 = import_express40.default.Router();
+function formatTgPhone(num) {
+  const digits = num.replace(/[\s+\-()]/g, "");
+  if (digits.startsWith("228")) return digits;
+  if (digits.startsWith("0")) return `228${digits.slice(1)}`;
+  return `228${digits}`;
+}
+router40.get("/api/admin/whatsapp-campagne/test-credentials", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const { getSetting: getSetting2 } = await Promise.resolve().then(() => (init_admin_db(), admin_db_exports));
+  const phoneId = await getSetting2("wa_phone_number_id");
+  const token = await getSetting2("wa_access_token");
+  if (!phoneId || !token) return res.json({ ok: false, error: "Credentials manquants en DB" });
+  const r = await fetch(`https://graph.facebook.com/v19.0/${phoneId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await r.json();
+  res.json({ status: r.status, phoneId, tokenPreview: token.slice(0, 20) + "...", data });
+});
+router40.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const clientIds = req.query.ids ?? "";
+  try {
+    let count = 0;
+    if (clientIds) {
+      const ids = clientIds.split(",").map(Number).filter(Boolean);
+      if (ids.length === 0) return res.json({ count: 0 });
+      const placeholders = ids.map(() => "?").join(",");
+      const [[row]] = await db.execute(
+        `SELECT COUNT(*) AS cnt FROM boutique_clients WHERE id IN (${placeholders}) AND telephone IS NOT NULL AND telephone != ''`,
+        ids
+      );
+      count = Number(row?.cnt ?? 0);
+    } else {
+      const [[row]] = await db.execute(
+        `SELECT COUNT(*) AS cnt FROM boutique_clients WHERE telephone IS NOT NULL AND telephone != ''`
+      );
+      count = Number(row?.cnt ?? 0);
+    }
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router40.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
+  console.log("[campagne] POST /send received, body:", JSON.stringify(req.body).slice(0, 200));
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const { message, client_ids, image_url } = req.body;
+  if (!message?.trim()) return res.status(400).json({ error: "Message requis." });
+  try {
+    let rows;
+    if (client_ids && client_ids.length > 0) {
+      const placeholders = client_ids.map(() => "?").join(",");
+      [rows] = await db.execute(
+        `SELECT id, nom, telephone FROM boutique_clients WHERE id IN (${placeholders}) AND telephone IS NOT NULL AND telephone != '' ORDER BY id ASC`,
+        client_ids
+      );
+    } else {
+      [rows] = await db.execute(
+        `SELECT id, nom, telephone FROM boutique_clients WHERE telephone IS NOT NULL AND telephone != '' ORDER BY id ASC`
+      );
+    }
+    let mediaId = null;
+    if (image_url?.trim()) {
+      console.log("[campagne] fetching image:", image_url.slice(0, 80));
+      const imgRes = await fetch(image_url).catch((e) => {
+        console.log("[campagne] fetch image error:", e);
+        return null;
+      });
+      console.log("[campagne] image fetch status:", imgRes?.status, imgRes?.ok);
+      if (imgRes?.ok) {
+        const buffer = Buffer.from(await imgRes.arrayBuffer());
+        const mime = imgRes.headers.get("content-type") ?? "image/jpeg";
+        const filename = image_url.split("/").pop()?.split("?")[0] ?? "product.jpg";
+        console.log("[campagne] uploading to WA media, mime:", mime, "size:", buffer.length);
+        const upload = await uploadWaMedia(buffer, mime, filename);
+        console.log("[campagne] upload result:", JSON.stringify(upload));
+        if (upload.success && upload.mediaId) mediaId = upload.mediaId;
+      }
+    }
+    console.log("[campagne] mediaId:", mediaId, "rows:", rows.length);
+    let sent = 0;
+    let failed = 0;
+    const errors = [];
+    for (const client of rows) {
+      await new Promise((r) => setTimeout(r, 600));
+      const to = formatTgPhone(String(client.telephone));
+      const result = mediaId ? await sendWaImage({ to, mediaId, caption: message }) : await sendWaText({ to, body: message });
+      if (result.success) sent++;
+      else {
+        failed++;
+        if (result.error && !errors.includes(result.error)) errors.push(result.error);
+      }
+    }
+    res.json({ success: true, sent, failed, total: rows.length, errors });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+var whatsapp_campagne_default = router40;
+
+// routes/admin/livreur-inscriptions.ts
+var import_express41 = __toESM(require("express"));
+var import_bcryptjs4 = __toESM(require("bcryptjs"));
+var import_cloudinary2 = require("cloudinary");
+init_admin_db();
+init_db();
+import_cloudinary2.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+var router41 = import_express41.default.Router();
+async function requireAdmin(req, res) {
+  const session = await getSession(req);
+  if (!session) {
+    res.status(401).json({ error: "Non autoris\xE9." });
+    return null;
+  }
+  if (!["admin", "super_admin"].includes(session.role)) {
+    res.status(403).json({ error: "Acc\xE8s r\xE9serv\xE9 aux admins." });
+    return null;
+  }
+  return session;
+}
+async function uploadBase64ToCloudinary(base64) {
+  return new Promise((resolve2, reject) => {
+    import_cloudinary2.v2.uploader.upload(
+      base64,
+      { folder: "togolese-shop/livreurs-cni", resource_type: "image", format: "webp", quality: "auto" },
+      (error, result) => {
+        if (error || !result) reject(error ?? new Error("Upload \xE9chou\xE9"));
+        else resolve2(result.secure_url);
+      }
+    );
+  });
+}
+router41.post("/api/livreur/inscription", async (req, res) => {
+  try {
+    await ensureLivreurInscriptionsTable();
+    const { nom, telephone, numero_plaque, password, carte_identite } = req.body;
+    if (!nom?.trim() || !telephone?.trim() || !password) {
+      return res.status(400).json({ error: "Nom, t\xE9l\xE9phone et mot de passe requis." });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Le mot de passe doit contenir au moins 6 caract\xE8res." });
+    }
+    if (!carte_identite) {
+      return res.status(400).json({ error: "La photo de la carte d'identit\xE9 est obligatoire." });
+    }
+    const pool2 = db;
+    const [existing] = await pool2.execute(
+      "SELECT id, statut FROM livreur_inscriptions WHERE telephone = ? LIMIT 1",
+      [telephone.trim()]
+    );
+    if (existing.length > 0) {
+      const prev = existing[0];
+      if (prev.statut === "en_attente") return res.status(409).json({ error: "Une demande avec ce num\xE9ro est d\xE9j\xE0 en attente." });
+      if (prev.statut === "approuve") return res.status(409).json({ error: "Ce num\xE9ro est d\xE9j\xE0 enregistr\xE9 comme livreur." });
+    }
+    const [existingUser] = await pool2.execute(
+      "SELECT id FROM utilisateurs WHERE telephone = ? AND actif = 1 LIMIT 1",
+      [telephone.trim()]
+    );
+    if (existingUser.length > 0) {
+      return res.status(409).json({ error: "Ce num\xE9ro est d\xE9j\xE0 associ\xE9 \xE0 un compte actif." });
+    }
+    let carteUrl;
+    try {
+      carteUrl = await uploadBase64ToCloudinary(carte_identite);
+    } catch {
+      return res.status(400).json({ error: "Impossible d'envoyer la photo. V\xE9rifiez le format (JPEG, PNG, max 10 Mo)." });
+    }
+    const hash = await import_bcryptjs4.default.hash(password, 12);
+    const id = await createLivreurInscription({
+      nom: nom.trim(),
+      telephone: telephone.trim(),
+      numero_plaque: numero_plaque?.trim() || void 0,
+      carte_identite_url: carteUrl,
+      password_hash: hash
+    });
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router41.get("/api/admin/livreur-inscriptions", async (req, res) => {
+  const session = await requireAdmin(req, res);
+  if (!session) return;
+  try {
+    const statut = typeof req.query.statut === "string" ? req.query.statut : void 0;
+    const items = await listLivreurInscriptions(statut);
+    res.json({ items });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router41.post("/api/admin/livreur-inscriptions/:id/approve", async (req, res) => {
+  const session = await requireAdmin(req, res);
+  if (!session) return;
+  try {
+    const id = Number(req.params.id);
+    const inscription = await getLivreurInscriptionById(id);
+    if (!inscription) return res.status(404).json({ error: "Demande introuvable." });
+    if (inscription.statut !== "en_attente") {
+      return res.status(409).json({ error: "Cette demande a d\xE9j\xE0 \xE9t\xE9 trait\xE9e." });
+    }
+    const note = String(req.body.note ?? "").trim() || null;
+    const username = inscription.telephone.toLowerCase().replace(/\s+/g, "");
+    await createUtilisateur({
+      nom: inscription.nom,
+      username,
+      telephone: inscription.telephone,
+      numero_plaque: inscription.numero_plaque ?? void 0,
+      poste: "Livreur",
+      motDePasse: inscription.password_hash,
+      mustChangePassword: false
+    });
+    await updateLivreurInscriptionStatut(id, "approuve", note ?? void 0);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router41.post("/api/admin/livreur-inscriptions/:id/reject", async (req, res) => {
+  const session = await requireAdmin(req, res);
+  if (!session) return;
+  try {
+    const id = Number(req.params.id);
+    const inscription = await getLivreurInscriptionById(id);
+    if (!inscription) return res.status(404).json({ error: "Demande introuvable." });
+    if (inscription.statut !== "en_attente") {
+      return res.status(409).json({ error: "Cette demande a d\xE9j\xE0 \xE9t\xE9 trait\xE9e." });
+    }
+    const note = String(req.body.note ?? "").trim() || null;
+    await updateLivreurInscriptionStatut(id, "rejete", note ?? void 0);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+var livreur_inscriptions_default = router41;
+
 // index.ts
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express37.default)();
+var app = (0, import_express42.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -9882,8 +10618,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express37.default.json({ limit: "5mb" }));
-app.use(import_express37.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express42.default.json({ limit: "5mb" }));
+app.use(import_express42.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -9921,6 +10657,11 @@ app.use(whatsapp_inbox_default);
 app.use(whatsapp_webhook_default);
 app.use(analytics_default);
 app.use(referrals_default);
+app.use(delivery_zones_default);
+app.use(coupons_default);
+app.use(social_default);
+app.use(whatsapp_campagne_default);
+app.use(livreur_inscriptions_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {
@@ -9972,6 +10713,12 @@ app.listen(PORT, async () => {
     console.error("[backend] ensureIndexes failed:", e);
   }
   try {
+    await fixSiteOrderFinanceEntries();
+    console.log("[backend] site order finance entries OK");
+  } catch (e) {
+    console.error("[backend] fixSiteOrderFinanceEntries failed:", e);
+  }
+  try {
     await ensureWaMessagesTable();
     console.log("[backend] wa_messages table OK");
   } catch (e) {
@@ -9983,5 +10730,7 @@ app.listen(PORT, async () => {
   } catch (e) {
     console.error("[backend] ensureWaMessagesCols failed:", e);
   }
+  recoverMixByYasEntries();
+  recoverCouponFinanceEntries();
 });
 var index_default = app;
