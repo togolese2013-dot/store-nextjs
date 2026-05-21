@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, Plus, Pencil, Trash2, Warehouse, Phone, MapPin,
   X, Save, Package, ChevronDown, ChevronUp, Settings,
+  ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
@@ -27,12 +28,25 @@ interface ExternalProduct {
   image_url: string | null;
 }
 
-const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
-const labelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1";
+interface AddForm {
+  nom: string;
+  prix_unitaire: string;
+  prix_entrepot: string;
+  description: string;
+  image_url: string;
+  reference: string;
+}
+
+function emptyAddForm(): AddForm {
+  return { nom: "", prix_unitaire: "", prix_entrepot: "", description: "", image_url: "", reference: "" };
+}
 
 function emptyFournisseur(): Partial<Entrepot> {
   return { nom: "", telephone: "", adresse: "", notes: "", actif: true };
 }
+
+const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
+const labelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1";
 
 export default function EntrepotsManager() {
   const [entrepots,    setEntrepots]    = useState<Entrepot[]>([]);
@@ -41,14 +55,27 @@ export default function EntrepotsManager() {
 
   /* fournisseurs modal */
   const [showModal,    setShowModal]    = useState(false);
-  const [form,         setForm]         = useState<Partial<Entrepot> | null>(null);
+  const [fForm,        setFForm]        = useState<Partial<Entrepot> | null>(null);
   const [saving,       setSaving]       = useState(false);
   const [deleting,     setDeleting]     = useState<number | null>(null);
 
-  /* products per entrepot — use plain arrays instead of Set */
+  /* products per entrepot */
   const [expanded,     setExpanded]     = useState<number[]>([]);
   const [products,     setProducts]     = useState<Record<number, ExternalProduct[]>>({});
   const [loadingProds, setLoadingProds] = useState<number[]>([]);
+
+  /* add product modal */
+  const [addFor,       setAddFor]       = useState<number | null>(null);
+  const [addForm,      setAddForm]      = useState<AddForm>(emptyAddForm());
+  const [addSaving,    setAddSaving]    = useState(false);
+  const [addError,     setAddError]     = useState("");
+
+  /* edit product modal */
+  const [editProduct,  setEditProduct]  = useState<ExternalProduct | null>(null);
+  const [editEntrepot, setEditEntrepot] = useState<number | null>(null);
+  const [editForm,     setEditForm]     = useState<AddForm>(emptyAddForm());
+  const [editSaving,   setEditSaving]   = useState(false);
+  const [editError,    setEditError]    = useState("");
 
   const fetchEntrepots = useCallback(async () => {
     setLoading(true);
@@ -85,18 +112,93 @@ export default function EntrepotsManager() {
     }
   }
 
+  /* ── Add product ── */
+  function openAdd(entrepotId: number) {
+    setAddFor(entrepotId);
+    setAddForm(emptyAddForm());
+    setAddError("");
+  }
+
+  async function handleAddProduct() {
+    if (!addForm.nom.trim())        { setAddError("Nom obligatoire."); return; }
+    if (!addForm.prix_unitaire)     { setAddError("Prix de vente obligatoire."); return; }
+    setAddSaving(true); setAddError("");
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom:           addForm.nom.trim(),
+          description:   addForm.description.trim() || null,
+          prix_unitaire: Number(addForm.prix_unitaire),
+          prix_entrepot: addForm.prix_entrepot ? Number(addForm.prix_entrepot) : null,
+          entrepot_id:   addFor,
+          image_url:     addForm.image_url.trim() || null,
+          reference:     addForm.reference.trim() || undefined,
+          stock_magasin: 0,
+          stock_boutique: 0,
+          actif: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setAddError(data.error ?? "Erreur création."); return; }
+      setAddFor(null);
+      if (addFor !== null) fetchProducts(addFor);
+    } catch { setAddError("Erreur réseau."); }
+    finally   { setAddSaving(false); }
+  }
+
+  /* ── Edit product ── */
+  function openEdit(p: ExternalProduct, entrepotId: number) {
+    setEditProduct(p);
+    setEditEntrepot(entrepotId);
+    setEditForm({
+      nom:           p.nom,
+      prix_unitaire: String(p.prix_unitaire),
+      prix_entrepot: p.prix_entrepot != null ? String(p.prix_entrepot) : "",
+      description:   "",
+      image_url:     p.image_url ?? "",
+      reference:     p.reference,
+    });
+    setEditError("");
+  }
+
+  async function handleEditProduct() {
+    if (!editForm.nom.trim())    { setEditError("Nom obligatoire."); return; }
+    if (!editForm.prix_unitaire) { setEditError("Prix de vente obligatoire."); return; }
+    if (!editProduct) return;
+    setEditSaving(true); setEditError("");
+    try {
+      const res = await fetch(`/api/admin/products/${editProduct.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom:           editForm.nom.trim(),
+          prix_unitaire: Number(editForm.prix_unitaire),
+          prix_entrepot: editForm.prix_entrepot ? Number(editForm.prix_entrepot) : null,
+          image_url:     editForm.image_url.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEditError(data.error ?? "Erreur."); return; }
+      setEditProduct(null);
+      if (editEntrepot !== null) fetchProducts(editEntrepot);
+    } catch { setEditError("Erreur réseau."); }
+    finally   { setEditSaving(false); }
+  }
+
   /* ── Fournisseur CRUD ── */
   async function handleSaveFournisseur() {
-    if (!form?.nom?.trim()) { setError("Nom obligatoire."); return; }
+    if (!fForm?.nom?.trim()) { setError("Nom obligatoire."); return; }
     setSaving(true); setError("");
     try {
       const res  = await fetch("/api/admin/entrepots", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(fForm),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Erreur."); return; }
-      setForm(null);
+      setFForm(null);
       await fetchEntrepots();
     } catch { setError("Erreur réseau."); }
     finally   { setSaving(false); }
@@ -118,6 +220,104 @@ export default function EntrepotsManager() {
       await fetch(`/api/admin/products/${productId}`, { method: "DELETE" });
       setProducts(prev => ({ ...prev, [entrepotId]: (prev[entrepotId] ?? []).filter(p => p.id !== productId) }));
     } catch { setError("Erreur suppression produit."); }
+  }
+
+  /* ── Product form section (shared between add/edit) ── */
+  function ProductFormFields({
+    form, setForm, error: formError, saving: formSaving, onSave, onCancel, title,
+  }: {
+    form: AddForm;
+    setForm: (f: AddForm) => void;
+    error: string;
+    saving: boolean;
+    onSave: () => void;
+    onCancel: () => void;
+    title: string;
+  }) {
+    const prix    = Number(form.prix_unitaire) || 0;
+    const achat   = Number(form.prix_entrepot) || 0;
+    const marge   = form.prix_unitaire && form.prix_entrepot ? prix - achat : null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[95vh] overflow-y-auto">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-brand-700" /> {title}
+            </h2>
+            <button onClick={onCancel} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {formError && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{formError}</div>}
+
+            <div>
+              <label className={labelCls}>Nom du produit *</label>
+              <input type="text" value={form.nom}
+                onChange={e => setForm({ ...form, nom: e.target.value })}
+                placeholder="Ex: iPhone 15 Pro" className={inputCls} autoFocus />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Prix de vente (FCFA) *</label>
+                <input type="number" min="0" value={form.prix_unitaire}
+                  onChange={e => setForm({ ...form, prix_unitaire: e.target.value })}
+                  placeholder="0" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Prix fournisseur
+                  {marge !== null && (
+                    <span className={`ml-1.5 font-bold ${marge >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                      ({marge >= 0 ? "+" : ""}{formatPrice(marge)})
+                    </span>
+                  )}
+                </label>
+                <input type="number" min="0" value={form.prix_entrepot}
+                  onChange={e => setForm({ ...form, prix_entrepot: e.target.value })}
+                  placeholder="0" className={inputCls} />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>Référence (optionnelle)</label>
+              <input type="text" value={form.reference}
+                onChange={e => setForm({ ...form, reference: e.target.value })}
+                placeholder="Auto-générée si vide" className={inputCls} />
+            </div>
+
+            <div>
+              <label className={labelCls}>Description (optionnelle)</label>
+              <textarea value={form.description} rows={2}
+                onChange={e => setForm({ ...form, description: e.target.value })}
+                placeholder="Caractéristiques du produit…" className={inputCls} />
+            </div>
+
+            <div>
+              <label className={labelCls}>URL image (optionnelle)</label>
+              <input type="text" value={form.image_url}
+                onChange={e => setForm({ ...form, image_url: e.target.value })}
+                placeholder="https://…" className={inputCls} />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={onCancel}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
+                Annuler
+              </button>
+              <button onClick={onSave} disabled={formSaving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors disabled:opacity-60">
+                {formSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -151,10 +351,8 @@ export default function EntrepotsManager() {
           <Package className="w-10 h-10 text-slate-200 mx-auto mb-3" />
           <p className="text-slate-500 font-semibold">Aucun fournisseur configuré</p>
           <p className="text-slate-400 text-sm mt-1">Ajoutez d&apos;abord un fournisseur via &quot;Gérer les fournisseurs&quot;</p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-semibold hover:bg-brand-800 transition-colors"
-          >
+          <button onClick={() => setShowModal(true)}
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-semibold hover:bg-brand-800 transition-colors">
             <Plus className="w-4 h-4" /> Ajouter un fournisseur
           </button>
         </div>
@@ -168,12 +366,8 @@ export default function EntrepotsManager() {
             return (
               <div key={e.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
 
-                {/* Fournisseur header */}
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(e.id)}
-                  className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
-                >
+                <button type="button" onClick={() => toggleExpand(e.id)}
+                  className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-colors">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.actif ? "bg-emerald-50" : "bg-slate-100"}`}>
                     <Warehouse className={`w-4 h-4 ${e.actif ? "text-emerald-600" : "text-slate-400"}`} />
                   </div>
@@ -195,19 +389,16 @@ export default function EntrepotsManager() {
                   {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
                 </button>
 
-                {/* Products list */}
                 {isExpanded && (
                   <div className="border-t border-slate-100">
                     <div className="flex items-center justify-between px-5 py-3 bg-slate-50">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">
                         {isLoading ? "Chargement…" : `${prods.length} produit${prods.length !== 1 ? "s" : ""}`}
                       </p>
-                      <Link
-                        href={`/admin/products/new?entrepot_id=${e.id}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 transition-colors"
-                      >
+                      <button onClick={() => openAdd(e.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 transition-colors">
                         <Plus className="w-3 h-3" /> Ajouter un produit
-                      </Link>
+                      </button>
                     </div>
 
                     {isLoading ? (
@@ -257,19 +448,15 @@ export default function EntrepotsManager() {
                                 </span>
                               )}
 
-                              {!p.actif && (
-                                <span className="text-[10px] font-bold bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full shrink-0">Inactif</span>
-                              )}
+                              {!p.actif && <span className="text-[10px] font-bold bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full shrink-0">Inactif</span>}
 
                               <div className="flex items-center gap-1 shrink-0">
-                                <Link href={`/admin/products/${p.id}`}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-brand-700 hover:bg-brand-50 transition-colors"
-                                  title="Modifier">
+                                <button onClick={() => openEdit(p, e.id)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-brand-700 hover:bg-brand-50 transition-colors" title="Modifier">
                                   <Pencil className="w-3.5 h-3.5" />
-                                </Link>
+                                </button>
                                 <button onClick={() => handleDeleteProduct(p.id, e.id)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                  title="Supprimer">
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Supprimer">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -286,6 +473,32 @@ export default function EntrepotsManager() {
         </div>
       )}
 
+      {/* ── Add product modal ── */}
+      {addFor !== null && (
+        <ProductFormFields
+          form={addForm}
+          setForm={setAddForm}
+          error={addError}
+          saving={addSaving}
+          onSave={handleAddProduct}
+          onCancel={() => setAddFor(null)}
+          title={`Nouveau produit — ${entrepots.find(e => e.id === addFor)?.nom ?? ""}`}
+        />
+      )}
+
+      {/* ── Edit product modal ── */}
+      {editProduct !== null && (
+        <ProductFormFields
+          form={editForm}
+          setForm={setEditForm}
+          error={editError}
+          saving={editSaving}
+          onSave={handleEditProduct}
+          onCancel={() => setEditProduct(null)}
+          title={`Modifier — ${editProduct.nom}`}
+        />
+      )}
+
       {/* ── Fournisseurs modal ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -294,7 +507,7 @@ export default function EntrepotsManager() {
               <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <Warehouse className="w-4 h-4 text-brand-700" /> Gérer les fournisseurs
               </h2>
-              <button onClick={() => { setShowModal(false); setForm(null); setError(""); }}
+              <button onClick={() => { setShowModal(false); setFForm(null); setError(""); }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                 <X className="w-4 h-4" />
               </button>
@@ -303,34 +516,33 @@ export default function EntrepotsManager() {
             <div className="p-5 space-y-4">
               {error && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
 
-              {/* Inline form */}
-              {form && (
+              {fForm && (
                 <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                    {form.id ? "Modifier" : "Nouveau fournisseur"}
+                    {fForm.id ? "Modifier" : "Nouveau fournisseur"}
                   </p>
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
                       <label className={labelCls}>Nom *</label>
-                      <input type="text" value={form.nom ?? ""}
-                        onChange={e => setForm(f => ({ ...f, nom: e.target.value }))}
+                      <input type="text" value={fForm.nom ?? ""}
+                        onChange={e => setFForm(f => ({ ...f, nom: e.target.value }))}
                         placeholder="Boutique Koffi" className={inputCls} autoFocus />
                     </div>
                     <div>
                       <label className={labelCls}>Téléphone / WhatsApp</label>
-                      <input type="text" value={form.telephone ?? ""}
-                        onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))}
+                      <input type="text" value={fForm.telephone ?? ""}
+                        onChange={e => setFForm(f => ({ ...f, telephone: e.target.value }))}
                         placeholder="+228 90 00 00 00" className={inputCls} />
                     </div>
                   </div>
                   <div>
                     <label className={labelCls}>Adresse</label>
-                    <input type="text" value={form.adresse ?? ""}
-                      onChange={e => setForm(f => ({ ...f, adresse: e.target.value }))}
+                    <input type="text" value={fForm.adresse ?? ""}
+                      onChange={e => setFForm(f => ({ ...f, adresse: e.target.value }))}
                       placeholder="Lomé, Marché central…" className={inputCls} />
                   </div>
                   <div className="flex justify-end gap-2 pt-1">
-                    <button onClick={() => { setForm(null); setError(""); }}
+                    <button onClick={() => { setFForm(null); setError(""); }}
                       className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
                       Annuler
                     </button>
@@ -343,7 +555,6 @@ export default function EntrepotsManager() {
                 </div>
               )}
 
-              {/* List */}
               <div className="space-y-2">
                 {entrepots.map(e => (
                   <div key={e.id} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl px-4 py-3">
@@ -355,7 +566,7 @@ export default function EntrepotsManager() {
                       {e.telephone && <p className="text-xs text-slate-400">{e.telephone}</p>}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => { setForm({ ...e }); setError(""); }}
+                      <button onClick={() => { setFForm({ ...e }); setError(""); }}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-brand-700 hover:bg-brand-50 transition-colors">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
@@ -368,8 +579,8 @@ export default function EntrepotsManager() {
                 ))}
               </div>
 
-              {!form && (
-                <button onClick={() => { setForm(emptyFournisseur()); setError(""); }}
+              {!fForm && (
+                <button onClick={() => { setFForm(emptyFournisseur()); setError(""); }}
                   className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 text-sm font-semibold hover:border-brand-300 hover:text-brand-700 transition-colors">
                   <Plus className="w-4 h-4" /> Ajouter un fournisseur
                 </button>
