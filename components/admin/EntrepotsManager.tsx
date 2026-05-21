@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, Plus, Pencil, Trash2, Warehouse, Phone, MapPin,
-  X, Save, Package, ChevronDown, ChevronUp, Settings2,
+  X, Save, Package, ChevronDown, ChevronUp, Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
@@ -45,42 +45,44 @@ export default function EntrepotsManager() {
   const [saving,       setSaving]       = useState(false);
   const [deleting,     setDeleting]     = useState<number | null>(null);
 
-  /* products per entrepot */
-  const [expanded,     setExpanded]     = useState<Set<number>>(new Set());
+  /* products per entrepot — use plain arrays instead of Set */
+  const [expanded,     setExpanded]     = useState<number[]>([]);
   const [products,     setProducts]     = useState<Record<number, ExternalProduct[]>>({});
-  const [loadingProds, setLoadingProds] = useState<Set<number>>(new Set());
+  const [loadingProds, setLoadingProds] = useState<number[]>([]);
 
   const fetchEntrepots = useCallback(async () => {
     setLoading(true);
     try {
       const res  = await fetch("/api/admin/entrepots");
       const data = await res.json();
-      setEntrepots(data.entrepots ?? []);
+      setEntrepots(Array.isArray(data.entrepots) ? data.entrepots : []);
     } catch { setError("Impossible de charger les fournisseurs."); }
     finally   { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchEntrepots(); }, [fetchEntrepots]);
 
-  async function fetchProducts(entrepotId: number) {
-    setLoadingProds(prev => new Set(prev).add(entrepotId));
+  const fetchProducts = useCallback(async (entrepotId: number) => {
+    setLoadingProds(prev => [...prev, entrepotId]);
     try {
       const res  = await fetch(`/api/admin/products?entrepot_id=${entrepotId}&limit=100`);
       const data = await res.json();
-      setProducts(prev => ({ ...prev, [entrepotId]: data.products ?? [] }));
-    } catch { /* silent */ }
-    finally {
-      setLoadingProds(prev => { const s = new Set(prev); s.delete(entrepotId); return s; });
+      setProducts(prev => ({ ...prev, [entrepotId]: Array.isArray(data.products) ? data.products : [] }));
+    } catch {
+      setProducts(prev => ({ ...prev, [entrepotId]: [] }));
+    } finally {
+      setLoadingProds(prev => prev.filter(id => id !== entrepotId));
     }
-  }
+  }, []);
 
   function toggleExpand(id: number) {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); }
-      else { next.add(id); if (!products[id]) fetchProducts(id); }
-      return next;
-    });
+    const isOpen = expanded.includes(id);
+    if (isOpen) {
+      setExpanded(prev => prev.filter(x => x !== id));
+    } else {
+      setExpanded(prev => [...prev, id]);
+      if (products[id] === undefined) fetchProducts(id);
+    }
   }
 
   /* ── Fournisseur CRUD ── */
@@ -118,8 +120,6 @@ export default function EntrepotsManager() {
     } catch { setError("Erreur suppression produit."); }
   }
 
-  const totalProducts = Object.values(products).reduce((sum, arr) => sum + arr.length, 0);
-
   return (
     <div className="space-y-6">
 
@@ -129,14 +129,12 @@ export default function EntrepotsManager() {
           <h1 className="text-xl font-bold text-slate-900">Produits externes</h1>
           <p className="text-slate-500 text-sm mt-0.5">Produits récupérés chez des fournisseurs, vendus sur le site</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setShowModal(true); setError(""); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-xs font-semibold hover:border-slate-300 hover:text-slate-700 transition-colors"
-          >
-            <Settings2 className="w-3.5 h-3.5" /> Gérer les fournisseurs
-          </button>
-        </div>
+        <button
+          onClick={() => { setShowModal(true); setError(""); }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-xs font-semibold hover:border-slate-300 hover:text-slate-700 transition-colors"
+        >
+          <Settings className="w-3.5 h-3.5" /> Gérer les fournisseurs
+        </button>
       </div>
 
       {error && (
@@ -152,7 +150,7 @@ export default function EntrepotsManager() {
         <div className="bg-white rounded-2xl border border-slate-100 p-16 text-center">
           <Package className="w-10 h-10 text-slate-200 mx-auto mb-3" />
           <p className="text-slate-500 font-semibold">Aucun fournisseur configuré</p>
-          <p className="text-slate-400 text-sm mt-1">Ajoutez d'abord un fournisseur via "Gérer les fournisseurs"</p>
+          <p className="text-slate-400 text-sm mt-1">Ajoutez d&apos;abord un fournisseur via &quot;Gérer les fournisseurs&quot;</p>
           <button
             onClick={() => setShowModal(true)}
             className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-semibold hover:bg-brand-800 transition-colors"
@@ -163,10 +161,9 @@ export default function EntrepotsManager() {
       ) : (
         <div className="grid gap-4">
           {entrepots.map(e => {
-            const isExpanded = expanded.has(e.id);
+            const isExpanded = expanded.includes(e.id);
             const prods      = products[e.id] ?? [];
-            const isLoading  = loadingProds.has(e.id);
-            const count      = isExpanded ? prods.length : null;
+            const isLoading  = loadingProds.includes(e.id);
 
             return (
               <div key={e.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
@@ -181,12 +178,12 @@ export default function EntrepotsManager() {
                     <Warehouse className={`w-4 h-4 ${e.actif ? "text-emerald-600" : "text-slate-400"}`} />
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-slate-900 text-sm">{e.nom}</p>
                       {!e.actif && <span className="text-[10px] font-bold bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full">Inactif</span>}
-                      {count !== null && (
+                      {isExpanded && (
                         <span className="text-[10px] font-bold bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full">
-                          {count} produit{count !== 1 ? "s" : ""}
+                          {prods.length} produit{prods.length !== 1 ? "s" : ""}
                         </span>
                       )}
                     </div>
@@ -225,7 +222,7 @@ export default function EntrepotsManager() {
                     ) : (
                       <div className="divide-y divide-slate-50">
                         {prods.map(p => {
-                          const marge = p.prix_entrepot != null ? p.prix_unitaire - p.prix_entrepot : null;
+                          const marge  = p.prix_entrepot != null ? p.prix_unitaire - p.prix_entrepot : null;
                           const imgSrc = p.image_url
                             ? (p.image_url.startsWith("http") || p.image_url.startsWith("/") ? p.image_url : `/api/uploads/${p.image_url}`)
                             : null;
