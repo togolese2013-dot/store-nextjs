@@ -62,9 +62,14 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
     status:     "ACTIVE",
   }, token);
 
+  const waNumber = process.env.WHATSAPP_NUMBER || "22890527912";
   const creative = await fbPost(`${AD_ACCOUNT_ID}/adcreatives`, {
     name:             `Creative — ${postId}`,
     object_story_id:  `${PAGE_ID}_${postId}`,
+    call_to_action: {
+      type:  "CONTACT_US",
+      value: { link: `https://wa.me/${waNumber}` },
+    },
   }, token);
 
   const ad = await fbPost(`${AD_ACCOUNT_ID}/ads`, {
@@ -94,7 +99,6 @@ router.post("/api/admin/social/publish", async (req, res) => {
     });
 
     const data = await n8nRes.json().catch(() => ({}));
-    console.log("[social] n8n response:", JSON.stringify(data));
 
     if (!n8nRes.ok) {
       return res.status(502).json({ error: data?.error || `n8n a retourné HTTP ${n8nRes.status}` });
