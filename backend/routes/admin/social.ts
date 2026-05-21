@@ -33,11 +33,12 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
 
   console.log("[boost] step 1 — campaign");
   const campaign = await fbPost(`${AD_ACCOUNT_ID}/campaigns`, {
-    name:                  `Boost ${postId}`,
-    objective:             "OUTCOME_ENGAGEMENT",
-    buying_type:           "AUCTION",
-    status:                "ACTIVE",
-    special_ad_categories: ["NONE"],
+    name:                           `Boost ${postId}`,
+    objective:                      "OUTCOME_ENGAGEMENT",
+    buying_type:                    "AUCTION",
+    status:                         "ACTIVE",
+    special_ad_categories:          ["NONE"],
+    is_adset_budget_sharing_enabled: false,
   }, token);
 
   console.log("[boost] step 2 — adset, campaign_id:", campaign.id);
