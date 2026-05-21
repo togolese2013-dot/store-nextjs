@@ -29,7 +29,7 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
   if (!token) throw new Error("META_ADS_TOKEN non configuré.");
 
   const now     = Math.floor(Date.now() / 1000);
-  const endTime = now + days * 86400;
+  const endTime = now + days * 86400 + 3600; // +1h buffer for clock skew
 
   console.log("[boost] step 1 — campaign");
   const campaign = await fbPost(`${AD_ACCOUNT_ID}/campaigns`, {
