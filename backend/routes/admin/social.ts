@@ -103,6 +103,8 @@ router.post("/api/admin/social/publish", async (req, res) => {
     let boostAdId: string | null = null;
     let boostError: string | null = null;
 
+    console.log("[social] n8n response:", JSON.stringify(data));
+
     if (boost === true) {
       // n8n returns the full post id as data.id (format: PAGE_ID_POST_ID or just the numeric part)
       const rawPostId = data?.post_id || data?.id || data?.[0]?.id || "";
