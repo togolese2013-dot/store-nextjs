@@ -31,7 +31,6 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
   const now     = Math.floor(Date.now() / 1000);
   const endTime = now + days * 86400 + 3600; // +1h buffer for clock skew
 
-  console.log("[boost] step 1 — campaign");
   const campaign = await fbPost(`${AD_ACCOUNT_ID}/campaigns`, {
     name:                           `Boost ${postId}`,
     objective:                      "OUTCOME_ENGAGEMENT",
@@ -41,7 +40,6 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
     is_adset_budget_sharing_enabled: false,
   }, token);
 
-  console.log("[boost] step 2 — adset, campaign_id:", campaign.id);
   const adset = await fbPost(`${AD_ACCOUNT_ID}/adsets`, {
     name:              "Acheteurs Togo — Mobile",
     campaign_id:       campaign.id,
@@ -65,13 +63,11 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
     status:     "ACTIVE",
   }, token);
 
-  console.log("[boost] step 3 — creative, adset_id:", adset.id);
   const creative = await fbPost(`${AD_ACCOUNT_ID}/adcreatives`, {
     name:             `Creative — ${postId}`,
     object_story_id:  `${PAGE_ID}_${postId}`,
   }, token);
 
-  console.log("[boost] step 4 — ad, creative_id:", creative.id);
   const ad = await fbPost(`${AD_ACCOUNT_ID}/ads`, {
     name:     "Boost Togo",
     adset_id: adset.id,
