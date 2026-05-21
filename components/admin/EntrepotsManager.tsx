@@ -4,10 +4,21 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, Plus, Pencil, Trash2, Warehouse, Phone, MapPin,
   X, Save, Package, ChevronDown, ChevronUp, Settings,
-  ShoppingBag,
+  ShoppingBag, ImagePlus,
 } from "lucide-react";
-import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9_\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
 
 interface Entrepot {
   id: number;
@@ -33,12 +44,13 @@ interface AddForm {
   prix_unitaire: string;
   prix_entrepot: string;
   description: string;
+  description_longue: string;
   image_url: string;
-  reference: string;
+  slug: string;
 }
 
 function emptyAddForm(): AddForm {
-  return { nom: "", prix_unitaire: "", prix_entrepot: "", description: "", image_url: "", reference: "" };
+  return { nom: "", prix_unitaire: "", prix_entrepot: "", description: "", description_longue: "", image_url: "", slug: "" };
 }
 
 function emptyFournisseur(): Partial<Entrepot> {
@@ -77,6 +89,9 @@ export default function EntrepotsManager() {
   const [editSaving,   setEditSaving]   = useState(false);
   const [editError,    setEditError]    = useState("");
 
+  /* image upload */
+  const [uploadingImg, setUploadingImg] = useState(false);
+
   const fetchEntrepots = useCallback(async () => {
     setLoading(true);
     try {
@@ -112,6 +127,63 @@ export default function EntrepotsManager() {
     }
   }
 
+  /* ── Image upload ── */
+  async function compressImage(file: File, maxDim = 1200, quality = 0.85): Promise<File> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          resolve(new File([blob!], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        }, "image/jpeg", quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  function toBase64(file: File): Promise<{ data: string; type: string }> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload  = () => resolve({ data: r.result as string, type: file.type });
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
+  async function uploadAndSetImage(
+    file: File,
+    setForm: React.Dispatch<React.SetStateAction<AddForm>>,
+    setFormError: React.Dispatch<React.SetStateAction<string>>,
+  ) {
+    setUploadingImg(true);
+    try {
+      const compressed = await compressImage(file);
+      const b64 = await toBase64(compressed);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: [b64] }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.urls?.[0]) throw new Error(data.error || "Erreur upload image");
+      setForm(f => ({ ...f, image_url: data.urls[0] }));
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Erreur upload image");
+    } finally {
+      setUploadingImg(false);
+    }
+  }
+
   /* ── Add product ── */
   function openAdd(entrepotId: number) {
     setAddFor(entrepotId);
@@ -120,24 +192,25 @@ export default function EntrepotsManager() {
   }
 
   async function handleAddProduct() {
-    if (!addForm.nom.trim())        { setAddError("Nom obligatoire."); return; }
-    if (!addForm.prix_unitaire)     { setAddError("Prix de vente obligatoire."); return; }
+    if (!addForm.nom.trim())    { setAddError("Nom obligatoire."); return; }
+    if (!addForm.prix_unitaire) { setAddError("Prix de vente obligatoire."); return; }
     setAddSaving(true); setAddError("");
     try {
       const res = await fetch("/api/admin/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nom:           addForm.nom.trim(),
-          description:   addForm.description.trim() || null,
-          prix_unitaire: Number(addForm.prix_unitaire),
-          prix_entrepot: addForm.prix_entrepot ? Number(addForm.prix_entrepot) : null,
-          entrepot_id:   addFor,
-          image_url:     addForm.image_url.trim() || null,
-          reference:     addForm.reference.trim() || undefined,
-          stock_magasin: 0,
-          stock_boutique: 0,
-          actif: true,
+          nom:                addForm.nom.trim(),
+          slug:               addForm.slug.trim() || toSlug(addForm.nom.trim()),
+          description:        addForm.description.trim() || null,
+          description_longue: addForm.description_longue.trim() || null,
+          prix_unitaire:      Number(addForm.prix_unitaire),
+          prix_entrepot:      addForm.prix_entrepot ? Number(addForm.prix_entrepot) : null,
+          entrepot_id:        addFor,
+          image_url:          addForm.image_url.trim() || null,
+          stock_magasin:      0,
+          stock_boutique:     0,
+          actif:              true,
         }),
       });
       const data = await res.json();
@@ -149,18 +222,35 @@ export default function EntrepotsManager() {
   }
 
   /* ── Edit product ── */
-  function openEdit(p: ExternalProduct, entrepotId: number) {
-    setEditProduct(p);
+  async function openEdit(p: ExternalProduct, entrepotId: number) {
     setEditEntrepot(entrepotId);
-    setEditForm({
-      nom:           p.nom,
-      prix_unitaire: String(p.prix_unitaire),
-      prix_entrepot: p.prix_entrepot != null ? String(p.prix_entrepot) : "",
-      description:   "",
-      image_url:     p.image_url ?? "",
-      reference:     p.reference,
-    });
     setEditError("");
+    setEditProduct(p);
+    setEditForm({
+      nom:                p.nom,
+      prix_unitaire:      String(p.prix_unitaire),
+      prix_entrepot:      p.prix_entrepot != null ? String(p.prix_entrepot) : "",
+      description:        "",
+      description_longue: "",
+      image_url:          p.image_url ?? "",
+      slug:               "",
+    });
+    try {
+      const res  = await fetch(`/api/admin/products/${p.id}`);
+      const data = await res.json();
+      const full = data.product;
+      if (full) {
+        setEditForm({
+          nom:                full.nom                ?? p.nom,
+          prix_unitaire:      String(full.prix_unitaire  ?? p.prix_unitaire),
+          prix_entrepot:      full.prix_entrepot != null ? String(full.prix_entrepot) : (p.prix_entrepot != null ? String(p.prix_entrepot) : ""),
+          description:        full.description         ?? "",
+          description_longue: full.description_longue  ?? "",
+          image_url:          full.image_url           ?? p.image_url ?? "",
+          slug:               full.slug                ?? "",
+        });
+      }
+    } catch { /* keep prefilled values */ }
   }
 
   async function handleEditProduct() {
@@ -173,10 +263,13 @@ export default function EntrepotsManager() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nom:           editForm.nom.trim(),
-          prix_unitaire: Number(editForm.prix_unitaire),
-          prix_entrepot: editForm.prix_entrepot ? Number(editForm.prix_entrepot) : null,
-          image_url:     editForm.image_url.trim() || null,
+          nom:                editForm.nom.trim(),
+          slug:               editForm.slug.trim() || undefined,
+          description:        editForm.description.trim() || null,
+          description_longue: editForm.description_longue.trim() || null,
+          prix_unitaire:      Number(editForm.prix_unitaire),
+          prix_entrepot:      editForm.prix_entrepot ? Number(editForm.prix_entrepot) : null,
+          image_url:          editForm.image_url.trim() || null,
         }),
       });
       const data = await res.json();
@@ -222,21 +315,23 @@ export default function EntrepotsManager() {
     } catch { setError("Erreur suppression produit."); }
   }
 
-  /* ── Product form section (shared between add/edit) ── */
+  /* ── Shared product form modal ── */
   function ProductFormFields({
     form, setForm, error: formError, saving: formSaving, onSave, onCancel, title,
+    onImageUpload,
   }: {
     form: AddForm;
-    setForm: (f: AddForm) => void;
+    setForm: React.Dispatch<React.SetStateAction<AddForm>>;
     error: string;
     saving: boolean;
     onSave: () => void;
     onCancel: () => void;
     title: string;
+    onImageUpload: (file: File) => void;
   }) {
-    const prix    = Number(form.prix_unitaire) || 0;
-    const achat   = Number(form.prix_entrepot) || 0;
-    const marge   = form.prix_unitaire && form.prix_entrepot ? prix - achat : null;
+    const prix  = Number(form.prix_unitaire) || 0;
+    const achat = Number(form.prix_entrepot) || 0;
+    const marge = form.prix_unitaire && form.prix_entrepot ? prix - achat : null;
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -253,54 +348,91 @@ export default function EntrepotsManager() {
           <div className="p-5 space-y-4">
             {formError && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{formError}</div>}
 
+            {/* Photo */}
             <div>
-              <label className={labelCls}>Nom du produit *</label>
-              <input type="text" value={form.nom}
-                onChange={e => setForm({ ...form, nom: e.target.value })}
-                placeholder="Ex: iPhone 15 Pro" className={inputCls} autoFocus />
+              <label className={labelCls}>Photo</label>
+              {form.image_url ? (
+                <div className="relative w-full h-32 rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={form.image_url} alt="" className="absolute inset-0 w-full h-full object-contain p-2" />
+                  <button type="button"
+                    onClick={() => setForm(f => ({ ...f, image_url: "" }))}
+                    className="absolute top-1.5 right-1.5 p-1 bg-white rounded-lg shadow text-slate-400 hover:text-red-500 transition-colors">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 cursor-pointer hover:border-brand-300 transition-colors">
+                  {uploadingImg
+                    ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                    : <ImagePlus className="w-5 h-5 text-slate-300" />}
+                  <span className="text-xs text-slate-400">{uploadingImg ? "Envoi en cours…" : "Cliquer pour choisir une image"}</span>
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) onImageUpload(f); e.target.value = ""; }} />
+                </label>
+              )}
             </div>
 
+            {/* Nom */}
+            <div>
+              <label className={labelCls}>Nom du produit *</label>
+              <input type="text" value={form.nom} autoFocus
+                onChange={e => {
+                  const newNom = e.target.value;
+                  setForm(f => ({
+                    ...f,
+                    nom:  newNom,
+                    slug: (f.slug === "" || f.slug === toSlug(f.nom)) ? toSlug(newNom) : f.slug,
+                  }));
+                }}
+                placeholder="Ex: iPhone 15 Pro" className={inputCls} />
+            </div>
+
+            {/* Slug */}
+            <div>
+              <label className={labelCls}>Slug URL</label>
+              <input type="text" value={form.slug}
+                onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
+                placeholder="auto-generé depuis le nom" className={inputCls} />
+            </div>
+
+            {/* Prix fournisseur → Prix de vente */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Prix de vente (FCFA) *</label>
-                <input type="number" min="0" value={form.prix_unitaire}
-                  onChange={e => setForm({ ...form, prix_unitaire: e.target.value })}
+                <label className={labelCls}>Prix fournisseur (FCFA)</label>
+                <input type="number" min="0" value={form.prix_entrepot}
+                  onChange={e => setForm(f => ({ ...f, prix_entrepot: e.target.value }))}
                   placeholder="0" className={inputCls} />
               </div>
               <div>
                 <label className={labelCls}>
-                  Prix fournisseur
+                  Prix de vente (FCFA) *
                   {marge !== null && (
                     <span className={`ml-1.5 font-bold ${marge >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                       ({marge >= 0 ? "+" : ""}{formatPrice(marge)})
                     </span>
                   )}
                 </label>
-                <input type="number" min="0" value={form.prix_entrepot}
-                  onChange={e => setForm({ ...form, prix_entrepot: e.target.value })}
+                <input type="number" min="0" value={form.prix_unitaire}
+                  onChange={e => setForm(f => ({ ...f, prix_unitaire: e.target.value }))}
                   placeholder="0" className={inputCls} />
               </div>
             </div>
 
+            {/* Mini description */}
             <div>
-              <label className={labelCls}>Référence (optionnelle)</label>
-              <input type="text" value={form.reference}
-                onChange={e => setForm({ ...form, reference: e.target.value })}
-                placeholder="Auto-générée si vide" className={inputCls} />
-            </div>
-
-            <div>
-              <label className={labelCls}>Description (optionnelle)</label>
+              <label className={labelCls}>Mini description</label>
               <textarea value={form.description} rows={2}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-                placeholder="Caractéristiques du produit…" className={inputCls} />
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Résumé court affiché dans les listes…" className={inputCls} />
             </div>
 
+            {/* Description complète */}
             <div>
-              <label className={labelCls}>URL image (optionnelle)</label>
-              <input type="text" value={form.image_url}
-                onChange={e => setForm({ ...form, image_url: e.target.value })}
-                placeholder="https://…" className={inputCls} />
+              <label className={labelCls}>Description complète</label>
+              <textarea value={form.description_longue} rows={4}
+                onChange={e => setForm(f => ({ ...f, description_longue: e.target.value }))}
+                placeholder="Détails complets du produit, caractéristiques…" className={inputCls} />
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
@@ -483,6 +615,7 @@ export default function EntrepotsManager() {
           onSave={handleAddProduct}
           onCancel={() => setAddFor(null)}
           title={`Nouveau produit — ${entrepots.find(e => e.id === addFor)?.nom ?? ""}`}
+          onImageUpload={file => uploadAndSetImage(file, setAddForm, setAddError)}
         />
       )}
 
@@ -496,6 +629,7 @@ export default function EntrepotsManager() {
           onSave={handleEditProduct}
           onCancel={() => setEditProduct(null)}
           title={`Modifier — ${editProduct.nom}`}
+          onImageUpload={file => uploadAndSetImage(file, setEditForm, setEditError)}
         />
       )}
 
