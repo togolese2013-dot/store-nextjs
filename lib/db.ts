@@ -148,6 +148,16 @@ export async function produitCols() {
     )`);
   } catch { /* already exists */ }
 
+  // Migrate existing entrepots table: add columns that may be missing (old schema had none)
+  for (const [col, def] of [
+    ["telephone", "VARCHAR(30) NULL"],
+    ["adresse",   "TEXT NULL"],
+    ["notes",     "TEXT NULL"],
+    ["actif",     "TINYINT(1) NOT NULL DEFAULT 1"],
+  ] as [string, string][]) {
+    try { await db.execute(`ALTER TABLE entrepots ADD COLUMN ${col} ${def}`); } catch { /* already exists */ }
+  }
+
   // Auto-migrate: add entrepot_id column if missing
   if (!names.has("entrepot_id")) {
     try {
