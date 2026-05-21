@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2, Megaphone, Warehouse,
+  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2, Megaphone, Warehouse, PackageSearch,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
@@ -33,7 +33,7 @@ const MODULES: Record<string, {
       { label: "Tous les produits", href: "/admin/products",     icon: Package },
       { label: "Catégories",        href: "/admin/categories",   icon: FolderOpen },
       { label: "Fournisseurs",      href: "/admin/fournisseurs", icon: Building2 },
-      { label: "Entrepôts",         href: "/admin/entrepots",    icon: Warehouse },
+      { label: "Produits externes",  href: "/admin/entrepots",    icon: PackageSearch },
       { label: "Achats",            href: "/admin/achats",       icon: Truck },
     ],
   },

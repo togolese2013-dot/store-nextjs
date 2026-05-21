@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
 export const metadata = { title: "Nouveau produit" };
+export const dynamic = "force-dynamic";
 
 interface PageProps { searchParams: Promise<{ entrepot_id?: string }> }
 
