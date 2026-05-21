@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { clsx } from "clsx";
 import {
   Loader2, Plus, Pencil, Trash2, Warehouse, Phone, MapPin,
   X, Save, Package, ChevronDown, ChevronUp, Settings,
@@ -18,6 +19,22 @@ function toSlug(name: string): string {
     .replace(/\s+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "");
+}
+
+function Toggle({ checked, onChange, label, color }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; color: "brand" | "green";
+}) {
+  const trackOn = color === "green" ? "peer-checked:bg-green-500" : "peer-checked:bg-brand-900";
+  return (
+    <label className="flex items-center gap-3 cursor-pointer select-none">
+      <div className="relative">
+        <input type="checkbox" className="sr-only peer" checked={checked} onChange={e => onChange(e.target.checked)} />
+        <div className={clsx("w-9 h-5 rounded-full bg-slate-200 transition-all", trackOn)} />
+        <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-all peer-checked:translate-x-4" />
+      </div>
+      <span className="text-sm font-semibold text-slate-700">{label}</span>
+    </label>
+  );
 }
 
 interface Entrepot {
@@ -46,19 +63,27 @@ interface AddForm {
   description: string;
   description_longue: string;
   image_url: string;
+  images: string[];
   slug: string;
+  actif: boolean;
 }
 
 function emptyAddForm(): AddForm {
-  return { nom: "", prix_unitaire: "", prix_entrepot: "", description: "", description_longue: "", image_url: "", slug: "" };
+  return {
+    nom: "", prix_unitaire: "", prix_entrepot: "",
+    description: "", description_longue: "",
+    image_url: "", images: [], slug: "", actif: true,
+  };
 }
 
 function emptyFournisseur(): Partial<Entrepot> {
   return { nom: "", telephone: "", adresse: "", notes: "", actif: true };
 }
 
-const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
-const labelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1";
+const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
+const labelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5";
+const fInputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all";
+const fLabelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1";
 
 export default function EntrepotsManager() {
   const [entrepots,    setEntrepots]    = useState<Entrepot[]>([]);
@@ -90,7 +115,8 @@ export default function EntrepotsManager() {
   const [editError,    setEditError]    = useState("");
 
   /* image upload */
-  const [uploadingImg, setUploadingImg] = useState(false);
+  const [uploadingMain,   setUploadingMain]   = useState(false);
+  const [uploadingSecond, setUploadingSecond] = useState(false);
 
   const fetchEntrepots = useCallback(async () => {
     setLoading(true);
@@ -127,7 +153,7 @@ export default function EntrepotsManager() {
     }
   }
 
-  /* ── Image upload ── */
+  /* ── Image upload helpers ── */
   async function compressImage(file: File, maxDim = 1200, quality = 0.85): Promise<File> {
     return new Promise((resolve) => {
       const img = new Image();
@@ -160,28 +186,49 @@ export default function EntrepotsManager() {
     });
   }
 
-  async function uploadAndSetImage(
-    file: File,
+  async function uploadFiles(files: File[]): Promise<string[]> {
+    const compressed = await Promise.all(files.map(f => compressImage(f)));
+    const b64Files   = await Promise.all(compressed.map(toBase64));
+    const res = await fetch("/api/admin/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: b64Files }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Erreur upload");
+    const valid = (data.urls ?? []).filter((u: unknown) => typeof u === "string" && (u as string).trim() !== "");
+    if (!valid.length) throw new Error(data.errors?.[0] || "Échec de l'upload");
+    return valid;
+  }
+
+  async function handleUploadMain(
+    e: React.ChangeEvent<HTMLInputElement>,
     setForm: React.Dispatch<React.SetStateAction<AddForm>>,
-    setFormError: React.Dispatch<React.SetStateAction<string>>,
+    setFormError: (v: string) => void,
   ) {
-    setUploadingImg(true);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingMain(true); setFormError("");
     try {
-      const compressed = await compressImage(file);
-      const b64 = await toBase64(compressed);
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files: [b64] }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.urls?.[0]) throw new Error(data.error || "Erreur upload image");
-      setForm(f => ({ ...f, image_url: data.urls[0] }));
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Erreur upload image");
-    } finally {
-      setUploadingImg(false);
-    }
+      const urls = await uploadFiles([file]);
+      if (urls[0]) setForm(f => ({ ...f, image_url: urls[0] }));
+    } catch (err) { setFormError(err instanceof Error ? err.message : "Erreur upload"); }
+    finally { setUploadingMain(false); e.target.value = ""; }
+  }
+
+  async function handleUploadSecondary(
+    e: React.ChangeEvent<HTMLInputElement>,
+    setForm: React.Dispatch<React.SetStateAction<AddForm>>,
+    setFormError: (v: string) => void,
+  ) {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setUploadingSecond(true); setFormError("");
+    try {
+      const urls = await uploadFiles(Array.from(files));
+      setForm(f => ({ ...f, images: [...f.images, ...urls] }));
+    } catch (err) { setFormError(err instanceof Error ? err.message : "Erreur upload"); }
+    finally { setUploadingSecond(false); e.target.value = ""; }
   }
 
   /* ── Add product ── */
@@ -208,9 +255,10 @@ export default function EntrepotsManager() {
           prix_entrepot:      addForm.prix_entrepot ? Number(addForm.prix_entrepot) : null,
           entrepot_id:        addFor,
           image_url:          addForm.image_url.trim() || null,
+          images:             addForm.images.length > 0 ? addForm.images : undefined,
+          actif:              addForm.actif,
           stock_magasin:      0,
           stock_boutique:     0,
-          actif:              true,
         }),
       });
       const data = await res.json();
@@ -233,7 +281,9 @@ export default function EntrepotsManager() {
       description:        "",
       description_longue: "",
       image_url:          p.image_url ?? "",
+      images:             [],
       slug:               "",
+      actif:              p.actif,
     });
     try {
       const res  = await fetch(`/api/admin/products/${p.id}`);
@@ -247,7 +297,9 @@ export default function EntrepotsManager() {
           description:        full.description         ?? "",
           description_longue: full.description_longue  ?? "",
           image_url:          full.image_url           ?? p.image_url ?? "",
+          images:             Array.isArray(full.images) ? full.images.filter((u: string) => u !== full.image_url) : [],
           slug:               full.slug                ?? "",
+          actif:              full.actif               ?? p.actif,
         });
       }
     } catch { /* keep prefilled values */ }
@@ -270,6 +322,8 @@ export default function EntrepotsManager() {
           prix_unitaire:      Number(editForm.prix_unitaire),
           prix_entrepot:      editForm.prix_entrepot ? Number(editForm.prix_entrepot) : null,
           image_url:          editForm.image_url.trim() || null,
+          images:             editForm.images.length > 0 ? editForm.images : undefined,
+          actif:              editForm.actif,
         }),
       });
       const data = await res.json();
@@ -315,137 +369,223 @@ export default function EntrepotsManager() {
     } catch { setError("Erreur suppression produit."); }
   }
 
-  /* ── Shared product form modal ── */
-  function ProductFormFields({
-    form, setForm, error: formError, saving: formSaving, onSave, onCancel, title,
-    onImageUpload,
+  /* ── Product form modal (ProductForm-style layout) ── */
+  function ProductFormModal({
+    form, setForm, formError, setFormError, saving: formSaving, onSave, onCancel, title,
   }: {
     form: AddForm;
     setForm: React.Dispatch<React.SetStateAction<AddForm>>;
-    error: string;
+    formError: string;
+    setFormError: (v: string) => void;
     saving: boolean;
     onSave: () => void;
     onCancel: () => void;
     title: string;
-    onImageUpload: (file: File) => void;
   }) {
     const prix  = Number(form.prix_unitaire) || 0;
     const achat = Number(form.prix_entrepot) || 0;
     const marge = form.prix_unitaire && form.prix_entrepot ? prix - achat : null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[95vh] overflow-y-auto">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/50 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col">
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-brand-700" /> {title}
             </h2>
-            <button onClick={onCancel} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <button onClick={onCancel}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="p-5 space-y-4">
-            {formError && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{formError}</div>}
+          {/* Body */}
+          <div className="flex flex-1 min-h-0">
 
-            {/* Photo */}
-            <div>
-              <label className={labelCls}>Photo</label>
-              {form.image_url ? (
-                <div className="relative w-full h-32 rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={form.image_url} alt="" className="absolute inset-0 w-full h-full object-contain p-2" />
-                  <button type="button"
-                    onClick={() => setForm(f => ({ ...f, image_url: "" }))}
-                    className="absolute top-1.5 right-1.5 p-1 bg-white rounded-lg shadow text-slate-400 hover:text-red-500 transition-colors">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 cursor-pointer hover:border-brand-300 transition-colors">
-                  {uploadingImg
-                    ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                    : <ImagePlus className="w-5 h-5 text-slate-300" />}
-                  <span className="text-xs text-slate-400">{uploadingImg ? "Envoi en cours…" : "Cliquer pour choisir une image"}</span>
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) onImageUpload(f); e.target.value = ""; }} />
-                </label>
-              )}
-            </div>
+            {/* Left — Images */}
+            <div className="w-52 shrink-0 border-r border-slate-100 p-4 space-y-4 bg-slate-50/60 overflow-y-auto">
 
-            {/* Nom */}
-            <div>
-              <label className={labelCls}>Nom du produit *</label>
-              <input type="text" value={form.nom} autoFocus
-                onChange={e => {
-                  const newNom = e.target.value;
-                  setForm(f => ({
-                    ...f,
-                    nom:  newNom,
-                    slug: (f.slug === "" || f.slug === toSlug(f.nom)) ? toSlug(newNom) : f.slug,
-                  }));
-                }}
-                placeholder="Ex: iPhone 15 Pro" className={inputCls} />
-            </div>
-
-            {/* Slug */}
-            <div>
-              <label className={labelCls}>Slug URL</label>
-              <input type="text" value={form.slug}
-                onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
-                placeholder="auto-generé depuis le nom" className={inputCls} />
-            </div>
-
-            {/* Prix fournisseur → Prix de vente */}
-            <div className="grid grid-cols-2 gap-3">
+              {/* Photo principale */}
               <div>
-                <label className={labelCls}>Prix fournisseur (FCFA)</label>
-                <input type="number" min="0" value={form.prix_entrepot}
-                  onChange={e => setForm(f => ({ ...f, prix_entrepot: e.target.value }))}
-                  placeholder="0" className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>
-                  Prix de vente (FCFA) *
-                  {marge !== null && (
-                    <span className={`ml-1.5 font-bold ${marge >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                      ({marge >= 0 ? "+" : ""}{formatPrice(marge)})
-                    </span>
+                <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-2">Photo principale</p>
+                <label className={clsx(
+                  "relative flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden cursor-pointer",
+                  "hover:border-brand-400 transition-all",
+                  uploadingMain && "opacity-60 pointer-events-none",
+                )}>
+                  {form.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={form.image_url} alt="" className="w-full h-full object-contain p-1" />
+                  ) : uploadingMain ? (
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <span className="text-xs">Upload…</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-slate-400 hover:text-brand-600">
+                      <ImagePlus className="w-7 h-7" />
+                      <span className="text-xs font-semibold text-center px-2">Choisir une photo</span>
+                    </div>
                   )}
+                  <input type="file" accept="image/jpeg,image/png,image/webp"
+                    onChange={e => handleUploadMain(e, setForm, setFormError)}
+                    disabled={uploadingMain} className="sr-only" />
                 </label>
-                <input type="number" min="0" value={form.prix_unitaire}
-                  onChange={e => setForm(f => ({ ...f, prix_unitaire: e.target.value }))}
-                  placeholder="0" className={inputCls} />
+                {form.image_url && (
+                  <button type="button" onClick={() => setForm(f => ({ ...f, image_url: "" }))}
+                    className="mt-1.5 w-full text-xs text-red-500 hover:text-red-600 font-semibold text-center">
+                    Supprimer
+                  </button>
+                )}
+              </div>
+
+              {/* Photos secondaires */}
+              <div>
+                <p className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-2">Photos secondaires</p>
+                <label className={clsx(
+                  "flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 bg-white text-slate-400 cursor-pointer text-xs font-semibold",
+                  "hover:border-brand-400 hover:text-brand-600 transition-all",
+                  uploadingSecond && "opacity-60 pointer-events-none",
+                )}>
+                  {uploadingSecond ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                  {uploadingSecond ? "Upload…" : "Ajouter"}
+                  <input type="file" multiple accept="image/jpeg,image/png,image/webp"
+                    onChange={e => handleUploadSecondary(e, setForm, setFormError)}
+                    disabled={uploadingSecond} className="sr-only" />
+                </label>
+                {form.images.length > 0 && (
+                  <div className="grid grid-cols-3 gap-1.5 mt-2">
+                    {form.images.map((url, idx) => (
+                      <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 border border-transparent hover:border-brand-300 transition-all">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button type="button"
+                          onClick={() => setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }))}
+                          className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center hover:bg-red-600">
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {form.images.length === 0 && (
+                  <p className="text-[10px] text-slate-400 text-center mt-1">Aucune photo secondaire</p>
+                )}
               </div>
             </div>
 
-            {/* Mini description */}
-            <div>
-              <label className={labelCls}>Mini description</label>
-              <textarea value={form.description} rows={2}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="Résumé court affiché dans les listes…" className={inputCls} />
-            </div>
+            {/* Right — Form fields */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
 
-            {/* Description complète */}
-            <div>
-              <label className={labelCls}>Description complète</label>
-              <textarea value={form.description_longue} rows={4}
-                onChange={e => setForm(f => ({ ...f, description_longue: e.target.value }))}
-                placeholder="Détails complets du produit, caractéristiques…" className={inputCls} />
-            </div>
+              {formError && (
+                <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">{formError}</div>
+              )}
 
-            <div className="flex justify-end gap-2 pt-1">
-              <button onClick={onCancel}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
-                Annuler
-              </button>
-              <button onClick={onSave} disabled={formSaving}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors disabled:opacity-60">
-                {formSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Enregistrer
-              </button>
+              {/* Informations générales */}
+              <section className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Informations générales</h3>
+
+                <div>
+                  <label className={labelCls}>Nom du produit *</label>
+                  <input type="text" value={form.nom} autoFocus
+                    onChange={e => {
+                      const newNom = e.target.value;
+                      setForm(f => ({
+                        ...f,
+                        nom:  newNom,
+                        slug: (f.slug === "" || f.slug === toSlug(f.nom)) ? toSlug(newNom) : f.slug,
+                      }));
+                    }}
+                    placeholder="Ex: iPhone 15 Pro" className={inputCls} />
+                </div>
+
+                <div>
+                  <label className={labelCls}>
+                    Slug URL
+                    <span className="ml-1 text-slate-400 font-normal normal-case tracking-normal">
+                      — /products/<span className="text-brand-600">{form.slug || "…"}</span>
+                    </span>
+                  </label>
+                  <input type="text" value={form.slug}
+                    onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_") }))}
+                    onBlur={e => setForm(f => ({ ...f, slug: e.target.value.replace(/^_+|_+$/g, "") }))}
+                    placeholder="auto-généré depuis le nom" className={inputCls} />
+                </div>
+              </section>
+
+              {/* Tarifs */}
+              <section className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Tarifs</h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Prix fournisseur (FCFA)</label>
+                    <input type="number" min="0" value={form.prix_entrepot}
+                      onChange={e => setForm(f => ({ ...f, prix_entrepot: e.target.value }))}
+                      placeholder="0" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>
+                      Prix de vente (FCFA) *
+                      {marge !== null && (
+                        <span className={clsx("ml-1.5 font-bold normal-case tracking-normal", marge >= 0 ? "text-emerald-600" : "text-red-500")}>
+                          → Marge : {marge >= 0 ? "+" : ""}{marge.toLocaleString("fr-FR")} F
+                        </span>
+                      )}
+                    </label>
+                    <input type="number" min="0" value={form.prix_unitaire}
+                      onChange={e => setForm(f => ({ ...f, prix_unitaire: e.target.value }))}
+                      placeholder="0" className={inputCls} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-5 pt-1">
+                  <Toggle checked={form.actif} onChange={v => setForm(f => ({ ...f, actif: v }))} label="Produit actif (visible sur le site)" color="green" />
+                </div>
+              </section>
+
+              {/* Descriptions */}
+              <section className="space-y-4">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Descriptions</h3>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className={labelCls + " mb-0"}>Mini description (carte produit)</label>
+                    <span className={clsx("text-xs font-semibold", form.description.length > 250 ? "text-red-500" : "text-slate-400")}>
+                      {form.description.length}/250
+                    </span>
+                  </div>
+                  <textarea value={form.description} rows={3} maxLength={250}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value.slice(0, 250) }))}
+                    placeholder="Description courte affichée sur les cartes produit (250 car. max)…"
+                    className={clsx(inputCls, "resize-none")} />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Description complète (page produit)</label>
+                  <textarea value={form.description_longue} rows={5}
+                    onChange={e => setForm(f => ({ ...f, description_longue: e.target.value }))}
+                    placeholder="Description détaillée, caractéristiques, matériaux, dimensions…"
+                    className={clsx(inputCls, "resize-y")} />
+                </div>
+              </section>
+
             </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-white shrink-0">
+            <button type="button" onClick={onCancel}
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
+              Annuler
+            </button>
+            <button type="button" onClick={onSave} disabled={formSaving || uploadingMain || uploadingSecond}
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 transition-colors disabled:opacity-60">
+              {formSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {formSaving ? "Enregistrement…" : "Enregistrer"}
+            </button>
           </div>
         </div>
       </div>
@@ -607,29 +747,29 @@ export default function EntrepotsManager() {
 
       {/* ── Add product modal ── */}
       {addFor !== null && (
-        <ProductFormFields
+        <ProductFormModal
           form={addForm}
           setForm={setAddForm}
-          error={addError}
+          formError={addError}
+          setFormError={setAddError}
           saving={addSaving}
           onSave={handleAddProduct}
           onCancel={() => setAddFor(null)}
           title={`Nouveau produit — ${entrepots.find(e => e.id === addFor)?.nom ?? ""}`}
-          onImageUpload={file => uploadAndSetImage(file, setAddForm, setAddError)}
         />
       )}
 
       {/* ── Edit product modal ── */}
       {editProduct !== null && (
-        <ProductFormFields
+        <ProductFormModal
           form={editForm}
           setForm={setEditForm}
-          error={editError}
+          formError={editError}
+          setFormError={setEditError}
           saving={editSaving}
           onSave={handleEditProduct}
           onCancel={() => setEditProduct(null)}
           title={`Modifier — ${editProduct.nom}`}
-          onImageUpload={file => uploadAndSetImage(file, setEditForm, setEditError)}
         />
       )}
 
@@ -657,23 +797,23 @@ export default function EntrepotsManager() {
                   </p>
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
-                      <label className={labelCls}>Nom *</label>
+                      <label className={fLabelCls}>Nom *</label>
                       <input type="text" value={fForm.nom ?? ""}
                         onChange={e => setFForm(f => ({ ...f, nom: e.target.value }))}
-                        placeholder="Boutique Koffi" className={inputCls} autoFocus />
+                        placeholder="Boutique Koffi" className={fInputCls} autoFocus />
                     </div>
                     <div>
-                      <label className={labelCls}>Téléphone / WhatsApp</label>
+                      <label className={fLabelCls}>Téléphone / WhatsApp</label>
                       <input type="text" value={fForm.telephone ?? ""}
                         onChange={e => setFForm(f => ({ ...f, telephone: e.target.value }))}
-                        placeholder="+228 90 00 00 00" className={inputCls} />
+                        placeholder="+228 90 00 00 00" className={fInputCls} />
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Adresse</label>
+                    <label className={fLabelCls}>Adresse</label>
                     <input type="text" value={fForm.adresse ?? ""}
                       onChange={e => setFForm(f => ({ ...f, adresse: e.target.value }))}
-                      placeholder="Lomé, Marché central…" className={inputCls} />
+                      placeholder="Lomé, Marché central…" className={fInputCls} />
                   </div>
                   <div className="flex justify-end gap-2 pt-1">
                     <button onClick={() => { setFForm(null); setError(""); }}
