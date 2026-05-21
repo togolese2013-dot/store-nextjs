@@ -63,6 +63,7 @@ interface Props {
   marques?:   { id: number; nom: string }[];
   initial?:   Partial<ProductData>;
   onSuccess?: () => void;
+  backHref?:  string;
 }
 
 const inputCls = "w-full px-4 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
@@ -72,7 +73,7 @@ function newVariant(): PendingVariant {
   return { _key: Math.random().toString(36).slice(2), nom: "", rawOptions: "", prix: "", stock: "", reference_sku: "", imageUrl: "", uploading: false };
 }
 
-export default function ProductForm({ categories, marques = [], initial, onSuccess }: Props) {
+export default function ProductForm({ categories, marques = [], initial, onSuccess, backHref }: Props) {
   const router  = useRouter();
   const isEdit  = !!initial?.id;
 
@@ -314,6 +315,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       }
       setSuccess(true);
       if (onSuccess) { onSuccess(); return; }
+      if (backHref)  { router.push(backHref); return; }
       if (!isEdit) router.push(`/admin/products/${data.id}`);
     } catch { setError("Erreur réseau."); }
     finally   { setLoading(false); }
@@ -672,7 +674,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
 
         {/* ── Footer actions ── */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-white">
-          <button type="button" onClick={() => router.back()}
+          <button type="button" onClick={() => backHref ? router.push(backHref) : router.back()}
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:border-slate-300 transition-colors">
             Annuler
           </button>
