@@ -33,7 +33,7 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
 
   const campaign = await fbPost(`${AD_ACCOUNT_ID}/campaigns`, {
     name:                           `Boost ${postId}`,
-    objective:                      "OUTCOME_ENGAGEMENT",
+    objective:                      "OUTCOME_AWARENESS",
     buying_type:                    "AUCTION",
     status:                         "ACTIVE",
     special_ad_categories:          ["NONE"],
@@ -45,7 +45,7 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
     campaign_id:       campaign.id,
     daily_budget:      budgetPerDay,
     billing_event:     "IMPRESSIONS",
-    optimization_goal: "POST_ENGAGEMENT",
+    optimization_goal: "REACH",
     bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
     targeting: {
       geo_locations: {
