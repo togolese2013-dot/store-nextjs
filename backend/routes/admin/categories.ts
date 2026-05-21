@@ -3,7 +3,6 @@ import { getSession } from "../../lib/auth";
 import {
   listAdminCategories, createCategory, updateCategory, deleteCategory,
   listAdminMarques, createMarque, updateMarque, deleteMarque,
-  listEntrepots, createEntrepot, updateEntrepot, deleteEntrepot,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -69,41 +68,6 @@ router.delete("/api/admin/marques/:id", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   await deleteMarque(Number(req.params.id));
   res.json({ success: true });
-});
-
-// ── Entrepots ─────────────────────────────────────────────────────────────
-router.get("/api/admin/entrepots", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  try {
-    const entrepots = await listEntrepots();
-    res.json({ entrepots });
-  } catch { res.json({ entrepots: [] }); }
-});
-
-router.post("/api/admin/entrepots", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  try {
-    const id = await createEntrepot(req.body);
-    res.status(201).json({ ok: true, id });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
-  }
-});
-
-router.patch("/api/admin/entrepots/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await updateEntrepot(Number(req.params.id), req.body);
-  res.json({ ok: true });
-});
-
-router.delete("/api/admin/entrepots/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await deleteEntrepot(Number(req.params.id));
-  res.json({ ok: true });
 });
 
 export default router;

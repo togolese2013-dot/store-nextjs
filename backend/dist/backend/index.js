@@ -159,6 +159,28 @@ async function produitCols() {
       }
     }
   }
+  if (!names.has("entrepot_id")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`);
+      names.add("entrepot_id");
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("entrepot_id");
+      }
+    }
+  }
+  if (!names.has("prix_entrepot")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`);
+      names.add("prix_entrepot");
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("prix_entrepot");
+      }
+    }
+  }
   if (!names.has("stock_magasin")) {
     try {
       await db.execute(`ALTER TABLE produits ADD COLUMN stock_magasin INT NOT NULL DEFAULT 0`);
@@ -197,7 +219,9 @@ async function produitCols() {
     date_creation: names.has("date_creation"),
     created_at: names.has("created_at"),
     marque_id: names.has("marque_id"),
-    slug: names.has("slug")
+    slug: names.has("slug"),
+    entrepot_id: names.has("entrepot_id"),
+    prix_entrepot: names.has("prix_entrepot")
   };
   return _cols;
 }
@@ -314,11 +338,16 @@ async function getProducts(opts) {
        ${cols.images_json ? "p.images_json" : "NULL"} AS images_json,
        ${cols.marque_id ? "p.marque_id" : "NULL"} AS marque_id,
        ${cols.marque_id ? "m.nom" : "NULL"} AS marque_nom,
+       ${cols.entrepot_id ? "p.entrepot_id" : "NULL"} AS entrepot_id,
+       ${cols.prix_entrepot ? "p.prix_entrepot" : "NULL"} AS prix_entrepot,
+       ${cols.entrepot_id ? "e.nom" : "NULL"} AS entrepot_nom,
+       ${cols.entrepot_id ? "e.telephone" : "NULL"} AS entrepot_telephone,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
+     ${cols.entrepot_id ? "LEFT JOIN entrepots e ON p.entrepot_id = e.id" : ""}
      WHERE ${where}
      ORDER BY ${orderCol} DESC
      LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -344,7 +373,11 @@ async function getProducts(opts) {
     marque_id: r.marque_id ? Number(r.marque_id) : null,
     marque_nom: r.marque_nom ?? null,
     avg_rating: null,
-    review_count: null
+    review_count: null,
+    entrepot_id: r.entrepot_id ? Number(r.entrepot_id) : null,
+    prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
+    entrepot_nom: r.entrepot_nom ?? null,
+    entrepot_telephone: r.entrepot_telephone ?? null
   }));
 }
 async function getProductsByIds(ids) {
@@ -600,7 +633,6 @@ __export(admin_db_exports, {
   createBoutiqueMouvement: () => createBoutiqueMouvement,
   createCategory: () => createCategory,
   createDevis: () => createDevis,
-  createEntrepot: () => createEntrepot,
   createFacture: () => createFacture,
   createFinanceEntry: () => createFinanceEntry,
   createFournisseur: () => createFournisseur,
@@ -636,6 +668,7 @@ __export(admin_db_exports, {
   deleteReview: () => deleteReview,
   deleteUtilisateur: () => deleteUtilisateur,
   ensureAdminUsersCols: () => ensureAdminUsersCols,
+  ensureEntrepotsTable: () => ensureEntrepotsTable,
   ensureIndexes: () => ensureIndexes,
   ensureLivraisonCols: () => ensureLivraisonCols,
   ensureLivreurInscriptionsTable: () => ensureLivreurInscriptionsTable,
@@ -659,7 +692,6 @@ __export(admin_db_exports, {
   getClientStats: () => getClientStats,
   getDashboardStats: () => getDashboardStats,
   getDeliveryZones: () => getDeliveryZones,
-  getEntrepots: () => getEntrepots,
   getFactureById: () => getFactureById,
   getFacturePaiements: () => getFacturePaiements,
   getFinanceStats: () => getFinanceStats,
@@ -673,6 +705,7 @@ __export(admin_db_exports, {
   getOrderEvents: () => getOrderEvents,
   getOrdersStats: () => getOrdersStats,
   getPaymentPlanByOrderId: () => getPaymentPlanByOrderId,
+  getProductEntrepotsForRefs: () => getProductEntrepotsForRefs,
   getProduitsWithStock: () => getProduitsWithStock,
   getRecentBoutiqueMovements: () => getRecentBoutiqueMovements,
   getSetting: () => getSetting,
@@ -734,7 +767,6 @@ __export(admin_db_exports, {
   updateBoutiqueClient: () => updateBoutiqueClient,
   updateCategory: () => updateCategory,
   updateDevisStatut: () => updateDevisStatut,
-  updateEntrepot: () => updateEntrepot,
   updateFacture: () => updateFacture,
   updateFactureStatut: () => updateFactureStatut,
   updateFinanceEntry: () => updateFinanceEntry,
@@ -1320,6 +1352,79 @@ async function ensureOrderLifecycleCols() {
 async function updateOrderStatus(id, status) {
   await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
 }
+async function ensureEntrepotsTable() {
+  return runOnce("entrepots", async () => {
+    await db.execute(`CREATE TABLE IF NOT EXISTS entrepots (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom VARCHAR(150) NOT NULL,
+      telephone VARCHAR(30) NULL,
+      adresse TEXT NULL,
+      notes TEXT NULL,
+      actif TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`);
+    } catch {
+    }
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`);
+    } catch {
+    }
+  });
+}
+async function listEntrepots() {
+  await ensureEntrepotsTable();
+  const [rows] = await db.execute(
+    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots ORDER BY nom"
+  );
+  return rows.map((r) => ({
+    id: Number(r.id),
+    nom: r.nom,
+    telephone: r.telephone ?? null,
+    adresse: r.adresse ?? null,
+    notes: r.notes ?? null,
+    actif: Boolean(r.actif)
+  }));
+}
+async function upsertEntrepot(data) {
+  await ensureEntrepotsTable();
+  if (data.id) {
+    await db.execute(
+      `UPDATE entrepots SET nom = ?, telephone = ?, adresse = ?, notes = ?, actif = ? WHERE id = ?`,
+      [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, data.id]
+    );
+    return data.id;
+  }
+  const [result] = await db.execute(
+    `INSERT INTO entrepots (nom, telephone, adresse, notes, actif) VALUES (?, ?, ?, ?, ?)`,
+    [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0]
+  );
+  return result.insertId;
+}
+async function deleteEntrepot(id) {
+  await db.execute("DELETE FROM entrepots WHERE id = ?", [id]);
+}
+async function getProductEntrepotsForRefs(refs) {
+  if (!refs.length) return {};
+  const placeholders = refs.map(() => "?").join(",");
+  const [rows] = await db.query(
+    `SELECT p.reference, p.prix_entrepot, e.nom AS entrepot_nom, e.telephone
+     FROM produits p
+     JOIN entrepots e ON p.entrepot_id = e.id
+     WHERE p.reference IN (${placeholders}) AND p.entrepot_id IS NOT NULL`,
+    refs
+  );
+  const map = {};
+  for (const r of rows) {
+    map[r.reference] = {
+      entrepot_nom: r.entrepot_nom,
+      telephone: r.telephone ?? null,
+      prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null
+    };
+  }
+  return map;
+}
 async function updateOrderFields(id, data) {
   const sets = [];
   const params = [];
@@ -1522,13 +1627,35 @@ async function ensureOrderVente(orderId, actor) {
   }
   const isDelivered = ["delivered", "livree", "livre", "livr\xE9"].includes(String(order.status ?? ""));
   if (isDelivered && !order.finance_entry_id) {
-    const montant = Math.max(0, Number(order.subtotal ?? 0) - Number(order.coupon_remise ?? 0));
+    const parsedItems = parseOrderItems(order.items);
+    const refs = parsedItems.map((i) => String(i.reference ?? "")).filter(Boolean);
+    let entrepotCost = 0;
+    if (refs.length > 0) {
+      try {
+        const placeholders = refs.map(() => "?").join(",");
+        const [entrepotRows] = await db.query(
+          `SELECT p.reference, p.prix_entrepot FROM produits p
+           WHERE p.reference IN (${placeholders}) AND p.entrepot_id IS NOT NULL AND p.prix_entrepot IS NOT NULL`,
+          refs
+        );
+        const eMap = /* @__PURE__ */ new Map();
+        for (const r of entrepotRows) {
+          if (r.prix_entrepot != null) eMap.set(r.reference, Number(r.prix_entrepot));
+        }
+        for (const item of parsedItems) {
+          const pe = eMap.get(String(item.reference ?? ""));
+          if (pe != null) entrepotCost += pe * Number(item.qty ?? item.quantite ?? 1);
+        }
+      } catch {
+      }
+    }
+    const montant = Math.max(0, Number(order.subtotal ?? 0) - Number(order.coupon_remise ?? 0) - entrepotCost);
     if (montant > 0) {
       const entryId = await createFinanceEntry({
         type: "vente",
         montant,
         mode_paiement: orderPaymentModeToFinanceMode(order.payment_mode) ?? "especes",
-        description: `Commande site livr\xE9e \u2014 ${order.reference}`,
+        description: `Commande site livr\xE9e \u2014 ${order.reference}${entrepotCost > 0 ? ` (marge nette, co\xFBt entrep\xF4t ${entrepotCost} FCFA d\xE9duit)` : ""}`,
         date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
         admin_id: actor?.id,
         admin_nom: actor?.nom
@@ -1996,21 +2123,6 @@ async function getCRMStats() {
     newClients30d: Number(newClients[0]?.cnt ?? 0),
     topClients
   };
-}
-async function listEntrepots() {
-  return [];
-}
-async function getEntrepots() {
-  return [];
-}
-async function upsertEntrepot(_e) {
-}
-async function createEntrepot(_e) {
-  return 1;
-}
-async function updateEntrepot(_id, _e) {
-}
-async function deleteEntrepot(_id) {
 }
 async function updateProductStock(produit_id, _entrepot_id, stock) {
   await db.execute(
@@ -3956,9 +4068,9 @@ async function fixSiteOrderFinanceEntries() {
     try {
       const [result] = await db.execute(
         `UPDATE finance_entries fe
-         JOIN orders o ON fe.description LIKE CONCAT('%', o.reference, '%')
+         JOIN orders o ON fe.description LIKE CONCAT('%', o.reference COLLATE utf8mb4_unicode_ci, '%')
          SET fe.montant = fe.montant - o.delivery_fee
-         WHERE fe.description LIKE 'Commande site livr\xE9e%'
+         WHERE fe.description LIKE 'Commande site livr\xE9e%' COLLATE utf8mb4_unicode_ci
            AND o.delivery_fee > 0
            AND fe.montant > o.delivery_fee`
       );
@@ -3991,7 +4103,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express42 = __toESM(require("express"));
+var import_express43 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -4524,6 +4636,14 @@ router2.post("/api/admin/products", async (req, res) => {
       await db.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_slug (slug)`);
     } catch {
     }
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`);
+    } catch {
+    }
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`);
+    } catch {
+    }
     invalidateProduitColsCache();
     const cols = await produitCols();
     const columns = ["reference", "nom", "description", "categorie_id", "prix_unitaire"];
@@ -4573,6 +4693,14 @@ router2.post("/api/admin/products", async (req, res) => {
     values.push(imagesJson);
     columns.push("slug");
     values.push(autoSlug || null);
+    if (body.entrepot_id != null) {
+      columns.push("entrepot_id");
+      values.push(Number(body.entrepot_id) || null);
+    }
+    if (body.prix_entrepot != null) {
+      columns.push("prix_entrepot");
+      values.push(Number(body.prix_entrepot) || null);
+    }
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await db.execute(
       `INSERT INTO produits (${columns.join(", ")}) VALUES (${placeholders})`,
@@ -4765,6 +4893,14 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       await db.execute(`ALTER TABLE produits ADD COLUMN description_longue TEXT NULL`);
     } catch {
     }
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`);
+    } catch {
+    }
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`);
+    } catch {
+    }
     invalidateProduitColsCache();
     const cols = await produitCols();
     const body = req.body;
@@ -4782,7 +4918,9 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       "neuf",
       "actif",
       "reference",
-      "slug"
+      "slug",
+      "entrepot_id",
+      "prix_entrepot"
     ];
     for (const key of alwaysAllowed) {
       if (key in body) {
@@ -6330,38 +6468,6 @@ router14.delete("/api/admin/marques/:id", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   await deleteMarque(Number(req.params.id));
   res.json({ success: true });
-});
-router14.get("/api/admin/entrepots", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  try {
-    const entrepots = await listEntrepots();
-    res.json({ entrepots });
-  } catch {
-    res.json({ entrepots: [] });
-  }
-});
-router14.post("/api/admin/entrepots", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  try {
-    const id = await createEntrepot(req.body);
-    res.status(201).json({ ok: true, id });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
-  }
-});
-router14.patch("/api/admin/entrepots/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await updateEntrepot(Number(req.params.id), req.body);
-  res.json({ ok: true });
-});
-router14.delete("/api/admin/entrepots/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await deleteEntrepot(Number(req.params.id));
-  res.json({ ok: true });
 });
 var categories_default = router14;
 
@@ -10267,11 +10373,80 @@ var coupons_default = router38;
 var import_express39 = __toESM(require("express"));
 var router39 = import_express39.default.Router();
 var N8N_WEBHOOK = "https://n8n.togolese.fr/webhook/facebook-publisher";
+var AD_ACCOUNT_ID = "act_976291178146381";
+var PAGE_ID = "1110500725482756";
+var FB_API_VERSION = "v21.0";
+var FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
+async function fbPost(path, body, token) {
+  const url = `${FB_API_BASE}/${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, access_token: token })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(data?.error?.message || `Meta API error on ${path}: HTTP ${res.status}`);
+  }
+  return data;
+}
+async function boostPost(postId, budgetPerDay, days) {
+  const token = process.env.META_ADS_TOKEN;
+  if (!token) throw new Error("META_ADS_TOKEN non configur\xE9.");
+  const now = Math.floor(Date.now() / 1e3);
+  const endTime = now + days * 86400 + 3600;
+  const campaign = await fbPost(`${AD_ACCOUNT_ID}/campaigns`, {
+    name: `Boost ${postId}`,
+    objective: "OUTCOME_AWARENESS",
+    buying_type: "AUCTION",
+    status: "ACTIVE",
+    special_ad_categories: ["NONE"],
+    is_adset_budget_sharing_enabled: false
+  }, token);
+  const adset = await fbPost(`${AD_ACCOUNT_ID}/adsets`, {
+    name: "Acheteurs Togo \u2014 Mobile",
+    campaign_id: campaign.id,
+    daily_budget: budgetPerDay,
+    billing_event: "IMPRESSIONS",
+    optimization_goal: "REACH",
+    bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+    targeting: {
+      geo_locations: {
+        countries: ["TG"]
+      },
+      age_min: 22,
+      age_max: 50,
+      device_platforms: ["mobile"],
+      publisher_platforms: ["facebook"],
+      facebook_positions: ["feed"],
+      targeting_automation: { advantage_audience: 0 }
+    },
+    start_time: now,
+    end_time: endTime,
+    status: "ACTIVE"
+  }, token);
+  const waNumber = process.env.WHATSAPP_NUMBER || "22890527912";
+  const creative = await fbPost(`${AD_ACCOUNT_ID}/adcreatives`, {
+    name: `Creative \u2014 ${postId}`,
+    object_story_id: `${PAGE_ID}_${postId}`,
+    call_to_action: {
+      type: "CONTACT_US",
+      value: { link: `https://wa.me/${waNumber}` }
+    }
+  }, token);
+  const ad = await fbPost(`${AD_ACCOUNT_ID}/ads`, {
+    name: "Boost Togo",
+    adset_id: adset.id,
+    creative: { creative_id: creative.id },
+    status: "ACTIVE"
+  }, token);
+  return ad.id;
+}
 router39.post("/api/admin/social/publish", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-    const { type, products } = req.body;
+    const { type, products, boost, boostBudget, boostDays } = req.body;
     if (!type || !Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ error: "Payload invalide." });
     }
@@ -10284,7 +10459,24 @@ router39.post("/api/admin/social/publish", async (req, res) => {
     if (!n8nRes.ok) {
       return res.status(502).json({ error: data?.error || `n8n a retourn\xE9 HTTP ${n8nRes.status}` });
     }
-    res.json({ ok: true, ...data });
+    let boostAdId = null;
+    let boostError = null;
+    console.log("[social] n8n response:", JSON.stringify(data));
+    if (boost === true) {
+      const rawPostId = data?.post_id || data?.id || data?.[0]?.id || "";
+      const postId = String(rawPostId).includes("_") ? String(rawPostId).split("_").pop() : String(rawPostId);
+      if (postId) {
+        const budget = Number(boostBudget) > 0 ? Number(boostBudget) : 2e3;
+        const days = Number(boostDays) > 0 ? Number(boostDays) : 3;
+        boostAdId = await boostPost(postId, budget, days).catch((err) => {
+          boostError = err instanceof Error ? err.message : "Erreur boost.";
+          return null;
+        });
+      } else {
+        boostError = "post_id introuvable dans la r\xE9ponse n8n \u2014 boost impossible.";
+      }
+    }
+    res.json({ ok: true, ...data, boostAdId, boostError });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
@@ -10540,12 +10732,56 @@ router41.post("/api/admin/livreur-inscriptions/:id/reject", async (req, res) => 
 });
 var livreur_inscriptions_default = router41;
 
+// routes/admin/entrepots.ts
+var import_express42 = __toESM(require("express"));
+init_admin_db();
+var router42 = import_express42.default.Router();
+router42.get("/api/admin/entrepots", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const entrepots = await listEntrepots();
+    res.json({ entrepots });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router42.post("/api/admin/entrepots", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  const { id, nom, telephone, adresse, notes, actif } = req.body;
+  if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
+  try {
+    const newId = await upsertEntrepot({ id: id ? Number(id) : void 0, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false });
+    res.json({ ok: true, id: newId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router42.delete("/api/admin/entrepots/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    await deleteEntrepot(Number(req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+var entrepots_default = router42;
+
 // index.ts
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express42.default)();
+var app = (0, import_express43.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -10618,8 +10854,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express42.default.json({ limit: "5mb" }));
-app.use(import_express42.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express43.default.json({ limit: "5mb" }));
+app.use(import_express43.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -10662,6 +10898,7 @@ app.use(coupons_default);
 app.use(social_default);
 app.use(whatsapp_campagne_default);
 app.use(livreur_inscriptions_default);
+app.use(entrepots_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {
@@ -10729,6 +10966,12 @@ app.listen(PORT, async () => {
     console.log("[backend] wa_messages media cols OK");
   } catch (e) {
     console.error("[backend] ensureWaMessagesCols failed:", e);
+  }
+  try {
+    await ensureEntrepotsTable();
+    console.log("[backend] entrepots table OK");
+  } catch (e) {
+    console.error("[backend] ensureEntrepotsTable failed:", e);
   }
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
