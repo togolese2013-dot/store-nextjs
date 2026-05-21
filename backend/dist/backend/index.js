@@ -159,6 +159,18 @@ async function produitCols() {
       }
     }
   }
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS entrepots (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom VARCHAR(150) NOT NULL,
+      telephone VARCHAR(30) NULL,
+      adresse TEXT NULL,
+      notes TEXT NULL,
+      actif TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+  } catch {
+  }
   if (!names.has("entrepot_id")) {
     try {
       await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`);

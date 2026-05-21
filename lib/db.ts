@@ -135,6 +135,19 @@ export async function produitCols() {
     }
   }
 
+  // Ensure entrepots table exists before adding FK column
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS entrepots (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom VARCHAR(150) NOT NULL,
+      telephone VARCHAR(30) NULL,
+      adresse TEXT NULL,
+      notes TEXT NULL,
+      actif TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+  } catch { /* already exists */ }
+
   // Auto-migrate: add entrepot_id column if missing
   if (!names.has("entrepot_id")) {
     try {
