@@ -62,7 +62,7 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
         setMobileOpen={setMobileOpen}
       />
       <div className="lg:pl-60 xl:pl-64 min-w-0">
-        <main className="min-h-screen p-4 sm:p-6 lg:p-8 min-w-0">
+        <main className="min-h-screen p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">
           <div className="lg:hidden mb-4">
             <button
               onClick={() => setMobileOpen(true)}

@@ -44,10 +44,11 @@ router.get("/api/admin/products", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
-  const q       = (req.query.q as string) || undefined;
-  const catId   = req.query.category ? Number(req.query.category) : undefined;
-  const brandId = req.query.brand    ? Number(req.query.brand)    : undefined;
-  const statut  = (req.query.statut as string) || undefined;
+  const q          = (req.query.q as string) || undefined;
+  const catId      = req.query.category   ? Number(req.query.category)   : undefined;
+  const brandId    = req.query.brand      ? Number(req.query.brand)      : undefined;
+  const entrepotId = req.query.entrepot_id ? Number(req.query.entrepot_id) : undefined;
+  const statut     = (req.query.statut as string) || undefined;
   const page    = Math.max(1, Number(req.query.page) || 1);
   const limit   = Math.min(500, Number(req.query.limit) || 20);
   const offset  = req.query.offset !== undefined ? Number(req.query.offset) : (page - 1) * limit;
@@ -56,8 +57,8 @@ router.get("/api/admin/products", async (req, res) => {
     : undefined;
 
   const [products, total] = await Promise.all([
-    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true }),
-    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true }),
+    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true, entrepotId }),
+    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true, entrepotId }),
   ]);
 
   res.json({ products, total, page, limit });

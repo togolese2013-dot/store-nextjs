@@ -278,11 +278,12 @@ export async function getProducts(opts?: {
   offset?: number;
   statut?: "disponible" | "faible" | "epuise";
   includeInactive?: boolean;
+  entrepotId?: number;
 }): Promise<Product[]> {
   const {
     categoryId, marqueId, search, referenceExact, promoOnly, newOnly,
     inStock, minPrice, maxPrice,
-    limit = 60, offset = 0, statut, includeInactive = false,
+    limit = 60, offset = 0, statut, includeInactive = false, entrepotId,
   } = opts ?? {};
 
   const cols = await produitCols();
@@ -302,6 +303,7 @@ export async function getProducts(opts?: {
   if (inStock)                   { conditions.push("COALESCE(p.stock_boutique, 0) > 0"); }
   if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
+  if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
 
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -499,8 +501,9 @@ export async function getProductCount(opts?: {
   maxPrice?: number;
   statut?: "disponible" | "faible" | "epuise";
   includeInactive?: boolean;
+  entrepotId?: number;
 }): Promise<number> {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId } = opts ?? {};
   const cols = await produitCols();
 
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
@@ -517,6 +520,7 @@ export async function getProductCount(opts?: {
   if (statut === "epuise")      { conditions.push("COALESCE(p.stock_boutique, 0) = 0"); }
   if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
+  if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,

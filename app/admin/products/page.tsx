@@ -393,7 +393,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                         : null;
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-5 py-3">
+                          <td className="px-5 py-3 max-w-0 w-1/2">
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden relative shrink-0">
                                 {imgSrc ? (
