@@ -47,7 +47,8 @@ async function boostPost(postId: string, budgetPerDay: number, days: number): Pr
     campaign_id:       campaign.id,
     daily_budget:      budgetPerDay,
     billing_event:     "IMPRESSIONS",
-    optimization_goal: "REACH",
+    optimization_goal: "POST_ENGAGEMENT",
+    bid_strategy:      "LOWEST_COST_WITHOUT_CAP",
     targeting: {
       geo_locations: {
         countries: ["TG"],
