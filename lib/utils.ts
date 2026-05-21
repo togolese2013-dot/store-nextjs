@@ -21,6 +21,10 @@ export interface Product {
   marque_nom: string | null;
   avg_rating?: number | null;
   review_count?: number | null;
+  entrepot_id?: number | null;
+  prix_entrepot?: number | null;
+  entrepot_nom?: string | null;
+  entrepot_telephone?: string | null;
 }
 
 export interface Category {

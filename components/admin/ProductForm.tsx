@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/utils";
-import { Loader2, Save, Plus, Trash2, ImagePlus, Package } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, ImagePlus, Package, Warehouse } from "lucide-react";
 import { clsx } from "clsx";
 import VariantsManager from "./VariantsManager";
 
@@ -37,6 +37,14 @@ interface ProductData {
   actif:              boolean;
   image_url:          string;
   images:             string[];
+  entrepot_id:        number | null;
+  prix_entrepot:      number | "";
+}
+
+interface EntrepotItem {
+  id: number;
+  nom: string;
+  telephone: string | null;
 }
 
 interface PendingVariant {
@@ -90,6 +98,8 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     neuf:               initial?.neuf               ?? false,
     actif:              initial?.actif              ?? true,
     image_url:          initial?.image_url          ?? "",
+    entrepot_id:        (initial as Record<string, unknown>)?.entrepot_id as number | null ?? null,
+    prix_entrepot:      (initial as Record<string, unknown>)?.prix_entrepot as number | "" ?? "",
     ...initial,
     images:             secondaryImages,
   });
@@ -112,7 +122,8 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
   const [uploadingSecond,setUploadingSecond]= useState(false);
   const [error,          setError]          = useState("");
   const [success,   setSuccess]   = useState(false);
-  const [schema,    setSchema]    = useState({ hasRemise: true, hasNeuf: true, hasImagesJson: true });
+  const [schema,      setSchema]      = useState({ hasRemise: true, hasNeuf: true, hasImagesJson: true });
+  const [entrepots,   setEntrepots]   = useState<EntrepotItem[]>([]);
 
   // Pending variants (creation mode only — in edit mode VariantsManager handles it live)
   const [variants,          setVariants]          = useState<PendingVariant[]>([]);
@@ -125,6 +136,13 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     fetch("/api/admin/schema/columns")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSchema({ hasRemise: d.hasRemise, hasNeuf: d.hasNeuf, hasImagesJson: d.hasImagesJson }); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/admin/entrepots")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.entrepots) setEntrepots(d.entrepots.filter((e: EntrepotItem & { actif: boolean }) => e.actif)); })
       .catch(() => {});
   }, []);
 
@@ -269,6 +287,8 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       if (schema.hasRemise)    payload.remise = form.remise;
       if (schema.hasNeuf)      payload.neuf   = form.neuf;
       if (form.images.length > 0) payload.images = form.images;
+      payload.entrepot_id   = form.entrepot_id ?? null;
+      payload.prix_entrepot = form.entrepot_id && form.prix_entrepot !== "" ? Number(form.prix_entrepot) : null;
       const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur"); return; }
@@ -538,6 +558,53 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                 </div>
               </section>
             )}
+
+            {/* Source entrepôt */}
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                <Warehouse className="w-3.5 h-3.5" /> Source entrepôt
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Entrepôt fournisseur</label>
+                  <select
+                    value={form.entrepot_id ?? ""}
+                    onChange={e => set("entrepot_id", e.target.value ? Number(e.target.value) : null)}
+                    className={inputCls}
+                  >
+                    <option value="">— Aucun (produit propre) —</option>
+                    {entrepots.map(e => (
+                      <option key={e.id} value={e.id}>{e.nom}{e.telephone ? ` · ${e.telephone}` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+                {form.entrepot_id && (
+                  <div>
+                    <label className={labelCls}>
+                      Prix entrepôt (FCFA)
+                      {form.entrepot_id && form.prix_entrepot !== "" && form.prix_unitaire !== "" && (
+                        <span className="ml-2 text-emerald-600 font-bold normal-case tracking-normal">
+                          → Marge : {(Number(form.prix_unitaire) - Number(form.prix_entrepot)).toLocaleString("fr-FR")} FCFA
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.prix_entrepot}
+                      onChange={e => set("prix_entrepot", e.target.value !== "" ? Number(e.target.value) : "")}
+                      placeholder="0"
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+              </div>
+              {form.entrepot_id && (
+                <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
+                  Ce produit sera récupéré à l&apos;entrepôt lors des commandes. Aucun impact sur le stock boutique.
+                </p>
+              )}
+            </section>
 
             {/* Variantes */}
             <section className="space-y-3">

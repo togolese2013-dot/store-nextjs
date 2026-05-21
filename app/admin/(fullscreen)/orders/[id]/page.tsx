@@ -1,11 +1,11 @@
-import { getOrderById, getOrderEvents } from "@/lib/admin-db";
+import { getOrderById, getOrderEvents, getProductEntrepotsForRefs } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 import OrderTimeline from "@/components/admin/OrderTimeline";
 import OrderConfirmButton from "@/components/admin/OrderConfirmButton";
 import OrderDetailActions from "@/components/admin/OrderDetailActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, Package, Phone, MapPin, MessageSquare, Link2 } from "lucide-react";
+import { ArrowLeft, Download, Package, Phone, MapPin, MessageSquare, Link2, Warehouse } from "lucide-react";
 
 export const metadata = { title: "Détail commande" };
 
@@ -38,6 +38,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
     const raw = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
     if (Array.isArray(raw)) items = raw;
   } catch { /* malformed items JSON — render empty */ }
+
+  const refs = items.map(i => i.reference).filter(Boolean) as string[];
+  const entrepotMap: Record<string, { entrepot_nom: string; telephone: string | null; prix_entrepot: number | null }> =
+    await getProductEntrepotsForRefs(refs).catch(() => ({}));
 
   /* Build typed order for client component */
   const orderForActions = {
@@ -117,17 +121,41 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-3 py-3">
-                        <p className="font-semibold text-slate-800">{item.nom}</p>
-                        {item.reference && <p className="text-xs text-slate-400">{item.reference}</p>}
-                      </td>
-                      <td className="px-3 py-3 text-center text-slate-600">{item.qty}</td>
-                      <td className="px-3 py-3 text-right text-slate-500">{formatPrice(item.prix_unitaire)}</td>
-                      <td className="px-3 py-3 text-right font-bold text-slate-900">{formatPrice(item.total)}</td>
-                    </tr>
-                  ))}
+                  {items.map((item, idx) => {
+                    const entrepot = item.reference ? entrepotMap[item.reference] : null;
+                    const marge = entrepot?.prix_entrepot != null
+                      ? item.prix_unitaire * item.qty - entrepot.prix_entrepot * item.qty
+                      : null;
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-3 py-3">
+                          <p className="font-semibold text-slate-800">{item.nom}</p>
+                          {item.reference && <p className="text-xs text-slate-400">{item.reference}</p>}
+                          {entrepot && (
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                                <Warehouse className="w-2.5 h-2.5" /> {entrepot.entrepot_nom}
+                              </span>
+                              {entrepot.telephone && (
+                                <a href={`https://wa.me/${entrepot.telephone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
+                                  className="text-[10px] font-semibold text-emerald-700 hover:underline">
+                                  {entrepot.telephone}
+                                </a>
+                              )}
+                              {marge != null && (
+                                <span className="text-[10px] font-bold text-emerald-600">
+                                  Marge : {formatPrice(marge)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-center text-slate-600">{item.qty}</td>
+                        <td className="px-3 py-3 text-right text-slate-500">{formatPrice(item.prix_unitaire)}</td>
+                        <td className="px-3 py-3 text-right font-bold text-slate-900">{formatPrice(item.total)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

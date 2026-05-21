@@ -706,6 +706,91 @@ export async function updateOrderStatus(id: number, status: string) {
   await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
 }
 
+// ─── Entrepôts ────────────────────────────────────────────────────────────────
+
+export interface Entrepot {
+  id: number;
+  nom: string;
+  telephone: string | null;
+  adresse: string | null;
+  notes: string | null;
+  actif: boolean;
+}
+
+export async function ensureEntrepotsTable(): Promise<void> {
+  return runOnce("entrepots", async () => {
+    await db.execute(`CREATE TABLE IF NOT EXISTS entrepots (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom VARCHAR(150) NOT NULL,
+      telephone VARCHAR(30) NULL,
+      adresse TEXT NULL,
+      notes TEXT NULL,
+      actif TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    try { await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`); } catch { /* exists */ }
+    try { await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`); } catch { /* exists */ }
+  });
+}
+
+export async function listEntrepots(): Promise<Entrepot[]> {
+  await ensureEntrepotsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots ORDER BY nom"
+  );
+  return (rows as mysql.RowDataPacket[]).map(r => ({
+    id:        Number(r.id),
+    nom:       r.nom as string,
+    telephone: (r.telephone ?? null) as string | null,
+    adresse:   (r.adresse ?? null) as string | null,
+    notes:     (r.notes ?? null) as string | null,
+    actif:     Boolean(r.actif),
+  }));
+}
+
+export async function upsertEntrepot(data: Partial<Entrepot> & { nom: string }): Promise<number> {
+  await ensureEntrepotsTable();
+  if (data.id) {
+    await db.execute(
+      `UPDATE entrepots SET nom = ?, telephone = ?, adresse = ?, notes = ?, actif = ? WHERE id = ?`,
+      [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, data.id]
+    );
+    return data.id;
+  }
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO entrepots (nom, telephone, adresse, notes, actif) VALUES (?, ?, ?, ?, ?)`,
+    [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0]
+  );
+  return result.insertId;
+}
+
+export async function deleteEntrepot(id: number): Promise<void> {
+  await db.execute("DELETE FROM entrepots WHERE id = ?", [id]);
+}
+
+export async function getProductEntrepotsForRefs(
+  refs: string[]
+): Promise<Record<string, { entrepot_nom: string; telephone: string | null; prix_entrepot: number | null }>> {
+  if (!refs.length) return {};
+  const placeholders = refs.map(() => "?").join(",");
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT p.reference, p.prix_entrepot, e.nom AS entrepot_nom, e.telephone
+     FROM produits p
+     JOIN entrepots e ON p.entrepot_id = e.id
+     WHERE p.reference IN (${placeholders}) AND p.entrepot_id IS NOT NULL`,
+    refs
+  );
+  const map: Record<string, { entrepot_nom: string; telephone: string | null; prix_entrepot: number | null }> = {};
+  for (const r of rows as mysql.RowDataPacket[]) {
+    map[r.reference as string] = {
+      entrepot_nom:  r.entrepot_nom as string,
+      telephone:     (r.telephone ?? null) as string | null,
+      prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
+    };
+  }
+  return map;
+}
+
 export async function updateOrderFields(id: number, data: {
   nom?:               string;
   telephone?:         string;
@@ -904,13 +989,35 @@ export async function ensureOrderVente(
   // Create vente finance entry once when order is delivered
   const isDelivered = ["delivered", "livree", "livre", "livré"].includes(String(order.status ?? ""));
   if (isDelivered && !order.finance_entry_id) {
-    const montant = Math.max(0, Number(order.subtotal ?? 0) - Number(order.coupon_remise ?? 0));
+    // Deduct entrepôt cost so finance entry = margin only
+    const parsedItems = parseOrderItems(order.items);
+    const refs = parsedItems.map(i => String(i.reference ?? "")).filter(Boolean);
+    let entrepotCost = 0;
+    if (refs.length > 0) {
+      try {
+        const placeholders = refs.map(() => "?").join(",");
+        const [entrepotRows] = await db.query<mysql.RowDataPacket[]>(
+          `SELECT p.reference, p.prix_entrepot FROM produits p
+           WHERE p.reference IN (${placeholders}) AND p.entrepot_id IS NOT NULL AND p.prix_entrepot IS NOT NULL`,
+          refs
+        );
+        const eMap = new Map<string, number>();
+        for (const r of entrepotRows as mysql.RowDataPacket[]) {
+          if (r.prix_entrepot != null) eMap.set(r.reference as string, Number(r.prix_entrepot));
+        }
+        for (const item of parsedItems) {
+          const pe = eMap.get(String(item.reference ?? ""));
+          if (pe != null) entrepotCost += pe * Number(item.qty ?? item.quantite ?? 1);
+        }
+      } catch { /* non-fatal — proceed with full amount */ }
+    }
+    const montant = Math.max(0, Number(order.subtotal ?? 0) - Number(order.coupon_remise ?? 0) - entrepotCost);
     if (montant > 0) {
       const entryId = await createFinanceEntry({
         type:          "vente",
         montant,
         mode_paiement: orderPaymentModeToFinanceMode(order.payment_mode as string | null) ?? "especes",
-        description:   `Commande site livrée — ${order.reference}`,
+        description:   `Commande site livrée — ${order.reference}${entrepotCost > 0 ? ` (marge nette, coût entrepôt ${entrepotCost} FCFA déduit)` : ""}`,
         date_entree:   new Date().toISOString().slice(0, 10),
         admin_id:      actor?.id,
         admin_nom:     actor?.nom,
@@ -1487,19 +1594,6 @@ export async function getCRMStats() {
     topClients: topClients as unknown as Record<string, unknown>[],
   };
 }
-
-/* ─── Entrepôts — supprimés, stubs pour compatibilité des imports ─── */
-export interface Entrepot {
-  id: number; nom: string; adresse: string | null;
-  telephone: string | null; responsable: string | null;
-  actif: boolean; sort_order: number; created_at: string;
-}
-export async function listEntrepots(): Promise<Entrepot[]> { return []; }
-export async function getEntrepots():  Promise<Entrepot[]> { return []; }
-export async function upsertEntrepot(_e: unknown): Promise<void> {}
-export async function createEntrepot(_e: unknown): Promise<number> { return 1; }
-export async function updateEntrepot(_id: number, _e: unknown): Promise<void> {}
-export async function deleteEntrepot(_id: number): Promise<void> {}
 
 export interface ProduitStock {
   produit_id: number; stock: number;

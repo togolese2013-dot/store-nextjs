@@ -135,6 +135,32 @@ export async function produitCols() {
     }
   }
 
+  // Auto-migrate: add entrepot_id column if missing
+  if (!names.has("entrepot_id")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`);
+      names.add("entrepot_id");
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("entrepot_id");
+      }
+    }
+  }
+
+  // Auto-migrate: add prix_entrepot column if missing
+  if (!names.has("prix_entrepot")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`);
+      names.add("prix_entrepot");
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("prix_entrepot");
+      }
+    }
+  }
+
   // Auto-migrate: add stock_magasin column directly on produits if missing
   if (!names.has("stock_magasin")) {
     try {
@@ -175,6 +201,8 @@ export async function produitCols() {
     created_at:      names.has("created_at"),
     marque_id:       names.has("marque_id"),
     slug:            names.has("slug"),
+    entrepot_id:     names.has("entrepot_id"),
+    prix_entrepot:   names.has("prix_entrepot"),
   };
   return _cols;
 }
@@ -275,11 +303,16 @@ export async function getProducts(opts?: {
        ${cols.images_json     ? "p.images_json"                                : "NULL" } AS images_json,
        ${cols.marque_id       ? "p.marque_id"                                  : "NULL" } AS marque_id,
        ${cols.marque_id       ? "m.nom"                                        : "NULL" } AS marque_nom,
+       ${cols.entrepot_id     ? "p.entrepot_id"                                : "NULL" } AS entrepot_id,
+       ${cols.prix_entrepot   ? "p.prix_entrepot"                              : "NULL" } AS prix_entrepot,
+       ${cols.entrepot_id     ? "e.nom"                                        : "NULL" } AS entrepot_nom,
+       ${cols.entrepot_id     ? "e.telephone"                                  : "NULL" } AS entrepot_telephone,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
-     ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
+     ${cols.marque_id   ? "LEFT JOIN marques m ON p.marque_id = m.id"     : ""}
+     ${cols.entrepot_id ? "LEFT JOIN entrepots e ON p.entrepot_id = e.id" : ""}
      WHERE ${where}
      ORDER BY ${orderCol} DESC
      LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -287,26 +320,30 @@ export async function getProducts(opts?: {
   );
 
   return rows.map((r) => ({
-    id:             Number(r.id),
-    reference:      r.reference as string,
-    slug:           (r.slug ?? null) as string | null,
-    nom:            r.nom as string,
-    description:    (r.description ?? null) as string | null,
-    categorie_id:   r.categorie_id ? Number(r.categorie_id) : null,
-    categorie_nom:  (r.categorie_nom ?? null) as string | null,
-    prix_unitaire:  Number(r.prix_unitaire),
-    stock_boutique: Number(r.stock_boutique),
-    stock_magasin:  Number(r.stock_magasin ?? 0),
-    remise:         Number(r.remise),
-    neuf:           Boolean(r.neuf),
-    image_url:      (r.image_url ?? null) as string | null,
-    images:         r.images_json ? tryParse(r.images_json as string) : [],
-    variations:     r.variations_json ? tryParse(r.variations_json as string) : null,
-    date_creation:  (r.sort_col ?? "") as string,
-    marque_id:      r.marque_id ? Number(r.marque_id) : null,
-    marque_nom:     (r.marque_nom ?? null) as string | null,
-    avg_rating:     null,
-    review_count:   null,
+    id:                  Number(r.id),
+    reference:           r.reference as string,
+    slug:                (r.slug ?? null) as string | null,
+    nom:                 r.nom as string,
+    description:         (r.description ?? null) as string | null,
+    categorie_id:        r.categorie_id ? Number(r.categorie_id) : null,
+    categorie_nom:       (r.categorie_nom ?? null) as string | null,
+    prix_unitaire:       Number(r.prix_unitaire),
+    stock_boutique:      Number(r.stock_boutique),
+    stock_magasin:       Number(r.stock_magasin ?? 0),
+    remise:              Number(r.remise),
+    neuf:                Boolean(r.neuf),
+    image_url:           (r.image_url ?? null) as string | null,
+    images:              r.images_json ? tryParse(r.images_json as string) : [],
+    variations:          r.variations_json ? tryParse(r.variations_json as string) : null,
+    date_creation:       (r.sort_col ?? "") as string,
+    marque_id:           r.marque_id ? Number(r.marque_id) : null,
+    marque_nom:          (r.marque_nom ?? null) as string | null,
+    avg_rating:          null,
+    review_count:        null,
+    entrepot_id:         r.entrepot_id ? Number(r.entrepot_id) : null,
+    prix_entrepot:       r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
+    entrepot_nom:        (r.entrepot_nom ?? null) as string | null,
+    entrepot_telephone:  (r.entrepot_telephone ?? null) as string | null,
   })) as Product[];
 }
 

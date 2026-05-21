@@ -104,6 +104,8 @@ router.post("/api/admin/products", async (req, res) => {
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN description_longue TEXT NULL`); } catch { /* already exists */ }
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN slug VARCHAR(255) NULL`); } catch { /* already exists */ }
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_slug (slug)`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`); } catch { /* already exists */ }
     invalidateProduitColsCache();
     const cols = await produitCols();
 
@@ -127,6 +129,9 @@ router.post("/api/admin/products", async (req, res) => {
     columns.push("images_json"); values.push(imagesJson);
     // slug
     columns.push("slug"); values.push(autoSlug || null);
+    // entrepôt
+    if (body.entrepot_id != null) { columns.push("entrepot_id"); values.push(Number(body.entrepot_id) || null); }
+    if (body.prix_entrepot != null) { columns.push("prix_entrepot"); values.push(Number(body.prix_entrepot) || null); }
 
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await (db as import("mysql2/promise").Pool).execute<mysql.ResultSetHeader>(
@@ -307,6 +312,8 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN stock_minimum INT NULL DEFAULT 5`); } catch { /* already exists */ }
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`); } catch { /* already exists */ }
     try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN description_longue TEXT NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`); } catch { /* already exists */ }
+    try { await (db as import("mysql2/promise").Pool).execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`); } catch { /* already exists */ }
     invalidateProduitColsCache();
     const cols = await produitCols();
     const body = req.body;
@@ -314,7 +321,8 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     const vals: (string | number | boolean | null)[] = [];
     // Only include columns that exist in the DB schema
     const alwaysAllowed = ["nom","description","description_longue","categorie_id","prix_unitaire",
-                           "stock_magasin","stock_boutique","remise","neuf","actif","reference","slug"];
+                           "stock_magasin","stock_boutique","remise","neuf","actif","reference","slug",
+                           "entrepot_id","prix_entrepot"];
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }

@@ -56,6 +56,7 @@ import adminSocialRoutes        from "./routes/admin/social";
 import adminWaCampagneRoutes     from "./routes/admin/whatsapp-campagne";
 import { recoverMixByYasEntries, recoverCouponFinanceEntries } from "./routes/admin/finance";
 import adminLivreurInscriptionsRoutes from "./routes/admin/livreur-inscriptions";
+import adminEntrepotsRoutes, { ensureEntrepotsTable } from "./routes/admin/entrepots";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -192,6 +193,7 @@ app.use(adminCouponsRoutes);
 app.use(adminSocialRoutes);
 app.use(adminWaCampagneRoutes);
 app.use(adminLivreurInscriptionsRoutes);
+app.use(adminEntrepotsRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);
@@ -260,6 +262,12 @@ try {
     console.log("[backend] wa_messages media cols OK");
   } catch (e) {
     console.error("[backend] ensureWaMessagesCols failed:", e);
+  }
+  try {
+    await ensureEntrepotsTable();
+    console.log("[backend] entrepots table OK");
+  } catch (e) {
+    console.error("[backend] ensureEntrepotsTable failed:", e);
   }
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
