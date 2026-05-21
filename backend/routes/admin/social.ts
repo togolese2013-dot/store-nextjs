@@ -94,6 +94,7 @@ router.post("/api/admin/social/publish", async (req, res) => {
     });
 
     const data = await n8nRes.json().catch(() => ({}));
+    console.log("[social] n8n response:", JSON.stringify(data));
 
     if (!n8nRes.ok) {
       return res.status(502).json({ error: data?.error || `n8n a retourné HTTP ${n8nRes.status}` });
