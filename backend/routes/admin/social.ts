@@ -18,6 +18,7 @@ async function fbPost(path: string, body: Record<string, unknown>, token: string
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) {
+    console.error("[boost] Meta error on", path, JSON.stringify(data?.error || data));
     throw new Error(data?.error?.message || `Meta API error on ${path}: HTTP ${res.status}`);
   }
   return data as { id: string };
