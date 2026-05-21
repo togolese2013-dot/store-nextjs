@@ -13,7 +13,7 @@ export default async function NewProductPage({ searchParams }: PageProps) {
   const entrepotId = sp.entrepot_id ? Number(sp.entrepot_id) : undefined;
   const backHref   = entrepotId ? "/admin/entrepots" : undefined;
 
-  const { categories } = await apiGet<{ categories: Category[] }>("/api/admin/categories").catch(() => ({ categories: [] }));
+  const { data: categories = [] } = await apiGet<{ data: Category[] }>("/api/admin/categories").catch(() => ({ data: [] }));
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">
