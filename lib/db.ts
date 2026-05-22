@@ -379,7 +379,9 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id
+    ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END"
+    : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol  = cols.stock_magasin  ? "COALESCE(p.stock_magasin, 0)"    : "0";
 
   const placeholders = ids.map(() => "?").join(",");
@@ -431,7 +433,9 @@ export async function getProductBySlug(slugOrRef: string): Promise<Product | nul
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id
+    ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END"
+    : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol  = cols.stock_magasin  ? "COALESCE(p.stock_magasin, 0)"    : "0";
 
   const selectSql = `SELECT

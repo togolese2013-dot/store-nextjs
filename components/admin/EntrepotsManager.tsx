@@ -66,6 +66,8 @@ interface AddForm {
   images: string[];
   slug: string;
   actif: boolean;
+  categorie_id: number | null;
+  marque_id: number | null;
 }
 
 function emptyAddForm(): AddForm {
@@ -73,6 +75,7 @@ function emptyAddForm(): AddForm {
     nom: "", prix_unitaire: "", prix_entrepot: "",
     description: "", description_longue: "",
     image_url: "", images: [], slug: "", actif: true,
+    categorie_id: null, marque_id: null,
   };
 }
 
@@ -89,6 +92,9 @@ const fLabelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wid
    ProductFormModal — top-level component (NOT nested) so React keeps its
    identity stable across parent re-renders and autoFocus only fires on mount.
 ───────────────────────────────────────────────────────────────────────────── */
+interface Category { id: number; nom: string; }
+interface Marque   { id: number; nom: string; }
+
 interface ProductFormModalProps {
   form: AddForm;
   setForm: React.Dispatch<React.SetStateAction<AddForm>>;
@@ -101,11 +107,14 @@ interface ProductFormModalProps {
   uploadingSecond: boolean;
   onUploadMain: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUploadSecond: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  categories: Category[];
+  marques: Marque[];
 }
 
 function ProductFormModal({
   form, setForm, formError, saving: formSaving, onSave, onCancel, title,
   uploadingMain, uploadingSecond, onUploadMain, onUploadSecond,
+  categories, marques,
 }: ProductFormModalProps) {
   const prix  = Number(form.prix_unitaire) || 0;
   const achat = Number(form.prix_entrepot) || 0;
@@ -236,6 +245,35 @@ function ProductFormModal({
                   onBlur={e => setForm(f => ({ ...f, slug: e.target.value.replace(/^_+|_+$/g, "") }))}
                   placeholder="auto-généré depuis le nom" className={inputCls} />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Catégorie</label>
+                  <select
+                    value={form.categorie_id ?? ""}
+                    onChange={e => setForm(f => ({ ...f, categorie_id: e.target.value ? Number(e.target.value) : null }))}
+                    className={inputCls}
+                  >
+                    <option value="">— Aucune —</option>
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.nom}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Marque</label>
+                  <select
+                    value={form.marque_id ?? ""}
+                    onChange={e => setForm(f => ({ ...f, marque_id: e.target.value ? Number(e.target.value) : null }))}
+                    className={inputCls}
+                  >
+                    <option value="">— Aucune —</option>
+                    {marques.map(m => (
+                      <option key={m.id} value={m.id}>{m.nom}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </section>
 
             {/* Tarifs */}
@@ -321,6 +359,8 @@ export default function EntrepotsManager() {
   const [entrepots,    setEntrepots]    = useState<Entrepot[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState("");
+  const [categories,   setCategories]   = useState<Category[]>([]);
+  const [marques,      setMarques]      = useState<Marque[]>([]);
 
   /* fournisseurs modal */
   const [showModal,    setShowModal]    = useState(false);
@@ -361,6 +401,16 @@ export default function EntrepotsManager() {
   }, []);
 
   useEffect(() => { fetchEntrepots(); }, [fetchEntrepots]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/admin/categories").then(r => r.json()),
+      fetch("/api/admin/marques").then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([catRes, marqRes]) => {
+      setCategories((catRes.data as Category[]) ?? []);
+      setMarques((marqRes.data as Marque[]) ?? []);
+    }).catch(() => {});
+  }, []);
 
   const fetchProducts = useCallback(async (entrepotId: number) => {
     setLoadingProds(prev => [...prev, entrepotId]);
@@ -489,6 +539,8 @@ export default function EntrepotsManager() {
           image_url:          addForm.image_url.trim() || null,
           images:             addForm.images.length > 0 ? addForm.images : undefined,
           actif:              addForm.actif,
+          categorie_id:       addForm.categorie_id ?? undefined,
+          marque_id:          addForm.marque_id    ?? undefined,
           stock_magasin:      0,
           stock_boutique:     0,
         }),
@@ -516,6 +568,8 @@ export default function EntrepotsManager() {
       images:             [],
       slug:               "",
       actif:              p.actif,
+      categorie_id:       null,
+      marque_id:          null,
     });
     try {
       const res  = await fetch(`/api/admin/products/${p.id}`);
@@ -532,6 +586,8 @@ export default function EntrepotsManager() {
           images:             Array.isArray(full.images) ? full.images.filter((u: string) => u !== full.image_url) : [],
           slug:               full.slug                ?? "",
           actif:              full.actif               ?? p.actif,
+          categorie_id:       full.categorie_id        ? Number(full.categorie_id) : null,
+          marque_id:          full.marque_id           ? Number(full.marque_id)    : null,
         });
       }
     } catch { /* keep prefilled values */ }
@@ -556,6 +612,8 @@ export default function EntrepotsManager() {
           image_url:          editForm.image_url.trim() || null,
           images:             editForm.images.length > 0 ? editForm.images : undefined,
           actif:              editForm.actif,
+          categorie_id:       editForm.categorie_id ?? null,
+          marque_id:          editForm.marque_id    ?? null,
         }),
       });
       const data = await res.json();
@@ -768,6 +826,8 @@ export default function EntrepotsManager() {
           uploadingSecond={uploadingSecond}
           onUploadMain={e => handleUploadMain(e, setAddForm, setAddError)}
           onUploadSecond={e => handleUploadSecondary(e, setAddForm, setAddError)}
+          categories={categories}
+          marques={marques}
         />
       )}
 
@@ -785,6 +845,8 @@ export default function EntrepotsManager() {
           uploadingSecond={uploadingSecond}
           onUploadMain={e => handleUploadMain(e, setEditForm, setEditError)}
           onUploadSecond={e => handleUploadSecondary(e, setEditForm, setEditError)}
+          categories={categories}
+          marques={marques}
         />
       )}
 
