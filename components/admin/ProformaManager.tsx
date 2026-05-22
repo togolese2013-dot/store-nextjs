@@ -6,9 +6,9 @@ import {
   X, Package, PenLine, CheckCircle, XCircle, Clock, Send,
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
-import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
+import ProformaDocPrint from "@/components/admin/ProformaDocPrint";
+import type { ProformaItem } from "@/components/admin/ProformaDocPrint";
 import type { Devis } from "@/lib/admin-db";
-import type { PrintItem } from "@/components/admin/BoutiqueDocPrint";
 
 /* ── Types ── */
 interface StockProduct {
@@ -56,7 +56,7 @@ function emptyModal(): ModalState {
   return { client_nom: "", client_tel: "", remise: 0, valide_jusqu: IN30, note: "", items: [] };
 }
 
-function parseItems(raw: string | unknown[]): PrintItem[] {
+function parseItems(raw: string | unknown[]): ProformaItem[] {
   try {
     const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
     return (arr as Record<string, unknown>[]).map(i => ({
@@ -616,9 +616,7 @@ export default function ProformaManager({ initialDevis, initialTotal }: {
       {printDoc && (() => {
         const items = parseItems(printDoc.items);
         return (
-          <BoutiqueDocPrint
-            type="proforma"
-            format="A4"
+          <ProformaDocPrint
             reference={printDoc.reference}
             date={printDoc.created_at}
             client_nom={printDoc.client_nom}
