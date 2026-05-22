@@ -321,7 +321,7 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     const sets: string[] = [];
     const vals: (string | number | boolean | null)[] = [];
     // Only include columns that exist in the DB schema
-    const alwaysAllowed = ["nom","description","description_longue","categorie_id","prix_unitaire",
+    const alwaysAllowed = ["nom","description","description_longue","categorie_id","marque_id","prix_unitaire",
                            "stock_magasin","stock_boutique","remise","neuf","actif","reference","slug",
                            "entrepot_id","prix_entrepot"];
     for (const key of alwaysAllowed) {

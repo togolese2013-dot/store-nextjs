@@ -108,14 +108,29 @@ export default async function ProductPage({ params }: PageProps) {
 
   /* JSON-LD — Schema.org Product */
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
+
+  // Resolve all image URLs to absolute
+  const absoluteImages = allProductImages
+    .filter(Boolean)
+    .map(u => u.startsWith("http") ? u : `${siteUrl}${u.startsWith("/") ? u : `/${u}`}`);
+
+  const productDescription =
+    (product as Product & { description_longue?: string }).description_longue
+    ?? product.description
+    ?? product.nom;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type":    "Product",
     name:        product.nom,
-    description: product.description ?? product.nom,
+    description: productDescription,
     sku:         product.reference,
-    brand:       { "@type": "Brand", name: "Togolese Shop" },
-    image:       rawUrl ? (rawUrl.startsWith("http") ? rawUrl : `${siteUrl}${rawUrl}`) : undefined,
+    brand: {
+      "@type": "Brand",
+      name: (product as Product & { marque_nom?: string }).marque_nom ?? "Togolese Shop",
+    },
+    image: absoluteImages.length > 1 ? absoluteImages : (absoluteImages[0] ?? undefined),
+    ...(product.categorie_nom ? { category: product.categorie_nom } : {}),
     offers: {
       "@type":          "Offer",
       url:              `${siteUrl}/products/${product.slug ?? product.reference}`,
@@ -124,8 +139,31 @@ export default async function ProductPage({ params }: PageProps) {
       availability:     outOf
         ? "https://schema.org/OutOfStock"
         : "https://schema.org/InStock",
+      itemCondition:    "https://schema.org/NewCondition",
       seller:           { "@type": "Organization", name: "Togolese Shop" },
     },
+  };
+
+  // JSON-LD — BreadcrumbList
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type":    "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil",  item: siteUrl },
+      { "@type": "ListItem", position: 2, name: "Produits", item: `${siteUrl}/products` },
+      ...(product.categorie_nom && product.categorie_id ? [{
+        "@type": "ListItem",
+        position: 3,
+        name: product.categorie_nom,
+        item: `${siteUrl}/products?category=${product.categorie_id}`,
+      }] : []),
+      {
+        "@type":    "ListItem",
+        position:   product.categorie_nom ? 4 : 3,
+        name:       product.nom,
+        item:       `${siteUrl}/products/${product.slug ?? product.reference}`,
+      },
+    ],
   };
   const imgSrc = rawUrl
     ? rawUrl.startsWith("http")
@@ -166,10 +204,15 @@ export default async function ProductPage({ params }: PageProps) {
       {/* Track this product view (client-side, localStorage) */}
       <RecentViewTracker item={recentItem} />
 
-      {/* Schema.org JSON-LD */}
+      {/* Schema.org JSON-LD — Product */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      {/* Schema.org JSON-LD — BreadcrumbList */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
 
       {/* Breadcrumb */}

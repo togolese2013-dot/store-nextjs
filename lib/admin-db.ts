@@ -1763,9 +1763,9 @@ export async function getStockBoutiqueList(opts: {
     conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
   }
-  if (filter === "faible")     conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
-  if (filter === "epuise")     conditions.push("bs.quantite = 0");
-  if (filter === "disponible") conditions.push("bs.quantite > 0");
+  if (filter === "faible")     conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte AND p.entrepot_id IS NULL");
+  if (filter === "epuise")     conditions.push("bs.quantite = 0 AND p.entrepot_id IS NULL");
+  if (filter === "disponible") conditions.push("(bs.quantite > 0 OR p.entrepot_id IS NOT NULL)");
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -1775,13 +1775,14 @@ export async function getStockBoutiqueList(opts: {
             ${remiseCol} AS remise,
             p.prix_unitaire,
             COALESCE(c.nom, '') AS categorie_nom,
-            bs.quantite, bs.seuil_alerte,
-            (bs.quantite * p.prix_unitaire) AS valeur
+            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE bs.quantite END AS quantite,
+            bs.seuil_alerte,
+            (CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE bs.quantite END * p.prix_unitaire) AS valeur
      FROM boutique_stock bs
      JOIN produits p ON p.id = bs.produit_id
      LEFT JOIN categories c ON c.id = p.categorie_id
      ${where}
-     ORDER BY bs.quantite ASC, p.nom ASC
+     ORDER BY p.entrepot_id IS NULL DESC, bs.quantite ASC, p.nom ASC
      LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
     params
   );

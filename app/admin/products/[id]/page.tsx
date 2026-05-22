@@ -35,6 +35,8 @@ export default async function EditProductPage({ params }: PageProps) {
     image_url:      ((product.image_url || product.image) as string) ?? "",
     images:         (() => { try { return JSON.parse((product.images_json as string) || "[]"); } catch { return []; } })(),
     slug:           (product.slug as string) ?? "",
+    entrepot_id:    product.entrepot_id ? Number(product.entrepot_id) : null,
+    prix_entrepot:  product.prix_entrepot != null ? Number(product.prix_entrepot) : ("" as const),
   };
 
   return (
