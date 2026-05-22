@@ -24,6 +24,7 @@ export const ADMIN_MODULES: Record<ModuleKey, ModuleDef> = {
       { id: "categories",      label: "Catégories" },
       { id: "fournisseurs",    label: "Fournisseurs" },
       { id: "achats",          label: "Achats" },
+      { id: "entrepots",        label: "Produits externes" },
       { id: "delete_product",  label: "Supprimer un produit" },
       { id: "generate_slugs",  label: "Générer les slugs" },
       { id: "export_csv",      label: "Exporter CSV" },

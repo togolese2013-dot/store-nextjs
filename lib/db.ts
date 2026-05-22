@@ -304,6 +304,7 @@ export async function getProducts(opts?: {
   if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
   if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
+  else { conditions.push("p.entrepot_id IS NULL"); }
 
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -521,6 +522,7 @@ export async function getProductCount(opts?: {
   if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
   if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
+  else { conditions.push("p.entrepot_id IS NULL"); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,

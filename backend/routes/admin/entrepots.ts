@@ -1,5 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
+import { hasPageAccess } from "@/lib/admin-permissions";
 import { ensureEntrepotsTable, listEntrepots, upsertEntrepot, deleteEntrepot } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -7,6 +8,10 @@ const router = express.Router();
 router.get("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
   try {
     const entrepots = await listEntrepots();
     res.json({ entrepots });
@@ -18,7 +23,8 @@ router.get("/api/admin/entrepots", async (req, res) => {
 router.post("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
     return res.status(403).json({ error: "Accès refusé." });
   }
   const { id, nom, telephone, adresse, notes, actif } = req.body;
@@ -34,7 +40,8 @@ router.post("/api/admin/entrepots", async (req, res) => {
 router.delete("/api/admin/entrepots/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
     return res.status(403).json({ error: "Accès refusé." });
   }
   try {
