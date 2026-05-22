@@ -609,16 +609,87 @@ export default function VentesManager({
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* ── Mobile cards (md:hidden) ── */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {(rows as Facture[]).map(f => {
+                const s = getStatutDisplay(f);
+                const totalFacture = f.source === "site_order"
+                  ? Math.max(0, (f.sous_total ?? f.total) - (f.coupon_remise ?? 0))
+                  : f.total;
+                const reste = (f.statut_paiement === "paye_total" || f.statut_paiement === "paye")
+                  ? 0
+                  : f.statut_paiement === "acompte" && f.montant_acompte != null
+                    ? totalFacture - f.montant_acompte
+                    : totalFacture;
+                return (
+                  <div
+                    key={f.id}
+                    className="px-4 py-3.5 bg-white active:bg-slate-50 cursor-pointer"
+                    onClick={() => handleView(f)}
+                  >
+                    {/* Row 1 : reference + status */}
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md">
+                        {f.reference}
+                      </span>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>
+                        {s.label}
+                      </span>
+                    </div>
+
+                    {/* Row 2 : client name */}
+                    <div className="font-semibold text-slate-900 text-sm mb-0.5">{f.client_nom}</div>
+
+                    {/* Row 3 : phone · type · date+time */}
+                    <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-500 mb-2">
+                      {f.client_tel && <span>{f.client_tel}</span>}
+                      {f.client_tel && (f.source === "site_order" || f.avec_livraison === 1) && <span>·</span>}
+                      {f.source === "site_order" ? (
+                        <span className="inline-flex items-center gap-1 text-violet-600 font-semibold">
+                          <Truck className="w-3 h-3" /> Commande
+                        </span>
+                      ) : f.avec_livraison === 1 ? (
+                        <span className="inline-flex items-center gap-1 text-indigo-600 font-semibold">
+                          <Truck className="w-3 h-3" /> Livraison
+                        </span>
+                      ) : null}
+                      {(f.client_tel || f.source === "site_order" || f.avec_livraison === 1) && <span>·</span>}
+                      <span>{formatDate(f.created_at)}</span>
+                    </div>
+
+                    {/* Row 4 : reste + actions */}
+                    <div className="flex items-center justify-between" onClick={e => e.stopPropagation()}>
+                      <span className={`text-sm font-bold ${reste > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        {reste > 0 ? `Reste : ${formatPrice(reste)}` : "Payé"}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <button onClick={() => handleView(f)} title="Voir" className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>
+                        {canEdit && <button onClick={() => handleEdit(f)} title="Modifier" className="p-2 rounded-xl hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"><Pencil className="w-4 h-4" /></button>}
+                        {f.source === "site_order" && f.order_id && f.order_status !== "delivered" && f.order_status !== "cancelled" && (
+                          <button onClick={() => handleMarkDelivered(f.order_id!)} title="Valider livraison" className="p-2 rounded-xl hover:bg-green-50 text-slate-400 hover:text-green-600 transition-colors"><PackageCheck className="w-4 h-4" /></button>
+                        )}
+                        <button onClick={() => handlePrint(f)} title="Imprimer" className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"><Printer className="w-4 h-4" /></button>
+                        {canDelete && f.source !== "site_order" && (
+                          <button onClick={() => handleDelete(f.id)} title="Supprimer" className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Desktop table (hidden on mobile) ── */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden sm:table-cell">Date</th>
+                    <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Date</th>
                     <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Référence</th>
                     <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Client</th>
-                    <th className="text-right px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden md:table-cell">Montant</th>
+                    <th className="text-right px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden lg:table-cell">Montant</th>
                     <th className="text-center px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Statut</th>
-                    <th className="text-center px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden sm:table-cell">Paiement</th>
+                    <th className="text-center px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider">Paiement</th>
                     <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wider hidden lg:table-cell">Vendeur</th>
                     <th className="px-5 py-3.5 text-center font-semibold text-slate-600 text-xs uppercase tracking-wider">Actions</th>
                   </tr>
@@ -632,7 +703,7 @@ export default function VentesManager({
                         className="hover:bg-slate-50 transition-colors group cursor-pointer"
                         onClick={() => handleView(f)}
                       >
-                        <td className="px-5 py-4 text-slate-500 text-xs hidden sm:table-cell">{formatDate(f.created_at)}</td>
+                        <td className="px-5 py-4 text-slate-500 text-xs">{formatDate(f.created_at)}</td>
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">{f.reference.replace(/-\d{4}$/, "")}</span>
@@ -650,13 +721,13 @@ export default function VentesManager({
                         <td className="px-5 py-4">
                           <div className="font-semibold text-slate-900">{f.client_nom}</div>
                         </td>
-                        <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden md:table-cell">
+                        <td className="px-5 py-4 text-right font-semibold text-slate-900 hidden lg:table-cell">
                           {formatPrice(f.source === "site_order" ? Math.max(0, (f.sous_total ?? f.total) - (f.coupon_remise ?? 0)) : f.total)}
                         </td>
                         <td className="px-5 py-4 text-center">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>{s.label}</span>
                         </td>
-                        <td className="px-5 py-4 text-center hidden sm:table-cell">
+                        <td className="px-5 py-4 text-center">
                           {(f.statut_paiement === "paye_total" || f.statut_paiement === "paye") ? (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Complet</span>
                           ) : f.statut_paiement === "acompte" && f.montant_acompte != null && f.total > 0 ? (
@@ -726,7 +797,7 @@ export default function VentesManager({
             </div>
 
             {/* ── Corps 2 colonnes ── */}
-            <div className="flex-1 grid grid-cols-[3fr_2fr] min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col md:grid md:grid-cols-[3fr_2fr] min-h-0 overflow-hidden">
 
               {/* ── Colonne gauche : Articles ── */}
               <div className="overflow-y-auto px-6 py-5 space-y-4 border-r border-slate-100">
@@ -743,7 +814,8 @@ export default function VentesManager({
                     disabled={loadingStock}
                     onChange={e => { setProdSearch(e.target.value); setShowDropdown(true); }}
                     onFocus={() => setShowDropdown(true)}
-                    className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all disabled:opacity-50"
+                    style={{ fontSize: '16px' }}
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all disabled:opacity-50"
                   />
                   {loadingStock && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />}
 
@@ -792,43 +864,78 @@ export default function VentesManager({
                 {/* Liste articles */}
                 {items.length > 0 && (
                   <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                    <div className="grid grid-cols-[minmax(0,1fr)_108px_128px_128px] gap-2 px-4 py-2 pr-8 bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    {/* Header — desktop only */}
+                    <div className="hidden md:grid grid-cols-[minmax(0,1fr)_108px_128px_128px] gap-2 px-4 py-2 pr-8 bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                       <span>Produit</span>
                       <span className="text-center">Qté</span>
                       <span className="text-center">Prix unit.</span>
                       <span className="text-center">Total</span>
                     </div>
                     {items.map(item => (
-                      <div key={item.produit_id} className="relative grid grid-cols-[minmax(0,1fr)_108px_128px_128px] gap-2 items-center px-4 py-3 pr-8 border-t border-slate-100 hover:bg-slate-50/60">
-                        {/* Remove button — top-right of the row */}
-                        <button type="button" onClick={() => removeItem(item.produit_id)}
-                          className="absolute top-1.5 right-2 p-0.5 rounded-full bg-white border border-slate-200 shadow-sm text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
-                          <X className="w-3 h-3" />
-                        </button>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
-                        </div>
-                        <div className="flex items-center gap-1 justify-center">
-                          <button type="button" onClick={() => changeQty(item.produit_id, -1)} disabled={item.qty <= 1}
-                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
-                            <Minus className="w-3 h-3" />
+                      <div key={item.produit_id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                        {/* Desktop row */}
+                        <div className="hidden md:grid relative grid-cols-[minmax(0,1fr)_108px_128px_128px] gap-2 items-center px-4 py-3 pr-8">
+                          <button type="button" onClick={() => removeItem(item.produit_id)}
+                            className="absolute top-1.5 right-2 p-0.5 rounded-full bg-white border border-slate-200 shadow-sm text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
+                            <X className="w-3 h-3" />
                           </button>
-                          <input type="number" min={1} max={item.stock_dispo} value={item.qty}
-                            onChange={e => setQtyDirect(item.produit_id, e.target.value)}
-                            className="w-10 text-center text-sm font-bold border border-slate-200 rounded-lg py-0.5 outline-none focus:border-amber-400" />
-                          <button type="button" onClick={() => changeQty(item.produit_id, +1)} disabled={item.qty >= item.stock_dispo}
-                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
-                            <Plus className="w-3 h-3" />
-                          </button>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
+                          </div>
+                          <div className="flex items-center gap-1 justify-center">
+                            <button type="button" onClick={() => changeQty(item.produit_id, -1)} disabled={item.qty <= 1}
+                              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <input type="number" min={1} max={item.stock_dispo} value={item.qty}
+                              onChange={e => setQtyDirect(item.produit_id, e.target.value)}
+                              style={{ fontSize: '16px' }}
+                              className="w-10 text-center font-bold border border-slate-200 rounded-lg py-0.5 outline-none focus:border-amber-400" />
+                            <button type="button" onClick={() => changeQty(item.produit_id, +1)} disabled={item.qty >= item.stock_dispo}
+                              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-sm text-slate-600 text-center tabular-nums">
+                            {formatPrice(item.prix_unitaire)}
+                          </div>
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-sm font-bold text-amber-700 text-center tabular-nums">
+                            {formatPrice(item.prix_unitaire * item.qty)}
+                          </div>
                         </div>
-                        {/* Prix unitaire — bordered box */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-sm text-slate-600 text-center tabular-nums">
-                          {formatPrice(item.prix_unitaire)}
-                        </div>
-                        {/* Total — bordered box */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-sm font-bold text-amber-700 text-center tabular-nums">
-                          {formatPrice(item.prix_unitaire * item.qty)}
+                        {/* Mobile card */}
+                        <div className="md:hidden px-3 py-2.5">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
+                            </div>
+                            <button type="button" onClick={() => removeItem(item.produit_id)}
+                              className="shrink-0 p-1 rounded-full bg-white border border-slate-200 shadow-sm text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => changeQty(item.produit_id, -1)} disabled={item.qty <= 1}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <input type="number" min={1} max={item.stock_dispo} value={item.qty}
+                                onChange={e => setQtyDirect(item.produit_id, e.target.value)}
+                                style={{ fontSize: '16px' }}
+                                className="w-12 text-center font-bold border border-slate-200 rounded-lg py-1 outline-none focus:border-amber-400" />
+                              <button type="button" onClick={() => changeQty(item.produit_id, +1)} disabled={item.qty >= item.stock_dispo}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <span>{formatPrice(item.prix_unitaire)} ×</span>
+                              <span className="font-bold text-amber-700 text-sm">{formatPrice(item.prix_unitaire * item.qty)}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -847,7 +954,8 @@ export default function VentesManager({
                           value={modal.remiseGlobale}
                           onChange={e => setModal(m => m ? { ...m, remiseGlobale: e.target.value } : m)}
                           placeholder="0"
-                          className="w-28 text-right text-sm font-semibold border border-slate-200 rounded-lg px-2 py-0.5 bg-white outline-none focus:border-amber-400"
+                          style={{ fontSize: '16px' }}
+                          className="w-28 text-right font-semibold border border-slate-200 rounded-lg px-2 py-0.5 bg-white outline-none focus:border-amber-400"
                         />
                       </div>
                       {remise > 0 && (
@@ -894,7 +1002,8 @@ export default function VentesManager({
                         placeholder="Ex : WADADA"
                         autoFocus
                         autoComplete="off"
-                        className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all"
+                        style={{ fontSize: '16px' }}
+                        className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all"
                       />
                       {/* Suggestions dropdown */}
                       {showSuggestions && (
@@ -934,7 +1043,8 @@ export default function VentesManager({
                           value={modal.clientTel}
                           onChange={e => setModal(m => m ? { ...m, clientTel: e.target.value } : m)}
                           placeholder="+228 90 00 00 00"
-                          className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-amber-300 focus:outline-none focus:border-amber-500 transition-all"
+                          style={{ fontSize: '16px' }}
+                          className="w-full px-3 py-2.5 bg-white rounded-xl border border-amber-300 focus:outline-none focus:border-amber-500 transition-all"
                         />
                         <p className="mt-1 text-xs text-amber-600">Ce client sera enregistré automatiquement.</p>
                       </div>
@@ -969,21 +1079,24 @@ export default function VentesManager({
                         <input type="text" value={modal.adresseLivraison}
                           onChange={e => setModal(m => m ? { ...m, adresseLivraison: e.target.value } : m)}
                           placeholder="Ex : Lomé, Tokoin, rue 123…"
-                          className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
+                          style={{ fontSize: '16px' }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Contact à livrer</label>
                         <input type="text" value={modal.contactLivraison}
                           onChange={e => setModal(m => m ? { ...m, contactLivraison: e.target.value } : m)}
                           placeholder="+228 90 00 00 00"
-                          className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
+                          style={{ fontSize: '16px' }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Lien de localisation</label>
                         <input type="text" value={modal.lienLocalisation}
                           onChange={e => setModal(m => m ? { ...m, lienLocalisation: e.target.value } : m)}
                           placeholder="https://maps.app.goo.gl/..."
-                          className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
+                          style={{ fontSize: '16px' }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
                         {modal.lienLocalisation && <MapPreview url={modal.lienLocalisation} />}
                       </div>
                     </div>
@@ -996,7 +1109,8 @@ export default function VentesManager({
                   <select
                     value={modal.modePaiement}
                     onChange={e => setModal(m => m ? { ...m, modePaiement: e.target.value } : m)}
-                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all font-semibold text-slate-700"
+                    style={{ fontSize: '16px' }}
+                    className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all font-semibold text-slate-700"
                   >
                     {MODES_PAIEMENT.map(mode => (
                       <option key={mode.value} value={mode.value}>{mode.label}</option>
@@ -1010,7 +1124,8 @@ export default function VentesManager({
                   <select
                     value={modal.statutPaiement}
                     onChange={e => setModal(m => m ? { ...m, statutPaiement: e.target.value } : m)}
-                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all font-semibold text-slate-700"
+                    style={{ fontSize: '16px' }}
+                    className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all font-semibold text-slate-700"
                   >
                     {STATUTS_PAIEMENT.map(s => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -1023,7 +1138,8 @@ export default function VentesManager({
                       <input type="number" min={0} max={totalVente} value={modal.montantAcompte}
                         onChange={e => setModal(m => m ? { ...m, montantAcompte: e.target.value } : m)}
                         placeholder="0"
-                        className="w-full px-3 py-2 text-sm bg-white rounded-xl border-2 border-amber-300 focus:border-amber-500 outline-none font-bold" />
+                        style={{ fontSize: '16px' }}
+                        className="w-full px-3 py-2 bg-white rounded-xl border-2 border-amber-300 focus:border-amber-500 outline-none font-bold" />
                       {totalVente > 0 && acompte > 0 && (
                         <div className="flex justify-between text-sm font-semibold text-amber-700">
                           <span>Reste :</span>
@@ -1040,7 +1156,8 @@ export default function VentesManager({
                   <textarea rows={2} value={modal.note}
                     onChange={e => setModal(m => m ? { ...m, note: e.target.value } : m)}
                     placeholder="Remarques…"
-                    className="w-full px-3 py-2.5 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all resize-none" />
+                    style={{ fontSize: '16px' }}
+                    className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all resize-none" />
                 </div>
 
                 {/* Erreur */}
