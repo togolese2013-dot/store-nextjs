@@ -627,12 +627,21 @@ export default function VentesManager({
                     className="px-4 py-3.5 bg-white active:bg-slate-50 cursor-pointer"
                     onClick={() => handleView(f)}
                   >
-                    {/* Row 1 : reference + status */}
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                    {/* Row 1 : reference + commande/livraison badge + status */}
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md">
                         {f.reference}
                       </span>
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>
+                      {f.source === "site_order" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-600 text-[10px] font-bold rounded-full border border-violet-100">
+                          <Truck className="w-3 h-3" /> Commande
+                        </span>
+                      ) : f.avec_livraison === 1 ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full border border-indigo-100">
+                          <Truck className="w-3 h-3" /> Livraison
+                        </span>
+                      ) : null}
+                      <span className={`ml-auto inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${s.color}`}>
                         {s.label}
                       </span>
                     </div>
@@ -640,27 +649,18 @@ export default function VentesManager({
                     {/* Row 2 : client name */}
                     <div className="font-semibold text-slate-900 text-sm mb-0.5">{f.client_nom}</div>
 
-                    {/* Row 3 : phone · type · date+time */}
+                    {/* Row 3 : phone · date+time · vendeur */}
                     <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-500 mb-2">
                       {f.client_tel && <span>{f.client_tel}</span>}
-                      {f.client_tel && (f.source === "site_order" || f.avec_livraison === 1) && <span>·</span>}
-                      {f.source === "site_order" ? (
-                        <span className="inline-flex items-center gap-1 text-violet-600 font-semibold">
-                          <Truck className="w-3 h-3" /> Commande
-                        </span>
-                      ) : f.avec_livraison === 1 ? (
-                        <span className="inline-flex items-center gap-1 text-indigo-600 font-semibold">
-                          <Truck className="w-3 h-3" /> Livraison
-                        </span>
-                      ) : null}
-                      {(f.client_tel || f.source === "site_order" || f.avec_livraison === 1) && <span>·</span>}
+                      {f.client_tel && <span>·</span>}
                       <span>{formatDate(f.created_at)}</span>
+                      {f.vendeur && <><span>·</span><span className="text-slate-400">par <span className="font-semibold text-slate-500">{f.vendeur}</span></span></>}
                     </div>
 
-                    {/* Row 4 : reste + actions */}
+                    {/* Row 4 : montant + actions */}
                     <div className="flex items-center justify-between" onClick={e => e.stopPropagation()}>
                       <span className={`text-sm font-bold ${reste > 0 ? "text-red-600" : "text-emerald-600"}`}>
-                        {reste > 0 ? `Reste : ${formatPrice(reste)}` : "Payé"}
+                        {reste > 0 ? `Reste : ${formatPrice(reste)}` : `Total : ${formatPrice(totalFacture)}`}
                       </span>
                       <div className="flex items-center gap-0.5">
                         <button onClick={() => handleView(f)} title="Voir" className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>
