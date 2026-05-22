@@ -111,26 +111,26 @@ export default function ProformaDocPrint({
 
             {/* ══ HEADER ══ */}
             <div style={{ padding: "32px 44px 24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              {/* Left: title */}
-              <div>
+              {/* Left: logo + company name + address */}
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <CircleLogo />
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: INDIGO, letterSpacing: "1px", textTransform: "uppercase" }}>
+                    Togolese Shop
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>Lomé, Togo</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>togolese.tg</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>+228 90 52 79 12</div>
+                </div>
+              </div>
+              {/* Right: PROFORMA title */}
+              <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 48, fontWeight: 900, color: INDIGO, letterSpacing: "-2px", lineHeight: 1, textTransform: "uppercase" }}>
                   Proforma
                 </div>
                 <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600, letterSpacing: "3px", textTransform: "uppercase", marginTop: 4 }}>
                   Devis · Offre commerciale
                 </div>
-              </div>
-              {/* Right: logo + company */}
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: INDIGO, letterSpacing: "1px", textTransform: "uppercase" }}>
-                    Togolese Shop
-                  </div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Lomé, Togo</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>togolese.tg</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>+228 90 52 79 12</div>
-                </div>
-                <CircleLogo />
               </div>
             </div>
 

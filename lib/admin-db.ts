@@ -2308,7 +2308,7 @@ export async function listDevis(opts: { limit?: number; offset?: number; search?
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT id, reference, client_nom, client_tel, client_email,
+    `SELECT id, reference, client_nom, client_tel, client_email, items,
             sous_total, remise, total, statut, valide_jusqu, note, admin_id, created_at, updated_at
      FROM devis ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params
   );
