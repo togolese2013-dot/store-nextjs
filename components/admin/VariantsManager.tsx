@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronUp, ImagePlus } from "lucide-react";
 
 export interface Variant {
@@ -288,6 +288,7 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   const [savingNew,   setSavingNew]   = useState(false);
   const [uploadingNew,setUploadingNew]= useState(false);
   const [msg,         setMsg]         = useState("");
+  const savingNewRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -341,6 +342,8 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   }
 
   async function handleSaveNew() {
+    if (savingNewRef.current) return;
+    savingNewRef.current = true;
     setSavingNew(true);
     setMsg("");
     try {
@@ -372,6 +375,7 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
       setMsg(`Erreur : ${err instanceof Error ? err.message : "Enregistrement échoué"}`);
     } finally {
       setSavingNew(false);
+      savingNewRef.current = false;
     }
   }
 
