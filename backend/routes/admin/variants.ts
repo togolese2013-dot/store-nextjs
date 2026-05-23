@@ -29,6 +29,8 @@ async function ensureTable() {
   for (const ddl of [
     "ALTER TABLE product_variants ADD COLUMN remise         DECIMAL(10,2) NOT NULL DEFAULT 0",
     "ALTER TABLE product_variants ADD COLUMN stock_boutique INT          NOT NULL DEFAULT 0",
+    "ALTER TABLE product_variants ADD COLUMN reference_sku  VARCHAR(100)",
+    "ALTER TABLE product_variants ADD COLUMN image_url      VARCHAR(500)",
   ]) {
     try { await (db as mysql.Pool).execute(ddl); }
     catch (err: unknown) { if ((err as { code?: string }).code !== "ER_DUP_FIELDNAME") throw err; }
