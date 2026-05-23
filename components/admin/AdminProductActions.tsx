@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Eye } from "lucide-react";
+import { Pencil, Trash2, Eye, QrCode } from "lucide-react";
 import ProductQuickViewModal from "./ProductQuickViewModal";
 import EditProductModal from "./EditProductModal";
+import ProductQRModal from "./ProductQRModal";
 
 interface Product {
   id:             number;
@@ -18,11 +19,15 @@ interface Product {
   stock_magasin:  number;
   image_url:      string | null;
   images:         string[];
+  slug?:          string | null;
+  entrepot_id?:   number | null;
+  entrepot_nom?:  string | null;
 }
 
 export default function AdminProductActions({ product, canDelete = true }: { product: Product; canDelete?: boolean }) {
   const [showView, setShowView] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showQR,   setShowQR]   = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
 
@@ -65,6 +70,15 @@ export default function AdminProductActions({ product, canDelete = true }: { pro
           <Pencil className="w-4 h-4" />
         </button>
 
+        {/* QR code */}
+        <button
+          onClick={() => setShowQR(true)}
+          title="Code QR"
+          className="p-2 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-500 transition-colors"
+        >
+          <QrCode className="w-4 h-4" />
+        </button>
+
         {/* Delete */}
         {canDelete && (
           <button
@@ -79,13 +93,32 @@ export default function AdminProductActions({ product, canDelete = true }: { pro
       </div>
 
       {showView && (
-        <ProductQuickViewModal product={product} onClose={() => setShowView(false)} />
+        <ProductQuickViewModal
+          product={{
+            ...product,
+            entrepot_id:  product.entrepot_id,
+            entrepot_nom: product.entrepot_nom,
+          }}
+          onClose={() => setShowView(false)}
+        />
       )}
       {showEdit && (
         <EditProductModal
           productId={product.id}
           productRef={product.reference}
           onClose={() => setShowEdit(false)}
+        />
+      )}
+      {showQR && (
+        <ProductQRModal
+          product={{
+            nom:           product.nom,
+            reference:     product.reference,
+            slug:          product.slug,
+            prix_unitaire: product.prix_unitaire,
+            image_url:     product.image_url,
+          }}
+          onClose={() => setShowQR(false)}
         />
       )}
     </>

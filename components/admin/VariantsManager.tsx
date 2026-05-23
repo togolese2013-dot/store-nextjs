@@ -4,15 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronUp, ImagePlus } from "lucide-react";
 
 export interface Variant {
-  id:            number;
-  produit_id:    number;
-  nom:           string;
-  options:       Record<string, string>;
-  prix:          number;
-  remise:        number;
-  stock:         number;
-  reference_sku: string | null;
-  image_url:     string | null;
+  id:             number;
+  produit_id:     number;
+  nom:            string;
+  options:        Record<string, string>;
+  prix:           number;
+  remise:         number;
+  stock:          number;          // magasin
+  stock_boutique: number;          // boutique
+  reference_sku:  string | null;
+  image_url:      string | null;
 }
 
 interface Props {
@@ -23,11 +24,11 @@ interface Props {
 const inputCls =
   "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-sans";
 
-type EditDraft = { options: Record<string, string>; prix: number; remise: number; stock: number; image_url: string | null };
+type EditDraft = { options: Record<string, string>; prix: number; remise: number; stock: number; stock_boutique: number; image_url: string | null };
 type PendingDraft = EditDraft & { _key: string; rawOptions: string; uploading: boolean };
 
 function emptyPending(): PendingDraft {
-  return { _key: Math.random().toString(36).slice(2), options: {}, rawOptions: "", prix: 0, remise: 0, stock: 0, image_url: null, uploading: false };
+  return { _key: Math.random().toString(36).slice(2), options: {}, rawOptions: "", prix: 0, remise: 0, stock: 0, stock_boutique: 0, image_url: null, uploading: false };
 }
 
 function parseOptions(raw: string): Record<string, string> {
@@ -71,17 +72,20 @@ interface RowProps {
 }
 
 function VariantRow({ variant, onSave, onDelete }: RowProps) {
-  const [open,       setOpen]       = useState(false);
-  const [draft,      setDraft]      = useState<EditDraft>({
-    options:   variant.options,
-    prix:      variant.prix,
-    remise:    variant.remise ?? 0,
-    stock:     variant.stock,
-    image_url: variant.image_url,
+  const [open,         setOpen]         = useState(false);
+  const [draft,        setDraft]        = useState<EditDraft>({
+    options:        variant.options,
+    prix:           variant.prix,
+    remise:         variant.remise ?? 0,
+    stock:          variant.stock,
+    stock_boutique: variant.stock_boutique ?? 0,
+    image_url:      variant.image_url,
   });
-  const [rawOptions, setRawOptions] = useState(serializeOptions(variant.options));
-  const [saving,     setSaving]     = useState(false);
-  const [uploading,  setUploading]  = useState(false);
+  const [rawOptions,   setRawOptions]   = useState(serializeOptions(variant.options));
+  const [saving,       setSaving]       = useState(false);
+  const [uploading,    setUploading]    = useState(false);
+  const [transferQty,  setTransferQty]  = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   function setField<K extends keyof EditDraft>(k: K, v: EditDraft[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
@@ -107,15 +111,33 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
     const opts = parseOptions(rawOptions);
     await onSave({
       ...variant,
-      options:   opts,
-      nom:       autoNom(opts) || variant.nom || "Variante",
-      prix:      draft.prix,
-      remise:    draft.remise,
-      stock:     draft.stock,
-      image_url: draft.image_url,
+      options:        opts,
+      nom:            autoNom(opts) || variant.nom || "Variante",
+      prix:           draft.prix,
+      remise:         draft.remise,
+      stock:          draft.stock,
+      stock_boutique: draft.stock_boutique,
+      image_url:      draft.image_url,
     });
     setSaving(false);
     setOpen(false);
+  }
+
+  async function handleTransfer() {
+    const qty = Number(transferQty);
+    if (!qty || qty <= 0) return;
+    setTransferring(true);
+    const res = await fetch(`/api/admin/products/${variant.produit_id}/variants/${variant.id}/boutique-transfer`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ qty }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setDraft(d => ({ ...d, stock: data.stock, stock_boutique: data.stock_boutique }));
+      setTransferQty("");
+    }
+    setTransferring(false);
   }
 
   const optLabels = Object.entries(variant.options);
@@ -153,7 +175,12 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
             <span className={`px-1.5 py-0.5 rounded-full font-medium ${
               variant.stock === 0 ? "bg-red-50 text-red-600" : variant.stock <= 5 ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
             }`}>
-              Stock : {variant.stock}
+              Magasin : {variant.stock}
+            </span>
+            <span className={`px-1.5 py-0.5 rounded-full font-medium ${
+              (variant.stock_boutique ?? 0) === 0 ? "bg-red-50 text-red-600" : (variant.stock_boutique ?? 0) <= 5 ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"
+            }`}>
+              Boutique : {variant.stock_boutique ?? 0}
             </span>
           </div>
         </div>
@@ -199,8 +226,8 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
               placeholder="Taille=M, Couleur=Rouge" className={inputCls} />
           </div>
 
-          {/* Prix + Remise + Stock */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Prix + Remise */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">Prix (FCFA)</label>
               <input type="number" min="0" value={draft.prix} onChange={(e) => setField("prix", Number(e.target.value))} className={inputCls} />
@@ -209,10 +236,30 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
               <label className="block text-xs font-bold text-slate-600 mb-1">Remise (FCFA)</label>
               <input type="number" min="0" value={draft.remise} onChange={(e) => setField("remise", Number(e.target.value))} className={inputCls} />
             </div>
+          </div>
+
+          {/* Stock magasin + Stock boutique */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Stock</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Stock magasin</label>
               <input type="number" min="0" value={draft.stock} onChange={(e) => setField("stock", Number(e.target.value))} className={inputCls} />
             </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Stock boutique</label>
+              <input type="number" min="0" value={draft.stock_boutique} onChange={(e) => setField("stock_boutique", Number(e.target.value))} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Transfer magasin → boutique */}
+          <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
+            <span className="text-xs text-slate-500 font-semibold">Transfert magasin → boutique :</span>
+            <input type="number" min="1" value={transferQty}
+              onChange={e => setTransferQty(e.target.value)}
+              placeholder="Qté" className="w-20 px-2 py-1 text-sm border rounded-lg" style={{fontSize:"16px"}} />
+            <button type="button" onClick={handleTransfer} disabled={transferring || !transferQty}
+              className="px-3 py-1 text-xs rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold disabled:opacity-60 transition flex items-center gap-1">
+              {transferring ? "..." : "→ Boutique"}
+            </button>
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -260,7 +307,10 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
     await fetch(`/api/admin/products/${productId}/variants/${v.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(v),
+      body: JSON.stringify({
+        ...v,
+        stock_boutique: v.stock_boutique ?? 0,
+      }),
     });
     await load();
     setMsg("Variante mise à jour ✓");
@@ -303,13 +353,14 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nom:          autoNom(v.options) || "Variante",
-          options:      v.options,
-          prix:         v.prix,
-          remise:       v.remise,
-          stock:        v.stock,
-          reference_sku: null,
-          image_url:    v.image_url,
+          nom:            autoNom(v.options) || "Variante",
+          options:        v.options,
+          prix:           v.prix,
+          remise:         v.remise,
+          stock:          v.stock,
+          stock_boutique: v.stock_boutique ?? 0,
+          reference_sku:  null,
+          image_url:      v.image_url,
         }),
       })
     ));
@@ -368,7 +419,8 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-500">
                     <span className="font-bold text-slate-700">{p.prix.toLocaleString("fr-FR")} FCFA</span>
-                    <span className="px-1.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600">Stock : {p.stock}</span>
+                    <span className="px-1.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600">Stock magasin : {p.stock}</span>
+                    <span className="px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">Boutique : {p.stock_boutique ?? 0}</span>
                     <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold text-[10px] uppercase tracking-wide">Nouveau</span>
                   </div>
                 </div>
@@ -429,8 +481,8 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
               placeholder="Taille=XL, Couleur=Noir" className={inputCls} />
           </div>
 
-          {/* Prix + Remise + Stock */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Prix + Remise */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">Prix (FCFA) *</label>
               <input type="number" min="0" value={newDraft.prix}
@@ -443,11 +495,21 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
                 onChange={e => setNewDraft(d => ({ ...d, remise: Number(e.target.value) }))}
                 placeholder="0" className={inputCls} />
             </div>
+          </div>
+
+          {/* Stock magasin + Stock boutique */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Stock</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Stock magasin</label>
               <input type="number" min="0" value={newDraft.stock}
                 onChange={e => setNewDraft(d => ({ ...d, stock: Number(e.target.value) }))}
                 placeholder="10" className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Stock boutique</label>
+              <input type="number" min="0" value={newDraft.stock_boutique}
+                onChange={e => setNewDraft(d => ({ ...d, stock_boutique: Number(e.target.value) }))}
+                placeholder="0" className={inputCls} />
             </div>
           </div>
 

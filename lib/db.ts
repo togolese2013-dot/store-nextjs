@@ -576,13 +576,16 @@ function tryParse(json: unknown): any {
 
 /* ─── Product Variants ─── */
 export interface ProductVariant {
-  id: number;
-  produit_id: number;
-  nom: string;
-  options: Record<string, string>;
-  prix: number;
-  stock: number;
+  id:            number;
+  produit_id:    number;
+  nom:           string;
+  options:       Record<string, string>;
+  prix:          number;
+  remise:        number;
+  stock:         number;   // stock magasin (warehouse)
+  stock_boutique: number;  // stock disponible en boutique
   reference_sku: string | null;
+  image_url:     string | null;
 }
 
 export async function getProductVariants(productId: number): Promise<ProductVariant[]> {
@@ -598,13 +601,16 @@ export async function getProductVariants(productId: number): Promise<ProductVari
       [productId]
     );
     return rows.map((r) => ({
-      id:            Number(r.id),
-      produit_id:    Number(r.produit_id),
-      nom:           r.nom as string,
-      options:       typeof r.options === "string" ? JSON.parse(r.options) : r.options ?? {},
-      prix:          Number(r.prix),
-      stock:         Number(r.stock),
-      reference_sku: (r.reference_sku ?? null) as string | null,
+      id:             Number(r.id),
+      produit_id:     Number(r.produit_id),
+      nom:            r.nom as string,
+      options:        typeof r.options === "string" ? JSON.parse(r.options) : r.options ?? {},
+      prix:           Number(r.prix),
+      remise:         Number(r.remise ?? 0),
+      stock:          Number(r.stock),
+      stock_boutique: Number(r.stock_boutique ?? 0),
+      reference_sku:  (r.reference_sku ?? null) as string | null,
+      image_url:      (r.image_url ?? null) as string | null,
     }));
   } catch {
     return [];

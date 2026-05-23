@@ -11,8 +11,11 @@ export interface Variant {
   nom: string;
   options: Record<string, string>;
   prix: number;
-  stock: number;
+  remise: number;
+  stock: number;           // stock magasin (used for online availability)
+  stock_boutique: number;  // stock boutique (in-store only)
   reference_sku: string | null;
+  image_url: string | null;
 }
 
 interface Props {

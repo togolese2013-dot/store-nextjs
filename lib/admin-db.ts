@@ -703,7 +703,14 @@ async function ensureOrderLifecycleCols() {
 }
 
 export async function updateOrderStatus(id: number, status: string) {
-  await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
+  if (status === "delivered") {
+    await db.execute(
+      "UPDATE orders SET status = ?, delivered_at = NOW() WHERE id = ?",
+      [status, id]
+    );
+  } else {
+    await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
+  }
 }
 
 // ─── Entrepôts ────────────────────────────────────────────────────────────────
@@ -1631,6 +1638,8 @@ export async function getStockStats() {
 /* ─── Stock Boutique (tables dédiées boutique_stock + boutique_mouvements) ─── */
 export interface BoutiqueStockItem {
   produit_id:    number;
+  variant_id?:   number;   // set when row represents a specific variant
+  variant_nom?:  string;   // e.g. "Rouge / M"
   nom:           string;
   reference:     string;
   image_url:     string | null;
@@ -1756,63 +1765,83 @@ export async function getStockBoutiqueList(opts: {
   const imageCol  = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
 
-  const conditions: string[] = [];
-  const params: (string | number | boolean | null | Buffer)[] = [];
+  const searchLike = search ? `%${search}%` : null;
 
-  if (search) {
-    conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`);
-  }
-  if (filter === "faible")     conditions.push("COALESCE(bs.quantite, 0) > 0 AND COALESCE(bs.quantite, 0) <= COALESCE(bs.seuil_alerte, 5) AND p.entrepot_id IS NULL");
-  if (filter === "epuise")     conditions.push("COALESCE(bs.quantite, 0) = 0 AND p.entrepot_id IS NULL");
-  if (filter === "disponible") conditions.push("(COALESCE(bs.quantite, 0) > 0 OR p.entrepot_id IS NOT NULL)");
+  // ── Part 1 : products WITHOUT variants (existing boutique_stock logic) ──────
+  const p1Conds: string[] = ["NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
+  const p1Params: (string | number | null)[] = [];
+  if (searchLike) { p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)"); p1Params.push(searchLike, searchLike); }
+  if (filter === "faible")     p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
+  if (filter === "epuise")     p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL");
+  if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
+  p1Conds.push("(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)");
 
-  // Base condition: only show products that have a boutique_stock row OR are entrepôt products
-  const baseCondition = "(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)";
-  const where = conditions.length
-    ? `WHERE ${baseCondition} AND ${conditions.join(" AND ")}`
-    : `WHERE ${baseCondition}`;
-
-  const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT COALESCE(bs.produit_id, p.id) AS produit_id, p.nom, p.reference,
-            ${imageCol}  AS image_url,
-            ${remiseCol} AS remise,
-            p.prix_unitaire,
-            COALESCE(c.nom, '') AS categorie_nom,
-            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite, 0) END AS quantite,
-            COALESCE(bs.seuil_alerte, 5) AS seuil_alerte,
-            (CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite, 0) END * p.prix_unitaire) AS valeur
+  const [rows1] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
+            NULL AS variant_id, NULL AS variant_nom,
+            p.nom, p.reference,
+            ${imageCol} AS image_url, ${remiseCol} AS remise, p.prix_unitaire,
+            COALESCE(c.nom,'') AS categorie_nom,
+            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite,0) END AS quantite,
+            COALESCE(bs.seuil_alerte,5) AS seuil_alerte
      FROM produits p
      LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
      LEFT JOIN categories c ON c.id = p.categorie_id
-     ${where}
-     ORDER BY p.entrepot_id IS NULL DESC, COALESCE(bs.quantite, 0) ASC, p.nom ASC
-     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
-    params
+     WHERE ${p1Conds.join(" AND ")}`,
+    p1Params
   );
 
-  const [countRows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT COUNT(*) AS cnt
-     FROM produits p
-     LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
-     ${where}`,
-    params
+  // ── Part 2 : products WITH variants (one row per variant) ──────────────────
+  const p2Conds: string[] = [];
+  const p2Params: (string | number | null)[] = [];
+  if (searchLike) { p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)"); p2Params.push(searchLike, searchLike, searchLike); }
+  if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");
+  if (filter === "epuise")     p2Conds.push("pv.stock_boutique = 0");
+  if (filter === "faible")     p2Conds.push("pv.stock_boutique > 0 AND pv.stock_boutique <= 5");
+  // "all" → no extra condition
+
+  const [rows2] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT pv.produit_id,
+            pv.id AS variant_id, pv.nom AS variant_nom,
+            CONCAT(p.nom, ' — ', pv.nom) AS nom,
+            COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+            COALESCE(NULLIF(pv.image_url,''), ${imageCol}) AS image_url,
+            COALESCE(NULLIF(pv.remise,0), 0) AS remise,
+            CASE WHEN pv.prix > 0 THEN pv.prix ELSE p.prix_unitaire END AS prix_unitaire,
+            COALESCE(c.nom,'') AS categorie_nom,
+            pv.stock_boutique AS quantite,
+            5 AS seuil_alerte
+     FROM product_variants pv
+     JOIN produits p ON p.id = pv.produit_id
+     LEFT JOIN categories c ON c.id = p.categorie_id
+     ${p2Conds.length ? "WHERE " + p2Conds.join(" AND ") : ""}`,
+    p2Params
   );
+
+  // ── Merge, sort, paginate in Node ─────────────────────────────────────────
+  const mapRow = (r: mysql.RowDataPacket): BoutiqueStockItem => ({
+    produit_id:    Number(r.produit_id),
+    variant_id:    r.variant_id != null ? Number(r.variant_id) : undefined,
+    variant_nom:   r.variant_nom ?? undefined,
+    nom:           String(r.nom),
+    reference:     String(r.reference ?? ""),
+    image_url:     r.image_url ?? null,
+    categorie_nom: String(r.categorie_nom ?? ""),
+    prix_unitaire: Number(r.prix_unitaire),
+    remise:        Number(r.remise ?? 0),
+    quantite:      Number(r.quantite),
+    seuil_alerte:  Number(r.seuil_alerte),
+    valeur:        Number(r.quantite) * Number(r.prix_unitaire),
+  });
+
+  const all = [
+    ...rows1.map(mapRow),
+    ...rows2.map(mapRow),
+  ].sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 
   return {
-    items: rows.map(r => ({
-      produit_id:    Number(r.produit_id),
-      nom:           String(r.nom),
-      reference:     String(r.reference ?? ""),
-      image_url:     r.image_url ?? null,
-      categorie_nom: String(r.categorie_nom ?? ""),
-      prix_unitaire: Number(r.prix_unitaire),
-      remise:        Number(r.remise ?? 0),
-      quantite:      Number(r.quantite),
-      seuil_alerte:  Number(r.seuil_alerte),
-      valeur:        Number(r.valeur),
-    })),
-    total: Number(countRows[0]?.cnt ?? 0),
+    items: all.slice(offset, offset + limit),
+    total: all.length,
   };
 }
 
@@ -2048,7 +2077,7 @@ export async function createVenteWithStock(data: {
   total:              number;
   note?:              string;
   admin_id?:          number;
-  items: Array<{ produit_id: number; nom: string; reference: string; qty: number; prix: number; total: number }>;
+  items: Array<{ produit_id: number; variant_id?: number; nom: string; reference: string; qty: number; prix: number; total: number }>;
 }): Promise<{ id: number; reference: string }> {
   const conn = await db.getConnection();
   try {
@@ -2056,12 +2085,23 @@ export async function createVenteWithStock(data: {
 
     // 1. Verify boutique stock for each item
     for (const item of data.items) {
-      const [rows] = await conn.execute<mysql.RowDataPacket[]>(
-        "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1", [item.produit_id]
-      );
-      const dispo = Number(rows[0]?.quantite ?? 0);
-      if (dispo < item.qty) {
-        throw new Error(`Stock insuffisant pour "${item.nom}" (dispo: ${dispo}, demandé: ${item.qty})`);
+      if (item.variant_id) {
+        // Variant product: check product_variants.stock_boutique
+        const [[vRow]] = await conn.execute<mysql.RowDataPacket[]>(
+          "SELECT stock_boutique FROM product_variants WHERE id = ? LIMIT 1", [item.variant_id]
+        );
+        const dispo = Number(vRow?.stock_boutique ?? 0);
+        if (dispo < item.qty) {
+          throw new Error(`Stock boutique insuffisant pour "${item.nom}" (dispo: ${dispo}, demandé: ${item.qty})`);
+        }
+      } else {
+        const [rows] = await conn.execute<mysql.RowDataPacket[]>(
+          "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1", [item.produit_id]
+        );
+        const dispo = Number(rows[0]?.quantite ?? 0);
+        if (dispo < item.qty) {
+          throw new Error(`Stock insuffisant pour "${item.nom}" (dispo: ${dispo}, demandé: ${item.qty})`);
+        }
       }
     }
 
@@ -2088,25 +2128,32 @@ export async function createVenteWithStock(data: {
     );
     const factureId = result.insertId;
 
-    // 3. Decrement boutique_stock + log mouvements
+    // 3. Decrement boutique stock + log mouvements
     for (const item of data.items) {
-      await conn.execute(
-        "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
-        [item.qty, item.produit_id]
-      );
+      if (item.variant_id) {
+        // Variant product: decrement product_variants.stock_boutique
+        await conn.execute(
+          "UPDATE product_variants SET stock_boutique = GREATEST(0, stock_boutique - ?) WHERE id = ?",
+          [item.qty, item.variant_id]
+        );
+      } else {
+        // Regular product: decrement boutique_stock
+        await conn.execute(
+          "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
+          [item.qty, item.produit_id]
+        );
+        // Sync produits.stock_boutique (ignore if column missing)
+        try { await conn.execute(
+          `UPDATE produits p JOIN boutique_stock bs ON bs.produit_id = p.id
+           SET p.stock_boutique = bs.quantite WHERE p.id = ?`,
+          [item.produit_id]
+        ); } catch { /* ignore */ }
+      }
       await conn.execute(
         `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
          VALUES (?,?,?,?,?,?)`,
         [item.produit_id, "sortie", item.qty, "Vente", reference, data.admin_id ?? null]
       );
-      // Sync produits.stock_boutique (ignore if column missing)
-      try { await conn.execute(
-        `UPDATE produits p
-         JOIN boutique_stock bs ON bs.produit_id = p.id
-         SET p.stock_boutique = bs.quantite
-         WHERE p.id = ?`,
-        [item.produit_id]
-      ); } catch { /* stock_boutique column may not exist */ }
     }
 
     // 4. If delivery, create livraison entry

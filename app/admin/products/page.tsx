@@ -339,28 +339,37 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                           </span>
                         </div>
 
-                        {/* Row 2 : ref + catégorie */}
+                        {/* Row 2 : ref + catégorie + badge externe */}
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <span className="text-[11px] text-slate-400 font-mono">{p.reference}</span>
                           {p.categorie_nom && (
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">· {p.categorie_nom}</span>
                           )}
+                          {p.entrepot_id && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[10px] font-bold uppercase tracking-wide">
+                              Externe
+                            </span>
+                          )}
                         </div>
 
                         {/* Row 3 : stock badge + actions */}
                         <div className="flex items-center justify-between mt-2">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                            p.stock_magasin === 0
-                              ? "bg-red-100 text-red-700"
-                              : p.stock_magasin <= 5
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-green-100 text-green-700"
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              p.stock_magasin === 0 ? "bg-red-400" : p.stock_magasin <= 5 ? "bg-amber-400" : "bg-green-400"
-                            }`} />
-                            Stock {p.stock_magasin} · {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
-                          </span>
+                          {p.entrepot_id ? (
+                            <span className="text-sm text-slate-300 font-semibold">—</span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                              p.stock_magasin === 0
+                                ? "bg-red-100 text-red-700"
+                                : p.stock_magasin <= 5
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-green-100 text-green-700"
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                p.stock_magasin === 0 ? "bg-red-400" : p.stock_magasin <= 5 ? "bg-amber-400" : "bg-green-400"
+                              }`} />
+                              Stock {p.stock_magasin} · {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
+                            </span>
+                          )}
                           <AdminProductActions product={p} canDelete={canDelete} />
                         </div>
                       </div>
@@ -406,7 +415,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-slate-900 truncate">{p.nom}</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-slate-900 truncate">{p.nom}</p>
+                                  {p.entrepot_id && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[10px] font-bold uppercase tracking-wide shrink-0">
+                                      Externe
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-slate-400 font-mono">{p.reference}</p>
                               </div>
                             </div>
@@ -422,20 +438,28 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <span className={`font-semibold ${p.stock_magasin === 0 ? "text-red-500" : p.stock_magasin <= 5 ? "text-amber-500" : "text-green-600"}`}>
-                              {p.stock_magasin}
-                            </span>
+                            {p.entrepot_id ? (
+                              <span className="text-slate-300 font-semibold">—</span>
+                            ) : (
+                              <span className={`font-semibold ${p.stock_magasin === 0 ? "text-red-500" : p.stock_magasin <= 5 ? "text-amber-500" : "text-green-600"}`}>
+                                {p.stock_magasin}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-center hidden lg:table-cell">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              p.stock_magasin === 0
-                                ? "bg-red-100 text-red-700"
-                                : p.stock_magasin <= 5
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-green-100 text-green-700"
-                            }`}>
-                              {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
-                            </span>
+                            {p.entrepot_id ? (
+                              <span className="text-slate-300 font-semibold">—</span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                p.stock_magasin === 0
+                                  ? "bg-red-100 text-red-700"
+                                  : p.stock_magasin <= 5
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-green-100 text-green-700"
+                              }`}>
+                                {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <AdminProductActions product={p} canDelete={canDelete} />

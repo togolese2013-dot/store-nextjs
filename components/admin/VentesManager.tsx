@@ -46,6 +46,9 @@ interface VenteItem {
   prix_unitaire: number;
   stock_dispo:   number;
   qty:           number;
+  item_key:      string;
+  variant_id?:   number;
+  variant_nom?:  string;
 }
 
 interface NewVenteModal {
@@ -290,11 +293,12 @@ export default function VentesManager({
   /* ── Ajouter un produit au panier ── */
   function addProduct(p: BoutiqueStockItem) {
     setItems(prev => {
-      const existing = prev.find(i => i.produit_id === p.produit_id);
+      const key = `${p.produit_id}_v${p.variant_id ?? 0}`;
+      const existing = prev.find(i => i.item_key === key);
       if (existing) {
         // Increase qty if within stock
         if (existing.qty < p.quantite) {
-          return prev.map(i => i.produit_id === p.produit_id ? { ...i, qty: i.qty + 1 } : i);
+          return prev.map(i => i.item_key === key ? { ...i, qty: i.qty + 1 } : i);
         }
         return prev; // already at max
       }
@@ -306,29 +310,32 @@ export default function VentesManager({
         prix_unitaire: p.prix_unitaire,
         stock_dispo:   p.quantite,
         qty:           1,
+        item_key:      key,
+        variant_id:    p.variant_id,
+        variant_nom:   p.variant_nom,
       }];
     });
     setProdSearch("");
     setShowDropdown(false);
   }
 
-  function removeItem(produit_id: number) {
-    setItems(prev => prev.filter(i => i.produit_id !== produit_id));
+  function removeItem(item_key: string) {
+    setItems(prev => prev.filter(i => i.item_key !== item_key));
   }
 
-  function changeQty(produit_id: number, delta: number) {
+  function changeQty(item_key: string, delta: number) {
     setItems(prev => prev.map(i => {
-      if (i.produit_id !== produit_id) return i;
+      if (i.item_key !== item_key) return i;
       const newQty = Math.max(1, Math.min(i.stock_dispo, i.qty + delta));
       return { ...i, qty: newQty };
     }));
   }
 
-  function setQtyDirect(produit_id: number, val: string) {
+  function setQtyDirect(item_key: string, val: string) {
     const n = parseInt(val, 10);
     if (isNaN(n)) return;
     setItems(prev => prev.map(i => {
-      if (i.produit_id !== produit_id) return i;
+      if (i.item_key !== item_key) return i;
       return { ...i, qty: Math.max(1, Math.min(i.stock_dispo, n)) };
     }));
   }
@@ -404,6 +411,7 @@ export default function VentesManager({
         qty:        i.qty,
         prix:       i.prix_unitaire,
         total:      i.prix_unitaire * i.qty,
+        ...(i.variant_id ? { variant_id: i.variant_id } : {}),
       })),
     };
 
@@ -823,7 +831,7 @@ export default function VentesManager({
                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-10 max-h-52 overflow-y-auto">
                       {filteredProducts.map(p => (
                         <button
-                          key={p.produit_id}
+                          key={`${p.produit_id}_v${p.variant_id ?? 0}`}
                           type="button"
                           disabled={p.quantite === 0}
                           onClick={() => addProduct(p)}
@@ -834,6 +842,9 @@ export default function VentesManager({
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-sm text-slate-800 break-words">{p.nom}</p>
+                            {p.variant_nom && (
+                              <p className="text-[10px] text-violet-600 font-semibold">{p.variant_nom}</p>
+                            )}
                             <p className="text-xs text-slate-400 font-mono">{p.reference}</p>
                           </div>
                           <div className="text-right shrink-0">
@@ -872,27 +883,30 @@ export default function VentesManager({
                       <span className="text-center">Total</span>
                     </div>
                     {items.map(item => (
-                      <div key={item.produit_id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                      <div key={item.item_key} className="border-t border-slate-100 hover:bg-slate-50/60">
                         {/* Desktop row */}
                         <div className="hidden md:grid relative grid-cols-[minmax(0,1fr)_108px_128px_128px] gap-2 items-center px-4 py-3 pr-8">
-                          <button type="button" onClick={() => removeItem(item.produit_id)}
+                          <button type="button" onClick={() => removeItem(item.item_key)}
                             className="absolute top-1.5 right-2 p-0.5 rounded-full bg-white border border-slate-200 shadow-sm text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
                             <X className="w-3 h-3" />
                           </button>
                           <div className="min-w-0">
                             <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
+                            {item.variant_nom && (
+                              <p className="text-[10px] text-violet-500 font-semibold">{item.variant_nom}</p>
+                            )}
                             <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
                           </div>
                           <div className="flex items-center gap-1 justify-center">
-                            <button type="button" onClick={() => changeQty(item.produit_id, -1)} disabled={item.qty <= 1}
+                            <button type="button" onClick={() => changeQty(item.item_key, -1)} disabled={item.qty <= 1}
                               className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
                               <Minus className="w-3 h-3" />
                             </button>
                             <input type="number" min={1} max={item.stock_dispo} value={item.qty}
-                              onChange={e => setQtyDirect(item.produit_id, e.target.value)}
+                              onChange={e => setQtyDirect(item.item_key, e.target.value)}
                               style={{ fontSize: '16px' }}
                               className="w-10 text-center font-bold border border-slate-200 rounded-lg py-0.5 outline-none focus:border-amber-400" />
-                            <button type="button" onClick={() => changeQty(item.produit_id, +1)} disabled={item.qty >= item.stock_dispo}
+                            <button type="button" onClick={() => changeQty(item.item_key, +1)} disabled={item.qty >= item.stock_dispo}
                               className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
                               <Plus className="w-3 h-3" />
                             </button>
@@ -909,24 +923,27 @@ export default function VentesManager({
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="min-w-0">
                               <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
+                              {item.variant_nom && (
+                                <p className="text-[10px] text-violet-500 font-semibold">{item.variant_nom}</p>
+                              )}
                               <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
                             </div>
-                            <button type="button" onClick={() => removeItem(item.produit_id)}
+                            <button type="button" onClick={() => removeItem(item.item_key)}
                               className="shrink-0 p-1 rounded-full bg-white border border-slate-200 shadow-sm text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
                               <X className="w-3 h-3" />
                             </button>
                           </div>
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1">
-                              <button type="button" onClick={() => changeQty(item.produit_id, -1)} disabled={item.qty <= 1}
+                              <button type="button" onClick={() => changeQty(item.item_key, -1)} disabled={item.qty <= 1}
                                 className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
                                 <Minus className="w-3 h-3" />
                               </button>
                               <input type="number" min={1} max={item.stock_dispo} value={item.qty}
-                                onChange={e => setQtyDirect(item.produit_id, e.target.value)}
+                                onChange={e => setQtyDirect(item.item_key, e.target.value)}
                                 style={{ fontSize: '16px' }}
                                 className="w-12 text-center font-bold border border-slate-200 rounded-lg py-1 outline-none focus:border-amber-400" />
-                              <button type="button" onClick={() => changeQty(item.produit_id, +1)} disabled={item.qty >= item.stock_dispo}
+                              <button type="button" onClick={() => changeQty(item.item_key, +1)} disabled={item.qty >= item.stock_dispo}
                                 className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
                                 <Plus className="w-3 h-3" />
                               </button>

@@ -17,6 +17,8 @@ interface Product {
   stock_magasin:  number;
   image_url:      string | null;
   images:         string[];
+  entrepot_id?:   number | null;
+  entrepot_nom?:  string | null;
 }
 
 interface Props {
@@ -141,7 +143,7 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
           {/* Right — Info */}
           <div className="flex-1 p-7 space-y-5 overflow-y-auto">
 
-            {/* Reference + Category */}
+            {/* Reference + Category + badge externe */}
             <div className="flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 font-mono text-xs text-slate-600 font-semibold">
                 {product.reference}
@@ -150,6 +152,12 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wide">
                   <Tag className="w-3 h-3" />
                   {product.categorie_nom.toUpperCase()}
+                </span>
+              )}
+              {product.entrepot_id && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-xs font-bold uppercase tracking-wide">
+                  <ExternalLink className="w-3 h-3" />
+                  {product.entrepot_nom ? `Externe · ${product.entrepot_nom}` : "Produit externe"}
                 </span>
               )}
             </div>
@@ -169,36 +177,38 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
               )}
             </div>
 
-            {/* Stock grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Boxes className="w-4 h-4 text-slate-400" />
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock magasin</p>
+            {/* Stock grid — masqué pour les produits externes */}
+            {!product.entrepot_id && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Boxes className="w-4 h-4 text-slate-400" />
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock magasin</p>
+                  </div>
+                  <p className={`font-bold text-2xl ${
+                    product.stock_magasin === 0 ? "text-red-500" :
+                    product.stock_magasin <= 5  ? "text-amber-500" : "text-emerald-600"
+                  }`}>
+                    {product.stock_magasin}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">unités en stock</p>
                 </div>
-                <p className={`font-bold text-2xl ${
-                  product.stock_magasin === 0 ? "text-red-500" :
-                  product.stock_magasin <= 5  ? "text-amber-500" : "text-emerald-600"
-                }`}>
-                  {product.stock_magasin}
-                </p>
-                <p className="text-xs text-slate-400 mt-0.5">unités en stock</p>
-              </div>
 
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Boxes className="w-4 h-4 text-slate-400" />
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock boutique</p>
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Boxes className="w-4 h-4 text-slate-400" />
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock boutique</p>
+                  </div>
+                  <p className={`font-bold text-2xl ${
+                    product.stock_boutique === 0 ? "text-red-500" :
+                    product.stock_boutique <= 5  ? "text-amber-500" : "text-emerald-600"
+                  }`}>
+                    {product.stock_boutique}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">unités disponibles</p>
                 </div>
-                <p className={`font-bold text-2xl ${
-                  product.stock_boutique === 0 ? "text-red-500" :
-                  product.stock_boutique <= 5  ? "text-amber-500" : "text-emerald-600"
-                }`}>
-                  {product.stock_boutique}
-                </p>
-                <p className="text-xs text-slate-400 mt-0.5">unités disponibles</p>
               </div>
-            </div>
+            )}
 
             {/* Description */}
             {product.description && (

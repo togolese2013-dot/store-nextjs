@@ -58,6 +58,7 @@ import { recoverMixByYasEntries, recoverCouponFinanceEntries } from "./routes/ad
 import adminLivreurInscriptionsRoutes from "./routes/admin/livreur-inscriptions";
 import adminEntrepotsRoutes, { ensureEntrepotsTable } from "./routes/admin/entrepots";
 import adminTombolaRoutes from "./routes/admin/tombola";
+import { startReviewNotifier } from "./lib/review-notifier";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -273,6 +274,7 @@ try {
   }
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
+  startReviewNotifier();
 });
 
 export default app;
