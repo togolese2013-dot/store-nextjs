@@ -291,14 +291,22 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   const [msg,         setMsg]         = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/admin/products/${productId}/variants`);
-    if (res.ok) {
-      const data = await res.json();
-      const arr: Variant[] = Array.isArray(data) ? data : (data.variants ?? []);
-      setVariants(arr);
-      onCountChange?.(arr.length);
+    try {
+      const res = await fetch(`/api/admin/products/${productId}/variants`);
+      if (res.ok) {
+        const data = await res.json();
+        const arr: Variant[] = Array.isArray(data) ? data : (data.variants ?? []);
+        setVariants(arr);
+        onCountChange?.(arr.length);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setMsg(`Erreur chargement : ${data.error ?? res.status}`);
+      }
+    } catch {
+      setMsg("Erreur réseau — impossible de charger les variantes.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [productId, onCountChange]);
 
   useEffect(() => { load(); }, [load]);
@@ -347,28 +355,41 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   async function handleSaveAll() {
     if (pendingNew.length === 0) return;
     setSavingAll(true);
+    setMsg("");
     const count = pendingNew.length;
-    await Promise.all(pendingNew.map(v =>
-      fetch(`/api/admin/products/${productId}/variants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nom:            autoNom(v.options) || "Variante",
-          options:        v.options,
-          prix:           v.prix,
-          remise:         v.remise,
-          stock:          v.stock,
-          stock_boutique: v.stock_boutique ?? 0,
-          reference_sku:  null,
-          image_url:      v.image_url,
-        }),
-      })
-    ));
-    setPendingNew([]);
-    setSavingAll(false);
-    await load();
-    setMsg(`${count} variante(s) enregistrée(s) ✓`);
-    setTimeout(() => setMsg(""), 2500);
+    try {
+      const results = await Promise.all(pendingNew.map(async v => {
+        const res = await fetch(`/api/admin/products/${productId}/variants`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nom:            autoNom(v.options) || "Variante",
+            options:        v.options,
+            prix:           v.prix,
+            remise:         v.remise,
+            stock:          v.stock,
+            stock_boutique: v.stock_boutique ?? 0,
+            reference_sku:  null,
+            image_url:      v.image_url,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? `Erreur ${res.status}`);
+        }
+        return res;
+      }));
+      if (results.length === count) {
+        setPendingNew([]);
+        await load();
+        setMsg(`${count} variante(s) enregistrée(s) ✓`);
+        setTimeout(() => setMsg(""), 2500);
+      }
+    } catch (err) {
+      setMsg(`Erreur : ${err instanceof Error ? err.message : "Enregistrement échoué"}`);
+    } finally {
+      setSavingAll(false);
+    }
   }
 
   if (loading) {
@@ -382,7 +403,9 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   return (
     <div className="space-y-3">
       {msg && (
-        <div className="px-4 py-2 rounded-xl bg-green-50 text-green-700 border border-green-200 text-sm">{msg}</div>
+        <div className={`px-4 py-2 rounded-xl border text-sm font-semibold ${
+          msg.startsWith("Erreur") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
+        }`}>{msg}</div>
       )}
 
       <p className="text-xs text-slate-500">
