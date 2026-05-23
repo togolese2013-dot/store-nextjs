@@ -57,6 +57,7 @@ import adminWaCampagneRoutes     from "./routes/admin/whatsapp-campagne";
 import { recoverMixByYasEntries, recoverCouponFinanceEntries } from "./routes/admin/finance";
 import adminLivreurInscriptionsRoutes from "./routes/admin/livreur-inscriptions";
 import adminEntrepotsRoutes, { ensureEntrepotsTable } from "./routes/admin/entrepots";
+import adminTombolaRoutes from "./routes/admin/tombola";
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -194,6 +195,7 @@ app.use(adminSocialRoutes);
 app.use(adminWaCampagneRoutes);
 app.use(adminLivreurInscriptionsRoutes);
 app.use(adminEntrepotsRoutes);
+app.use(adminTombolaRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);

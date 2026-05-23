@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2, Megaphone, Warehouse, PackageSearch,
+  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2, Megaphone, Warehouse, PackageSearch, Ticket,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
@@ -54,6 +54,7 @@ const MODULES: Record<string, {
       { label: "Statistiques",   href: "/admin/boutique-stats",        icon: BarChart2 },
       { label: "WhatsApp",       href: "/admin/whatsapp",              icon: MessageCircle },
       { label: "Campagnes WA",   href: "/admin/whatsapp-campagne",     icon: Megaphone },
+      { label: "Tombola",        href: "/admin/tombola",               icon: Ticket },
     ],
   },
   store: {
@@ -123,6 +124,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/commerciaux",           "boutique"],
   ["/admin/boutique-stats",        "boutique"],
   ["/admin/whatsapp-campagne",      "boutique"],
+  ["/admin/tombola",               "boutique"],
   ["/admin/whatsapp",              "boutique"],
   ["/admin/store",                 "store"],
   ["/admin/orders",                "store"],

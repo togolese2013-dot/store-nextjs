@@ -1763,34 +1763,38 @@ export async function getStockBoutiqueList(opts: {
     conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
   }
-  if (filter === "faible")     conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte AND p.entrepot_id IS NULL");
-  if (filter === "epuise")     conditions.push("bs.quantite = 0 AND p.entrepot_id IS NULL");
-  if (filter === "disponible") conditions.push("(bs.quantite > 0 OR p.entrepot_id IS NOT NULL)");
+  if (filter === "faible")     conditions.push("COALESCE(bs.quantite, 0) > 0 AND COALESCE(bs.quantite, 0) <= COALESCE(bs.seuil_alerte, 5) AND p.entrepot_id IS NULL");
+  if (filter === "epuise")     conditions.push("COALESCE(bs.quantite, 0) = 0 AND p.entrepot_id IS NULL");
+  if (filter === "disponible") conditions.push("(COALESCE(bs.quantite, 0) > 0 OR p.entrepot_id IS NOT NULL)");
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  // Base condition: only show products that have a boutique_stock row OR are entrepôt products
+  const baseCondition = "(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)";
+  const where = conditions.length
+    ? `WHERE ${baseCondition} AND ${conditions.join(" AND ")}`
+    : `WHERE ${baseCondition}`;
 
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT bs.produit_id, p.nom, p.reference,
+    `SELECT COALESCE(bs.produit_id, p.id) AS produit_id, p.nom, p.reference,
             ${imageCol}  AS image_url,
             ${remiseCol} AS remise,
             p.prix_unitaire,
             COALESCE(c.nom, '') AS categorie_nom,
-            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE bs.quantite END AS quantite,
-            bs.seuil_alerte,
-            (CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE bs.quantite END * p.prix_unitaire) AS valeur
-     FROM boutique_stock bs
-     JOIN produits p ON p.id = bs.produit_id
+            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite, 0) END AS quantite,
+            COALESCE(bs.seuil_alerte, 5) AS seuil_alerte,
+            (CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite, 0) END * p.prix_unitaire) AS valeur
+     FROM produits p
+     LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
      LEFT JOIN categories c ON c.id = p.categorie_id
      ${where}
-     ORDER BY p.entrepot_id IS NULL DESC, bs.quantite ASC, p.nom ASC
+     ORDER BY p.entrepot_id IS NULL DESC, COALESCE(bs.quantite, 0) ASC, p.nom ASC
      LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
     params
   );
 
   const [countRows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) AS cnt
-     FROM boutique_stock bs
-     JOIN produits p ON p.id = bs.produit_id
+     FROM produits p
+     LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
      ${where}`,
     params
   );
@@ -3926,4 +3930,167 @@ export async function fixSiteOrderFinanceEntries(): Promise<void> {
       console.error("[migration] fixSiteOrderFinanceEntries failed:", e);
     }
   });
+}
+
+// ─── TOMBOLA ──────────────────────────────────────────────────────────────────
+
+export interface TombolaSession {
+  id: number;
+  nom: string;
+  statut: "draft" | "active" | "termine";
+  min_montant: number;
+  min_participants: number;
+  prize_description: string | null;
+  winner_facture_id: number | null;
+  winner_nom: string | null;
+  winner_tel: string | null;
+  winner_montant: number | null;
+  winner_reference: string | null;
+  notifie: boolean;
+  created_at: string;
+  launched_at: string | null;
+  completed_at: string | null;
+}
+
+export interface TombolaParticipant {
+  facture_id: number;
+  reference: string;
+  client_nom: string;
+  client_tel: string | null;
+  total: number;
+  created_at: string;
+}
+
+function mapTombolaRow(r: mysql.RowDataPacket): TombolaSession {
+  return {
+    id:                Number(r.id),
+    nom:               String(r.nom),
+    statut:            r.statut as TombolaSession["statut"],
+    min_montant:       Number(r.min_montant),
+    min_participants:  Number(r.min_participants),
+    prize_description: r.prize_description ?? null,
+    winner_facture_id: r.winner_facture_id ? Number(r.winner_facture_id) : null,
+    winner_nom:        r.winner_nom ?? null,
+    winner_tel:        r.winner_tel ?? null,
+    winner_montant:    r.winner_montant != null ? Number(r.winner_montant) : null,
+    winner_reference:  r.winner_reference ?? null,
+    notifie:           Boolean(r.notifie),
+    created_at:        String(r.created_at),
+    launched_at:       r.launched_at ? String(r.launched_at) : null,
+    completed_at:      r.completed_at ? String(r.completed_at) : null,
+  };
+}
+
+export async function ensureTombolaTable(): Promise<void> {
+  return runOnce("tombola", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS tombola_sessions (
+        id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        nom              VARCHAR(150) NOT NULL,
+        statut           ENUM('draft','active','termine') NOT NULL DEFAULT 'draft',
+        min_montant      DECIMAL(10,2) NOT NULL DEFAULT 50000,
+        min_participants INT UNSIGNED NOT NULL DEFAULT 10,
+        prize_description TEXT NULL,
+        winner_facture_id INT UNSIGNED NULL,
+        winner_nom       VARCHAR(150) NULL,
+        winner_tel       VARCHAR(30)  NULL,
+        winner_montant   DECIMAL(10,2) NULL,
+        winner_reference VARCHAR(50)  NULL,
+        notifie          TINYINT(1) NOT NULL DEFAULT 0,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        launched_at      TIMESTAMP NULL,
+        completed_at     TIMESTAMP NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  });
+}
+
+export async function listTombolaSessions(): Promise<TombolaSession[]> {
+  await ensureTombolaTable();
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT * FROM tombola_sessions ORDER BY created_at DESC`
+  );
+  return rows.map(mapTombolaRow);
+}
+
+export async function getTombolaSession(id: number): Promise<TombolaSession | null> {
+  await ensureTombolaTable();
+  const [[row]] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT * FROM tombola_sessions WHERE id = ?`, [id]
+  );
+  if (!row) return null;
+  return mapTombolaRow(row);
+}
+
+export async function createTombolaSession(data: {
+  nom: string;
+  min_montant: number;
+  min_participants: number;
+  prize_description?: string | null;
+}): Promise<number> {
+  await ensureTombolaTable();
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO tombola_sessions (nom, min_montant, min_participants, prize_description)
+     VALUES (?, ?, ?, ?)`,
+    [data.nom, data.min_montant, data.min_participants, data.prize_description ?? null]
+  );
+  return result.insertId;
+}
+
+export async function updateTombolaSession(id: number, data: {
+  nom?: string;
+  statut?: "draft" | "active" | "termine";
+  min_montant?: number;
+  min_participants?: number;
+  prize_description?: string | null;
+}): Promise<void> {
+  const entries = Object.entries(data).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return;
+  const fields = entries.map(([k]) => `${k} = ?`).join(", ");
+  const values = [...entries.map(([, v]) => v), id];
+  await db.execute(`UPDATE tombola_sessions SET ${fields} WHERE id = ?`, values);
+}
+
+export async function deleteTombolaSession(id: number): Promise<void> {
+  await db.execute(
+    `DELETE FROM tombola_sessions WHERE id = ? AND statut = 'draft'`, [id]
+  );
+}
+
+export async function getTombolaParticipants(minMontant: number): Promise<TombolaParticipant[]> {
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT id AS facture_id, reference, client_nom, client_tel, total, created_at
+     FROM factures
+     WHERE statut_paiement = 'paye_total' AND total >= ?
+     ORDER BY created_at DESC`,
+    [minMontant]
+  );
+  return rows.map(r => ({
+    facture_id: Number(r.facture_id),
+    reference:  String(r.reference),
+    client_nom: String(r.client_nom),
+    client_tel: r.client_tel ?? null,
+    total:      Number(r.total),
+    created_at: String(r.created_at),
+  }));
+}
+
+export async function spinTombola(sessionId: number, winnerFactureId: number): Promise<void> {
+  const [[row]] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT client_nom, client_tel, total, reference FROM factures WHERE id = ?`,
+    [winnerFactureId]
+  );
+  if (!row) throw new Error("Facture introuvable");
+  await db.execute(
+    `UPDATE tombola_sessions
+     SET statut = 'termine', winner_facture_id = ?, winner_nom = ?, winner_tel = ?,
+         winner_montant = ?, winner_reference = ?, completed_at = NOW()
+     WHERE id = ? AND statut IN ('draft','active')`,
+    [winnerFactureId, row.client_nom, row.client_tel ?? null,
+     row.total, row.reference, sessionId]
+  );
+}
+
+export async function markTombolaNotified(sessionId: number): Promise<void> {
+  await db.execute(`UPDATE tombola_sessions SET notifie = 1 WHERE id = ?`, [sessionId]);
 }
