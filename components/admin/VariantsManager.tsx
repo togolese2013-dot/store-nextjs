@@ -283,10 +283,9 @@ function VariantRow({ variant, onSave, onDelete }: RowProps) {
 export default function VariantsManager({ productId, onCountChange }: Props) {
   const [variants,    setVariants]    = useState<Variant[]>([]);
   const [loading,     setLoading]     = useState(true);
-  const [pendingNew,  setPendingNew]  = useState<PendingDraft[]>([]);
   const [showAdd,     setShowAdd]     = useState(false);
   const [newDraft,    setNewDraft]    = useState<PendingDraft>(emptyPending());
-  const [savingAll,   setSavingAll]   = useState(false);
+  const [savingNew,   setSavingNew]   = useState(false);
   const [uploadingNew,setUploadingNew]= useState(false);
   const [msg,         setMsg]         = useState("");
 
@@ -341,54 +340,38 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
     e.target.value = "";
   }
 
-  function handleAddToPending() {
-    const opts = parseOptions(newDraft.rawOptions);
-    setPendingNew(prev => [...prev, { ...newDraft, options: opts }]);
-    setNewDraft(emptyPending());
-    setShowAdd(false);
-  }
-
-  function removePending(key: string) {
-    setPendingNew(prev => prev.filter(p => p._key !== key));
-  }
-
-  async function handleSaveAll() {
-    if (pendingNew.length === 0) return;
-    setSavingAll(true);
+  async function handleSaveNew() {
+    setSavingNew(true);
     setMsg("");
-    const count = pendingNew.length;
     try {
-      const results = await Promise.all(pendingNew.map(async v => {
-        const res = await fetch(`/api/admin/products/${productId}/variants`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nom:            autoNom(v.options) || "Variante",
-            options:        v.options,
-            prix:           v.prix,
-            remise:         v.remise,
-            stock:          v.stock,
-            stock_boutique: v.stock_boutique ?? 0,
-            reference_sku:  null,
-            image_url:      v.image_url,
-          }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error ?? `Erreur ${res.status}`);
-        }
-        return res;
-      }));
-      if (results.length === count) {
-        setPendingNew([]);
-        await load();
-        setMsg(`${count} variante(s) enregistrée(s) ✓`);
-        setTimeout(() => setMsg(""), 2500);
+      const opts = parseOptions(newDraft.rawOptions);
+      const res = await fetch(`/api/admin/products/${productId}/variants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom:            autoNom(opts) || "Variante",
+          options:        opts,
+          prix:           newDraft.prix,
+          remise:         newDraft.remise,
+          stock:          newDraft.stock,
+          stock_boutique: newDraft.stock_boutique ?? 0,
+          reference_sku:  null,
+          image_url:      newDraft.image_url,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Erreur ${res.status}`);
       }
+      setNewDraft(emptyPending());
+      setShowAdd(false);
+      await load();
+      setMsg("Variante enregistrée ✓");
+      setTimeout(() => setMsg(""), 2000);
     } catch (err) {
       setMsg(`Erreur : ${err instanceof Error ? err.message : "Enregistrement échoué"}`);
     } finally {
-      setSavingAll(false);
+      setSavingNew(false);
     }
   }
 
@@ -421,51 +404,8 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
         </div>
       )}
 
-      {/* Pending new variants (not yet saved) */}
-      {pendingNew.length > 0 && (
-        <div className="space-y-2">
-          {pendingNew.map(p => {
-            const optLabels = Object.entries(p.options);
-            return (
-              <div key={p._key} className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-brand-300 rounded-2xl bg-brand-50/40">
-                <div className="w-9 h-9 rounded-lg bg-white border border-brand-200 overflow-hidden shrink-0 flex items-center justify-center">
-                  {p.image_url
-                    ? <img src={p.image_url} alt="" className="w-full h-full object-cover" />
-                    : <ImagePlus className="w-4 h-4 text-slate-300" />
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap gap-1.5 mb-1">
-                    {optLabels.length > 0 ? optLabels.map(([k, v]) => (
-                      <span key={k} className="px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 text-xs font-semibold">{k}: {v}</span>
-                    )) : <span className="text-xs text-slate-400">Sans options</span>}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span className="font-bold text-slate-700">{p.prix.toLocaleString("fr-FR")} FCFA</span>
-                    <span className="px-1.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600">Stock magasin : {p.stock}</span>
-                    <span className="px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">Boutique : {p.stock_boutique ?? 0}</span>
-                    <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold text-[10px] uppercase tracking-wide">Nouveau</span>
-                  </div>
-                </div>
-                <button type="button" onClick={() => removePending(p._key)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            );
-          })}
-
-          {/* Save all pending button */}
-          <button type="button" onClick={handleSaveAll} disabled={savingAll}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-2xl bg-brand-900 text-white text-sm font-bold hover:bg-brand-800 disabled:opacity-60 transition-colors">
-            {savingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {savingAll ? "Enregistrement…" : `Enregistrer ${pendingNew.length} variante${pendingNew.length > 1 ? "s" : ""}`}
-          </button>
-        </div>
-      )}
-
       {/* Empty state */}
-      {variants.length === 0 && pendingNew.length === 0 && !showAdd && (
+      {variants.length === 0 && !showAdd && (
         <div className="py-6 text-center text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
           Aucune variante — le produit se vend tel quel (prix et stock globaux).
         </div>
@@ -537,9 +477,9 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
           </div>
 
           <div className="flex gap-2">
-            <button type="button" onClick={handleAddToPending}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 transition-colors">
-              <Plus className="w-3.5 h-3.5" /> Ajouter à la liste
+            <button type="button" onClick={handleSaveNew} disabled={savingNew}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 disabled:opacity-60 transition-colors">
+              {savingNew ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Enregistrer cette variante
             </button>
             <button type="button" onClick={() => { setShowAdd(false); setNewDraft(emptyPending()); }}
               className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:border-slate-300 transition-colors">
