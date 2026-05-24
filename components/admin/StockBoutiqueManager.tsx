@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import {
   Filter, Package, TrendingDown, AlertTriangle, XCircle,
@@ -93,10 +93,16 @@ export default function StockBoutiqueManager({
   const [flash, setFlash] = useState("");
   function showFlash(msg: string) { setFlash(msg); setTimeout(() => setFlash(""), 3500); }
 
-  /* ── Fetch data ── */
+  /* ── Fetch data (AbortController cancels stale in-flight requests) ── */
+  const fetchAbortRef = useRef<AbortController | null>(null);
   const fetchData = useCallback(async (opts: {
     q?: string; filter?: FilterTab; off?: number;
   } = {}) => {
+    // Cancel any previous in-flight request
+    fetchAbortRef.current?.abort();
+    fetchAbortRef.current = new AbortController();
+    const { signal } = fetchAbortRef.current;
+
     setLoading(true);
     const params = new URLSearchParams();
     if (opts.q)      params.set("q",      opts.q);
@@ -104,13 +110,17 @@ export default function StockBoutiqueManager({
     if (opts.off)    params.set("offset", String(opts.off));
     params.set("limit", String(LIMIT));
 
-    const res  = await fetch(`/api/admin/stock-boutique?${params}`);
-    const data = await res.json();
-    if (res.ok) {
-      setStats(data.stats);
-      setItems(data.items);
-      setTotal(data.total);
-      setMovements(data.movements);
+    try {
+      const res  = await fetch(`/api/admin/stock-boutique?${params}`, { signal });
+      const data = await res.json();
+      if (res.ok) {
+        setStats(data.stats);
+        setItems(data.items);
+        setTotal(data.total);
+        setMovements(data.movements);
+      }
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") return; // superseded by newer request
     }
     setLoading(false);
   }, []);
