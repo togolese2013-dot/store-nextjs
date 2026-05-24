@@ -58,6 +58,7 @@ import { recoverMixByYasEntries, recoverCouponFinanceEntries } from "./routes/ad
 import adminLivreurInscriptionsRoutes from "./routes/admin/livreur-inscriptions";
 import adminEntrepotsRoutes, { ensureEntrepotsTable } from "./routes/admin/entrepots";
 import adminTombolaRoutes from "./routes/admin/tombola";
+import adminOnboardingRoutes from "./routes/admin/onboarding";
 import { startReviewNotifier } from "./lib/review-notifier";
 
 const app  = express();
@@ -197,6 +198,7 @@ app.use(adminWaCampagneRoutes);
 app.use(adminLivreurInscriptionsRoutes);
 app.use(adminEntrepotsRoutes);
 app.use(adminTombolaRoutes);
+app.use(adminOnboardingRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);

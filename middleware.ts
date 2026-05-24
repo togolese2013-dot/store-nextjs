@@ -79,7 +79,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 
-  const isAdminRoute      = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
+  const isAdminRoute      = pathname.startsWith("/admin") &&
+                            !pathname.startsWith("/admin/login") &&
+                            !pathname.startsWith("/admin/onboarding");
   const isLivreurRoute    = pathname.startsWith("/livreur") &&
                             !pathname.startsWith("/livreur/login");
   const isChangePassRoute = pathname.startsWith("/change-password");
