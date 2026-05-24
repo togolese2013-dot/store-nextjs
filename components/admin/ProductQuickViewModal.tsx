@@ -36,24 +36,28 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
   const hasPromo = product.remise > 0;
 
   // Fetch variant stocks to display sums (only for non-external products)
-  const [variantStocks, setVariantStocks] = useState<{ stock: number; stock_boutique: number }[] | null>(null);
+  // undefined = still fetching | null = fetched, no variants | array = fetched, has variants
+  const [variantStocks, setVariantStocks] = useState<{ stock: number; stock_boutique: number }[] | null | undefined>(
+    product.entrepot_id ? null : undefined
+  );
   useEffect(() => {
     if (product.entrepot_id) return;
-    setVariantStocks(null);
+    setVariantStocks(undefined); // reset to loading on product change
     fetch(`/api/admin/products/${product.id}/variants`)
       .then(r => r.json())
       .then((data: unknown) => {
         if (Array.isArray(data) && data.length > 0) setVariantStocks(data as { stock: number; stock_boutique: number }[]);
-        else setVariantStocks(null);
+        else setVariantStocks(null); // no variants → use product fields
       })
       .catch(() => setVariantStocks(null));
   }, [product.id, product.entrepot_id]);
 
-  const displayMagasin  = variantStocks
-    ? variantStocks.reduce((s, v) => s + (Number(v.stock)          ?? 0), 0)
+  // undefined = loading (show —), null = no variants (use product fields), array = use variant sums
+  const displayMagasin  = variantStocks === undefined ? null
+    : variantStocks ? variantStocks.reduce((s, v) => s + Number(v.stock), 0)
     : (product.stock_magasin  ?? 0);
-  const displayBoutique = variantStocks
-    ? variantStocks.reduce((s, v) => s + (Number(v.stock_boutique) ?? 0), 0)
+  const displayBoutique = variantStocks === undefined ? null
+    : variantStocks ? variantStocks.reduce((s, v) => s + Number(v.stock_boutique), 0)
     : (product.stock_boutique ?? 0);
 
   // Build image list: main photo first, then secondary (deduplicated)
@@ -207,12 +211,15 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock magasin</p>
                   </div>
                   <p className={`font-bold text-2xl ${
-                    displayMagasin === 0 ? "text-red-500" :
-                    displayMagasin <= 5  ? "text-amber-500" : "text-emerald-600"
+                    displayMagasin === null ? "text-slate-300" :
+                    displayMagasin === 0   ? "text-red-500" :
+                    displayMagasin <= 5    ? "text-amber-500" : "text-emerald-600"
                   }`}>
-                    {displayMagasin}
+                    {displayMagasin === null ? "—" : displayMagasin}
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">{variantStocks ? `${variantStocks.length} variante(s)` : "unités en stock"}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {variantStocks ? `${variantStocks.length} variante(s)` : "unités en stock"}
+                  </p>
                 </div>
 
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
@@ -221,10 +228,11 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock boutique</p>
                   </div>
                   <p className={`font-bold text-2xl ${
-                    displayBoutique === 0 ? "text-red-500" :
-                    displayBoutique <= 5  ? "text-amber-500" : "text-emerald-600"
+                    displayBoutique === null ? "text-slate-300" :
+                    displayBoutique === 0   ? "text-red-500" :
+                    displayBoutique <= 5    ? "text-amber-500" : "text-emerald-600"
                   }`}>
-                    {displayBoutique}
+                    {displayBoutique === null ? "—" : displayBoutique}
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">unités disponibles</p>
                 </div>

@@ -61,7 +61,28 @@ router.get("/api/admin/products", async (req, res) => {
     getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true, entrepotId }),
   ]);
 
-  res.json({ products, total, page, limit });
+  // Enrich products with variant stock sums (sum of product_variants.stock per product)
+  const ids = products.map((p: mysql.RowDataPacket) => p.id).filter(Boolean) as number[];
+  const variantStockMap: Record<number, number> = {};
+  if (ids.length > 0) {
+    try {
+      const [vrows] = await (db as import("mysql2/promise").Pool).query<mysql.RowDataPacket[]>(
+        `SELECT produit_id, COALESCE(SUM(stock), 0) AS variants_stock
+         FROM product_variants
+         WHERE produit_id IN (${ids.map(() => "?").join(",")})
+         GROUP BY produit_id`,
+        ids
+      );
+      for (const row of vrows) variantStockMap[row.produit_id as number] = Number(row.variants_stock);
+    } catch { /* table may not exist yet — ignore */ }
+  }
+
+  const enriched = products.map((p: mysql.RowDataPacket) => ({
+    ...p,
+    variants_stock: Object.prototype.hasOwnProperty.call(variantStockMap, p.id) ? variantStockMap[p.id] : null,
+  }));
+
+  res.json({ products: enriched, total, page, limit });
 });
 
 router.post("/api/admin/products", async (req, res) => {

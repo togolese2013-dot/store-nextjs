@@ -308,8 +308,9 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
               {/* ── Mobile cards (xs only) ── */}
               <div className="sm:hidden divide-y divide-slate-100">
                 {products.map(p => {
-                  const price   = finalPrice(p);
-                  const isPromo = p.remise > 0;
+                  const price    = finalPrice(p);
+                  const isPromo  = p.remise > 0;
+                  const stockMag = p.variants_stock !== null && p.variants_stock !== undefined ? p.variants_stock : p.stock_magasin;
                   const imgSrc = p.image_url
                     ? (p.image_url.startsWith("http") || p.image_url.startsWith("/"))
                       ? p.image_url
@@ -358,16 +359,16 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             <span className="text-sm text-slate-300 font-semibold">—</span>
                           ) : (
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                              p.stock_magasin === 0
+                              stockMag === 0
                                 ? "bg-red-100 text-red-700"
-                                : p.stock_magasin <= 5
+                                : stockMag <= 5
                                 ? "bg-amber-100 text-amber-700"
                                 : "bg-green-100 text-green-700"
                             }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${
-                                p.stock_magasin === 0 ? "bg-red-400" : p.stock_magasin <= 5 ? "bg-amber-400" : "bg-green-400"
+                                stockMag === 0 ? "bg-red-400" : stockMag <= 5 ? "bg-amber-400" : "bg-green-400"
                               }`} />
-                              Stock {p.stock_magasin} · {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
+                              Stock {stockMag} · {stockMag === 0 ? "Épuisé" : stockMag <= 5 ? "Faible" : "Disponible"}
                             </span>
                           )}
                           <AdminProductActions product={p} canDelete={canDelete} />
@@ -393,8 +394,9 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {products.map(p => {
-                      const price   = finalPrice(p);
-                      const isPromo = p.remise > 0;
+                      const price    = finalPrice(p);
+                      const isPromo  = p.remise > 0;
+                      const stockMag = p.variants_stock !== null && p.variants_stock !== undefined ? p.variants_stock : p.stock_magasin;
                       const imgSrc = p.image_url
                         ? (p.image_url.startsWith("http") || p.image_url.startsWith("/"))
                           ? p.image_url
@@ -441,8 +443,8 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                             {p.entrepot_id ? (
                               <span className="text-slate-300 font-semibold">—</span>
                             ) : (
-                              <span className={`font-semibold ${p.stock_magasin === 0 ? "text-red-500" : p.stock_magasin <= 5 ? "text-amber-500" : "text-green-600"}`}>
-                                {p.stock_magasin}
+                              <span className={`font-semibold ${stockMag === 0 ? "text-red-500" : stockMag <= 5 ? "text-amber-500" : "text-green-600"}`}>
+                                {stockMag}
                               </span>
                             )}
                           </td>
@@ -451,13 +453,13 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                               <span className="text-slate-300 font-semibold">—</span>
                             ) : (
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                p.stock_magasin === 0
+                                stockMag === 0
                                   ? "bg-red-100 text-red-700"
-                                  : p.stock_magasin <= 5
+                                  : stockMag <= 5
                                   ? "bg-amber-100 text-amber-700"
                                   : "bg-green-100 text-green-700"
                               }`}>
-                                {p.stock_magasin === 0 ? "Épuisé" : p.stock_magasin <= 5 ? "Faible" : "Disponible"}
+                                {stockMag === 0 ? "Épuisé" : stockMag <= 5 ? "Faible" : "Disponible"}
                               </span>
                             )}
                           </td>

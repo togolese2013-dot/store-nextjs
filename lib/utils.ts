@@ -25,6 +25,7 @@ export interface Product {
   prix_entrepot?: number | null;
   entrepot_nom?: string | null;
   entrepot_telephone?: string | null;
+  variants_stock?: number | null; // sum of variant.stock when product has variants
 }
 
 export interface Category {

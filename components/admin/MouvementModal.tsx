@@ -160,8 +160,7 @@ export default function MouvementModal() {
     if (!search.trim()) return [];
     const q = search.toLowerCase();
     return produits.filter(p =>
-      (p.variants_count ?? 0) === 0 &&
-      (p.nom.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q))
+      p.nom.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q)
     );
   }
 
