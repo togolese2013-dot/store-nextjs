@@ -107,8 +107,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Root domain (no shop subdomain) + "/" → SaaS landing page
-  if (!shopSlug && pathname === "/") {
+  // Root domain (no shop subdomain) + "/" → SaaS landing page (production only)
+  const isLocalhost = hostname.startsWith("localhost") || hostname.startsWith("127.");
+  if (!shopSlug && !isLocalhost && pathname === "/") {
     return NextResponse.redirect(new URL("/saas", request.url));
   }
 
