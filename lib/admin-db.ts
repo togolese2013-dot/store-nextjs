@@ -11,19 +11,21 @@ function runOnce(key: string, fn: () => Promise<void>): Promise<void> {
 // ─── Stock Operations ─────────────────────────────────────────────────────────
 
 export interface ProduitStock {
-  produit_id: number;
-  nom:        string;
-  reference:  string;
-  stock:      number; // stock magasin (sum de produit_stocks)
+  produit_id:     number;
+  nom:            string;
+  reference:      string;
+  stock:          number; // stock magasin
+  variants_count: number; // 0 = no variants (product-level stock); >0 = stock managed per variant
 }
 
 export async function getProduitsWithStock(): Promise<ProduitStock[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT id AS produit_id, nom, reference,
-            COALESCE(stock_magasin, 0) AS stock
-     FROM produits
-     WHERE actif = 1
-     ORDER BY nom`
+    `SELECT p.id AS produit_id, p.nom, p.reference,
+            COALESCE(p.stock_magasin, 0) AS stock,
+            (SELECT COUNT(*) FROM product_variants WHERE produit_id = p.id) AS variants_count
+     FROM produits p
+     WHERE p.actif = 1
+     ORDER BY p.nom`
   );
   return rows as ProduitStock[];
 }

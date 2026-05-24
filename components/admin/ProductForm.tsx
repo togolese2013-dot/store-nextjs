@@ -561,53 +561,6 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
               </section>
             )}
 
-            {/* Source entrepôt */}
-            <section className="space-y-3">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
-                <Warehouse className="w-3.5 h-3.5" /> Source entrepôt
-              </h3>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Entrepôt fournisseur</label>
-                  <select
-                    value={form.entrepot_id ?? ""}
-                    onChange={e => set("entrepot_id", e.target.value ? Number(e.target.value) : null)}
-                    className={inputCls}
-                  >
-                    <option value="">— Aucun (produit propre) —</option>
-                    {entrepots.map(e => (
-                      <option key={e.id} value={e.id}>{e.nom}{e.telephone ? ` · ${e.telephone}` : ""}</option>
-                    ))}
-                  </select>
-                </div>
-                {form.entrepot_id && (
-                  <div>
-                    <label className={labelCls}>
-                      Prix entrepôt (FCFA)
-                      {form.entrepot_id && form.prix_entrepot !== "" && form.prix_unitaire !== "" && (
-                        <span className="ml-2 text-emerald-600 font-bold normal-case tracking-normal">
-                          → Marge : {(Number(form.prix_unitaire) - Number(form.prix_entrepot)).toLocaleString("fr-FR")} FCFA
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.prix_entrepot}
-                      onChange={e => set("prix_entrepot", e.target.value !== "" ? Number(e.target.value) : "")}
-                      placeholder="0"
-                      className={inputCls}
-                    />
-                  </div>
-                )}
-              </div>
-              {form.entrepot_id && (
-                <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
-                  Ce produit sera récupéré à l&apos;entrepôt lors des commandes. Aucun impact sur le stock boutique.
-                </p>
-              )}
-            </section>
-
             {/* Variantes */}
             <section className="space-y-3">
               <div className="flex items-center justify-between">
@@ -667,6 +620,53 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                 </div>
               )}
               {isEdit && initial?.id && <VariantsManager productId={initial.id} onCountChange={setEditVariantsCount} />}
+            </section>
+
+            {/* Source entrepôt */}
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                <Warehouse className="w-3.5 h-3.5" /> Source entrepôt
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Entrepôt fournisseur</label>
+                  <select
+                    value={form.entrepot_id ?? ""}
+                    onChange={e => set("entrepot_id", e.target.value ? Number(e.target.value) : null)}
+                    className={inputCls}
+                  >
+                    <option value="">— Aucun (produit propre) —</option>
+                    {entrepots.map(e => (
+                      <option key={e.id} value={e.id}>{e.nom}{e.telephone ? ` · ${e.telephone}` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+                {form.entrepot_id && (
+                  <div>
+                    <label className={labelCls}>
+                      Prix entrepôt (FCFA)
+                      {form.entrepot_id && form.prix_entrepot !== "" && form.prix_unitaire !== "" && (
+                        <span className="ml-2 text-emerald-600 font-bold normal-case tracking-normal">
+                          → Marge : {(Number(form.prix_unitaire) - Number(form.prix_entrepot)).toLocaleString("fr-FR")} FCFA
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.prix_entrepot}
+                      onChange={e => set("prix_entrepot", e.target.value !== "" ? Number(e.target.value) : "")}
+                      placeholder="0"
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+              </div>
+              {form.entrepot_id && (
+                <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
+                  Ce produit sera récupéré à l&apos;entrepôt lors des commandes. Aucun impact sur le stock boutique.
+                </p>
+              )}
             </section>
 
           </div>

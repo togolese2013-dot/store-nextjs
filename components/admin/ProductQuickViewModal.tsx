@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Package, Tag, Boxes, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
@@ -34,6 +34,27 @@ function normalizeUrl(url: string): string {
 export default function ProductQuickViewModal({ product, onClose }: Props) {
   const price    = product.remise > 0 ? Math.max(0, product.prix_unitaire - product.remise) : product.prix_unitaire;
   const hasPromo = product.remise > 0;
+
+  // Fetch variant stocks to display sums (only for non-external products)
+  const [variantStocks, setVariantStocks] = useState<{ stock: number; stock_boutique: number }[] | null>(null);
+  useEffect(() => {
+    if (product.entrepot_id) return;
+    setVariantStocks(null);
+    fetch(`/api/admin/products/${product.id}/variants`)
+      .then(r => r.json())
+      .then((data: unknown) => {
+        if (Array.isArray(data) && data.length > 0) setVariantStocks(data as { stock: number; stock_boutique: number }[]);
+        else setVariantStocks(null);
+      })
+      .catch(() => setVariantStocks(null));
+  }, [product.id, product.entrepot_id]);
+
+  const displayMagasin  = variantStocks
+    ? variantStocks.reduce((s, v) => s + (Number(v.stock)          ?? 0), 0)
+    : (product.stock_magasin  ?? 0);
+  const displayBoutique = variantStocks
+    ? variantStocks.reduce((s, v) => s + (Number(v.stock_boutique) ?? 0), 0)
+    : (product.stock_boutique ?? 0);
 
   // Build image list: main photo first, then secondary (deduplicated)
   const mainUrl = product.image_url ? normalizeUrl(product.image_url) : null;
@@ -186,12 +207,12 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock magasin</p>
                   </div>
                   <p className={`font-bold text-2xl ${
-                    product.stock_magasin === 0 ? "text-red-500" :
-                    product.stock_magasin <= 5  ? "text-amber-500" : "text-emerald-600"
+                    displayMagasin === 0 ? "text-red-500" :
+                    displayMagasin <= 5  ? "text-amber-500" : "text-emerald-600"
                   }`}>
-                    {product.stock_magasin}
+                    {displayMagasin}
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">unités en stock</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{variantStocks ? `${variantStocks.length} variante(s)` : "unités en stock"}</p>
                 </div>
 
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
@@ -200,10 +221,10 @@ export default function ProductQuickViewModal({ product, onClose }: Props) {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Stock boutique</p>
                   </div>
                   <p className={`font-bold text-2xl ${
-                    product.stock_boutique === 0 ? "text-red-500" :
-                    product.stock_boutique <= 5  ? "text-amber-500" : "text-emerald-600"
+                    displayBoutique === 0 ? "text-red-500" :
+                    displayBoutique <= 5  ? "text-amber-500" : "text-emerald-600"
                   }`}>
-                    {product.stock_boutique}
+                    {displayBoutique}
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">unités disponibles</p>
                 </div>

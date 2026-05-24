@@ -10,10 +10,11 @@ import {
 
 /* ─── Types ─── */
 interface ProduitStock {
-  produit_id: number;
-  nom:        string;
-  reference:  string;
-  stock:      number;
+  produit_id:     number;
+  nom:            string;
+  reference:      string;
+  stock:          number;
+  variants_count: number; // products with variants are excluded (stock managed per-variant)
 }
 
 type MouvType = "entree" | "sortie" | "ajustement";
@@ -158,7 +159,10 @@ export default function MouvementModal() {
     const search = items[index]?.search ?? "";
     if (!search.trim()) return [];
     const q = search.toLowerCase();
-    return produits.filter(p => p.nom.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q));
+    return produits.filter(p =>
+      (p.variants_count ?? 0) === 0 &&
+      (p.nom.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q))
+    );
   }
 
   const selectedType = TYPES.find(t => t.value === type)!;
