@@ -2,13 +2,14 @@ import { db } from "./db";
 import mysql from "mysql2/promise";
 
 export interface Shop {
-  id:         number;
-  nom:        string;
-  slug:       string;
-  email:      string;
-  plan:       "free" | "basic" | "pro";
-  actif:      boolean;
-  created_at: string;
+  id:            number;
+  nom:           string;
+  slug:          string;
+  email:         string;
+  plan:          "free" | "basic" | "pro";
+  actif:         boolean;
+  custom_domain: string | null;
+  created_at:    string;
 }
 
 let _ensured = false;
@@ -17,15 +18,20 @@ export async function ensureShopsTable(): Promise<void> {
   if (_ensured) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS shops (
-      id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      nom        VARCHAR(150)                       NOT NULL,
-      slug       VARCHAR(100)                       NOT NULL UNIQUE,
-      email      VARCHAR(150)                       NOT NULL,
-      plan       ENUM('free','basic','pro')         NOT NULL DEFAULT 'basic',
-      actif      TINYINT(1)                         NOT NULL DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom           VARCHAR(150)                       NOT NULL,
+      slug          VARCHAR(100)                       NOT NULL UNIQUE,
+      email         VARCHAR(150)                       NOT NULL,
+      plan          ENUM('free','basic','pro')         NOT NULL DEFAULT 'basic',
+      actif         TINYINT(1)                         NOT NULL DEFAULT 1,
+      custom_domain VARCHAR(255)                       NULL UNIQUE,
+      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // Add custom_domain column if table already existed without it
+  try {
+    await db.execute(`ALTER TABLE shops ADD COLUMN custom_domain VARCHAR(255) NULL UNIQUE`);
+  } catch { /* already exists */ }
   // Shop #1 = legacy single-tenant data
   await db.execute(
     `INSERT IGNORE INTO shops (id, nom, slug, email) VALUES (1, 'Default Shop', 'default', 'admin@shop.com')`
@@ -41,7 +47,7 @@ export async function getShopBySlug(slug: string): Promise<Shop | null> {
   );
   if (!rows.length) return null;
   const r = rows[0];
-  return { ...r, actif: Boolean(r.actif) } as Shop;
+  return { ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null } as Shop;
 }
 
 export async function getShopById(id: number): Promise<Shop | null> {
@@ -52,7 +58,28 @@ export async function getShopById(id: number): Promise<Shop | null> {
   );
   if (!rows.length) return null;
   const r = rows[0];
-  return { ...r, actif: Boolean(r.actif) } as Shop;
+  return { ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null } as Shop;
+}
+
+/** Resolve a shop from its custom domain (exact match, active only). */
+export async function getShopByDomain(domain: string): Promise<Shop | null> {
+  await ensureShopsTable();
+  const normalized = domain.toLowerCase().replace(/^www\./, "").split(":")[0];
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM shops WHERE custom_domain = ? AND actif = 1 LIMIT 1",
+    [normalized]
+  );
+  if (!rows.length) return null;
+  const r = rows[0];
+  return { ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null } as Shop;
+}
+
+export async function setShopDomain(id: number, domain: string | null): Promise<void> {
+  await ensureShopsTable();
+  const normalized = domain
+    ? domain.toLowerCase().replace(/^www\./, "").split(":")[0]
+    : null;
+  await db.execute("UPDATE shops SET custom_domain = ? WHERE id = ?", [normalized, id]);
 }
 
 export async function createShop(data: {
@@ -74,7 +101,7 @@ export async function listShops(): Promise<Shop[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT * FROM shops ORDER BY created_at DESC"
   );
-  return rows.map(r => ({ ...r, actif: Boolean(r.actif) })) as Shop[];
+  return rows.map(r => ({ ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null })) as Shop[];
 }
 
 export async function updateShop(
@@ -110,6 +137,7 @@ export async function listShopsWithStats(): Promise<
   return rows.map(r => ({
     ...r,
     actif:         Boolean(r.actif),
+    custom_domain: r.custom_domain ?? null,
     product_count: Number(r.product_count),
     admin_count:   Number(r.admin_count),
   })) as (Shop & { product_count: number; admin_count: number })[];

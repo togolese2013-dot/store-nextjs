@@ -31,6 +31,19 @@ function extractShopSlug(hostname: string): string | null {
   return sub;
 }
 
+/**
+ * Returns true if the hostname is one of our platform domains
+ * (togolese.tg, togolese.fr, localhost, or any subdomain thereof).
+ */
+function isPlatformHost(hostname: string): boolean {
+  const host = hostname.split(":")[0].toLowerCase();
+  return (
+    host === "localhost" ||
+    host.startsWith("127.") ||
+    /^(.*\.)?togolese\.(tg|fr)$/.test(host)
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -41,7 +54,11 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get("host") ?? "";
 
   // Inject shop slug for multi-tenant resolution in server components / route handlers
-  const shopSlug = extractShopSlug(hostname);
+  const shopSlug    = extractShopSlug(hostname);
+  // Custom domain: hostname is not one of our platform domains (not subdomain of togolese.tg/fr)
+  const customDomain = !isPlatformHost(hostname) && !hostname.startsWith("livraison.")
+    ? hostname.split(":")[0].toLowerCase().replace(/^www\./, "")
+    : null;
 
   if (hostname.startsWith("livraison.")) {
     const requestHeaders = new Headers(request.headers);
@@ -115,10 +132,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/saas", request.url));
   }
 
-  // Pass nonce + shop slug to Server Components via request headers
+  // Pass nonce + shop context to Server Components via request headers
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
-  if (shopSlug) requestHeaders.set("x-shop-slug", shopSlug);
+  if (shopSlug)    requestHeaders.set("x-shop-slug",     shopSlug);
+  if (customDomain) requestHeaders.set("x-custom-domain", customDomain);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", buildCsp(nonce));

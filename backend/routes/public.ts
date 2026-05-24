@@ -3,27 +3,49 @@ import { getProducts, getProductsByIds, getProductCount, getCategories, checkRev
 import {
   subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings, getDeliveryZones,
 } from "@/lib/admin-db";
-import { getShopBySlug } from "@/lib/shops";
+import { getShopBySlug, getShopByDomain } from "@/lib/shops";
 
 const router = express.Router();
 
-// ── Multi-tenant: resolve shop_id from x-shop-slug header ─────────────────
-const _shopSlugCache = new Map<string, { id: number; ts: number }>();
+// ── Multi-tenant: resolve shop_id from headers ────────────────────────────
+// Priority: x-shop-slug (subdomain) → x-custom-domain → default shop 1
+const _shopCache    = new Map<string, { id: number; slug: string; ts: number }>();
 const SHOP_CACHE_TTL = 60_000; // 1 minute
 
 async function resolveShopId(req: express.Request): Promise<number> {
+  // 1. Subdomain slug
   const slug = (req.headers["x-shop-slug"] as string | undefined)?.trim();
-  if (!slug || slug === "default") return 1;
-  const cached = _shopSlugCache.get(slug);
-  if (cached && Date.now() - cached.ts < SHOP_CACHE_TTL) return cached.id;
-  try {
-    const shop = await getShopBySlug(slug);
-    const id   = shop?.id ?? 1;
-    _shopSlugCache.set(slug, { id, ts: Date.now() });
-    return id;
-  } catch {
-    return 1;
+  if (slug && slug !== "default") {
+    const cacheKey = `slug:${slug}`;
+    const cached   = _shopCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < SHOP_CACHE_TTL) return cached.id;
+    try {
+      const shop = await getShopBySlug(slug);
+      const id   = shop?.id ?? 1;
+      _shopCache.set(cacheKey, { id, slug, ts: Date.now() });
+      return id;
+    } catch {
+      return 1;
+    }
   }
+
+  // 2. Custom domain
+  const customDomain = (req.headers["x-custom-domain"] as string | undefined)?.trim();
+  if (customDomain) {
+    const cacheKey = `domain:${customDomain}`;
+    const cached   = _shopCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < SHOP_CACHE_TTL) return cached.id;
+    try {
+      const shop = await getShopByDomain(customDomain);
+      const id   = shop?.id ?? 1;
+      _shopCache.set(cacheKey, { id, slug: shop?.slug ?? "", ts: Date.now() });
+      return id;
+    } catch {
+      return 1;
+    }
+  }
+
+  return 1;
 }
 
 // ── Seeded shuffle — deterministic random order that changes every hour ───────
@@ -432,6 +454,20 @@ router.get("/api/public/delivery-zones", async (req, res) => {
     res.json(zones);
   } catch {
     res.json([]);
+  }
+});
+
+// GET /api/resolve-domain?h=monshop.com — resolve custom domain → slug (cached)
+// Used by middleware and external tools to verify domain ownership
+router.get("/api/resolve-domain", async (req, res) => {
+  const h = String(req.query.h ?? "").toLowerCase().trim().replace(/^www\./, "");
+  if (!h) return res.json({ slug: null });
+  try {
+    const shop = await getShopByDomain(h);
+    if (!shop) return res.json({ slug: null });
+    res.json({ slug: shop.slug, shop_id: shop.id });
+  } catch {
+    res.json({ slug: null });
   }
 });
 

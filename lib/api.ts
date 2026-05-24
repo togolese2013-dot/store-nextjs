@@ -11,25 +11,30 @@ async function getCookieHeader(): Promise<string> {
   }
 }
 
-/** Reads the x-shop-slug injected by middleware — forwarded to backend on every call. */
-async function getShopSlugHeader(): Promise<string | null> {
+/** Reads x-shop-slug and x-custom-domain injected by middleware. */
+async function getShopHeaders(): Promise<{ slug: string | null; customDomain: string | null }> {
   try {
     const h = await headers();
-    return h.get("x-shop-slug");
+    return {
+      slug:         h.get("x-shop-slug"),
+      customDomain: h.get("x-custom-domain"),
+    };
   } catch {
-    return null;
+    return { slug: null, customDomain: null };
   }
 }
 
 async function buildHeaders(
   cookieHeader: string,
-  shopSlug: string | null,
+  slug: string | null,
+  customDomain: string | null,
   extra?: Record<string, string>
 ): Promise<Record<string, string>> {
   return {
     "Content-Type": "application/json",
-    ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-    ...(shopSlug    ? { "x-shop-slug": shopSlug } : {}),
+    ...(cookieHeader  ? { Cookie: cookieHeader } : {}),
+    ...(slug          ? { "x-shop-slug":     slug }         : {}),
+    ...(customDomain  ? { "x-custom-domain": customDomain } : {}),
     ...extra,
   };
 }
@@ -38,12 +43,12 @@ export async function apiGet<T = unknown>(
   path: string,
   opts?: { noAuth?: boolean; revalidate?: number }
 ): Promise<T> {
-  const [cookieHeader, shopSlug] = await Promise.all([
+  const [cookieHeader, { slug, customDomain }] = await Promise.all([
     opts?.noAuth ? Promise.resolve("") : getCookieHeader(),
-    getShopSlugHeader(),
+    getShopHeaders(),
   ]);
   const res = await fetch(`${BACKEND}${path}`, {
-    headers: await buildHeaders(cookieHeader, shopSlug),
+    headers: await buildHeaders(cookieHeader, slug, customDomain),
     ...(opts?.revalidate !== undefined
       ? { next: { revalidate: opts.revalidate } }
       : { cache: "no-store" as const }),
@@ -56,13 +61,13 @@ export async function apiGet<T = unknown>(
 }
 
 export async function apiPost<T = unknown>(path: string, body: unknown): Promise<T> {
-  const [cookieHeader, shopSlug] = await Promise.all([
+  const [cookieHeader, { slug, customDomain }] = await Promise.all([
     getCookieHeader(),
-    getShopSlugHeader(),
+    getShopHeaders(),
   ]);
   const res = await fetch(`${BACKEND}${path}`, {
     method: "POST",
-    headers: await buildHeaders(cookieHeader, shopSlug),
+    headers: await buildHeaders(cookieHeader, slug, customDomain),
     body: JSON.stringify(body),
     cache: "no-store",
   });
