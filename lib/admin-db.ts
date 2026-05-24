@@ -438,18 +438,18 @@ export async function ensureShopIdCols(): Promise<void> {
   });
 }
 
-export async function getAdminByEmail(email: string): Promise<AdminUser | null> {
+export async function getAdminByEmail(email: string, shopId = 1): Promise<AdminUser | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT * FROM admin_users WHERE email = ? AND actif = 1 LIMIT 1",
-    [email]
+    "SELECT * FROM admin_users WHERE email = ? AND shop_id = ? AND actif = 1 LIMIT 1",
+    [email, shopId]
   );
   return (rows[0] as AdminUser) ?? null;
 }
 
-export async function getAdminByUsername(username: string): Promise<AdminUser | null> {
+export async function getAdminByUsername(username: string, shopId = 1): Promise<AdminUser | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT * FROM admin_users WHERE username = ? AND actif = 1 LIMIT 1",
-    [username]
+    "SELECT * FROM admin_users WHERE username = ? AND shop_id = ? AND actif = 1 LIMIT 1",
+    [username, shopId]
   );
   return (rows[0] as AdminUser) ?? null;
 }
@@ -462,9 +462,10 @@ export async function getAdminById(id: number): Promise<AdminUser | null> {
   return (rows[0] as AdminUser) ?? null;
 }
 
-export async function listAdminUsers(): Promise<AdminUser[]> {
+export async function listAdminUsers(shopId = 1): Promise<AdminUser[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, username, email, telephone, poste, role, actif, permissions, created_at, last_login FROM admin_users ORDER BY id ASC"
+    "SELECT id, nom, username, email, telephone, poste, role, actif, permissions, created_at, last_login FROM admin_users WHERE shop_id = ? ORDER BY id ASC",
+    [shopId]
   );
   return rows as AdminUser[];
 }
@@ -473,10 +474,11 @@ export async function createAdminUser(data: {
   nom: string; username: string; email?: string | null;
   telephone?: string | null; poste?: string | null;
   password_hash: string; role: string; must_change_password?: boolean;
+  shop_id?: number;
 }) {
   await db.execute(
-    "INSERT INTO admin_users (nom, username, email, telephone, poste, password_hash, role, must_change_password) VALUES (?,?,?,?,?,?,?,?)",
-    [data.nom, data.username, data.email ?? null, data.telephone ?? null, data.poste ?? "staff", data.password_hash, data.role, data.must_change_password ? 1 : 0]
+    "INSERT INTO admin_users (nom, username, email, telephone, poste, password_hash, role, must_change_password, shop_id) VALUES (?,?,?,?,?,?,?,?,?)",
+    [data.nom, data.username, data.email ?? null, data.telephone ?? null, data.poste ?? "staff", data.password_hash, data.role, data.must_change_password ? 1 : 0, data.shop_id ?? 1]
   );
 }
 
@@ -796,19 +798,21 @@ export interface Order {
   created_at:      string;
 }
 
-export async function listOrders(limit = 50, offset = 0): Promise<Order[]> {
+export async function listOrders(limit = 50, offset = 0, shopId = 1): Promise<Order[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
             items, subtotal, total, status, statut_paiement,
             livreur_id, livraison_statut, created_at, updated_at
-     FROM orders ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+     FROM orders WHERE shop_id = ${Number(shopId)}
+     ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
   );
   return rows as Order[];
 }
 
-export async function countOrders(): Promise<number> {
+export async function countOrders(shopId = 1): Promise<number> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT COUNT(*) as cnt FROM orders"
+    "SELECT COUNT(*) as cnt FROM orders WHERE shop_id = ?",
+    [shopId]
   );
   return Number(rows[0]?.cnt ?? 0);
 }
@@ -1008,19 +1012,20 @@ export async function createOrder(data: {
   items: Array<{ id: number; nom: string; reference: string; prix_unitaire?: number; prix?: number; qty: number; total: number }>;
   subtotal: number;
   total: number;
+  shop_id?: number;
 }): Promise<number> {
   await ensureOrderLifecycleCols();
-  // Generate reference CMD-YYYYMMDD-XXXX
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
   const rand = Math.floor(1000 + Math.random() * 9000);
   const reference = `CMD-${dateStr}-${rand}`;
 
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO orders (reference, nom, telephone, adresse, zone_livraison, delivery_fee, note, items, subtotal, total, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    `INSERT INTO orders (reference, nom, telephone, adresse, zone_livraison, delivery_fee, note, items, subtotal, total, status, shop_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [reference, data.nom, data.telephone, data.adresse, data.zone_livraison,
-     data.delivery_fee, data.note, JSON.stringify(data.items), data.subtotal, data.total]
+     data.delivery_fee, data.note, JSON.stringify(data.items), data.subtotal, data.total,
+     data.shop_id ?? 1]
   );
   return result.insertId;
 }
@@ -2069,14 +2074,14 @@ export interface Facture {
   paiements?:        FacturePaiement[];
 }
 
-export async function listFactures(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Facture[]; total: number }> {
-  const { limit = 50, offset = 0, search, statut } = opts;
-  const conditions: string[] = [];
-  const params: (string | number | boolean | null | Buffer)[] = [];
+export async function listFactures(opts: { limit?: number; offset?: number; search?: string; statut?: string; shopId?: number } = {}): Promise<{ items: Facture[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+  const conditions: string[] = ["f.shop_id = ?"];
+  const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT f.*, COALESCE(_so.coupon_remise, 0) AS coupon_remise, _so.status AS order_status,
             CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur

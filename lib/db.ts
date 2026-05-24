@@ -526,15 +526,17 @@ export async function getProductCount(opts?: {
   statut?: "disponible" | "faible" | "epuise";
   includeInactive?: boolean;
   entrepotId?: number;
+  shopId?: number;
 }): Promise<number> {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1 } = opts ?? {};
   const cols = await produitCols();
 
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
   const params: (string | number)[] = [];
 
-  if (categoryId) { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
-  if (marqueId)   { conditions.push("p.marque_id = ?");    params.push(marqueId); }
+  if (cols.shop_id)  { conditions.push("p.shop_id = ?");    params.push(shopId); }
+  if (categoryId)    { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
+  if (marqueId)      { conditions.push("p.marque_id = ?");   params.push(marqueId); }
   if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise) { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)   { conditions.push("p.neuf = 1"); }

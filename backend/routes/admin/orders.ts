@@ -28,10 +28,11 @@ const router = express.Router();
 router.get("/api/admin/orders", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  const page   = Math.max(1, Number(req.query.page ?? 1));
-  const limit  = Math.min(100, Math.max(1, Number(req.query.limit ?? 25)));
-  const offset = (page - 1) * limit;
-  const [orders, total] = await Promise.all([listOrders(limit, offset), countOrders()]);
+  const shopId  = session.shop_id ?? 1;
+  const page    = Math.max(1, Number(req.query.page ?? 1));
+  const limit   = Math.min(100, Math.max(1, Number(req.query.limit ?? 25)));
+  const offset  = (page - 1) * limit;
+  const [orders, total] = await Promise.all([listOrders(limit, offset, shopId), countOrders(shopId)]);
   res.json({ success: true, data: orders, total, page, limit });
 });
 
@@ -44,7 +45,7 @@ router.post("/api/admin/orders", async (req, res) => {
   }
   const subtotal = items.reduce((s: number, i: { total: number }) => s + i.total, 0);
   const total    = subtotal + Number(delivery_fee ?? 0);
-  const id = await createOrder({ nom, telephone, adresse, zone_livraison, delivery_fee: Number(delivery_fee ?? 0), note, items, subtotal, total });
+  const id = await createOrder({ nom, telephone, adresse, zone_livraison, delivery_fee: Number(delivery_fee ?? 0), note, items, subtotal, total, shop_id: session.shop_id ?? 1 });
   await addOrderEvent(id, "pending", "Commande créée par l'admin", session.nom);
 
   const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(

@@ -56,9 +56,10 @@ router.get("/api/admin/products", async (req, res) => {
     ? statut as "disponible" | "faible" | "epuise"
     : undefined;
 
+  const shopId = session.shop_id ?? 1;
   const [products, total] = await Promise.all([
-    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true, entrepotId }),
-    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true, entrepotId }),
+    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true, entrepotId, shopId }),
+    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true, entrepotId, shopId }),
   ]);
 
   // Enrich products with variant stock sums (sum of product_variants.stock per product)

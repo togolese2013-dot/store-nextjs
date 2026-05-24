@@ -9,6 +9,7 @@ import {
   getAdminById, getUtilisateurById,
 } from "@/lib/admin-db";
 import { db } from "@/lib/db";
+import { getShopBySlug, ensureShopsTable } from "@/lib/shops";
 import { signToken, getSession, setAuthCookie, clearAuthCookie } from "../../lib/auth";
 import { logSecurityEvent } from "../../lib/security-log";
 import type { AdminPermissions } from "@/lib/admin-permissions";
@@ -72,10 +73,18 @@ function attemptsLeft(slug: string): number {
 /* ── Login ────────────────────────────────────────────────────────────────── */
 router.post("/api/admin/auth/login", async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, shop_slug } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: "Nom d'utilisateur et mot de passe requis." });
     }
+
+    // Resolve shop: from body, then header (set by Next.js middleware via rewrite), then default=1
+    await ensureShopsTable();
+    const rawSlug: string = shop_slug
+      ?? (req.headers["x-shop-slug"] as string | undefined)
+      ?? "default";
+    const shop = await getShopBySlug(rawSlug);
+    const shopId = shop?.id ?? 1;
 
     const slug = (username as string).trim().toLowerCase();
 
@@ -88,9 +97,9 @@ router.post("/api/admin/auth/login", async (req, res) => {
       });
     }
 
-    // Try username first, then email fallback for existing accounts
-    let user = await getAdminByUsername(slug)
-      ?? await getAdminByEmail(slug);
+    // Try username first, then email fallback for existing accounts — scoped to shop
+    let user = await getAdminByUsername(slug, shopId)
+      ?? await getAdminByEmail(slug, shopId);
 
     if (!user) {
       // Bootstrap: create the first super_admin if table is empty
@@ -143,6 +152,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
           permissions,
           must_change_password: mustChange,
           token_version:       tokenVersion,
+          shop_id:             shopId,
         });
         setAuthCookie(res, token);
         logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], "role=staff");
@@ -183,6 +193,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
       permissions,
       must_change_password: mustChange,
       token_version:       tokenVersion,
+      shop_id:             shopId,
     });
     await updateAdminLastLogin(user.id);
     setAuthCookie(res, token);
