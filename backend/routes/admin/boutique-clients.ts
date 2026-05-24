@@ -19,10 +19,11 @@ router.get("/api/admin/boutique-clients", async (req, res) => {
   const search = (req.query.q as string) ?? "";
   const filtre = ((req.query.filtre as string) ?? "tous") as "tous"|"debiteurs"|"dettes";
   const stats  = req.query.stats === "1";
+  const shopId = session.shop_id ?? 1;
 
   if (stats) {
     try {
-      const data = await getBoutiqueClientsStats();
+      const data = await getBoutiqueClientsStats(shopId);
       return res.json({ success: true, data });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -33,8 +34,8 @@ router.get("/api/admin/boutique-clients", async (req, res) => {
 
   try {
     const [clients, total] = await Promise.all([
-      listBoutiqueClients(limit, offset, search, filtre),
-      countBoutiqueClients(search, filtre),
+      listBoutiqueClients(limit, offset, search, filtre, shopId),
+      countBoutiqueClients(search, filtre, shopId),
     ]);
     res.json({ success: true, data: clients, total, page, limit });
   } catch (err) {
@@ -48,7 +49,8 @@ router.get("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const client = await getBoutiqueClientById(Number(req.params.id));
+    const shopId = session.shop_id ?? 1;
+    const client = await getBoutiqueClientById(Number(req.params.id), shopId);
     if (!client) return res.status(404).json({ error: "Client introuvable." });
     const factures = await getClientFacturesByNom(client.nom, client.telephone);
     res.json({ client, factures });
@@ -62,23 +64,27 @@ router.post("/api/admin/boutique-clients", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   if (!req.body.nom?.trim()) return res.status(400).json({ error: "Nom requis." });
   if (!req.body.telephone?.trim()) return res.status(400).json({ error: "Téléphone requis." });
-  const [[existing]] = await db.execute<any[]>("SELECT id FROM boutique_clients WHERE telephone = ? LIMIT 1", [req.body.telephone.trim()]);
+  const shopId = session.shop_id ?? 1;
+  const [[existing]] = await db.execute<any[]>(
+    "SELECT id FROM boutique_clients WHERE telephone = ? AND shop_id = ? LIMIT 1",
+    [req.body.telephone.trim(), shopId]
+  );
   if (existing) return res.status(400).json({ error: "Un client avec ce numéro existe déjà." });
-  const id = await createBoutiqueClient(req.body);
+  const id = await createBoutiqueClient({ ...req.body, shop_id: shopId });
   res.json({ success: true, id });
 });
 
 router.patch("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await updateBoutiqueClient(Number(req.params.id), req.body);
+  await updateBoutiqueClient(Number(req.params.id), req.body, session.shop_id ?? 1);
   res.json({ success: true });
 });
 
 router.delete("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await deleteBoutiqueClient(Number(req.params.id));
+  await deleteBoutiqueClient(Number(req.params.id), session.shop_id ?? 1);
   res.json({ success: true });
 });
 

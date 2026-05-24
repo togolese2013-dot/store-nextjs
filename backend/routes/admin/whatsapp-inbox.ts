@@ -17,6 +17,7 @@ export async function ensureWaMessagesCols() {
     "ALTER TABLE wa_messages ADD COLUMN media_type  VARCHAR(30)  NOT NULL DEFAULT 'text'",
     "ALTER TABLE wa_messages ADD COLUMN mime_type   VARCHAR(100) NULL",
     "ALTER TABLE wa_messages ADD COLUMN notre_numero VARCHAR(30) NULL",
+    "ALTER TABLE wa_messages ADD COLUMN shop_id     INT UNSIGNED NOT NULL DEFAULT 1",
   ];
   for (const sql of alters) {
     try { await db.execute(sql); } catch { /* already exists */ }
@@ -28,7 +29,7 @@ router.get("/api/admin/whatsapp/webhook", async (req, res) => {
   const mode      = req.query["hub.mode"];
   const token     = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  const savedToken = await getSetting("wa_webhook_verify_token").catch(() => null);
+  const savedToken = await getSetting("wa_webhook_verify_token", 1).catch(() => null);
   const expected   = savedToken || process.env.WA_VERIFY_TOKEN || "";
   if (mode === "subscribe" && token === expected && expected) {
     return res.status(200).send(challenge);
@@ -96,6 +97,7 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
 router.get("/api/admin/whatsapp/threads", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé" });
+  const shopId = session.shop_id ?? 1;
   try {
     const [rows] = await db.execute<mysql.RowDataPacket[]>(`
       SELECT
@@ -116,11 +118,13 @@ router.get("/api/admin/whatsapp/threads", async (req, res) => {
           COUNT(*)                                                           AS total_messages,
           SUM(CASE WHEN direction = 'inbound' AND lu = 0 THEN 1 ELSE 0 END) AS unread
         FROM wa_messages
+        WHERE shop_id = ?
         GROUP BY telephone
       ) t ON t.telephone = m.telephone AND t.last_id = m.id
+      WHERE m.shop_id = ?
       ORDER BY last_at DESC
       LIMIT 200
-    `);
+    `, [shopId, shopId]);
     res.json({ threads: rows });
   } catch (err) {
     console.error("[whatsapp/threads]", err);
@@ -133,19 +137,20 @@ router.get("/api/admin/whatsapp/threads/:phone", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé" });
   const { phone } = req.params;
+  const shopId2 = session.shop_id ?? 1;
   try {
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
       `SELECT id, direction, body, sent_by, contact_name, lu, media_id, media_type, mime_type, created_at
        FROM wa_messages
-       WHERE telephone = ?
+       WHERE telephone = ? AND shop_id = ?
        ORDER BY created_at ASC
        LIMIT 500`,
-      [phone],
+      [phone, shopId2],
     );
     res.json({ messages: rows });
     await db.execute(
-      "UPDATE wa_messages SET lu = 1 WHERE telephone = ? AND direction = 'inbound' AND lu = 0",
-      [phone],
+      "UPDATE wa_messages SET lu = 1 WHERE telephone = ? AND shop_id = ? AND direction = 'inbound' AND lu = 0",
+      [phone, shopId2],
     ).catch(() => {});
   } catch (err) {
     console.error("[whatsapp/thread]", err);
@@ -158,7 +163,7 @@ router.get("/api/admin/whatsapp/media/:mediaId", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).end();
   try {
-    const token = await getSetting("wa_access_token");
+    const token = await getSetting("wa_access_token", session.shop_id ?? 1);
     if (!token) return res.status(503).end();
 
     // 1. Obtenir l'URL de téléchargement
@@ -198,9 +203,9 @@ router.post("/api/admin/whatsapp/threads/:phone/send", async (req, res) => {
   if (!result.success) return res.status(502).json({ error: result.error });
 
   await db.execute(
-    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_type)
-     VALUES (?, 'outbound', ?, ?, 'text')`,
-    [phone, body.trim(), session.nom ?? session.username ?? "admin"],
+    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_type, shop_id)
+     VALUES (?, 'outbound', ?, ?, 'text', ?)`,
+    [phone, body.trim(), session.nom ?? session.username ?? "admin", session.shop_id ?? 1],
   ).catch(() => {});
   emitAdminEvent("message", { type_action: "sent", to: phone });
   res.json({ ok: true });
@@ -230,9 +235,9 @@ router.post("/api/admin/whatsapp/threads/:phone/send-image", async (req, res) =>
   if (!send.success) return res.status(502).json({ error: send.error });
 
   await db.execute(
-    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type)
-     VALUES (?, 'outbound', ?, ?, ?, 'image', ?)`,
-    [phone, caption || "[Image]", session.nom ?? "admin", up.mediaId, mimeType],
+    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type, shop_id)
+     VALUES (?, 'outbound', ?, ?, ?, 'image', ?, ?)`,
+    [phone, caption || "[Image]", session.nom ?? "admin", up.mediaId, mimeType, session.shop_id ?? 1],
   ).catch(() => {});
   res.json({ ok: true });
 });
@@ -259,9 +264,9 @@ router.post("/api/admin/whatsapp/threads/:phone/send-audio", async (req, res) =>
   if (!send.success) return res.status(502).json({ error: send.error });
 
   await db.execute(
-    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type)
-     VALUES (?, 'outbound', '[Message vocal]', ?, ?, 'audio', ?)`,
-    [phone, session.nom ?? "admin", up.mediaId, mimeType],
+    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type, shop_id)
+     VALUES (?, 'outbound', '[Message vocal]', ?, ?, 'audio', ?, ?)`,
+    [phone, session.nom ?? "admin", up.mediaId, mimeType, session.shop_id ?? 1],
   ).catch(() => {});
   res.json({ ok: true });
 });
@@ -272,7 +277,7 @@ router.delete("/api/admin/whatsapp/threads/:phone", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé" });
   const { phone } = req.params;
   try {
-    await db.execute("DELETE FROM wa_messages WHERE telephone = ?", [phone]);
+    await db.execute("DELETE FROM wa_messages WHERE telephone = ? AND shop_id = ?", [phone, session.shop_id ?? 1]);
     res.json({ ok: true });
   } catch (err) {
     console.error("[whatsapp/delete thread]", err);

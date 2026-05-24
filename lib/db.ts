@@ -224,6 +224,12 @@ export async function produitCols() {
     }
   }
 
+  // Replace global slug unique index with per-shop composite index
+  if (names.has("slug") && names.has("shop_id")) {
+    try { await db.execute(`ALTER TABLE produits DROP INDEX idx_produits_slug`); } catch { /* already dropped */ }
+    try { await db.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_shop_slug (shop_id, slug)`); } catch { /* already exists */ }
+  }
+
   _cols = {
     remise:          names.has("remise"),
     neuf:            names.has("neuf"),

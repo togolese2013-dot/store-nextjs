@@ -414,6 +414,7 @@ export async function ensureShopIdCols(): Promise<void> {
       ["devis"],
       ["livraisons_ventes"],
       ["boutique_mouvements"],
+      ["boutique_clients"],
     ];
     for (const [table, extra] of tables) {
       try {
@@ -1134,11 +1135,12 @@ export async function ensureOrderVente(
     await db.execute("UPDATE orders SET vente_facture_id = ? WHERE id = ?", [factureId, orderId]);
 
     if (order.nom && order.telephone) {
+      const _sId = Number(order.shop_id ?? 1);
       await db.execute(
-        `INSERT INTO boutique_clients (nom, telephone, type_client)
-         SELECT ?, ?, 'particulier' FROM DUAL
-         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
-        [String(order.nom).trim(), String(order.telephone).trim(), String(order.telephone).trim()]
+        `INSERT INTO boutique_clients (nom, telephone, type_client, shop_id)
+         SELECT ?, ?, 'particulier', ? FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ? AND shop_id = ?)`,
+        [String(order.nom).trim(), String(order.telephone).trim(), _sId, String(order.telephone).trim(), _sId]
       ).catch(() => {});
     }
   }
@@ -1431,18 +1433,17 @@ export interface WaMessage {
   created_at:   string;
 }
 
-export async function listWaMessages(limit = 100): Promise<WaMessage[]> {
-  // Try modern schema first; fall back to legacy schema (body instead of content)
+export async function listWaMessages(limit = 100, shopId = 1): Promise<WaMessage[]> {
   const modern = `SELECT id, wa_message_id, from_number, to_number, contact_name, direction, type,
                          COALESCE(content, body, '') as content, COALESCE(media_url,'') as media_url,
                          status, read_at, created_at
-                  FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`;
+                  FROM whatsapp_messages WHERE shop_id = ${Number(shopId)} ORDER BY created_at DESC LIMIT ${limit}`;
   const legacy = `SELECT id, COALESCE(wa_message_id,'') as wa_message_id, from_number,
                          COALESCE(to_number,'') as to_number, COALESCE(contact_name,'') as contact_name,
                          COALESCE(direction,'in') as direction, COALESCE(type,'text') as type,
                          COALESCE(body,'') as content, '' as media_url, COALESCE(status,'received') as status,
                          read_at, created_at
-                  FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`;
+                  FROM whatsapp_messages WHERE shop_id = ${Number(shopId)} ORDER BY created_at DESC LIMIT ${limit}`;
 
   const [rows] = await db.query<mysql.RowDataPacket[]>(modern)
     .catch(() => db.query<mysql.RowDataPacket[]>(legacy))
@@ -2216,11 +2217,12 @@ export async function createFacture(data: {
   );
   // Sync to boutique_clients if client has a name and phone
   if (data.client_nom?.trim() && data.client_tel?.trim()) {
+    const _sId = data.shop_id ?? 1;
     await db.execute(
-      `INSERT INTO boutique_clients (nom, telephone, email, type_client)
-       SELECT ?, ?, ?, 'particulier' FROM DUAL
-       WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
-      [data.client_nom.trim(), data.client_tel.trim(), data.client_email ?? null, data.client_tel.trim()]
+      `INSERT INTO boutique_clients (nom, telephone, email, type_client, shop_id)
+       SELECT ?, ?, ?, 'particulier', ? FROM DUAL
+       WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ? AND shop_id = ?)`,
+      [data.client_nom.trim(), data.client_tel.trim(), data.client_email ?? null, _sId, data.client_tel.trim(), _sId]
     ).catch(() => {});
   }
   return result.insertId;
@@ -2340,11 +2342,12 @@ export async function createVenteWithStock(data: {
 
     // Sync client to boutique_clients after successful sale
     if (data.client_nom?.trim() && data.client_tel?.trim()) {
+      const _sId = data.shop_id ?? 1;
       await db.execute(
-        `INSERT INTO boutique_clients (nom, telephone, type_client)
-         SELECT ?, ?, 'particulier' FROM DUAL
-         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
-        [data.client_nom.trim(), data.client_tel.trim(), data.client_tel.trim()]
+        `INSERT INTO boutique_clients (nom, telephone, type_client, shop_id)
+         SELECT ?, ?, 'particulier', ? FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ? AND shop_id = ?)`,
+        [data.client_nom.trim(), data.client_tel.trim(), _sId, data.client_tel.trim(), _sId]
       ).catch(() => {});
     }
 
@@ -3712,10 +3715,12 @@ async function ensureBoutiqueClientsTable(): Promise<void> {
         type_client  ENUM('particulier','professionnel') NOT NULL DEFAULT 'particulier',
         solde        DECIMAL(15,2) NOT NULL DEFAULT 0,
         notes        TEXT,
+        shop_id      INT UNSIGNED NOT NULL DEFAULT 1,
         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_nom       (nom),
-        INDEX idx_telephone (telephone)
+        INDEX idx_telephone (telephone),
+        INDEX idx_shop_id   (shop_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     const [[cnt]] = await db.execute<mysql.RowDataPacket[]>(
@@ -3736,11 +3741,12 @@ export async function listBoutiqueClients(
   limit: number,
   offset: number,
   search: string,
-  filtre: "tous" | "debiteurs" | "dettes"
+  filtre: "tous" | "debiteurs" | "dettes",
+  shopId = 1,
 ): Promise<BoutiqueClient[]> {
   await ensureBoutiqueClientsTable();
-  const conditions: string[] = [];
-  const params: (string | number | boolean | null | Buffer)[] = [];
+  const conditions: string[] = ["shop_id = ?"];
+  const params: (string | number | boolean | null | Buffer)[] = [shopId];
 
   if (search) {
     conditions.push("(nom LIKE ? OR telephone LIKE ?)");
@@ -3752,7 +3758,7 @@ export async function listBoutiqueClients(
     conditions.push("solde > 0");
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT * FROM boutique_clients ${where} ORDER BY nom ASC LIMIT ? OFFSET ?`,
     [...params, limit, offset]
@@ -3762,10 +3768,11 @@ export async function listBoutiqueClients(
 
 export async function countBoutiqueClients(
   search: string,
-  filtre: "tous" | "debiteurs" | "dettes"
+  filtre: "tous" | "debiteurs" | "dettes",
+  shopId = 1,
 ): Promise<number> {
-  const conditions: string[] = [];
-  const params: (string | number | boolean | null | Buffer)[] = [];
+  const conditions: string[] = ["shop_id = ?"];
+  const params: (string | number | boolean | null | Buffer)[] = [shopId];
 
   if (search) {
     conditions.push("(nom LIKE ? OR telephone LIKE ?)");
@@ -3777,7 +3784,7 @@ export async function countBoutiqueClients(
     conditions.push("solde > 0");
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) AS cnt FROM boutique_clients ${where}`,
     params
@@ -3785,17 +3792,17 @@ export async function countBoutiqueClients(
   return (rows[0] as mysql.RowDataPacket).cnt as number;
 }
 
-export async function getBoutiqueClientById(id: number): Promise<BoutiqueClient | null> {
+export async function getBoutiqueClientById(id: number, shopId = 1): Promise<BoutiqueClient | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT * FROM boutique_clients WHERE id = ?", [id]
+    "SELECT * FROM boutique_clients WHERE id = ? AND shop_id = ?", [id, shopId]
   );
   return (rows[0] as BoutiqueClient) ?? null;
 }
 
-export async function createBoutiqueClient(data: Partial<BoutiqueClient>): Promise<number> {
+export async function createBoutiqueClient(data: Partial<BoutiqueClient> & { shop_id?: number }): Promise<number> {
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO boutique_clients (nom, telephone, email, localisation, type_client, solde, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO boutique_clients (nom, telephone, email, localisation, type_client, solde, notes, shop_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.nom ?? "",
       data.telephone ?? null,
@@ -3804,12 +3811,13 @@ export async function createBoutiqueClient(data: Partial<BoutiqueClient>): Promi
       data.type_client ?? "particulier",
       data.solde ?? 0,
       data.notes ?? null,
+      data.shop_id ?? 1,
     ]
   );
   return result.insertId;
 }
 
-export async function updateBoutiqueClient(id: number, data: Partial<BoutiqueClient>): Promise<void> {
+export async function updateBoutiqueClient(id: number, data: Partial<BoutiqueClient>, shopId = 1): Promise<void> {
   const fields: string[] = [];
   const values: (string | number | boolean | null | Buffer)[] = [];
 
@@ -3822,15 +3830,15 @@ export async function updateBoutiqueClient(id: number, data: Partial<BoutiqueCli
   if (data.notes        !== undefined) { fields.push("notes = ?");        values.push(data.notes); }
 
   if (fields.length === 0) return;
-  values.push(id);
-  await db.execute(`UPDATE boutique_clients SET ${fields.join(", ")} WHERE id = ?`, values);
+  values.push(id, shopId);
+  await db.execute(`UPDATE boutique_clients SET ${fields.join(", ")} WHERE id = ? AND shop_id = ?`, values);
 }
 
-export async function deleteBoutiqueClient(id: number): Promise<void> {
-  await db.execute("DELETE FROM boutique_clients WHERE id = ?", [id]);
+export async function deleteBoutiqueClient(id: number, shopId = 1): Promise<void> {
+  await db.execute("DELETE FROM boutique_clients WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
-export async function getBoutiqueClientsStats(): Promise<BoutiqueClientStats> {
+export async function getBoutiqueClientsStats(shopId = 1): Promise<BoutiqueClientStats> {
   const [[kpis], [segments], [acquisitions], [topDebiteurs], [topDepensiers], [derniers]] =
     await Promise.all([
       // KPIs
@@ -3840,42 +3848,48 @@ export async function getBoutiqueClientsStats(): Promise<BoutiqueClientStats> {
            SUM(solde > 0) AS en_avance,
            SUM(solde < 0) AS debiteurs,
            ROUND(AVG(solde), 2) AS solde_moyen
-         FROM boutique_clients`
+         FROM boutique_clients WHERE shop_id = ?`,
+        [shopId]
       ),
       // Segment distribution
       db.query<mysql.RowDataPacket[]>(
         `SELECT type_client, COUNT(*) AS count
-         FROM boutique_clients
-         GROUP BY type_client`
+         FROM boutique_clients WHERE shop_id = ?
+         GROUP BY type_client`,
+        [shopId]
       ),
       // New acquisitions last 6 months
       db.query<mysql.RowDataPacket[]>(
         `SELECT DATE_FORMAT(created_at, '%b') AS mois,
                 COUNT(*) AS count
          FROM boutique_clients
-         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+         WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
          GROUP BY YEAR(created_at), MONTH(created_at), mois
-         ORDER BY YEAR(created_at), MONTH(created_at)`
+         ORDER BY YEAR(created_at), MONTH(created_at)`,
+        [shopId]
       ),
       // Top debiteurs (solde le plus négatif)
       db.query<mysql.RowDataPacket[]>(
         `SELECT id, nom, telephone, type_client, solde
          FROM boutique_clients
-         WHERE solde < 0
+         WHERE shop_id = ? AND solde < 0
          ORDER BY solde ASC
-         LIMIT 5`
+         LIMIT 5`,
+        [shopId]
       ),
       // Top dépensiers (solde le plus positif = en avance = ont payé le plus)
       db.query<mysql.RowDataPacket[]>(
         `SELECT id, nom, telephone, type_client, solde AS total_achats
          FROM boutique_clients
-         WHERE solde > 0
+         WHERE shop_id = ? AND solde > 0
          ORDER BY solde DESC
-         LIMIT 5`
+         LIMIT 5`,
+        [shopId]
       ),
       // Derniers clients ajoutés
       db.query<mysql.RowDataPacket[]>(
-        `SELECT * FROM boutique_clients ORDER BY created_at DESC LIMIT 8`
+        `SELECT * FROM boutique_clients WHERE shop_id = ? ORDER BY created_at DESC LIMIT 8`,
+        [shopId]
       ),
     ]);
 
