@@ -45,11 +45,14 @@ router.post("/api/admin/stock/entree", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { produit_id, quantite, reference, note } = req.body;
+    const { produit_id, quantite, reference, note, variant_id } = req.body;
     if (!produit_id || !quantite || quantite <= 0) {
       return res.status(400).json({ error: "produit_id et quantite (> 0) requis." });
     }
-    await createStockEntree({ produit_id, quantite: Number(quantite), reference, note, user_id: session.id });
+    await createStockEntree({
+      produit_id, quantite: Number(quantite), reference, note, user_id: session.id,
+      ...(variant_id ? { variant_id: Number(variant_id) } : {}),
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -61,11 +64,14 @@ router.post("/api/admin/stock/sortie", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { produit_id, quantite, reference, note } = req.body;
+    const { produit_id, quantite, reference, note, variant_id } = req.body;
     if (!produit_id || !quantite || quantite <= 0) {
       return res.status(400).json({ error: "produit_id et quantite (> 0) requis." });
     }
-    await createStockSortie({ produit_id, quantite: Number(quantite), reference, note, user_id: session.id });
+    await createStockSortie({
+      produit_id, quantite: Number(quantite), reference, note, user_id: session.id,
+      ...(variant_id ? { variant_id: Number(variant_id) } : {}),
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -77,14 +83,17 @@ router.post("/api/admin/stock/ajustement", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { produit_id, quantite, motif } = req.body;
+    const { produit_id, quantite, motif, variant_id } = req.body;
     if (!produit_id || quantite === undefined || quantite === null) {
       return res.status(400).json({ error: "produit_id et quantite requis." });
     }
     if (!motif?.trim()) {
       return res.status(400).json({ error: "Un motif est requis pour un ajustement." });
     }
-    await createStockAjustement({ produit_id, quantite: Number(quantite), motif, user_id: session.id });
+    await createStockAjustement({
+      produit_id, quantite: Number(quantite), motif, user_id: session.id,
+      ...(variant_id ? { variant_id: Number(variant_id) } : {}),
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {

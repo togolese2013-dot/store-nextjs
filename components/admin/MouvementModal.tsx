@@ -14,7 +14,9 @@ interface ProduitStock {
   nom:            string;
   reference:      string;
   stock:          number;
-  variants_count: number; // products with variants are excluded (stock managed per-variant)
+  variants_count: number;
+  variant_id?:    number;
+  variant_nom?:   string;
 }
 
 type MouvType = "entree" | "sortie" | "ajustement";
@@ -186,6 +188,7 @@ export default function MouvementModal() {
           produit_id: item.produit!.produit_id,
           quantite:   Number(item.qty),
         };
+        if (item.produit!.variant_id) body.variant_id = item.produit!.variant_id;
         if (ref.trim())  body.reference = ref.trim();
         if (note.trim()) body.note      = note.trim();
         if (type === "ajustement") body.motif = note.trim() || "Ajustement inventaire";
@@ -358,7 +361,7 @@ export default function MouvementModal() {
                                   <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-20 max-h-44 overflow-y-auto">
                                     {filtered.map(p => (
                                       <button
-                                        key={p.produit_id}
+                                        key={`${p.produit_id}_v${p.variant_id ?? 0}`}
                                         type="button"
                                         onClick={() => updateItem(index, { produit: p, search: "", showDropdown: false })}
                                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"

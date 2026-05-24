@@ -14,49 +14,104 @@ export interface ProduitStock {
   produit_id:     number;
   nom:            string;
   reference:      string;
-  stock:          number; // stock magasin
-  variants_count: number; // 0 = no variants (product-level stock); >0 = stock managed per variant
+  stock:          number; // stock magasin (per-variant when variant_id set)
+  variants_count: number;
+  variant_id?:    number;
+  variant_nom?:   string;
 }
 
 export async function getProduitsWithStock(): Promise<ProduitStock[]> {
+  // Check if product_variants table exists before using it in queries
+  let hasVariantsTable = false;
+  try {
+    await db.execute("SELECT 1 FROM product_variants LIMIT 0");
+    hasVariantsTable = true;
+  } catch { /* table not created yet */ }
+
+  if (!hasVariantsTable) {
+    const [rows] = await db.query<mysql.RowDataPacket[]>(
+      `SELECT p.id AS produit_id, p.nom, p.reference,
+              COALESCE(p.stock_magasin, 0) AS stock,
+              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+       FROM produits p WHERE p.actif = 1 ORDER BY p.nom`
+    );
+    return rows as ProduitStock[];
+  }
+
+  // UNION: products without variants + one row per variant
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT p.id AS produit_id, p.nom, p.reference,
-            COALESCE(p.stock_magasin, 0) AS stock,
-            (SELECT COUNT(*) FROM product_variants WHERE produit_id = p.id) AS variants_count
-     FROM produits p
-     WHERE p.actif = 1
-     ORDER BY p.nom`
+    `SELECT * FROM (
+       SELECT p.id AS produit_id, p.nom,
+              p.reference,
+              COALESCE(p.stock_magasin, 0) AS stock,
+              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+       FROM produits p
+       WHERE p.actif = 1
+         AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
+
+       UNION ALL
+
+       SELECT p.id AS produit_id,
+              CONCAT(p.nom, ' — ', pv.nom) AS nom,
+              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              pv.stock AS stock,
+              1 AS variants_count,
+              pv.id AS variant_id,
+              pv.nom AS variant_nom
+       FROM product_variants pv
+       JOIN produits p ON p.id = pv.produit_id
+       WHERE p.actif = 1
+     ) AS combined
+     ORDER BY nom ASC`
   );
   return rows as ProduitStock[];
 }
 
-// Entrée stock magasin
+// Entrée stock magasin (product-level or variant-level)
 export async function createStockEntree(data: {
-  produit_id: number;
-  quantite:   number;
-  reference?: string;
-  note?:      string;
-  user_id?:   number;
+  produit_id:  number;
+  quantite:    number;
+  reference?:  string;
+  note?:       string;
+  user_id?:    number;
+  variant_id?: number;
 }) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
-    await conn.execute(
-      `UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?`,
-      [data.quantite, data.produit_id]
-    );
+    let stockApres: number;
 
-    const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
+    if (data.variant_id) {
+      // Variant-level: update product_variants.stock
+      await conn.execute(
+        `UPDATE product_variants SET stock = stock + ? WHERE id = ? AND produit_id = ?`,
+        [data.quantite, data.variant_id, data.produit_id]
+      );
+      const [[vRow]] = await conn.execute<mysql.RowDataPacket[]>(
+        `SELECT stock FROM product_variants WHERE id = ?`, [data.variant_id]
+      );
+      stockApres = Number((vRow as mysql.RowDataPacket)?.stock ?? 0);
+    } else {
+      // Product-level: update produits.stock_magasin
+      await conn.execute(
+        `UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?`,
+        [data.quantite, data.produit_id]
+      );
+      const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
+    }
 
+    const noteWithVariant = data.variant_id && !data.note
+      ? null
+      : data.note ?? null;
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
        VALUES (?, 'entree', ?, ?, ?, ?, ?)`,
-      [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
+      [data.produit_id, data.quantite, stockApres, data.reference ?? null, noteWithVariant, data.user_id ?? null]
     );
 
     await conn.commit();
@@ -68,37 +123,70 @@ export async function createStockEntree(data: {
   }
 }
 
-// Sortie stock magasin → boutique
+// Sortie stock magasin → boutique (product-level or variant-level)
 export async function createStockSortie(data: {
-  produit_id: number;
-  quantite:   number;
-  reference?: string;
-  note?:      string;
-  user_id?:   number;
+  produit_id:  number;
+  quantite:    number;
+  reference?:  string;
+  note?:       string;
+  user_id?:    number;
+  variant_id?: number;
 }) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
-    const [[row]] = await conn.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const available = Number((row as mysql.RowDataPacket)?.stock ?? 0);
-    if (available < data.quantite) {
-      throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demandé(s)`);
+    let stockApres: number;
+
+    if (data.variant_id) {
+      // Variant-level: decrement variant.stock, increment variant.stock_boutique
+      const [[vRow]] = await conn.execute<mysql.RowDataPacket[]>(
+        `SELECT stock FROM product_variants WHERE id = ? AND produit_id = ?`,
+        [data.variant_id, data.produit_id]
+      );
+      const available = Number((vRow as mysql.RowDataPacket)?.stock ?? 0);
+      if (available < data.quantite) {
+        throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demandé(s)`);
+      }
+      await conn.execute(
+        `UPDATE product_variants
+         SET stock = stock - ?, stock_boutique = stock_boutique + ?
+         WHERE id = ?`,
+        [data.quantite, data.quantite, data.variant_id]
+      );
+      stockApres = available - data.quantite;
+    } else {
+      // Product-level: existing logic
+      const [[row]] = await conn.execute<mysql.RowDataPacket[]>(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      const available = Number((row as mysql.RowDataPacket)?.stock ?? 0);
+      if (available < data.quantite) {
+        throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demandé(s)`);
+      }
+      await conn.execute(
+        `UPDATE produits
+         SET stock_magasin  = GREATEST(0, COALESCE(stock_magasin, 0) - ?),
+             stock_boutique = COALESCE(stock_boutique, 0) + ?
+         WHERE id = ?`,
+        [data.quantite, data.quantite, data.produit_id]
+      );
+      stockApres = available - data.quantite;
+
+      // Track in boutique_mouvements + boutique_stock (product-level only)
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
+        [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
+      );
+      await conn.execute(
+        `INSERT INTO boutique_stock (produit_id, quantite)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE quantite = quantite + VALUES(quantite), updated_at = NOW()`,
+        [data.produit_id, data.quantite]
+      );
     }
-
-    // Decrement magasin, increment boutique
-    await conn.execute(
-      `UPDATE produits
-       SET stock_magasin  = GREATEST(0, COALESCE(stock_magasin, 0) - ?),
-           stock_boutique = COALESCE(stock_boutique, 0) + ?
-       WHERE id = ?`,
-      [data.quantite, data.quantite, data.produit_id]
-    );
-
-    const stockApres = available - data.quantite;
 
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
@@ -106,20 +194,6 @@ export async function createStockSortie(data: {
       [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
     );
 
-    // Track the entry in boutique_mouvements
-    await conn.execute(
-      `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
-       VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
-      [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
-    );
-    // Update boutique_stock (INSERT or increment)
-    await conn.execute(
-      `INSERT INTO boutique_stock (produit_id, quantite)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE quantite = quantite + VALUES(quantite), updated_at = NOW()`,
-      [data.produit_id, data.quantite]
-    );
-
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -129,12 +203,13 @@ export async function createStockSortie(data: {
   }
 }
 
-// Ajustement stock magasin (correction)
+// Ajustement stock magasin (correction) — product-level or variant-level
 export async function createStockAjustement(data: {
-  produit_id: number;
-  quantite:   number; // positif = ajout, négatif = retrait
-  motif:      string;
-  user_id?:   number;
+  produit_id:  number;
+  quantite:    number; // positif = ajout, négatif = retrait
+  motif:       string;
+  user_id?:    number;
+  variant_id?: number;
 }) {
   const conn = await db.getConnection();
   try {
@@ -142,19 +217,30 @@ export async function createStockAjustement(data: {
 
     const abs  = Math.abs(data.quantite);
     const type = data.quantite >= 0 ? "entree" : "retrait";
+    let stockApres: number;
 
-    await conn.execute(
-      `UPDATE produits
-       SET stock_magasin = GREATEST(0, COALESCE(stock_magasin, 0) + ?)
-       WHERE id = ?`,
-      [data.quantite, data.produit_id]
-    );
-
-    const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
+    if (data.variant_id) {
+      await conn.execute(
+        `UPDATE product_variants SET stock = GREATEST(0, stock + ?) WHERE id = ? AND produit_id = ?`,
+        [data.quantite, data.variant_id, data.produit_id]
+      );
+      const [[vRow]] = await conn.execute<mysql.RowDataPacket[]>(
+        `SELECT stock FROM product_variants WHERE id = ?`, [data.variant_id]
+      );
+      stockApres = Number((vRow as mysql.RowDataPacket)?.stock ?? 0);
+    } else {
+      await conn.execute(
+        `UPDATE produits
+         SET stock_magasin = GREATEST(0, COALESCE(stock_magasin, 0) + ?)
+         WHERE id = ?`,
+        [data.quantite, data.produit_id]
+      );
+      const [[stockRow]] = await conn.execute<mysql.RowDataPacket[]>(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      stockApres = Number((stockRow as mysql.RowDataPacket)?.stock ?? 0);
+    }
 
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note, user_id)
