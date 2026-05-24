@@ -2,6 +2,8 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import { createAdminUser, getAdminByUsername } from "@/lib/admin-db";
 import { createShop, getShopBySlug } from "@/lib/shops";
+import { sendMail } from "../../lib/mailer";
+import { welcomeShopEmail } from "../../lib/email-templates";
 
 const router = express.Router();
 
@@ -56,6 +58,24 @@ router.post("/api/admin/onboarding", async (req, res) => {
       password_hash,
       shop_id:       shopId,
     });
+
+    // ── Welcome email (fire-and-forget — don't fail the request if mail fails) ─
+    const siteBase = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const adminUrl = `${siteBase}/admin`;
+    const loginUrl = `${siteBase}/admin/login`;
+    const emailTo  = admin_email?.trim() || shop_email.trim();
+
+    const { subject, html, text } = welcomeShopEmail({
+      adminNom:  admin_nom.trim(),
+      shopNom:   shop_nom.trim(),
+      shopSlug:  slug,
+      adminUrl,
+      loginUrl,
+      plan,
+    });
+    sendMail({ to: emailTo, subject, html, text }).catch(e =>
+      console.error("[onboarding] welcome email failed:", e)
+    );
 
     res.status(201).json({ ok: true, shop_id: shopId, slug });
   } catch (err) {

@@ -4,6 +4,8 @@ import { emitAdminEvent } from "../../lib/admin-events";
 import { hasPageAccess } from "@/lib/admin-permissions";
 import { getProducts, getProductCount, getProductStatusCounts, getCategories, db, produitCols, invalidateProduitColsCache } from "@/lib/db";
 import { getStockStats } from "@/lib/admin-db";
+import { getShopById } from "@/lib/shops";
+import { planLimit } from "../../lib/plan-limits";
 import type mysql from "mysql2/promise";
 
 const router = express.Router();
@@ -111,6 +113,24 @@ router.post("/api/admin/products", async (req, res) => {
       return res.status(400).json({ error: "Champs obligatoires manquants." });
     }
 
+    // ── Plan limit check ────────────────────────────────────────────────
+    const shopId = session.shop_id ?? 1;
+    const shop   = await getShopById(shopId);
+    const limit  = planLimit(shop?.plan ?? "free");
+    if (limit !== Infinity) {
+      const [[countRow]] = await (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>(
+        "SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId]
+      );
+      const currentCount = Number((countRow as mysql.RowDataPacket).cnt ?? 0);
+      if (currentCount >= limit) {
+        return res.status(403).json({
+          error: `Limite atteinte : votre plan ${shop?.plan ?? "free"} autorise ${limit} produits maximum. Passez à un plan supérieur pour en ajouter.`,
+          plan_limit: limit,
+          current:    currentCount,
+        });
+      }
+    }
+
     try {
       validateImageUrl(image_url);
       validateImages(images);
@@ -155,6 +175,8 @@ router.post("/api/admin/products", async (req, res) => {
     // entrepôt
     if (body.entrepot_id != null) { columns.push("entrepot_id"); values.push(Number(body.entrepot_id) || null); }
     if (body.prix_entrepot != null) { columns.push("prix_entrepot"); values.push(Number(body.prix_entrepot) || null); }
+    // shop_id (multi-tenant)
+    columns.push("shop_id"); values.push(shopId);
 
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await (db as import("mysql2/promise").Pool).execute<mysql.ResultSetHeader>(
