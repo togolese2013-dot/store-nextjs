@@ -25,8 +25,8 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
     const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
       listFactures({ search, statut, limit, offset, shopId }),
       getVentesStats(),
-      getFinanceStats().catch(() => null),
-      getStockBoutiqueStats().catch(() => null),
+      getFinanceStats(shopId).catch(() => null),
+      getStockBoutiqueStats(shopId).catch(() => null),
     ]);
     const stats = {
       ...ventesStats,
@@ -108,6 +108,7 @@ router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
         statut, statut_paiement, mode_paiement, montant_acompte,
         montant_paiement: montant_paiement ? Number(montant_paiement) : undefined,
         admin_id: session.id,
+        shop_id:  session.shop_id ?? 1,
       });
     }
     emitAdminEvent("vente");
@@ -137,7 +138,7 @@ router.get("/api/admin/ventes/devis", async (req, res) => {
     const statut = (req.query.statut as string) || undefined;
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset)  || 0);
-    const { items, total } = await listDevis({ search, statut, limit, offset });
+    const { items, total } = await listDevis({ search, statut, limit, offset, shopId: session.shop_id ?? 1 });
     res.json({ items, total });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -152,7 +153,7 @@ router.post("/api/admin/ventes/devis", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const id = await createDevis({ ...body, admin_id: session.id });
+    const id = await createDevis({ ...body, admin_id: session.id, shop_id: session.shop_id ?? 1 });
     res.json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -166,7 +167,7 @@ router.get("/api/admin/ventes/livraisons", async (req, res) => {
   try {
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset)  || 0);
-    const { items, total } = await listLivraisons({ limit, offset });
+    const { items, total } = await listLivraisons({ limit, offset, shopId: session.shop_id ?? 1 });
     res.json({ items, total });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

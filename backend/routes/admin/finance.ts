@@ -17,9 +17,10 @@ router.get("/api/admin/finance", async (req, res) => {
     const search = (req.query.q as string)    || undefined;
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0,   Number(req.query.offset) || 0);
+    const shopId = session.shop_id ?? 1;
     const [{ items, total }, stats] = await Promise.all([
-      listFinanceEntries({ type, search, limit, offset }),
-      getFinanceStats(),
+      listFinanceEntries({ type, search, limit, offset, shopId }),
+      getFinanceStats(shopId),
     ]);
     res.json({ items, total, stats });
   } catch (err) {
@@ -40,7 +41,7 @@ router.post("/api/admin/finance", async (req, res) => {
     }
     const admin_id  = typeof session.id === "number" ? session.id : undefined;
     const admin_nom = typeof session.nom === "string" ? session.nom : undefined;
-    const id = await createFinanceEntry({ type, mode_paiement, compte_destination, categorie, description, montant: Number(montant), date_entree, admin_id, admin_nom });
+    const id = await createFinanceEntry({ type, mode_paiement, compte_destination, categorie, description, montant: Number(montant), date_entree, admin_id, admin_nom, shop_id: session.shop_id ?? 1 });
     emitAdminEvent("finance");
     res.status(201).json({ ok: true, id });
   } catch (err) {

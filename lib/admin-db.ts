@@ -410,6 +410,10 @@ export async function ensureShopIdCols(): Promise<void> {
       ["settings"],
       ["entrepots"],
       ["marques"],
+      ["finance_entries"],
+      ["devis"],
+      ["livraisons_ventes"],
+      ["boutique_mouvements"],
     ];
     for (const [table, extra] of tables) {
       try {
@@ -435,6 +439,13 @@ export async function ensureShopIdCols(): Promise<void> {
         }
       }
     }
+    // Migrate settings unique key from (key) to (key, shop_id) for multi-tenant
+    try {
+      await db.execute("ALTER TABLE settings DROP INDEX `key`");
+    } catch { /* already dropped or doesn't exist */ }
+    try {
+      await db.execute("ALTER TABLE settings ADD UNIQUE KEY `key_shop` (`key`, shop_id)");
+    } catch { /* already exists */ }
   });
 }
 
@@ -695,53 +706,57 @@ export async function setUtilisateurPermissions(utilisateurId: number, permissio
   }
 }
 
-/* ─── Settings — in-memory cache 5 min TTL ─── */
-let _settingsCache: { data: Record<string, string>; expiresAt: number } | null = null;
+/* ─── Settings — per-shop in-memory cache 5 min TTL ─── */
+const _settingsCacheMap = new Map<number, { data: Record<string, string>; expiresAt: number }>();
 
-function invalidateSettingsCache() { _settingsCache = null; }
+function invalidateSettingsCache(shopId?: number) {
+  if (shopId !== undefined) _settingsCacheMap.delete(shopId);
+  else _settingsCacheMap.clear();
+}
 
-async function loadSettings(): Promise<Record<string, string>> {
+async function loadSettings(shopId = 1): Promise<Record<string, string>> {
   const now = Date.now();
-  if (_settingsCache && _settingsCache.expiresAt > now) return _settingsCache.data;
-  const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT `key`, `value` FROM settings");
+  const cached = _settingsCacheMap.get(shopId);
+  if (cached && cached.expiresAt > now) return cached.data;
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT `key`, `value` FROM settings WHERE shop_id = ?", [shopId]
+  );
   const data = Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
-  _settingsCache = { data, expiresAt: now + 5 * 60_000 };
+  _settingsCacheMap.set(shopId, { data, expiresAt: now + 5 * 60_000 });
   return data;
 }
 
-export async function getSettings(): Promise<Record<string, string>> {
-  return loadSettings();
+export async function getSettings(shopId = 1): Promise<Record<string, string>> {
+  return loadSettings(shopId);
 }
 
-export async function getSetting(key: string): Promise<string> {
-  const all = await loadSettings();
-  // Key already cached — return immediately
+export async function getSetting(key: string, shopId = 1): Promise<string> {
+  const all = await loadSettings(shopId);
   if (key in all) return all[key] ?? "";
-  // Key not in cache (new key) — fall back to direct query without poisoning cache
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT `value` FROM settings WHERE `key` = ?", [key]
+    "SELECT `value` FROM settings WHERE `key` = ? AND shop_id = ?", [key, shopId]
   );
   return (rows[0]?.value as string) ?? "";
 }
 
-export async function setSetting(key: string, value: string) {
+export async function setSetting(key: string, value: string, shopId = 1) {
   await db.execute(
-    "INSERT INTO settings (`key`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-    [key, value]
+    "INSERT INTO settings (`key`, `value`, shop_id) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+    [key, value, shopId]
   );
-  invalidateSettingsCache();
+  invalidateSettingsCache(shopId);
 }
 
-export async function setSettings(entries: Record<string, string>) {
+export async function setSettings(entries: Record<string, string>, shopId = 1) {
   const pairs = Object.entries(entries);
   if (!pairs.length) return;
-  const placeholders = pairs.map(() => "(?,?)").join(",");
-  const values = pairs.flatMap(([k, v]) => [k, v]);
+  const placeholders = pairs.map(() => "(?,?,?)").join(",");
+  const values = pairs.flatMap(([k, v]) => [k, v, shopId]);
   await db.execute(
-    `INSERT INTO settings (\`key\`, \`value\`) VALUES ${placeholders} ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
+    `INSERT INTO settings (\`key\`, \`value\`, shop_id) VALUES ${placeholders} ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
     values
   );
-  invalidateSettingsCache();
+  invalidateSettingsCache(shopId);
 }
 
 /* ─── Delivery Zones ─── */
@@ -1870,17 +1885,18 @@ async function ensureBoutiqueStockPopulated(): Promise<void> {
   }); // end runOnce
 }
 
-export async function getStockBoutiqueStats(): Promise<BoutiqueStats> {
+export async function getStockBoutiqueStats(shopId = 1): Promise<BoutiqueStats> {
   await ensureBoutiqueStockPopulated();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT
-      (SELECT COUNT(*) FROM produits)                                                        AS total_produits,
+      (SELECT COUNT(*) FROM produits WHERE shop_id = ?)                                     AS total_produits,
       COALESCE(SUM(bs.quantite * p.prix_unitaire), 0)                                      AS valeur_boutique,
       SUM(CASE WHEN bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte THEN 1 ELSE 0 END) AS stock_faible,
       SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
     FROM boutique_stock bs
     JOIN produits p ON p.id = bs.produit_id
-  `);
+    WHERE p.shop_id = ?
+  `, [shopId, shopId]);
   const r = rows[0] ?? {};
   return {
     total_produits:  Number(r.total_produits  ?? 0),
@@ -1997,12 +2013,13 @@ export async function createBoutiqueMouvement(data: {
   motif?:        string;
   ref_commande?: string;
   admin_id?:     number;
+  shop_id?:      number;
 }): Promise<void> {
   await db.execute(
-    `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
-     VALUES (?,?,?,?,?,?)`,
+    `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id, shop_id)
+     VALUES (?,?,?,?,?,?,?)`,
     [data.produit_id, data.type, Math.abs(data.quantite),
-     data.motif ?? null, data.ref_commande ?? null, data.admin_id ?? null]
+     data.motif ?? null, data.ref_commande ?? null, data.admin_id ?? null, data.shop_id ?? 1]
   );
   const delta = data.type === "entree" ? Math.abs(data.quantite) : -Math.abs(data.quantite);
   await db.execute(
@@ -2017,7 +2034,7 @@ export async function createBoutiqueMouvement(data: {
   } catch { /* stock_boutique column may not exist */ }
 }
 
-export async function getRecentBoutiqueMovements(limit = 30): Promise<BoutiqueMouvement[]> {
+export async function getRecentBoutiqueMovements(limit = 30, shopId = 1): Promise<BoutiqueMouvement[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT bm.*, p.nom AS nom_produit,
             COALESCE(au.nom, u.nom) AS admin_nom
@@ -2025,8 +2042,10 @@ export async function getRecentBoutiqueMovements(limit = 30): Promise<BoutiqueMo
      JOIN produits p ON p.id = bm.produit_id
      LEFT JOIN admin_users au ON au.id = bm.admin_id
      LEFT JOIN utilisateurs u ON u.id = bm.admin_id
+     WHERE p.shop_id = ?
      ORDER BY bm.created_at DESC
-     LIMIT ${Number(limit)}`
+     LIMIT ${Number(limit)}`,
+    [shopId]
   );
   return rows as BoutiqueMouvement[];
 }
@@ -2357,6 +2376,7 @@ export async function createVenteWithStock(data: {
           description:   `Vente ${reference} – ${data.client_nom.trim()}`,
           montant:       montantFinance,
           date_entree:   new Date().toISOString().slice(0, 10),
+          shop_id:       data.shop_id ?? 1,
         }).catch(() => {});
       }
     }
@@ -2383,6 +2403,7 @@ export async function updateFacture(id: number, data: {
   montant_acompte?:   number | null;
   montant_paiement?:  number;
   admin_id?:          number | null;
+  shop_id?:           number;
 }) {
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
@@ -2420,6 +2441,7 @@ export async function updateFacture(id: number, data: {
           description:   `Paiement ${factureRow.reference} – ${factureRow.client_nom}`,
           montant:       data.montant_paiement,
           date_entree:   new Date().toISOString().slice(0, 10),
+          shop_id:       data.shop_id ?? 1,
         });
       } catch (err) {
         console.error("[updateFacture/createFinanceEntry]", err);
@@ -2498,13 +2520,13 @@ export interface Devis {
   updated_at:   string;
 }
 
-export async function listDevis(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Devis[]; total: number }> {
-  const { limit = 50, offset = 0, search, statut } = opts;
-  const conditions: string[] = [];
-  const params: (string | number | boolean | null | Buffer)[] = [];
+export async function listDevis(opts: { limit?: number; offset?: number; search?: string; statut?: string; shopId?: number } = {}): Promise<{ items: Devis[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+  const conditions: string[] = ["shop_id = ?"];
+  const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT id, reference, client_nom, client_tel, client_email, items,
             sous_total, remise, total, statut, valide_jusqu, note, admin_id, created_at, updated_at
@@ -2517,15 +2539,15 @@ export async function listDevis(opts: { limit?: number; offset?: number; search?
 export async function createDevis(data: {
   client_nom: string; client_tel?: string; client_email?: string;
   items: FactureItem[]; sous_total: number; remise?: number; total: number;
-  statut?: Devis["statut"]; valide_jusqu?: string; note?: string; admin_id?: number;
+  statut?: Devis["statut"]; valide_jusqu?: string; note?: string; admin_id?: number; shop_id?: number;
 }): Promise<number> {
   const reference = generateVenteRef("DV");
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO devis (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, valide_jusqu, note, admin_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO devis (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, valide_jusqu, note, admin_id, shop_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [reference, data.client_nom, data.client_tel ?? null, data.client_email ?? null,
      JSON.stringify(data.items), data.sous_total, data.remise ?? 0, data.total,
-     data.statut ?? "brouillon", data.valide_jusqu ?? null, data.note ?? null, data.admin_id ?? null]
+     data.statut ?? "brouillon", data.valide_jusqu ?? null, data.note ?? null, data.admin_id ?? null, data.shop_id ?? 1]
   );
   return result.insertId;
 }
@@ -2678,13 +2700,13 @@ export interface Livraison {
   updated_at:  string;
 }
 
-export async function listLivraisons(opts: { limit?: number; offset?: number; search?: string; statut?: string } = {}): Promise<{ items: Livraison[]; total: number }> {
-  const { limit = 50, offset = 0, search, statut } = opts;
-  const conditions: string[] = [];
-  const params: (string | number | boolean | null | Buffer)[] = [];
+export async function listLivraisons(opts: { limit?: number; offset?: number; search?: string; statut?: string; shopId?: number } = {}): Promise<{ items: Livraison[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+  const conditions: string[] = ["shop_id = ?"];
+  const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT id, reference, facture_id, client_nom, client_tel, adresse,
             contact_livraison, lien_localisation, statut, livreur,
@@ -2736,11 +2758,12 @@ export async function listFinanceEntries(opts: {
   search?: string;
   limit?:  number;
   offset?: number;
+  shopId?: number;
 } = {}): Promise<{ items: FinanceEntry[]; total: number }> {
-  const { limit = 50, offset = 0, type, search } = opts;
+  const { limit = 50, offset = 0, type, search, shopId = 1 } = opts;
   await financeEntrieCols(); // ensure columns exist
-  const conditions: string[] = ["f.type != 'vente'"]; // never show auto-generated vente entries
-  const params: (string | number | boolean | null | Buffer)[] = [];
+  const conditions: string[] = ["f.type != 'vente'", "f.shop_id = ?"];
+  const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (type)   { conditions.push("f.type = ?");                                                   params.push(type); }
   if (search) { conditions.push("(f.categorie LIKE ? OR f.reference LIKE ?)");                   params.push(`%${search}%`, `%${search}%`); }
   const where = `WHERE ${conditions.join(" AND ")}`;
@@ -2803,7 +2826,7 @@ async function financeEntrieCols() {
   return _finCols;
 }
 
-export async function getFinanceStats(): Promise<FinanceStats> {
+export async function getFinanceStats(shopId = 1): Promise<FinanceStats> {
   const cols = await financeEntrieCols();
 
   const [netRows, transfersOut, transfersIn, summaryRow] = await Promise.all([
@@ -2817,24 +2840,27 @@ export async function getFinanceStats(): Promise<FinanceStats> {
                     ELSE 0
                   END) AS net
            FROM finance_entries
-           WHERE type != 'transfert'
-           GROUP BY COALESCE(mode_paiement, 'especes')`
+           WHERE type != 'transfert' AND shop_id = ?
+           GROUP BY COALESCE(mode_paiement, 'especes')`,
+          [shopId]
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),
     // Transfer outflows (debit from source account)
     cols.mode_paiement
       ? db.query<mysql.RowDataPacket[]>(
           `SELECT mode_paiement, SUM(montant) AS total
-           FROM finance_entries WHERE type = 'transfert'
-           GROUP BY mode_paiement`
+           FROM finance_entries WHERE type = 'transfert' AND shop_id = ?
+           GROUP BY mode_paiement`,
+          [shopId]
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),
     // Transfer inflows (credit to destination account)
     cols.compte_destination
       ? db.query<mysql.RowDataPacket[]>(
           `SELECT compte_destination AS mode_paiement, SUM(montant) AS total
-           FROM finance_entries WHERE type = 'transfert' AND compte_destination IS NOT NULL
-           GROUP BY compte_destination`
+           FROM finance_entries WHERE type = 'transfert' AND compte_destination IS NOT NULL AND shop_id = ?
+           GROUP BY compte_destination`,
+          [shopId]
         ).then(([rows]) => rows as mysql.RowDataPacket[])
       : Promise.resolve([] as mysql.RowDataPacket[]),
     // Summary totals (manual entries only, not ventes)
@@ -2842,7 +2868,8 @@ export async function getFinanceStats(): Promise<FinanceStats> {
       `SELECT
          SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
          SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
-       FROM finance_entries`
+       FROM finance_entries WHERE shop_id = ?`,
+      [shopId]
     ).then(([[row]]) => row as mysql.RowDataPacket),
   ]);
 
@@ -2890,15 +2917,16 @@ export async function createFinanceEntry(data: {
   date_entree:         string;
   admin_id?:           number;
   admin_nom?:          string;
+  shop_id?:            number;
 }): Promise<number> {
   const cols      = await financeEntrieCols();
   const reference = genFinanceRef(data.type);
 
-  const colNames: string[] = ["reference", "type", "categorie", "description", "montant", "date_entree"];
+  const colNames: string[] = ["reference", "type", "categorie", "description", "montant", "date_entree", "shop_id"];
   const colVals:  (string | number | null)[] = [
     reference, data.type,
     data.categorie ?? null, data.description ?? null,
-    data.montant, data.date_entree,
+    data.montant, data.date_entree, data.shop_id ?? 1,
   ];
   if (cols.mode_paiement)      { colNames.push("mode_paiement");      colVals.push(data.mode_paiement ?? "especes"); }
   if (cols.compte_destination) { colNames.push("compte_destination"); colVals.push(data.compte_destination ?? null); }

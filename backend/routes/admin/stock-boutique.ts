@@ -19,11 +19,12 @@ router.get("/api/admin/stock-boutique", async (req, res) => {
     const limit  = Math.min(500, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
 
+    const shopId = session.shop_id ?? 1;
     const [stats, { items, total }, movements, prodCount] = await Promise.all([
-      getStockBoutiqueStats(),
-      getStockBoutiqueList({ search: q, filter, limit, offset, shopId: session.shop_id ?? 1 }),
-      getRecentBoutiqueMovements(20),
-      (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM produits"),
+      getStockBoutiqueStats(shopId),
+      getStockBoutiqueList({ search: q, filter, limit, offset, shopId }),
+      getRecentBoutiqueMovements(20, shopId),
+      (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId]),
     ]);
     stats.total_produits = Number((prodCount[0] as mysql.RowDataPacket[])[0]?.cnt ?? stats.total_produits);
     res.json({ stats, items, total, movements });
@@ -61,6 +62,7 @@ router.post("/api/admin/stock-boutique/mouvement", async (req, res) => {
       motif:        motif  || undefined,
       ref_commande: ref_commande || undefined,
       admin_id:     session.id,
+      shop_id:      session.shop_id ?? 1,
     });
     res.json({ ok: true });
   } catch (err) {
@@ -76,8 +78,9 @@ router.get("/api/admin/stock-boutique/entrees", async (req, res) => {
     const limit  = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
 
-    const conditions = ["bm.type = 'entree'"];
-    const params: (string | number)[] = [];
+    const shopId2 = session.shop_id ?? 1;
+    const conditions = ["bm.type = 'entree'", "p.shop_id = ?"];
+    const params: (string | number)[] = [shopId2];
     if (q) { conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)"); params.push(`%${q}%`, `%${q}%`); }
     const where = `WHERE ${conditions.join(" AND ")}`;
 
