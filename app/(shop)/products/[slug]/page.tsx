@@ -6,8 +6,9 @@ import { apiGet } from "@/lib/api";
 import { getRelatedProductsWithDetails } from "@/lib/related-products";
 import ProductCard from "@/components/ProductCard";
 import AddToCartButton from "@/components/AddToCartButton";
-import ProductVariantSelector, { type Variant } from "@/components/ProductVariantSelector";
+import { type Variant } from "@/components/ProductVariantSelector";
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
+import ProductGalleryWithVariants from "@/components/ProductGalleryWithVariants";
 import RecentViewTracker from "@/components/RecentViewTracker";
 import ShareButtons from "@/components/ShareButtons";
 import Link from "next/link";
@@ -243,6 +244,76 @@ export default async function ProductPage({ params }: PageProps) {
 
         {/* ── Product main block ── */}
         <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm mb-10">
+          {hasVariants ? (
+            /* ── Variant product: client wrapper syncs gallery ↔ selector ── */
+            <ProductGalleryWithVariants
+              product={product}
+              variants={variants}
+              defaultImages={allProductImages}
+              badges={<>
+                {isPromo && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent-500 text-white text-sm font-bold shadow-accent">
+                    <Zap className="w-3.5 h-3.5" /> -{discountPercent}%
+                  </span>
+                )}
+                {isNew && !isPromo && (
+                  <span className="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-bold">
+                    Nouveau
+                  </span>
+                )}
+              </>}
+              headerSlot={<>
+                <div className="flex items-center justify-between mb-3">
+                  {product.marque_nom ? (
+                    <span className="text-xs font-bold uppercase tracking-widest text-brand-600">
+                      {product.marque_nom}
+                    </span>
+                  ) : product.categorie_nom ? (
+                    <Link href={`/products?category=${product.categorie_id}`}
+                      className="text-xs font-bold uppercase tracking-widest text-brand-600 hover:text-brand-800 transition-colors"
+                    >
+                      {product.categorie_nom}
+                    </Link>
+                  ) : null}
+                  <span className="text-xs text-slate-400 font-mono">Réf. {product.reference}</span>
+                </div>
+                <h1 className="font-display text-2xl sm:text-3xl font-800 text-slate-900 leading-tight mb-2">
+                  {product.nom}
+                </h1>
+                <RatingBadge productId={product.id} size="md" />
+                {product.description && (
+                  <div className="mb-6 pb-6 border-b border-slate-100">
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      {product.description.length > 250
+                        ? product.description.slice(0, 250).trimEnd() + "…"
+                        : product.description}
+                    </p>
+                  </div>
+                )}
+              </>}
+              footerSlot={<>
+                <div className="mt-5">
+                  <ShareButtons title={product.nom} />
+                </div>
+                <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-2 gap-3">
+                  {[
+                    { icon: Truck,       label: "Livraison rapide",        sub: "Lomé & tout le Togo" },
+                    { icon: ShieldCheck, label: "Paiement à la livraison", sub: "Payez à la réception" },
+                  ].map(({ icon: Icon, label, sub }) => (
+                    <div key={label} className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-brand-700" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">{label}</p>
+                        <p className="text-xs text-slate-400">{sub}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>}
+            />
+          ) : (
           <div className="grid lg:grid-cols-2 gap-0">
 
             {/* Image column */}
@@ -251,8 +322,6 @@ export default async function ProductPage({ params }: PageProps) {
                 images={allProductImages}
                 productName={product.nom}
               />
-
-              {/* Badges overlay */}
               <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
                 {isPromo && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent-500 text-white text-sm font-bold shadow-accent">
@@ -269,8 +338,6 @@ export default async function ProductPage({ params }: PageProps) {
 
             {/* Info column */}
             <div className="p-6 sm:p-8 lg:p-10 flex flex-col">
-
-              {/* Marque ou catégorie + référence */}
               <div className="flex items-center justify-between mb-3">
                 {product.marque_nom ? (
                   <span className="text-xs font-bold uppercase tracking-widest text-brand-600">
@@ -285,15 +352,10 @@ export default async function ProductPage({ params }: PageProps) {
                 ) : null}
                 <span className="text-xs text-slate-400 font-mono">Réf. {product.reference}</span>
               </div>
-
-              {/* Name */}
               <h1 className="font-display text-2xl sm:text-3xl font-800 text-slate-900 leading-tight mb-2">
                 {product.nom}
               </h1>
-
               <RatingBadge productId={product.id} size="md" />
-
-              {/* Mini description */}
               {product.description && (
                 <div className="mb-6 pb-6 border-b border-slate-100">
                   <p className="text-slate-600 text-sm leading-relaxed">
@@ -303,66 +365,44 @@ export default async function ProductPage({ params }: PageProps) {
                   </p>
                 </div>
               )}
-
-              {hasVariants ? (
-                /* Variant selector (handles price, stock, add-to-cart) */
-                <ProductVariantSelector
-                  product={product}
-                  variants={variants}
-                />
-              ) : (
-                <>
-                  {/* Price */}
-                  <div className="flex items-end gap-3 mb-0">
-                    <span className="font-display text-3xl font-800 text-slate-900">
-                      {formatPrice(price)}
+              {/* Price */}
+              <div className="flex items-end gap-3 mb-0">
+                <span className="font-display text-3xl font-800 text-slate-900">
+                  {formatPrice(price)}
+                </span>
+                {isPromo && (
+                  <div className="flex flex-col">
+                    <span className="text-base text-slate-400 line-through mb-0.5">
+                      {formatPrice(product.prix_unitaire)}
                     </span>
-                    {isPromo && (
-                      <div className="flex flex-col">
-                        <span className="text-base text-slate-400 line-through mb-0.5">
-                          {formatPrice(product.prix_unitaire)}
-                        </span>
-                        <span className="text-xs font-bold text-accent-500 bg-accent-50 px-2 py-0.5 rounded-full">
-                          -{discountPercent}% · économisez {formatPrice(product.prix_unitaire - price)}
-                        </span>
-                      </div>
-                    )}
+                    <span className="text-xs font-bold text-accent-500 bg-accent-50 px-2 py-0.5 rounded-full">
+                      -{discountPercent}% · économisez {formatPrice(product.prix_unitaire - price)}
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-400 mb-6">Taxes incluses. Livraison calculée lors du paiement.</p>
-
-                  {/* Stock badge */}
-                  <div className="mb-6">
-                    {outOf ? (
-                      <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-100 text-slate-500 text-sm font-semibold">
-                        <span className="w-2 h-2 rounded-full bg-slate-400" />
-                        Rupture de stock
-                      </span>
-                    ) : isLow ? (
-                      <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-50 text-amber-700 text-sm font-semibold border border-amber-200">
-                        <span className="w-2 h-2 rounded-full bg-amber-500" />
-                        Plus que {stockDisp} en stock !
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-green-50 text-green-700 text-sm font-semibold border border-green-200">
-                        <span className="w-2 h-2 rounded-full bg-green-500" />
-                        En stock · Expédié sous 24h
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="mt-auto">
-                    <AddToCartButton product={product} />
-                  </div>
-                </>
-              )}
-
-              {/* Share */}
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mb-6">Taxes incluses. Livraison calculée lors du paiement.</p>
+              <div className="mb-6">
+                {outOf ? (
+                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-100 text-slate-500 text-sm font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-slate-400" /> Rupture de stock
+                  </span>
+                ) : isLow ? (
+                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-50 text-amber-700 text-sm font-semibold border border-amber-200">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Plus que {stockDisp} en stock !
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-green-50 text-green-700 text-sm font-semibold border border-green-200">
+                    <span className="w-2 h-2 rounded-full bg-green-500" /> En stock · Expédié sous 24h
+                  </span>
+                )}
+              </div>
+              <div className="mt-auto">
+                <AddToCartButton product={product} />
+              </div>
               <div className="mt-5">
                 <ShareButtons title={product.nom} />
               </div>
-
-              {/* Trust badges */}
               <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-2 gap-3">
                 {[
                   { icon: Truck,       label: "Livraison rapide",        sub: "Lomé & tout le Togo" },
@@ -381,6 +421,7 @@ export default async function ProductPage({ params }: PageProps) {
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* ── Description complète ── */}

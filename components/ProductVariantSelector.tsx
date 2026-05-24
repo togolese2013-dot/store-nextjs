@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/utils";
 import AddToCartButton from "@/components/AddToCartButton";
@@ -12,8 +12,8 @@ export interface Variant {
   options: Record<string, string>;
   prix: number;
   remise: number;
-  stock: number;           // stock magasin (used for online availability)
-  stock_boutique: number;  // stock boutique (in-store only)
+  stock: number;           // stock magasin (warehouse — not used on vitrine)
+  stock_boutique: number;  // stock boutique → used for online availability
   reference_sku: string | null;
   image_url: string | null;
 }
@@ -22,9 +22,10 @@ interface Props {
   product: Product;
   variants: Variant[];
   waText?: string;
+  onVariantChange?: (variant: Variant | null) => void;
 }
 
-export default function ProductVariantSelector({ product, variants }: Props) {
+export default function ProductVariantSelector({ product, variants, onVariantChange }: Props) {
   // Compute axes: { Taille: ["XS","S","M","L"], Couleur: ["Rouge","Bleu"] }
   const axes = useMemo(() => {
     const result: Record<string, string[]> = {};
@@ -54,6 +55,11 @@ export default function ProductVariantSelector({ product, variants }: Props) {
 
   const isComplete = axisNames.every((axis) => !!selection[axis]);
 
+  // Notify parent when selected variant changes
+  useEffect(() => {
+    onVariantChange?.(isComplete ? selectedVariant : null);
+  }, [selectedVariant, isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Price to display
   const displayPrice = selectedVariant
     ? selectedVariant.prix
@@ -63,8 +69,8 @@ export default function ProductVariantSelector({ product, variants }: Props) {
 
   const priceLabel = !isComplete && variants.length > 0 ? "À partir de" : null;
 
-  // Stock
-  const displayStock = selectedVariant ? selectedVariant.stock : null;
+  // Stock — vitrine uses stock_boutique (transferred from magasin)
+  const displayStock = selectedVariant ? selectedVariant.stock_boutique : null;
   const outOf = isComplete && displayStock === 0;
   const isLow = isComplete && displayStock !== null && displayStock > 0 && displayStock <= 5;
 
@@ -74,6 +80,7 @@ export default function ProductVariantSelector({ product, variants }: Props) {
     const testAxes = axisNames.filter((a) => a !== axis);
     return variants.some((v) =>
       v.options[axis] === value &&
+      v.stock_boutique > 0 &&
       testAxes.every((a) => !testSelection[a] || v.options[a] === testSelection[a])
     );
   }
@@ -166,7 +173,7 @@ export default function ProductVariantSelector({ product, variants }: Props) {
           <AddToCartButton
             product={product}
             variant={variantForWa}
-            stock={selectedVariant.stock}
+            stock={selectedVariant.stock_boutique}
           />
         ) : (
           <button
