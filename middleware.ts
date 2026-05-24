@@ -107,6 +107,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Root domain (no shop subdomain) + "/" → SaaS landing page
+  if (!shopSlug && pathname === "/") {
+    return NextResponse.redirect(new URL("/saas", request.url));
+  }
+
   // Pass nonce + shop slug to Server Components via request headers
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
