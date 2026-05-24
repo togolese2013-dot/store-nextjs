@@ -1802,23 +1802,29 @@ export async function getStockBoutiqueList(opts: {
   if (filter === "faible")     p2Conds.push("pv.stock_boutique > 0 AND pv.stock_boutique <= 5");
   // "all" → no extra condition
 
-  const [rows2] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT pv.produit_id,
-            pv.id AS variant_id, pv.nom AS variant_nom,
-            CONCAT(p.nom, ' — ', pv.nom) AS nom,
-            COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
-            COALESCE(NULLIF(pv.image_url,''), ${imageCol}) AS image_url,
-            COALESCE(NULLIF(pv.remise,0), 0) AS remise,
-            CASE WHEN pv.prix > 0 THEN pv.prix ELSE p.prix_unitaire END AS prix_unitaire,
-            COALESCE(c.nom,'') AS categorie_nom,
-            pv.stock_boutique AS quantite,
-            5 AS seuil_alerte
-     FROM product_variants pv
-     JOIN produits p ON p.id = pv.produit_id
-     LEFT JOIN categories c ON c.id = p.categorie_id
-     ${p2Conds.length ? "WHERE " + p2Conds.join(" AND ") : ""}`,
-    p2Params
-  );
+  let rows2: mysql.RowDataPacket[] = [];
+  try {
+    [rows2] = await db.query<mysql.RowDataPacket[]>(
+      `SELECT pv.produit_id,
+              pv.id AS variant_id, pv.nom AS variant_nom,
+              CONCAT(p.nom, ' — ', pv.nom) AS nom,
+              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              COALESCE(NULLIF(pv.image_url,''), ${imageCol}) AS image_url,
+              COALESCE(NULLIF(pv.remise,0), 0) AS remise,
+              CASE WHEN pv.prix > 0 THEN pv.prix ELSE p.prix_unitaire END AS prix_unitaire,
+              COALESCE(c.nom,'') AS categorie_nom,
+              pv.stock_boutique AS quantite,
+              5 AS seuil_alerte
+       FROM product_variants pv
+       JOIN produits p ON p.id = pv.produit_id
+       LEFT JOIN categories c ON c.id = p.categorie_id
+       ${p2Conds.length ? "WHERE " + p2Conds.join(" AND ") : ""}`,
+      p2Params
+    );
+  } catch (err: unknown) {
+    // product_variants table may not exist yet — treat as empty
+    if ((err as { code?: string }).code !== "ER_NO_SUCH_TABLE") throw err;
+  }
 
   // ── Merge, sort, paginate in Node ─────────────────────────────────────────
   const mapRow = (r: mysql.RowDataPacket): BoutiqueStockItem => ({
