@@ -397,6 +397,47 @@ export async function ensureAdminUsersCols() {
   }
 }
 
+/** Add shop_id (DEFAULT 1) to all multi-tenant tables that don't have it yet. */
+export async function ensureShopIdCols(): Promise<void> {
+  return runOnce("shop_id_cols", async () => {
+    const tables: [string, string?][] = [
+      ["admin_users"],
+      ["orders"],
+      ["factures"],
+      ["categories"],
+      ["delivery_zones"],
+      ["coupons"],
+      ["settings"],
+      ["entrepots"],
+      ["marques"],
+    ];
+    for (const [table, extra] of tables) {
+      try {
+        await db.execute(
+          `ALTER TABLE \`${table}\` ADD COLUMN shop_id INT UNSIGNED NOT NULL DEFAULT 1`
+        );
+        try {
+          await db.execute(
+            `ALTER TABLE \`${table}\` ADD INDEX idx_${table}_shop_id (shop_id)`
+          );
+        } catch { /* index already exists */ }
+        void extra; // unused — reserved for future per-table options
+      } catch (e: unknown) {
+        const err = e as { code?: string; message?: string };
+        const msg = String(err?.message ?? "");
+        // Table may not exist yet or column already added — both are fine
+        if (
+          err?.code !== "ER_DUP_FIELDNAME" &&
+          !msg.includes("Duplicate column") &&
+          err?.code !== "ER_NO_SUCH_TABLE"
+        ) {
+          console.warn(`[ensureShopIdCols] ${table}:`, err?.code ?? msg);
+        }
+      }
+    }
+  });
+}
+
 export async function getAdminByEmail(email: string): Promise<AdminUser | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT * FROM admin_users WHERE email = ? AND actif = 1 LIMIT 1",

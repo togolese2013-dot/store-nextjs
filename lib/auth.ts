@@ -14,14 +14,15 @@ const COOKIE_NAME = "ts_admin_token";
 const TTL         = 60 * 60 * 8; // 8 hours
 
 export interface AdminPayload {
-  id:                  number;
-  username:            string;
-  email:               string | null;
-  nom:                 string;
-  role:                string;
-  poste?:              string;
-  permissions:         AdminPermissions | null;
+  id:                   number;
+  username:             string;
+  email:                string | null;
+  nom:                  string;
+  role:                 string;
+  poste?:               string;
+  permissions:          AdminPermissions | null;
   must_change_password?: boolean;
+  shop_id:              number;
 }
 
 export async function signToken(payload: AdminPayload): Promise<string> {

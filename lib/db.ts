@@ -210,6 +210,20 @@ export async function produitCols() {
     } catch { /* ALTER may fail if column already added by concurrent request */ }
   }
 
+  // Auto-migrate: add shop_id column if missing (multi-tenant)
+  if (!names.has("shop_id")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN shop_id INT UNSIGNED NOT NULL DEFAULT 1`);
+      names.add("shop_id");
+      try { await db.execute(`ALTER TABLE produits ADD INDEX idx_produits_shop_id (shop_id)`); } catch { /* ignore */ }
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("shop_id");
+      }
+    }
+  }
+
   _cols = {
     remise:          names.has("remise"),
     neuf:            names.has("neuf"),
@@ -226,6 +240,7 @@ export async function produitCols() {
     slug:            names.has("slug"),
     entrepot_id:     names.has("entrepot_id"),
     prix_entrepot:   names.has("prix_entrepot"),
+    shop_id:         names.has("shop_id"),
   };
   return _cols;
 }
@@ -279,11 +294,13 @@ export async function getProducts(opts?: {
   statut?: "disponible" | "faible" | "epuise";
   includeInactive?: boolean;
   entrepotId?: number;
+  shopId?: number;
 }): Promise<Product[]> {
   const {
     categoryId, marqueId, search, referenceExact, promoOnly, newOnly,
     inStock, minPrice, maxPrice,
     limit = 60, offset = 0, statut, includeInactive = false, entrepotId,
+    shopId = 1,
   } = opts ?? {};
 
   const cols = await produitCols();
@@ -291,9 +308,10 @@ export async function getProducts(opts?: {
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
   const params: (string | number)[] = [];
 
-  if (categoryId)      { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
-  if (marqueId)        { conditions.push("p.marque_id = ?");    params.push(marqueId); }
-  if (referenceExact)  { conditions.push("p.reference = ?");    params.push(referenceExact); }
+  if (cols.shop_id)    { conditions.push("p.shop_id = ?");       params.push(shopId); }
+  if (categoryId)      { conditions.push("p.categorie_id = ?");  params.push(categoryId); }
+  if (marqueId)        { conditions.push("p.marque_id = ?");     params.push(marqueId); }
+  if (referenceExact)  { conditions.push("p.reference = ?");     params.push(referenceExact); }
   if (search)          { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (promoOnly && cols.remise)  { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)    { conditions.push("p.neuf = 1"); }

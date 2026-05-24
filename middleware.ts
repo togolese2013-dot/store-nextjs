@@ -21,6 +21,16 @@ function buildCsp(nonce: string): string {
   ].join("; ");
 }
 
+/** Extract the leftmost subdomain, excluding known system subdomains. */
+function extractShopSlug(hostname: string): string | null {
+  const host = hostname.split(":")[0]; // strip port
+  const parts = host.split(".");
+  if (parts.length < 3) return null; // no subdomain (e.g. saas.com)
+  const sub = parts[0];
+  if (["www", "livraison", "api", "mail"].includes(sub)) return null;
+  return sub;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -29,6 +39,10 @@ export async function middleware(request: NextRequest) {
 
   // ── Subdomain routing: livraison.togolese.tg → /livreur ────────────────────
   const hostname = request.headers.get("host") ?? "";
+
+  // Inject shop slug for multi-tenant resolution in server components / route handlers
+  const shopSlug = extractShopSlug(hostname);
+
   if (hostname.startsWith("livraison.")) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-nonce", nonce);
@@ -93,9 +107,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Pass nonce to Server Components via request header
+  // Pass nonce + shop slug to Server Components via request headers
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  if (shopSlug) requestHeaders.set("x-shop-slug", shopSlug);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", buildCsp(nonce));

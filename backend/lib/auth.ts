@@ -43,6 +43,7 @@ export interface AdminPayload {
   permissions:          AdminPermissions | null;
   must_change_password?: boolean;
   token_version:        number;
+  shop_id:              number;
 }
 
 export async function signToken(payload: AdminPayload): Promise<string> {

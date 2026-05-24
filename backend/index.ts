@@ -40,7 +40,7 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
-import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes, fixSiteOrderFinanceEntries } from "@/lib/admin-db";
+import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes, fixSiteOrderFinanceEntries, ensureShopIdCols } from "@/lib/admin-db";
 import adminSecurityLogsRoutes from "./routes/admin/security-logs";
 import { ensureSecurityLogsTable } from "./lib/security-log";
 import adminRapportsRoutes  from "./routes/admin/rapports";
@@ -271,6 +271,12 @@ try {
     console.log("[backend] entrepots table OK");
   } catch (e) {
     console.error("[backend] ensureEntrepotsTable failed:", e);
+  }
+  try {
+    await ensureShopIdCols();
+    console.log("[backend] shop_id cols OK");
+  } catch (e) {
+    console.error("[backend] ensureShopIdCols failed:", e);
   }
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
