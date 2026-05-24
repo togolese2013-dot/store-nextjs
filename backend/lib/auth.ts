@@ -17,20 +17,23 @@ const TTL = 60 * 60 * 8; // 8 hours
 
 function cookieDomain(): string | undefined {
   if (process.env.NODE_ENV !== "production") return undefined;
+  // Explicit override — use for compound TLDs (.co.uk) or custom setups
   if (process.env.AUTH_COOKIE_DOMAIN) return process.env.AUTH_COOKIE_DOMAIN;
 
   const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  if (siteUrl) {
-    try {
-      const host = new URL(siteUrl).hostname;
-      if (host === "togolese.tg" || host.endsWith(".togolese.tg")) return ".togolese.tg";
-      if (host === "togolese.fr" || host.endsWith(".togolese.fr")) return ".togolese.fr";
-    } catch {
-      // Fall back to host-only cookies if the configured URL is malformed.
-    }
-  }
+  if (!siteUrl) return undefined;
 
-  return undefined;
+  try {
+    const host = new URL(siteUrl).hostname;
+    // Skip localhost and bare IPv4/IPv6
+    if (host === "localhost" || /^\d+[\d.:]+$/.test(host)) return undefined;
+    // Derive root domain from any hostname: "shop1.example.com" → ".example.com"
+    const parts = host.split(".");
+    if (parts.length < 2) return undefined;
+    return `.${parts.slice(-2).join(".")}`;
+  } catch {
+    return undefined;
+  }
 }
 
 export interface AdminPayload {
