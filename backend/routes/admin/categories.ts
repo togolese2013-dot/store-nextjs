@@ -11,7 +11,7 @@ const router = express.Router();
 router.get("/api/admin/categories", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  const categories = await listAdminCategories();
+  const categories = await listAdminCategories(session.shop_id ?? 1);
   res.json({ success: true, data: categories });
 });
 
@@ -21,21 +21,22 @@ router.post("/api/admin/categories", async (req, res) => {
   if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Droits insuffisants." });
   const { nom, description = "" } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createCategory(nom.trim(), description.trim());
+  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1);
   res.json({ success: true, id });
 });
 
 router.patch("/api/admin/categories/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await updateCategory(Number(req.params.id), req.body);
+  const { nom, description = "" } = req.body;
+  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1);
   res.json({ success: true });
 });
 
 router.delete("/api/admin/categories/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await deleteCategory(Number(req.params.id));
+  await deleteCategory(Number(req.params.id), session.shop_id ?? 1);
   res.json({ success: true });
 });
 

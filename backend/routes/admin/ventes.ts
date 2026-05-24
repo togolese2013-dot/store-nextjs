@@ -21,8 +21,9 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
     const statut = (req.query.statut as string) || undefined;
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset)  || 0);
+    const shopId = session.shop_id ?? 1;
     const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
-      listFactures({ search, statut, limit, offset }),
+      listFactures({ search, statut, limit, offset, shopId }),
       getVentesStats(),
       getFinanceStats().catch(() => null),
       getStockBoutiqueStats().catch(() => null),
@@ -57,7 +58,7 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id });
+    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: session.shop_id ?? 1 });
     emitAdminEvent("vente");
     if (body.client_tel) {
       const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];

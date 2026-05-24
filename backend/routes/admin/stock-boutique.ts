@@ -21,7 +21,7 @@ router.get("/api/admin/stock-boutique", async (req, res) => {
 
     const [stats, { items, total }, movements, prodCount] = await Promise.all([
       getStockBoutiqueStats(),
-      getStockBoutiqueList({ search: q, filter, limit, offset }),
+      getStockBoutiqueList({ search: q, filter, limit, offset, shopId: session.shop_id ?? 1 }),
       getRecentBoutiqueMovements(20),
       (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM produits"),
     ]);

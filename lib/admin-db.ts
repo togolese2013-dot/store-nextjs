@@ -754,30 +754,31 @@ export interface DeliveryZone {
   prix_libre:  boolean;
 }
 
-export async function getDeliveryZones(activeOnly = false): Promise<DeliveryZone[]> {
-  const where = activeOnly ? "WHERE actif = 1" : "";
+export async function getDeliveryZones(activeOnly = false, shopId = 1): Promise<DeliveryZone[]> {
+  const conds = [`shop_id = ${Number(shopId)}`];
+  if (activeOnly) conds.push("actif = 1");
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT * FROM delivery_zones ${where} ORDER BY sort_order ASC, id ASC`
+    `SELECT * FROM delivery_zones WHERE ${conds.join(" AND ")} ORDER BY sort_order ASC, id ASC`
   );
   return rows.map(r => ({ ...r, actif: Boolean(r.actif), prix_libre: Boolean(r.prix_libre) })) as DeliveryZone[];
 }
 
-export async function upsertDeliveryZone(zone: Omit<DeliveryZone, "id"> & { id?: number }) {
+export async function upsertDeliveryZone(zone: Omit<DeliveryZone, "id"> & { id?: number }, shopId = 1) {
   if (zone.id) {
     await db.execute(
-      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=?",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id]
+      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=? AND shop_id=?",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id, shopId]
     );
   } else {
     await db.execute(
-      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre) VALUES (?,?,?,?,?)",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0]
+      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre, shop_id) VALUES (?,?,?,?,?,?)",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, shopId]
     );
   }
 }
 
-export async function deleteDeliveryZone(id: number) {
-  await db.execute("DELETE FROM delivery_zones WHERE id = ?", [id]);
+export async function deleteDeliveryZone(id: number, shopId = 1) {
+  await db.execute("DELETE FROM delivery_zones WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
 /* ─── Orders ─── */
@@ -1532,30 +1533,31 @@ async function ensureCouponsTable() {
   `).then(() => {}));
 }
 
-export async function listCoupons(): Promise<Coupon[]> {
+export async function listCoupons(shopId = 1): Promise<Coupon[]> {
   await ensureCouponsTable();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif, created_at FROM coupons ORDER BY created_at DESC LIMIT 500"
+    "SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif, created_at FROM coupons WHERE shop_id = ? ORDER BY created_at DESC LIMIT 500",
+    [shopId]
   );
   return rows.map(r => ({ ...r, actif: Boolean(r.actif) })) as Coupon[];
 }
 
-export async function upsertCoupon(c: Omit<Coupon, "id" | "uses_count" | "created_at"> & { id?: number }) {
+export async function upsertCoupon(c: Omit<Coupon, "id" | "uses_count" | "created_at"> & { id?: number }, shopId = 1) {
   if (c.id) {
     await db.execute(
-      "UPDATE coupons SET code=?,type=?,valeur=?,min_order=?,max_uses=?,expires_at=?,actif=? WHERE id=?",
-      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0, c.id]
+      "UPDATE coupons SET code=?,type=?,valeur=?,min_order=?,max_uses=?,expires_at=?,actif=? WHERE id=? AND shop_id=?",
+      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0, c.id, shopId]
     );
   } else {
     await db.execute(
-      "INSERT INTO coupons (code,type,valeur,min_order,max_uses,expires_at,actif) VALUES (?,?,?,?,?,?,?)",
-      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0]
+      "INSERT INTO coupons (code,type,valeur,min_order,max_uses,expires_at,actif,shop_id) VALUES (?,?,?,?,?,?,?,?)",
+      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0, shopId]
     );
   }
 }
 
-export async function deleteCoupon(id: number) {
-  await db.execute("DELETE FROM coupons WHERE id = ?", [id]);
+export async function deleteCoupon(id: number, shopId = 1) {
+  await db.execute("DELETE FROM coupons WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
 /* ─── Categories (admin) ─── */
@@ -1566,35 +1568,37 @@ export interface AdminCategory {
   nb_produits: number;
 }
 
-export async function listAdminCategories(): Promise<AdminCategory[]> {
+export async function listAdminCategories(shopId = 1): Promise<AdminCategory[]> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
             COUNT(p.id) AS nb_produits
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
+     WHERE c.shop_id = ?
      GROUP BY c.id
-     ORDER BY c.nom ASC`
+     ORDER BY c.nom ASC`,
+    [shopId]
   );
   return rows.map(r => ({ ...r, nb_produits: Number(r.nb_produits) })) as AdminCategory[];
 }
 
-export async function createCategory(nom: string, description: string) {
+export async function createCategory(nom: string, description: string, shopId = 1) {
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    "INSERT INTO categories (nom, description) VALUES (?,?)",
-    [nom, description]
+    "INSERT INTO categories (nom, description, shop_id) VALUES (?,?,?)",
+    [nom, description, shopId]
   );
   return result.insertId;
 }
 
-export async function updateCategory(id: number, nom: string, description: string) {
+export async function updateCategory(id: number, nom: string, description: string, shopId = 1) {
   await db.execute(
-    "UPDATE categories SET nom=?, description=? WHERE id=?",
-    [nom, description, id]
+    "UPDATE categories SET nom=?, description=? WHERE id=? AND shop_id=?",
+    [nom, description, id, shopId]
   );
 }
 
-export async function deleteCategory(id: number) {
-  await db.execute("DELETE FROM categories WHERE id = ?", [id]);
+export async function deleteCategory(id: number, shopId = 1) {
+  await db.execute("DELETE FROM categories WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
 /* ─── Clients (CRM) ─── */
@@ -1891,8 +1895,9 @@ export async function getStockBoutiqueList(opts: {
   filter?: "all" | "faible" | "epuise" | "disponible";
   limit?: number;
   offset?: number;
+  shopId?: number;
 }): Promise<{ items: BoutiqueStockItem[]; total: number }> {
-  const { search, filter = "all", limit = 50, offset = 0 } = opts;
+  const { search, filter = "all", limit = 50, offset = 0, shopId = 1 } = opts;
 
   await ensureBoutiqueStockPopulated();
   const cols = await getProduitColsAdmin();
@@ -1902,7 +1907,7 @@ export async function getStockBoutiqueList(opts: {
   const searchLike = search ? `%${search}%` : null;
 
   // ── Part 1 : products WITHOUT variants (existing boutique_stock logic) ──────
-  const p1Conds: string[] = ["NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
+  const p1Conds: string[] = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
   const p1Params: (string | number | null)[] = [];
   if (searchLike) { p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)"); p1Params.push(searchLike, searchLike); }
   if (filter === "faible")     p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
@@ -1926,7 +1931,7 @@ export async function getStockBoutiqueList(opts: {
   );
 
   // ── Part 2 : products WITH variants (one row per variant) ──────────────────
-  const p2Conds: string[] = [];
+  const p2Conds: string[] = [`p.shop_id = ${Number(shopId)}`];
   const p2Params: (string | number | null)[] = [];
   if (searchLike) { p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)"); p2Params.push(searchLike, searchLike, searchLike); }
   if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");
@@ -2180,15 +2185,15 @@ function generateVenteRef(prefix: string): string {
 export async function createFacture(data: {
   client_nom: string; client_tel?: string; client_email?: string;
   items: FactureItem[]; sous_total: number; remise?: number; total: number;
-  statut?: Facture["statut"]; note?: string; admin_id?: number;
+  statut?: Facture["statut"]; note?: string; admin_id?: number; shop_id?: number;
 }): Promise<number> {
   const reference = generateVenteRef("FV");
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO factures (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, note, admin_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO factures (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, note, admin_id, shop_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [reference, data.client_nom, data.client_tel ?? null, data.client_email ?? null,
      JSON.stringify(data.items), data.sous_total, data.remise ?? 0, data.total,
-     data.statut ?? "brouillon", data.note ?? null, data.admin_id ?? null]
+     data.statut ?? "brouillon", data.note ?? null, data.admin_id ?? null, data.shop_id ?? 1]
   );
   // Sync to boutique_clients if client has a name and phone
   if (data.client_nom?.trim() && data.client_tel?.trim()) {
@@ -2217,6 +2222,7 @@ export async function createVenteWithStock(data: {
   total:              number;
   note?:              string;
   admin_id?:          number;
+  shop_id?:           number;
   items: Array<{ produit_id: number; variant_id?: number; nom: string; reference: string; qty: number; prix: number; total: number }>;
 }): Promise<{ id: number; reference: string }> {
   const conn = await db.getConnection();
@@ -2254,8 +2260,8 @@ export async function createVenteWithStock(data: {
           sous_total, remise, total,
           avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
           mode_paiement, statut_paiement, montant_acompte,
-          statut, note, admin_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          statut, note, admin_id, shop_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         reference, data.client_nom, data.client_tel ?? null,
         JSON.stringify(data.items),
@@ -2263,7 +2269,7 @@ export async function createVenteWithStock(data: {
         data.avec_livraison ? 1 : 0,
         data.adresse_livraison ?? null, data.contact_livraison ?? null, data.lien_localisation ?? null,
         data.mode_paiement ?? null, data.statut_paiement ?? null, data.montant_acompte ?? null,
-        "valide", data.note ?? null, data.admin_id ?? null,
+        "valide", data.note ?? null, data.admin_id ?? null, data.shop_id ?? 1,
       ]
     );
     const factureId = result.insertId;

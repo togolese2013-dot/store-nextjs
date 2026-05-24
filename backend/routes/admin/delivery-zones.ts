@@ -26,7 +26,7 @@ router.get("/api/admin/delivery-zones", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autorisé." });
-    const zones = await getDeliveryZones();
+    const zones = await getDeliveryZones(false, session.shop_id ?? 1);
     res.json(zones);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -44,8 +44,10 @@ router.post("/api/admin/delivery-zones", async (req, res) => {
 
     const body = req.body;
 
+    const shopId = session.shop_id ?? 1;
+
     if (body._delete && body.id) {
-      await deleteDeliveryZone(Number(body.id));
+      await deleteDeliveryZone(Number(body.id), shopId);
       return res.json({ ok: true, deleted: true });
     }
 
@@ -60,7 +62,7 @@ router.post("/api/admin/delivery-zones", async (req, res) => {
       actif:      body.actif !== false && body.actif !== 0,
       sort_order: Number(body.sort_order ?? 0),
       prix_libre: Boolean(body.prix_libre),
-    });
+    }, shopId);
 
     res.json({ ok: true });
   } catch (err) {
@@ -76,7 +78,7 @@ router.delete("/api/admin/delivery-zones/:id", async (req, res) => {
     if (!["super_admin", "admin"].includes(session.role)) {
       return res.status(403).json({ error: "Accès refusé." });
     }
-    await deleteDeliveryZone(Number(req.params.id));
+    await deleteDeliveryZone(Number(req.params.id), session.shop_id ?? 1);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });

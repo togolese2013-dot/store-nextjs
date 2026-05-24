@@ -40,7 +40,7 @@ router.get("/api/admin/coupons", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autorisé." });
-    const coupons = await listCoupons();
+    const coupons = await listCoupons(session.shop_id ?? 1);
     res.json(coupons);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -60,8 +60,10 @@ router.post("/api/admin/coupons", async (req, res) => {
 
     const body = req.body;
 
+    const shopId = session.shop_id ?? 1;
+
     if (body._delete && body.id) {
-      await deleteCoupon(Number(body.id));
+      await deleteCoupon(Number(body.id), shopId);
       return res.json({ ok: true, deleted: true });
     }
 
@@ -78,7 +80,7 @@ router.post("/api/admin/coupons", async (req, res) => {
       max_uses:   Number(body.max_uses ?? 0),
       expires_at: body.expires_at || null,
       actif:      body.actif !== false && body.actif !== 0,
-    });
+    }, shopId);
 
     res.json({ ok: true });
   } catch (err) {
