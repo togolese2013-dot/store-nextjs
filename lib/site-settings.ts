@@ -1,11 +1,13 @@
 import { getSetting } from "./admin-db";
+import { getShopId } from "./shop-context";
 
 const FALLBACK_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
 
 /** Returns the canonical site URL stored in admin settings, falls back to env var. */
-export async function getSiteUrl(): Promise<string> {
+export async function getSiteUrl(shopId?: number): Promise<string> {
   try {
-    const url = await getSetting("site_url");
+    const id  = shopId ?? await getShopId();
+    const url = await getSetting("site_url", id);
     return url?.trim() || FALLBACK_URL;
   } catch {
     return FALLBACK_URL;
@@ -13,9 +15,10 @@ export async function getSiteUrl(): Promise<string> {
 }
 
 /** Returns the store name stored in admin settings. */
-export async function getSiteName(): Promise<string> {
+export async function getSiteName(shopId?: number): Promise<string> {
   try {
-    const name = await getSetting("site_name");
+    const id   = shopId ?? await getShopId();
+    const name = await getSetting("site_name", id);
     return name?.trim() || "Togolese Shop";
   } catch {
     return "Togolese Shop";
@@ -23,9 +26,10 @@ export async function getSiteName(): Promise<string> {
 }
 
 /** Returns the main WhatsApp number stored in admin settings. */
-export async function getSiteWhatsApp(): Promise<string> {
+export async function getSiteWhatsApp(shopId?: number): Promise<string> {
   try {
-    const num = await getSetting("whatsapp_number");
+    const id  = shopId ?? await getShopId();
+    const num = await getSetting("whatsapp_number", id);
     return num?.trim() || "";
   } catch {
     return "";

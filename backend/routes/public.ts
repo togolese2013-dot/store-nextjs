@@ -3,8 +3,28 @@ import { getProducts, getProductsByIds, getProductCount, getCategories, checkRev
 import {
   subscribeNewsletter, addFidelitePoints, listReviews, createReview, getSettings, getDeliveryZones,
 } from "@/lib/admin-db";
+import { getShopBySlug } from "@/lib/shops";
 
 const router = express.Router();
+
+// ── Multi-tenant: resolve shop_id from x-shop-slug header ─────────────────
+const _shopSlugCache = new Map<string, { id: number; ts: number }>();
+const SHOP_CACHE_TTL = 60_000; // 1 minute
+
+async function resolveShopId(req: express.Request): Promise<number> {
+  const slug = (req.headers["x-shop-slug"] as string | undefined)?.trim();
+  if (!slug || slug === "default") return 1;
+  const cached = _shopSlugCache.get(slug);
+  if (cached && Date.now() - cached.ts < SHOP_CACHE_TTL) return cached.id;
+  try {
+    const shop = await getShopBySlug(slug);
+    const id   = shop?.id ?? 1;
+    _shopSlugCache.set(slug, { id, ts: Date.now() });
+    return id;
+  } catch {
+    return 1;
+  }
+}
 
 // ── Seeded shuffle — deterministic random order that changes every hour ───────
 function seededShuffle<T>(arr: T[], seed: number): T[] {
@@ -18,12 +38,13 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return result;
 }
 
-// ── Bestsellers cache — 60s TTL ──────────────────────────────────────────────
-let _bsCache: { data: unknown[]; ts: number } | null = null;
+// ── Bestsellers cache — 60s TTL per shop ────────────────────────────────────
+const _bsCacheMap = new Map<number, { data: unknown[]; ts: number }>();
 const BS_TTL = 60_000;
 
-async function loadBestsellerProducts(limit: number) {
-  if (_bsCache && Date.now() - _bsCache.ts < BS_TTL) return _bsCache.data;
+async function loadBestsellerProducts(limit: number, shopId = 1) {
+  const cached = _bsCacheMap.get(shopId);
+  if (cached && Date.now() - cached.ts < BS_TTL) return cached.data;
 
   const pool = db as import("mysql2/promise").Pool;
 
@@ -93,8 +114,9 @@ async function loadBestsellerProducts(limit: number) {
        FROM produits p
        LEFT JOIN categories c ON c.id = p.categorie_id
        WHERE p.id IN (${placeholders})
-         AND p.actif = 1`,
-      ids
+         AND p.actif = 1
+         AND p.shop_id = ?`,
+      [...ids, shopId]
     );
 
     prodRows.sort((a, b) => (salesMap.get(b.id as number) ?? 0) - (salesMap.get(a.id as number) ?? 0));
@@ -108,7 +130,7 @@ async function loadBestsellerProducts(limit: number) {
     products = topPool.slice(0, limit);
   }
 
-  _bsCache = { data: products, ts: Date.now() };
+  _bsCacheMap.set(shopId, { data: products, ts: Date.now() });
   return products;
 }
 
@@ -131,10 +153,12 @@ router.get("/api/health", async (_req, res) => {
 // ── Products ──────────────────────────────────────────────────────────────
 router.get("/api/products", async (req, res) => {
   try {
+    const shopId  = await resolveShopId(req);
     const idsParam = req.query.ids as string;
     if (idsParam) {
       const ids = idsParam.split(",").map(Number).filter(n => !isNaN(n) && n > 0).slice(0, 50);
       if (!ids.length) return res.json({ success: true, data: [] });
+      // getProductsByIds doesn't filter by shop (cart items by ID) — keep as is
       const products = await getProductsByIds(ids);
       return res.json({ success: true, data: products });
     }
@@ -152,22 +176,22 @@ router.get("/api/products", async (req, res) => {
     const offset         = req.query.offset ? Number(req.query.offset) : 0;
 
     if (bestOnly) {
-      const products = await loadBestsellerProducts(limit);
+      const products = await loadBestsellerProducts(limit, shopId);
       return res.json({ success: true, data: products, total: products.length });
     }
 
     // Lookup by slug — search slug column then fallback to reference
     if (slugExact) {
       const { getProductBySlug } = await import("@/lib/db");
-      const product = await getProductBySlug(slugExact);
+      const product = await getProductBySlug(slugExact, shopId);
       return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
 
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset }),
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId }),
       referenceExact
         ? Promise.resolve(1)
-        : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice }),
+        : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId }),
     ]);
 
     // Shuffle when no active filter — order changes every hour
@@ -183,9 +207,10 @@ router.get("/api/products", async (req, res) => {
 });
 
 // ── Categories ────────────────────────────────────────────────────────────
-router.get("/api/categories", async (_req, res) => {
+router.get("/api/categories", async (req, res) => {
   try {
-    const categories = await getCategories();
+    const shopId     = await resolveShopId(req);
+    const categories = await getCategories(shopId);
     res.json({ success: true, data: categories });
   } catch (err) {
     res.status(500).json({ success: false, error: "Erreur serveur." });
@@ -263,9 +288,10 @@ router.post("/api/reviews", async (req, res) => {
   }
 });
 
-router.get("/api/settings/public", async (_req, res) => {
+router.get("/api/settings/public", async (req, res) => {
   try {
-    const settings = await getSettings();
+    const shopId   = await resolveShopId(req);
+    const settings = await getSettings(shopId);
     res.json({ settings });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -275,8 +301,9 @@ router.get("/api/settings/public", async (_req, res) => {
 // ── Bestsellers ───────────────────────────────────────────────────────────────
 router.get("/api/products/bestsellers", async (req, res) => {
   try {
-    const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 8)));
-    const products = await loadBestsellerProducts(limit);
+    const shopId  = await resolveShopId(req);
+    const limit   = Math.min(20, Math.max(1, Number(req.query.limit ?? 8)));
+    const products = await loadBestsellerProducts(limit, shopId);
     res.json({ success: true, data: products });
   } catch (err) {
     // Graceful fallback on JSON_TABLE error (older MySQL)
@@ -398,9 +425,10 @@ router.get("/api/public/coupons/validate", async (req, res) => {
 });
 
 // GET /api/public/delivery-zones — zones actives pour le checkout (pas d'auth)
-router.get("/api/public/delivery-zones", async (_req, res) => {
+router.get("/api/public/delivery-zones", async (req, res) => {
   try {
-    const zones = await getDeliveryZones(true); // activeOnly = true
+    const shopId = await resolveShopId(req);
+    const zones  = await getDeliveryZones(true, shopId); // activeOnly = true
     res.json(zones);
   } catch {
     res.json([]);

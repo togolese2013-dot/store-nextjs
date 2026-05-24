@@ -453,7 +453,7 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
   })) as Product[];
 }
 
-export async function getProductBySlug(slugOrRef: string): Promise<Product | null> {
+export async function getProductBySlug(slugOrRef: string, shopId = 1): Promise<Product | null> {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
@@ -480,18 +480,23 @@ export async function getProductBySlug(slugOrRef: string): Promise<Product | nul
      LEFT JOIN categories c ON p.categorie_id = c.id
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}`;
 
+  const shopCondition = cols.shop_id ? " AND p.shop_id = ?" : "";
+  const shopParams    = cols.shop_id ? [shopId] : [];
+
   // 1. Try slug column first (if it exists)
   let rows: mysql.RowDataPacket[] = [];
   if (cols.slug) {
     const [r1] = await db.execute<mysql.RowDataPacket[]>(
-      `${selectSql} WHERE p.slug = ? AND p.actif = 1 LIMIT 1`, [slugOrRef]
+      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      [slugOrRef, ...shopParams]
     );
     rows = r1;
   }
   // 2. Fallback: try reference
   if (!rows.length) {
     const [r2] = await db.execute<mysql.RowDataPacket[]>(
-      `${selectSql} WHERE p.reference = ? AND p.actif = 1 LIMIT 1`, [slugOrRef]
+      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      [slugOrRef, ...shopParams]
     );
     rows = r2;
   }
