@@ -9,7 +9,7 @@ import {
   FolderOpen, Image, ShoppingCart,
   TrendingUp, Archive, FilePlus, DollarSign,
   Truck, Building2, PieChart, FileText, BarChart2,
-  Gift, Mail, UserCheck, Home, ShieldCheck, Activity, Share2, Megaphone, Warehouse, PackageSearch, Ticket,
+  Gift, Mail, UserCheck, ShieldCheck, Activity, Share2, Megaphone, Warehouse, PackageSearch, Ticket,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { AdminPermissions, ModuleKey } from "@/lib/admin-permissions";
@@ -220,23 +220,19 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
 
       {/* Module badge */}
       <div className="px-3 pt-4 pb-2">
-        {activeModule ? (
+        {activeModule && (
           <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${activeModule.ring} bg-white/5`}>
             <span className={`w-2 h-2 rounded-full ${activeModule.dot} shrink-0`} />
             <span className="text-white font-display font-800 text-xs tracking-widest">
               {activeModule.label}
             </span>
           </div>
-        ) : (
-          <div className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
-            <span className="text-white/40 text-xs font-semibold tracking-widest">MODULE</span>
-          </div>
         )}
       </div>
 
       {/* Nav items */}
       <nav className="flex-1 overflow-y-auto px-3 py-2">
-        {visibleItems.length > 0 ? (
+        {visibleItems.length > 0 && (
           <div className="space-y-0.5">
             {visibleItems.map(item => (
               <Link
@@ -261,23 +257,6 @@ export default function AdminSidebar({ nom, role, permissions, mobileOpen, setMo
                 {isActive(item.href) && <ChevronRight className="w-3 h-3 opacity-60 shrink-0" />}
               </Link>
             ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-40 gap-3 text-center px-4">
-            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-              <Home className="w-5 h-5 text-white/20" />
-            </div>
-            <p className="text-xs text-white/40 leading-relaxed">
-              {activeModule
-                ? "Aucune page accessible dans ce module"
-                : "Sélectionnez un module depuis l'accueil"}
-            </p>
-            <Link
-              href="/admin"
-              className="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/15 transition-colors"
-            >
-              Retour à l&apos;accueil
-            </Link>
           </div>
         )}
       </nav>
