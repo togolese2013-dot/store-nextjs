@@ -4261,7 +4261,18 @@ export async function fixPendingMmOrders(): Promise<void> {
       console.log(`[backend] fixPendingMmOrders: confirmed ${result.affectedRows} stuck orders`);
     }
 
-    // 2. Ensure confirmed MM orders have a facture marked as 'paye' (if still non_paye)
+    // 2. Downgrade old factures set to paye_total before delivery (old confirm_mm bug)
+    await db.execute(
+      `UPDATE factures f
+       JOIN orders o ON o.id = f.order_id
+       SET f.statut_paiement = 'paye'
+       WHERE o.payment_mode IN ('moov_direct', 'yas_direct')
+         AND o.statut_paiement = 'paye'
+         AND o.status NOT IN ('delivered', 'livree', 'livrée', 'livre', 'livré')
+         AND f.statut_paiement = 'paye_total'`
+    ).catch(() => {});
+
+    // 3. Ensure confirmed MM orders have a facture marked as 'paye' (if still non_paye)
     await db.execute(
       `UPDATE factures f
        JOIN orders o ON o.id = f.order_id
