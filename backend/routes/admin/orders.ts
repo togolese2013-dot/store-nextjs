@@ -209,6 +209,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     invalidateVentesStats();
     emitAdminEvent("finance");
     emitAdminEvent("commande");
+    emitAdminEvent("vente");   // refresh VentesManager list
     return res.json({ ok: true });
   }
 
