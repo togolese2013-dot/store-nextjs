@@ -162,7 +162,7 @@ export default function CheckoutPage() {
   const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
   const [payMode,      setPayMode]      = useState<"livraison" | "flooz" | "yas" | "echelonne">("livraison");
   const [mmScreenshot,        setMmScreenshot]        = useState<File | null>(null);
-  const [mmScreenshotPreview, setMmScreenshotPreview] = useState<string>("");
+  const [mmScreenshotB64,     setMmScreenshotB64]     = useState<string>("");
 
   /* ── Saved addresses ── */
   interface SavedAddress { id: number; nom: string; telephone: string; adresse: string; zone_livraison: string; is_default: number }
@@ -247,28 +247,6 @@ export default function CheckoutPage() {
   }
 
   // Compress screenshot before upload (max 1200px wide, JPEG 0.75)
-  async function compressScreenshot(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = new window.Image();
-        img.onload = () => {
-          const MAX_W = 1200;
-          const ratio   = Math.min(1, MAX_W / img.width);
-          const canvas  = document.createElement("canvas");
-          canvas.width  = Math.round(img.width  * ratio);
-          canvas.height = Math.round(img.height * ratio);
-          canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL("image/jpeg", 0.75));
-        };
-        img.onerror = reject;
-        img.src = ev.target?.result as string;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
   function handleScreenshotChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -277,9 +255,24 @@ export default function CheckoutPage() {
       return;
     }
     setMmScreenshot(file);
-    const url = URL.createObjectURL(file);
-    setMmScreenshotPreview(url);
+    setMmScreenshotB64("");
     setErrors(err => ({ ...err, reference: undefined }));
+    // Compress immediately so submit is instant
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX_W  = 1200;
+        const ratio  = Math.min(1, MAX_W / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setMmScreenshotB64(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   }
 
   async function applyCoupon() {
@@ -309,8 +302,12 @@ export default function CheckoutPage() {
     }
     if (!form.adresse.trim())   e.adresse   = "Votre adresse est requise.";
     if (!form.zone)             e.zone      = "Choisissez une zone de livraison.";
-    if ((payMode === "flooz" || payMode === "yas") && !mmScreenshot) {
-      e.reference = "La capture d'écran de confirmation est obligatoire.";
+    if (payMode === "flooz" || payMode === "yas") {
+      if (!mmScreenshot) {
+        e.reference = "La capture d'écran de confirmation est obligatoire.";
+      } else if (!mmScreenshotB64) {
+        e.reference = "Compression en cours, patientez quelques secondes…";
+      }
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -338,16 +335,8 @@ export default function CheckoutPage() {
         qty:          i.qty,
         total:        calcPrice(i) * i.qty,
       }));
-      // Compress screenshot to base64 if present
-      let mmScreenshotB64: string | null = null;
-      if ((payMode === "flooz" || payMode === "yas") && mmScreenshot) {
-        try {
-          mmScreenshotB64 = await compressScreenshot(mmScreenshot);
-        } catch {
-          setSubmitError("Erreur lors du traitement de la capture d'écran.");
-          return;
-        }
-      }
+      // Screenshot already compressed at file-selection time
+      const mmScreenshotPayload = (payMode === "flooz" || payMode === "yas") ? mmScreenshotB64 || null : null;
 
       const res = await fetch("/api/orders", {
         method:  "POST",
@@ -368,7 +357,7 @@ export default function CheckoutPage() {
           coupon_remise:     couponDiscount > 0 ? couponDiscount : undefined,
           payment_mode:      payMode === "flooz" ? "moov_direct" : payMode === "yas" ? "yas_direct" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
-          mm_screenshot_b64: mmScreenshotB64,
+          mm_screenshot_b64: mmScreenshotPayload,
         }),
       });
       const data = await res.json();
@@ -979,45 +968,32 @@ export default function CheckoutPage() {
 
                           {/* Capture d'écran confirmation */}
                           <div className="pt-2 border-t border-slate-100">
-                            <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                            <p className="text-xs font-bold text-slate-600 mb-1.5">
                               Capture d'écran de confirmation{" "}
                               <span className="text-red-500">*</span>
-                            </label>
-
-                            {mmScreenshotPreview ? (
-                              <div className="relative rounded-xl overflow-hidden border border-slate-200">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={mmScreenshotPreview}
-                                  alt="Confirmation paiement"
-                                  className="w-full max-h-52 object-contain bg-slate-50"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => { setMmScreenshot(null); setMmScreenshotPreview(""); }}
-                                  className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow transition-colors"
-                                >
-                                  <XIcon className="w-3.5 h-3.5" />
-                                </button>
-                                <p className="text-[11px] text-emerald-700 font-medium bg-emerald-50 px-3 py-1.5 border-t border-emerald-100">
-                                  ✓ Capture ajoutée
+                            </p>
+                            <label className={`flex items-center gap-3 cursor-pointer rounded-xl border px-3 py-2.5 transition-colors ${errors.reference ? "border-red-300 bg-red-50" : mmScreenshot ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}>
+                              <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${mmScreenshot ? "bg-emerald-100" : "bg-slate-100"}`}>
+                                {mmScreenshot
+                                  ? <Check className="w-4 h-4 text-emerald-600" />
+                                  : <Camera className="w-4 h-4 text-slate-400" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium truncate ${mmScreenshot ? "text-emerald-700" : "text-slate-600"}`}>
+                                  {mmScreenshot ? mmScreenshot.name : "Ajouter la capture d'écran"}
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  {mmScreenshot ? (mmScreenshotB64 ? "Prête à envoyer" : "Compression…") : "JPG, PNG · max 10 Mo"}
                                 </p>
                               </div>
-                            ) : (
-                              <label className={`flex flex-col items-center justify-center gap-2 w-full py-6 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${errors.reference ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100 active:bg-slate-200"}`}>
-                                <Camera className="w-7 h-7 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-600">Ajouter la capture d'écran</span>
-                                <span className="text-[11px] text-slate-400">JPG, PNG · max 10 Mo</span>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  capture="environment"
-                                  className="hidden"
-                                  onChange={handleScreenshotChange}
-                                />
-                              </label>
-                            )}
-
+                              {mmScreenshot && (
+                                <button type="button" onClick={(ev) => { ev.preventDefault(); setMmScreenshot(null); setMmScreenshotB64(""); }}
+                                  className="text-slate-400 hover:text-red-500 transition-colors shrink-0">
+                                  <XIcon className="w-4 h-4" />
+                                </button>
+                              )}
+                              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScreenshotChange} />
+                            </label>
                             {errors.reference && <p className="text-xs text-red-500 mt-1">{errors.reference}</p>}
                             <p className="text-[11px] text-slate-400 mt-1.5">
                               Faites une capture du SMS de confirmation reçu après votre virement {isMoov ? "Moov" : "Yas"}.
