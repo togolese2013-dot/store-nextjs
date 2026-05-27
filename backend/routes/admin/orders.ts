@@ -195,8 +195,9 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
   /* ── Confirm Mobile Money direct payment ── */
   if (req.body.field === "confirm_mm") {
     await ensurePaymentColumn();
-    // Confirm payment + order in one step
-    await updateOrderFields(id, { statut_paiement: "paye", status: "confirmed" });
+    // Confirm payment + order status in two calls (updateOrderFields has no status field)
+    await updateOrderStatus(id, "confirmed");
+    await updateOrderFields(id, { statut_paiement: "paye" });
     // Ensure facture exists (creates it if missing) and stamp confirming admin
     const actor = { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom };
     await ensureOrderVente(id, actor).catch(e => console.error("[orders] ensureOrderVente confirm_mm:", e));
