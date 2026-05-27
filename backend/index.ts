@@ -160,8 +160,8 @@ const reviewsLimiter = rateLimit({
 });
 app.use("/api/reviews", reviewsLimiter);
 
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+app.use(express.json({ limit: "15mb" }));        // 15mb — allows base64 payment screenshots (~10mb image = ~14mb b64)
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 app.use(cookieParser());
 
 // ── Routes ──────────────────────────────────────────────────────────────────

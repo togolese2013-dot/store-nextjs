@@ -6,6 +6,39 @@ import { db } from "@/lib/db";
 import { getClientSession } from "../lib/client-auth";
 import { ensurePaymentTables } from "./admin/payment-plans";
 import type mysql from "mysql2/promise";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+async function uploadScreenshotToCloudinary(base64Data: string): Promise<string> {
+  // Strip data URL prefix if present
+  const data = base64Data.replace(/^data:[^;]+;base64,/, "");
+  const buffer = Buffer.from(data, "base64");
+
+  if (buffer.length > 10 * 1024 * 1024) {
+    throw new Error("Image trop volumineuse (max 10 Mo).");
+  }
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder:        "togolese-payment-proofs",
+        resource_type: "image",
+        format:        "jpg",
+        quality:       "auto",
+      },
+      (error, result) => {
+        if (error || !result) reject(error ?? new Error("Upload échoué"));
+        else resolve(result.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
+}
 
 const router = express.Router();
 
@@ -167,8 +200,9 @@ router.post("/api/orders", async (req, res) => {
     const {
       nom, telephone, adresse, zone_livraison, delivery_fee,
       note, lien_localisation, items, subtotal, total,
-      payment_mode, nb_tranches, mm_transaction_ref, ref_code,
+      payment_mode, nb_tranches, ref_code,
       coupon_code, coupon_remise,
+      mm_screenshot_b64,
     } = req.body;
 
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
@@ -178,8 +212,19 @@ router.post("/api/orders", async (req, res) => {
     if (!cleanTelephone) {
       return res.status(400).json({ error: "Le numéro WhatsApp doit contenir exactement 8 chiffres togolais." });
     }
-    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !String(mm_transaction_ref ?? "").trim()) {
-      return res.status(400).json({ error: "La référence de transaction est obligatoire pour ce paiement." });
+    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !mm_screenshot_b64) {
+      return res.status(400).json({ error: "La capture d'écran de confirmation est obligatoire." });
+    }
+
+    // Upload payment screenshot to Cloudinary
+    let mm_transaction_ref: string | null = null;
+    if (mm_screenshot_b64) {
+      try {
+        mm_transaction_ref = await uploadScreenshotToCloudinary(mm_screenshot_b64);
+      } catch (uploadErr) {
+        console.error("[orders] screenshot upload failed:", uploadErr);
+        return res.status(500).json({ error: "Échec de l'upload de la capture d'écran. Réessayez." });
+      }
     }
 
     // Server-side price validation — prevents client-side total manipulation

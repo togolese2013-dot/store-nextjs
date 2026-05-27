@@ -590,9 +590,27 @@ function ConfirmMMPayment({ order }: { order: Order }) {
         <h2 className="font-bold text-orange-800">Paiement {label} à vérifier</h2>
       </div>
       {order.mm_transaction_ref && (
-        <div className="bg-white border border-orange-100 rounded-xl px-3 py-2">
-          <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">ID transaction client</p>
-          <p className="font-mono text-sm font-bold text-slate-800">{order.mm_transaction_ref}</p>
+        <div className="bg-white border border-orange-100 rounded-xl overflow-hidden">
+          {order.mm_transaction_ref.startsWith("http") ? (
+            <>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium px-3 pt-2 pb-1">
+                Capture d'écran confirmation client
+              </p>
+              <a href={order.mm_transaction_ref} target="_blank" rel="noreferrer" title="Ouvrir en grand">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={order.mm_transaction_ref}
+                  alt="Confirmation paiement"
+                  className="w-full max-h-64 object-contain bg-slate-50 hover:opacity-90 transition-opacity cursor-zoom-in"
+                />
+              </a>
+            </>
+          ) : (
+            <div className="px-3 py-2">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">ID transaction client</p>
+              <p className="font-mono text-sm font-bold text-slate-800">{order.mm_transaction_ref}</p>
+            </div>
+          )}
         </div>
       )}
       <p className="text-xs text-orange-700 leading-relaxed">

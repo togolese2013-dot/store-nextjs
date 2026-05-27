@@ -120,7 +120,14 @@ function backupViaBinary(cfg: ReturnType<typeof dbCfg>, filepath: string): Promi
 function escapeValue(v: unknown): string {
   if (v === null || v === undefined) return "NULL";
   if (typeof v === "number" || typeof v === "bigint") return String(v);
-  if (v instanceof Date) return `'${v.toISOString().slice(0, 19).replace("T", " ")}'`;
+  if (v instanceof Date) {
+    try {
+      return `'${v.toISOString().slice(0, 19).replace("T", " ")}'`;
+    } catch {
+      // MySQL zero-date (0000-00-00 00:00:00) → invalid JS Date
+      return "NULL";
+    }
+  }
   if (Buffer.isBuffer(v)) return `0x${v.toString("hex")}`;
   // string — escape single quotes and backslashes
   return `'${String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "\\r")}'`;
