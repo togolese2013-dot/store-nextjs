@@ -55,7 +55,7 @@ async function ensureOrderCols() {
   for (const ddl of [
     "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
-    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
+    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
     "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL",
     "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) NULL",
@@ -65,6 +65,12 @@ async function ensureOrderCols() {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
     }
   }
+  // Migrate existing VARCHAR(100) → VARCHAR(500) to fit Cloudinary URLs
+  try {
+    await pool.execute(
+      "ALTER TABLE orders MODIFY COLUMN mm_transaction_ref VARCHAR(500) NULL"
+    );
+  } catch {}
   _orderColsReady = true;
 }
 
