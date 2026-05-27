@@ -1,0 +1,54 @@
+name: Daily Database Backup
+
+on:
+  schedule:
+    # Every day at 02:00 UTC (03:00 Paris / 02:00 Togo)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  backup:
+    name: MySQL Backup — Railway
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Install MySQL client
+        run: sudo apt-get install -y mysql-client
+
+      - name: Run mysqldump
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          FILENAME="backup_$(date +%Y-%m-%d_%H-%M-%S).sql"
+          mysqldump \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USER" \
+            --password="$DB_PASSWORD" \
+            --single-transaction \
+            --routines \
+            --triggers \
+            --set-gtid-purged=OFF \
+            "$DB_NAME" > "$FILENAME"
+          gzip "$FILENAME"
+          echo "BACKUP_FILE=${FILENAME}.gz" >> $GITHUB_ENV
+          echo "✅ Backup créé : ${FILENAME}.gz ($(du -sh ${FILENAME}.gz | cut -f1))"
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_number }}-${{ github.run_id }}
+          path: "*.sql.gz"
+          retention-days: 90
+
+      - name: Backup summary
+        run: |
+          echo "### ✅ Backup réussi" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date** : $(date '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fichier** : $BACKUP_FILE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rétention** : 90 jours" >> $GITHUB_STEP_SUMMARY
