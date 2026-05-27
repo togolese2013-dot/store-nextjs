@@ -364,6 +364,10 @@ router.post("/api/orders", async (req, res) => {
     );
     const reference = (rows[0]?.reference as string) ?? `CMD-${id}`;
 
+    // Refresh ventes card — cash orders are confirmed immediately so finance data changes at creation
+    const isCash = !["moov_direct", "yas_direct", "2x", "3x", "4x"].includes(payment_mode ?? "");
+    if (isCash) emitAdminEvent("finance");
+
     emitAdminEvent("commande", {
       id,
       reference,

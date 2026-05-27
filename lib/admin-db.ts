@@ -2915,7 +2915,8 @@ export async function getVentesStats(): Promise<{
   if (_ventesStatsCache && _ventesStatsCache.expiresAt > now) return _ventesStatsCache.data;
 
   // LEFT JOIN replaces the correlated EXISTS — one join scanned once instead of one subquery per row
-  const SITE_JOIN = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
+  // Include confirmed/shipped/delivered site orders (not just delivered) so cash+MM confirmed orders show in ventes
+  const SITE_JOIN = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered')";
   const SITE_COND = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
   const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(
@@ -2941,8 +2942,10 @@ export async function getVentesStats(): Promise<{
                 END
               ), 0) AS montant
        FROM factures f
+       LEFT JOIN orders _soj ON _soj.id = f.order_id AND _soj.status IN ('confirmed','shipped','delivered')
        LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
-       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
+       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule'
+         AND (f.source IS NULL OR f.source != 'site_order' OR (_soj.id IS NOT NULL AND f.statut_paiement IN ('paye','paye_total')))
          AND (lv.id IS NULL OR lv.statut = 'livre')`),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
