@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/context/CartContext";
 import { calcPrice } from "@/context/CartContext";
 import { formatPrice } from "@/lib/utils";
@@ -147,6 +147,7 @@ export default function CheckoutPage() {
   const [phoneNumber,  setPhoneNumber]  = useState("");
   const [submitted,    setSubmitted]    = useState(false);
   const [loading,      setLoading]      = useState(false);
+  const submittingRef = useRef(false); // sync guard against double-submit
   const [errors,       setErrors]       = useState<Partial<Form & { telephone: string; reference: string }>>({});
   const [submitError,  setSubmitError]  = useState("");
   const [orderedItems, setOrderedItems] = useState<typeof items>([]);
@@ -321,8 +322,10 @@ export default function CheckoutPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return; // sync guard — blocks before React re-render
     if (!validate()) return;
     if (selectedItems.length === 0) return;
+    submittingRef.current = true;
     setLoading(true);
     setSubmitError("");
     try {
@@ -372,6 +375,7 @@ export default function CheckoutPage() {
       setSubmitError("Erreur réseau. Vérifiez votre connexion et réessayez.");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   }
 
