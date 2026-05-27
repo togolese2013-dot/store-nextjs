@@ -25,6 +25,9 @@ router.get("/api/admin/schema/columns", async (req, res) => {
 router.post("/api/admin/schema/migrate", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Accès réservé aux administrateurs." });
+  }
 
   const results: Record<string, string> = {};
   try {
@@ -47,7 +50,8 @@ router.post("/api/admin/schema/migrate", async (req, res) => {
     invalidateProduitColsCache();
     res.json({ ok: true, results });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    console.error("[schema/migrate]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 

@@ -200,7 +200,8 @@ router.post("/api/newsletter", async (req, res) => {
     await subscribeNewsletter(email.trim().toLowerCase());
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[newsletter]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -247,7 +248,8 @@ router.get("/api/reviews", async (req, res) => {
     const reviews    = await listReviews({ produit_id });
     res.json({ reviews });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[reviews/list]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 

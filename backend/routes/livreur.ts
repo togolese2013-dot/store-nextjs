@@ -49,7 +49,7 @@ router.get("/api/livreur/profile", async (req, res) => {
       res.json({ nom: admin?.nom ?? ctx.member.nom, telephone: admin?.telephone ?? null, numero_plaque: null, poste: "Livreur" });
     }
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -91,7 +91,7 @@ router.get("/api/livreur/stats", async (req, res) => {
 
     res.json({ today, week, total, enCours, tauxReussite, gainToday, gainWeek, gainTotal });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -123,7 +123,7 @@ router.get("/api/livreur/orders/available", async (req, res) => {
     );
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -157,7 +157,7 @@ router.get("/api/livreur/orders/mine", async (req, res) => {
     );
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -194,7 +194,7 @@ router.get("/api/livreur/orders/history", async (req, res) => {
       .slice(0, limit);
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -241,7 +241,7 @@ router.patch("/api/livreur/orders/:id/accept", async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -319,7 +319,7 @@ router.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -367,7 +367,7 @@ router.patch("/api/livreur/orders/:id/fail", async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 

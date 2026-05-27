@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const SECRET      = new TextEncoder().encode(
-  process.env.JWT_SECRET || "togolese-shop-secret-change-in-production-2024"
-);
+// Absence of JWT_SECRET must deny access, never silently use a known fallback
+const _jwtSecretRaw = process.env.JWT_SECRET;
+if (!_jwtSecretRaw) {
+  console.error("[middleware] CRITICAL: JWT_SECRET is not set — all admin sessions will be rejected.");
+}
+// Empty string as fallback: all jwtVerify() calls will fail → redirect to login (safe deny)
+const SECRET = new TextEncoder().encode(_jwtSecretRaw ?? "");
 const COOKIE_NAME = "ts_admin_token";
 
 function buildCsp(nonce: string): string {

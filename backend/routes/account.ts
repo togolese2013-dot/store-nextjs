@@ -507,7 +507,7 @@ router.get("/api/account/addresses", async (req, res) => {
     );
     res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+    console.error("[account]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -543,7 +543,7 @@ router.post("/api/account/addresses", async (req, res) => {
 
     res.json({ success: true, id: result.insertId });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+    console.error("[account]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
@@ -561,7 +561,7 @@ router.delete("/api/account/addresses/:id", async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+    console.error("[account]", err); res.status(500).json({ error: "Erreur serveur." });
   }
 });
 

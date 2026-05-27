@@ -28,13 +28,41 @@ function ensureDir() {
 }
 
 function dbCfg() {
-  return {
-    host:     process.env.DB_HOST     || "127.0.0.1",
-    port:     Number(process.env.DB_PORT || 3306),
-    user:     process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.DB_NAME!,
-  };
+  // 1. Individual env vars (local dev)
+  if (process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME) {
+    return {
+      host:     process.env.DB_HOST,
+      port:     Number(process.env.DB_PORT || 3306),
+      user:     process.env.DB_USER,
+      password: process.env.DB_PASSWORD || "",
+      database: process.env.DB_NAME,
+    };
+  }
+
+  // 2. URL-based config (Railway/prod: DATABASE_URL, MYSQL_URL, MYSQL_PUBLIC_URL)
+  const rawUrl =
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL    ||
+    process.env.MYSQL_PUBLIC_URL;
+
+  if (rawUrl && (rawUrl.startsWith("mysql://") || rawUrl.startsWith("mysql2://"))) {
+    try {
+      const url = new URL(rawUrl);
+      return {
+        host:     url.hostname,
+        port:     Number(url.port) || 3306,
+        user:     decodeURIComponent(url.username),
+        password: decodeURIComponent(url.password),
+        database: url.pathname.replace(/^\//, ""),
+      };
+    } catch (e) {
+      throw new Error(`[backup] Cannot parse DATABASE_URL: ${e}`);
+    }
+  }
+
+  throw new Error(
+    "[backup] No DB configuration found. Set DB_HOST+DB_USER+DB_NAME or DATABASE_URL."
+  );
 }
 
 function listFiles() {
@@ -221,7 +249,14 @@ router.post("/api/admin/backup", async (req, res) => {
     return res.status(403).json({ error: "Accès refusé." });
   }
 
+  // Cooldown — prevent repeated heavy backups (DoS mitigation)
+  if (lastManualBackup && Date.now() - lastManualBackup.getTime() < BACKUP_COOLDOWN_MS) {
+    const wait = Math.ceil((BACKUP_COOLDOWN_MS - (Date.now() - lastManualBackup.getTime())) / 1000);
+    return res.status(429).json({ error: `Attendez ${wait}s avant la prochaine sauvegarde.` });
+  }
+
   try {
+    lastManualBackup = new Date();
     const { filename, filepath } = await runBackup();
     cleanOld();
 
@@ -273,6 +308,11 @@ router.get("/api/admin/backups/:filename", async (req, res) => {
   res.setHeader("Content-Type", "application/gzip");
   createReadStream(filepath).pipe(res);
 });
+
+// ── Backup cooldown (prevent DoS via repeated heavy backups) ─────────────────
+
+const BACKUP_COOLDOWN_MS  = 60 * 1000; // 60 seconds between manual backups
+let   lastManualBackup: Date | null = null;
 
 // ── Nightly scheduler ─────────────────────────────────────────────────────────
 

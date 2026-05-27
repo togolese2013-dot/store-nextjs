@@ -150,6 +150,16 @@ const generalLimiter = rateLimit({
 });
 app.use(generalLimiter);
 
+// Reviews — stricter limit to prevent spam (5 per 10 min per IP)
+const reviewsLimiter = rateLimit({
+  windowMs:        10 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message:         { error: "Trop d'avis soumis. Réessayez dans 10 minutes." },
+});
+app.use("/api/reviews", reviewsLimiter);
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 app.use(cookieParser());

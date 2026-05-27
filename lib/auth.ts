@@ -6,9 +6,14 @@ import type { AdminPermissions } from "./admin-permissions";
 
 export type { AdminPermissions };
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "togolese-shop-secret-change-in-production-2024"
-);
+const _jwtSecret = process.env.JWT_SECRET;
+if (!_jwtSecret) {
+  throw new Error(
+    "FATAL: JWT_SECRET env var is not set. " +
+    "Add it to your Vercel environment variables."
+  );
+}
+const SECRET = new TextEncoder().encode(_jwtSecret);
 
 const COOKIE_NAME = "ts_admin_token";
 const TTL         = 60 * 60 * 8; // 8 hours
