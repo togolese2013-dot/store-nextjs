@@ -195,7 +195,8 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
   /* ── Confirm Mobile Money direct payment ── */
   if (req.body.field === "confirm_mm") {
     await ensurePaymentColumn();
-    await updateOrderFields(id, { statut_paiement: "paye" });
+    // Confirm payment + order in one step
+    await updateOrderFields(id, { statut_paiement: "paye", status: "confirmed" });
     // Sync linked boutique facture
     const [[mmOrderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
       "SELECT vente_facture_id FROM orders WHERE id = ? LIMIT 1", [id]
@@ -206,7 +207,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
         [mmOrderRow.vente_facture_id]
       );
     }
-    await addOrderEvent(id, "confirmée", "Paiement Mobile Money vérifié et confirmé", session.nom);
+    await addOrderEvent(id, "confirmed", "Paiement Mobile Money vérifié — commande confirmée", session.nom);
     emitAdminEvent("finance");
     emitAdminEvent("commande");
     return res.json({ ok: true });

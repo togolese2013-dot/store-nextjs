@@ -87,7 +87,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {order.status === "pending" && (
+          {order.status === "pending" &&
+           order.payment_mode !== "moov_direct" &&
+           order.payment_mode !== "yas_direct" && (
             <OrderConfirmButton orderId={order.id} />
           )}
           <a

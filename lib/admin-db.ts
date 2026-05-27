@@ -739,20 +739,26 @@ export async function deleteDeliveryZone(id: number) {
 
 /* ─── Orders ─── */
 export interface Order {
-  id:              number;
-  reference:       string;
-  nom:             string;
-  telephone:       string;
-  adresse:         string;
-  zone_livraison:  string;
-  delivery_fee:    number;
-  note:            string;
-  items:           string;
-  subtotal:        number;
-  total:           number;
-  status:          string;
-  statut_paiement: string | null;
-  created_at:      string;
+  id:                number;
+  reference:         string;
+  nom:               string;
+  telephone:         string;
+  adresse:           string;
+  zone_livraison:    string;
+  delivery_fee:      number;
+  note:              string;
+  items:             string;
+  subtotal:          number;
+  total:             number;
+  status:            string;
+  statut_paiement:   string | null;
+  payment_mode:      string | null;
+  mm_transaction_ref: string | null;
+  lien_localisation: string | null;
+  coupon_code:       string | null;
+  coupon_remise:     number | null;
+  ref_code:          string | null;
+  created_at:        string;
 }
 
 export async function listOrders(limit = 50, offset = 0): Promise<Order[]> {
