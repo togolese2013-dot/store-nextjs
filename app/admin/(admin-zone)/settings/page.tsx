@@ -1,6 +1,7 @@
 import { getSettings } from "@/lib/admin-db";
 import GeneralSettingsForm from "@/components/admin/GeneralSettingsForm";
 import AdminZonePage from "@/components/admin/AdminZonePage";
+import BackupManager from "@/components/admin/BackupManager";
 import { Settings } from "lucide-react";
 
 export const metadata = { title: "Réglages généraux" };
@@ -16,6 +17,10 @@ export default async function SettingsPage() {
       maxWidth="3xl"
     >
       <GeneralSettingsForm settings={settings} />
+
+      <hr className="my-8 border-slate-200" />
+
+      <BackupManager />
     </AdminZonePage>
   );
 }
