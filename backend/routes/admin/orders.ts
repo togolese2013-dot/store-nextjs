@@ -197,17 +197,16 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
     await ensurePaymentColumn();
     // Confirm payment + order in one step
     await updateOrderFields(id, { statut_paiement: "paye", status: "confirmed" });
-    // Sync linked boutique facture
-    const [[mmOrderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
-      "SELECT vente_facture_id FROM orders WHERE id = ? LIMIT 1", [id]
-    );
-    if (mmOrderRow?.vente_facture_id) {
-      await (db as mysql.Pool).execute(
-        "UPDATE factures SET statut_paiement = 'paye_total' WHERE id = ?",
-        [mmOrderRow.vente_facture_id]
-      );
-    }
+    // Ensure facture exists (creates it if missing) and stamp confirming admin
+    const actor = { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom };
+    await ensureOrderVente(id, actor).catch(e => console.error("[orders] ensureOrderVente confirm_mm:", e));
+    // Mark facture as paid
+    await (db as mysql.Pool).execute(
+      "UPDATE factures SET statut_paiement = 'paye_total' WHERE order_id = ? AND statut != 'annule'",
+      [id]
+    ).catch(() => {});
     await addOrderEvent(id, "confirmed", "Paiement Mobile Money vérifié — commande confirmée", session.nom);
+    invalidateVentesStats();
     emitAdminEvent("finance");
     emitAdminEvent("commande");
     return res.json({ ok: true });
