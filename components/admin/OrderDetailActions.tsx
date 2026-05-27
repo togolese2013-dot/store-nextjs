@@ -563,6 +563,7 @@ function ConfirmMMPayment({ order }: { order: Order }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [done,    setDone]    = useState(false);
+  const [error,   setError]   = useState<string>("");
 
   const isMmDirect = order.payment_mode === "moov_direct" || order.payment_mode === "yas_direct";
   const alreadyPaid = order.statut_paiement === "paye";
@@ -572,15 +573,26 @@ function ConfirmMMPayment({ order }: { order: Order }) {
 
   async function confirm() {
     setLoading(true);
-    await fetch(`/api/admin/orders/${order.id}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ field: "confirm_mm" }),
-      credentials: "include",
-    });
-    setLoading(false);
-    setDone(true);
-    router.refresh();
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ field: "confirm_mm" }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? `Erreur ${res.status}`);
+        return;
+      }
+      setDone(true);
+      router.refresh();
+    } catch {
+      setError("Erreur réseau.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -616,6 +628,7 @@ function ConfirmMMPayment({ order }: { order: Order }) {
       <p className="text-xs text-orange-700 leading-relaxed">
         Vérifiez le paiement sur votre téléphone {label}, puis confirmez.
       </p>
+      {error && <p className="text-xs text-red-600 font-medium bg-red-50 rounded-lg px-3 py-2">{error}</p>}
       <button
         onClick={confirm}
         disabled={loading || done}
