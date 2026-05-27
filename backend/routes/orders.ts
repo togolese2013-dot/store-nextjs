@@ -113,8 +113,9 @@ async function validateOrderPricing(
       const qty = Math.max(1, Number(item.qty ?? item.quantite ?? 1));
       const prod = priceMap.get(pid);
       if (!prod) return { ok: false, error: `Produit introuvable ou inactif : ID ${pid}` };
+      // remise is stored in FCFA (not %), matching frontend calcPrice logic
       const unitPrice = prod.remise > 0
-        ? Math.round(prod.prix * (1 - prod.remise / 100))
+        ? Math.max(0, prod.prix - prod.remise)
         : prod.prix;
       serverSubtotal += unitPrice * qty;
     }
