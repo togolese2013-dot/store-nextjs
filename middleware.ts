@@ -27,8 +27,27 @@ export async function middleware(request: NextRequest) {
   // Generate a unique nonce for every request
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
 
-  // ── Subdomain routing: livraison.togolese.tg → /livreur ────────────────────
+  // ── Subdomain routing: app.togolese.tg → /admin ────────────────────────────
   const hostname = request.headers.get("host") ?? "";
+  if (hostname.startsWith("app.")) {
+    // API requests: pass through without prefix
+    if (pathname.startsWith("/api/")) {
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-nonce", nonce);
+      return NextResponse.next({ request: { headers: requestHeaders } });
+    }
+    // Already on an /admin path — let normal auth middleware handle it
+    if (pathname.startsWith("/admin")) {
+      // fall through to standard middleware below
+    } else {
+      // Redirect root (and any non-admin path) to /admin
+      const url = request.nextUrl.clone();
+      url.pathname = pathname === "/login" ? "/admin/login" : "/admin";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // ── Subdomain routing: livraison.togolese.tg → /livreur ────────────────────
   if (hostname.startsWith("livraison.")) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-nonce", nonce);
