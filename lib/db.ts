@@ -20,7 +20,7 @@ function createPool() {
 
   const shared = {
     waitForConnections:    true,
-    connectionLimit:       5,
+    connectionLimit:       3,
     charset:               "utf8mb4",
     timezone:              "+00:00",
     connectTimeout:        10_000,
