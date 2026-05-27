@@ -200,8 +200,10 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
       await updateOrderFields(id, { statut_paiement: "paye" });
       const actor = { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom };
       await ensureOrderVente(id, actor).catch(e => console.error("[orders] ensureOrderVente confirm_mm:", e));
+      // Payment received but not yet delivered — mark as 'paye', not 'paye_total'
+      // 'paye_total' (Complet) is only set when delivery is confirmed
       await (db as mysql.Pool).execute(
-        "UPDATE factures SET statut_paiement = 'paye_total' WHERE order_id = ? AND statut != 'annule'",
+        "UPDATE factures SET statut_paiement = 'paye' WHERE order_id = ? AND statut != 'annule'",
         [id]
       ).catch(() => {});
       await addOrderEvent(id, "confirmed", "Paiement Mobile Money vérifié — commande confirmée", session.nom);

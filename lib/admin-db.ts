@@ -4246,11 +4246,10 @@ export async function markTombolaNotified(sessionId: number): Promise<void> {
   await db.execute(`UPDATE tombola_sessions SET notifie = 1 WHERE id = ?`, [sessionId]);
 }
 
-// ── One-time migration: fix old MM orders stuck in pending ────────────────────
-// Orders where admin confirmed payment (statut_paiement=paye) but status
-// stayed pending due to the old confirm_mm bug (status field was silently dropped).
+// ── Migration: fix old MM orders stuck in pending + fix premature paye_total ──
 export async function fixPendingMmOrders(): Promise<void> {
   try {
+    // 1. Fix orders stuck in pending (confirm_mm bug: status wasn't updated)
     const [result] = await db.execute<mysql.ResultSetHeader>(
       `UPDATE orders
        SET status = 'confirmed'
@@ -4259,18 +4258,20 @@ export async function fixPendingMmOrders(): Promise<void> {
          AND status = 'pending'`
     );
     if (result.affectedRows > 0) {
-      console.log(`[backend] fixPendingMmOrders: fixed ${result.affectedRows} stuck orders`);
-      // Also ensure their factures are marked as paid
-      await db.execute(
-        `UPDATE factures f
-         JOIN orders o ON o.id = f.order_id
-         SET f.statut_paiement = 'paye_total'
-         WHERE o.payment_mode IN ('moov_direct', 'yas_direct')
-           AND o.statut_paiement = 'paye'
-           AND o.status = 'confirmed'
-           AND f.statut_paiement != 'paye_total'`
-      ).catch(() => {});
+      console.log(`[backend] fixPendingMmOrders: confirmed ${result.affectedRows} stuck orders`);
     }
+
+    // 2. Ensure confirmed MM orders have a facture marked as 'paye' (if still non_paye)
+    await db.execute(
+      `UPDATE factures f
+       JOIN orders o ON o.id = f.order_id
+       SET f.statut_paiement = 'paye'
+       WHERE o.payment_mode IN ('moov_direct', 'yas_direct')
+         AND o.statut_paiement = 'paye'
+         AND o.status IN ('confirmed', 'shipped')
+         AND f.statut_paiement = 'non_paye'`
+    ).catch(() => {});
+
   } catch (e) {
     console.error("[backend] fixPendingMmOrders failed:", e);
   }
