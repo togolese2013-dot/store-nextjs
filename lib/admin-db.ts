@@ -949,6 +949,7 @@ export async function getOrderById(id: number): Promise<Order | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
             note, items, subtotal, total, status, statut_paiement, payment_mode,
+            mm_transaction_ref, lien_localisation, coupon_code, coupon_remise, ref_code,
             livreur_id, livraison_statut, stock_boutique_deducted, finance_entry_id,
             vente_facture_id, created_at, updated_at
      FROM orders WHERE id = ? LIMIT 1`,
