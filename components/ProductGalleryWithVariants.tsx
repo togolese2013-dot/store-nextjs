@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import ProductImageGallerySimple from "@/components/ProductImageGallerySimple";
 import ProductVariantSelector, { type Variant } from "@/components/ProductVariantSelector";
 import type { Product } from "@/lib/utils";
@@ -24,10 +24,15 @@ export default function ProductGalleryWithVariants({
   product, variants, defaultImages, badges, headerSlot, footerSlot,
 }: Props) {
   const [variantImage, setVariantImage] = useState<string | null>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   const handleVariantChange = useCallback((v: Variant | null) => {
     const img = v?.image_url ? resolveUrl(v.image_url) : null;
     setVariantImage(img);
+    // Mobile only — scroll gallery into view so user sees the updated image
+    if (typeof window !== "undefined" && window.innerWidth < 1024 && galleryRef.current) {
+      galleryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }, []);
 
   // Variant image first, then product images (no duplicates)
@@ -38,7 +43,7 @@ export default function ProductGalleryWithVariants({
   return (
     <div className="grid lg:grid-cols-2 gap-0">
       {/* Left — gallery; key forces remount (idx reset) when variant image changes */}
-      <div className="relative lg:rounded-l-3xl overflow-hidden border-r border-slate-100">
+      <div ref={galleryRef} className="relative lg:rounded-l-3xl overflow-hidden border-r border-slate-100">
         <ProductImageGallerySimple
           key={variantImage ?? "default"}
           images={images}
