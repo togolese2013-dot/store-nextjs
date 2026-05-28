@@ -63,7 +63,7 @@ function createPool() {
   const url = rawUrl?.startsWith("mysql://") || rawUrl?.startsWith("mysql2://") ? rawUrl : void 0;
   const shared = {
     waitForConnections: true,
-    connectionLimit: 5,
+    connectionLimit: 3,
     charset: "utf8mb4",
     timezone: "+00:00",
     connectTimeout: 1e4,
@@ -170,6 +170,17 @@ async function produitCols() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
   } catch {
+  }
+  for (const [col, def] of [
+    ["telephone", "VARCHAR(30) NULL"],
+    ["adresse", "TEXT NULL"],
+    ["notes", "TEXT NULL"],
+    ["actif", "TINYINT(1) NOT NULL DEFAULT 1"]
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE entrepots ADD COLUMN ${col} ${def}`);
+    } catch {
+    }
   }
   if (!names.has("entrepot_id")) {
     try {
@@ -283,7 +294,8 @@ async function getProducts(opts) {
     limit = 60,
     offset = 0,
     statut,
-    includeInactive = false
+    includeInactive = false,
+    entrepotId
   } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
@@ -301,8 +313,8 @@ async function getProducts(opts) {
     params.push(referenceExact);
   }
   if (search) {
-    conditions.push("(p.nom LIKE ? OR p.description LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`);
+    conditions.push("(p.nom LIKE ? OR p.description LIKE ? OR EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id AND (pv.nom LIKE ? OR pv.reference_sku LIKE ?)))");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (promoOnly && cols.remise) {
     conditions.push("p.remise > 0");
@@ -330,10 +342,14 @@ async function getProducts(opts) {
     conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?");
     params.push(maxPrice);
   }
+  if (entrepotId != null) {
+    conditions.push("p.entrepot_id = ?");
+    params.push(entrepotId);
+  }
   const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END" : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol = cols.stock_magasin ? "COALESCE(p.stock_magasin, 0)" : "0";
   const safeLimit = Math.max(1, Math.min(200, Number(limit)));
   const safeOffset = Math.max(0, Number(offset));
@@ -397,7 +413,7 @@ async function getProductsByIds(ids) {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END" : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol = cols.stock_magasin ? "COALESCE(p.stock_magasin, 0)" : "0";
   const placeholders = ids.map(() => "?").join(",");
   const [rows] = await db.query(
@@ -446,7 +462,7 @@ async function getProductBySlug(slugOrRef) {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END" : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol = cols.stock_magasin ? "COALESCE(p.stock_magasin, 0)" : "0";
   const selectSql = `SELECT
        p.id, p.reference, ${cols.slug ? "p.slug" : "NULL"} AS slug, p.nom, p.description, p.categorie_id,
@@ -504,7 +520,7 @@ async function getProductBySlug(slugOrRef) {
   };
 }
 async function getProductCount(opts) {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
   const params = [];
@@ -517,8 +533,8 @@ async function getProductCount(opts) {
     params.push(marqueId);
   }
   if (search) {
-    conditions.push("(p.nom LIKE ? OR p.description LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`);
+    conditions.push("(p.nom LIKE ? OR p.description LIKE ? OR EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id AND (pv.nom LIKE ? OR pv.reference_sku LIKE ?)))");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (promoOnly && cols.remise) {
     conditions.push("p.remise > 0");
@@ -545,6 +561,10 @@ async function getProductCount(opts) {
   if (maxPrice != null && !isNaN(maxPrice)) {
     conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?");
     params.push(maxPrice);
+  }
+  if (entrepotId != null) {
+    conditions.push("p.entrepot_id = ?");
+    params.push(entrepotId);
   }
   const [rows] = await db.execute(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,
@@ -605,8 +625,11 @@ async function getProductVariants(productId) {
       nom: r.nom,
       options: typeof r.options === "string" ? JSON.parse(r.options) : r.options ?? {},
       prix: Number(r.prix),
+      remise: Number(r.remise ?? 0),
       stock: Number(r.stock),
-      reference_sku: r.reference_sku ?? null
+      stock_boutique: Number(r.stock_boutique ?? 0),
+      reference_sku: r.reference_sku ?? null,
+      image_url: r.image_url ?? null
     }));
   } catch {
     return [];
@@ -634,6 +657,7 @@ __export(admin_db_exports, {
   applyOrderDeliveredEffects: () => applyOrderDeliveredEffects,
   applyOrderPaidEffects: () => applyOrderPaidEffects,
   approveReview: () => approveReview,
+  backfillEntrepotBoutiqueFinance: () => backfillEntrepotBoutiqueFinance,
   cancelPaymentPlan: () => cancelPaymentPlan,
   countAchats: () => countAchats,
   countBoutiqueClients: () => countBoutiqueClients,
@@ -658,6 +682,7 @@ __export(admin_db_exports, {
   createStockAjustement: () => createStockAjustement,
   createStockEntree: () => createStockEntree,
   createStockSortie: () => createStockSortie,
+  createTombolaSession: () => createTombolaSession,
   createUtilisateur: () => createUtilisateur,
   createVenteWithStock: () => createVenteWithStock,
   deleteAchat: () => deleteAchat,
@@ -678,6 +703,7 @@ __export(admin_db_exports, {
   deleteNewsletterSubscriber: () => deleteNewsletterSubscriber,
   deleteOrder: () => deleteOrder,
   deleteReview: () => deleteReview,
+  deleteTombolaSession: () => deleteTombolaSession,
   deleteUtilisateur: () => deleteUtilisateur,
   ensureAdminUsersCols: () => ensureAdminUsersCols,
   ensureEntrepotsTable: () => ensureEntrepotsTable,
@@ -687,7 +713,9 @@ __export(admin_db_exports, {
   ensureOrderLivreurCols: () => ensureOrderLivreurCols,
   ensureOrderVente: () => ensureOrderVente,
   ensureTokenVersionCols: () => ensureTokenVersionCols,
+  ensureTombolaTable: () => ensureTombolaTable,
   ensureUtilisateursCols: () => ensureUtilisateursCols,
+  fixPendingMmOrders: () => fixPendingMmOrders,
   fixSiteOrderFinanceEntries: () => fixSiteOrderFinanceEntries,
   getAchatById: () => getAchatById,
   getAchatStats: () => getAchatStats,
@@ -728,6 +756,8 @@ __export(admin_db_exports, {
   getStockMovements: () => getStockMovements,
   getStockStats: () => getStockStats,
   getTokenVersion: () => getTokenVersion,
+  getTombolaParticipants: () => getTombolaParticipants,
+  getTombolaSession: () => getTombolaSession,
   getUtilisateurById: () => getUtilisateurById,
   getUtilisateurByUsername: () => getUtilisateurByUsername,
   getUtilisateurPermissions: () => getUtilisateurPermissions,
@@ -759,9 +789,11 @@ __export(admin_db_exports, {
   listReferrals: () => listReferrals,
   listReviews: () => listReviews,
   listSiteClients: () => listSiteClients,
+  listTombolaSessions: () => listTombolaSessions,
   listUtilisateurs: () => listUtilisateurs,
   listWaMessages: () => listWaMessages,
   markMessagesRead: () => markMessagesRead,
+  markTombolaNotified: () => markTombolaNotified,
   markTranchePaid: () => markTranchePaid,
   markTrancheUnpaid: () => markTrancheUnpaid,
   migrateAdminLivreursToTeam: () => migrateAdminLivreursToTeam,
@@ -770,6 +802,7 @@ __export(admin_db_exports, {
   setSetting: () => setSetting,
   setSettings: () => setSettings,
   setUtilisateurPermissions: () => setUtilisateurPermissions,
+  spinTombola: () => spinTombola,
   subscribeNewsletter: () => subscribeNewsletter,
   updateAchat: () => updateAchat,
   updateAchatStatut: () => updateAchatStatut,
@@ -791,6 +824,7 @@ __export(admin_db_exports, {
   updateOrderFields: () => updateOrderFields,
   updateOrderStatus: () => updateOrderStatus,
   updateProductStock: () => updateProductStock,
+  updateTombolaSession: () => updateTombolaSession,
   updateUtilisateur: () => updateUtilisateur,
   updateUtilisateurPassword: () => updateUtilisateurPassword,
   upsertClient: () => upsertClient,
@@ -803,12 +837,45 @@ function runOnce(key, fn) {
   return _ensurePromises.get(key);
 }
 async function getProduitsWithStock() {
+  let hasVariantsTable = false;
+  try {
+    await db.execute("SELECT 1 FROM product_variants LIMIT 0");
+    hasVariantsTable = true;
+  } catch {
+  }
+  if (!hasVariantsTable) {
+    const [rows2] = await db.query(
+      `SELECT p.id AS produit_id, p.nom, p.reference,
+              COALESCE(p.stock_magasin, 0) AS stock,
+              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+       FROM produits p WHERE p.actif = 1 ORDER BY p.nom`
+    );
+    return rows2;
+  }
   const [rows] = await db.query(
-    `SELECT id AS produit_id, nom, reference,
-            COALESCE(stock_magasin, 0) AS stock
-     FROM produits
-     WHERE actif = 1
-     ORDER BY nom`
+    `SELECT * FROM (
+       SELECT p.id AS produit_id, p.nom,
+              p.reference,
+              COALESCE(p.stock_magasin, 0) AS stock,
+              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+       FROM produits p
+       WHERE p.actif = 1
+         AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
+
+       UNION ALL
+
+       SELECT p.id AS produit_id,
+              CONCAT(p.nom, ' \u2014 ', pv.nom) AS nom,
+              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              pv.stock AS stock,
+              1 AS variants_count,
+              pv.id AS variant_id,
+              pv.nom AS variant_nom
+       FROM product_variants pv
+       JOIN produits p ON p.id = pv.produit_id
+       WHERE p.actif = 1
+     ) AS combined
+     ORDER BY nom ASC`
   );
   return rows;
 }
@@ -816,19 +883,33 @@ async function createStockEntree(data) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.execute(
-      `UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?`,
-      [data.quantite, data.produit_id]
-    );
-    const [[stockRow]] = await conn.execute(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const stockApres = Number(stockRow?.stock ?? 0);
+    let stockApres;
+    if (data.variant_id) {
+      await conn.execute(
+        `UPDATE product_variants SET stock = stock + ? WHERE id = ? AND produit_id = ?`,
+        [data.quantite, data.variant_id, data.produit_id]
+      );
+      const [[vRow]] = await conn.execute(
+        `SELECT stock FROM product_variants WHERE id = ?`,
+        [data.variant_id]
+      );
+      stockApres = Number(vRow?.stock ?? 0);
+    } else {
+      await conn.execute(
+        `UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?`,
+        [data.quantite, data.produit_id]
+      );
+      const [[stockRow]] = await conn.execute(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      stockApres = Number(stockRow?.stock ?? 0);
+    }
+    const noteWithVariant = data.variant_id && !data.note ? null : data.note ?? null;
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
        VALUES (?, 'entree', ?, ?, ?, ?, ?)`,
-      [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
+      [data.produit_id, data.quantite, stockApres, data.reference ?? null, noteWithVariant, data.user_id ?? null]
     );
     await conn.commit();
   } catch (err) {
@@ -842,37 +923,56 @@ async function createStockSortie(data) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [[row]] = await conn.execute(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const available = Number(row?.stock ?? 0);
-    if (available < data.quantite) {
-      throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demand\xE9(s)`);
+    let stockApres;
+    if (data.variant_id) {
+      const [[vRow]] = await conn.execute(
+        `SELECT stock FROM product_variants WHERE id = ? AND produit_id = ?`,
+        [data.variant_id, data.produit_id]
+      );
+      const available = Number(vRow?.stock ?? 0);
+      if (available < data.quantite) {
+        throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demand\xE9(s)`);
+      }
+      await conn.execute(
+        `UPDATE product_variants
+         SET stock = stock - ?, stock_boutique = stock_boutique + ?
+         WHERE id = ?`,
+        [data.quantite, data.quantite, data.variant_id]
+      );
+      stockApres = available - data.quantite;
+    } else {
+      const [[row]] = await conn.execute(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      const available = Number(row?.stock ?? 0);
+      if (available < data.quantite) {
+        throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demand\xE9(s)`);
+      }
+      await conn.execute(
+        `UPDATE produits
+         SET stock_magasin  = GREATEST(0, COALESCE(stock_magasin, 0) - ?),
+             stock_boutique = COALESCE(stock_boutique, 0) + ?
+         WHERE id = ?`,
+        [data.quantite, data.quantite, data.produit_id]
+      );
+      stockApres = available - data.quantite;
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
+        [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
+      );
+      await conn.execute(
+        `INSERT INTO boutique_stock (produit_id, quantite)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE quantite = quantite + VALUES(quantite), updated_at = NOW()`,
+        [data.produit_id, data.quantite]
+      );
     }
-    await conn.execute(
-      `UPDATE produits
-       SET stock_magasin  = GREATEST(0, COALESCE(stock_magasin, 0) - ?),
-           stock_boutique = COALESCE(stock_boutique, 0) + ?
-       WHERE id = ?`,
-      [data.quantite, data.quantite, data.produit_id]
-    );
-    const stockApres = available - data.quantite;
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
        VALUES (?, 'retrait', ?, ?, ?, ?, ?)`,
       [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
-    );
-    await conn.execute(
-      `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
-       VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
-      [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
-    );
-    await conn.execute(
-      `INSERT INTO boutique_stock (produit_id, quantite)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE quantite = quantite + VALUES(quantite), updated_at = NOW()`,
-      [data.produit_id, data.quantite]
     );
     await conn.commit();
   } catch (err) {
@@ -888,17 +988,30 @@ async function createStockAjustement(data) {
     await conn.beginTransaction();
     const abs = Math.abs(data.quantite);
     const type = data.quantite >= 0 ? "entree" : "retrait";
-    await conn.execute(
-      `UPDATE produits
-       SET stock_magasin = GREATEST(0, COALESCE(stock_magasin, 0) + ?)
-       WHERE id = ?`,
-      [data.quantite, data.produit_id]
-    );
-    const [[stockRow]] = await conn.execute(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const stockApres = Number(stockRow?.stock ?? 0);
+    let stockApres;
+    if (data.variant_id) {
+      await conn.execute(
+        `UPDATE product_variants SET stock = GREATEST(0, stock + ?) WHERE id = ? AND produit_id = ?`,
+        [data.quantite, data.variant_id, data.produit_id]
+      );
+      const [[vRow]] = await conn.execute(
+        `SELECT stock FROM product_variants WHERE id = ?`,
+        [data.variant_id]
+      );
+      stockApres = Number(vRow?.stock ?? 0);
+    } else {
+      await conn.execute(
+        `UPDATE produits
+         SET stock_magasin = GREATEST(0, COALESCE(stock_magasin, 0) + ?)
+         WHERE id = ?`,
+        [data.quantite, data.produit_id]
+      );
+      const [[stockRow]] = await conn.execute(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      stockApres = Number(stockRow?.stock ?? 0);
+    }
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note, user_id)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -1362,7 +1475,14 @@ async function ensureOrderLifecycleCols() {
   }
 }
 async function updateOrderStatus(id, status) {
-  await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
+  if (status === "delivered") {
+    await db.execute(
+      "UPDATE orders SET status = ?, delivered_at = NOW() WHERE id = ?",
+      [status, id]
+    );
+  } else {
+    await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
+  }
 }
 async function ensureEntrepotsTable() {
   return runOnce("entrepots", async () => {
@@ -1521,6 +1641,7 @@ async function getOrderById(id) {
   const [rows] = await db.execute(
     `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
             note, items, subtotal, total, status, statut_paiement, payment_mode,
+            mm_transaction_ref, lien_localisation, coupon_code, coupon_remise, ref_code,
             livreur_id, livraison_statut, stock_boutique_deducted, finance_entry_id,
             vente_facture_id, created_at, updated_at
      FROM orders WHERE id = ? LIMIT 1`,
@@ -2240,53 +2361,85 @@ async function getStockBoutiqueList(opts) {
   const cols = await getProduitColsAdmin();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
-  const conditions = [];
-  const params = [];
-  if (search) {
-    conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`);
+  const searchLike = search ? `%${search}%` : null;
+  const p1Conds = ["NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
+  const p1Params = [];
+  if (searchLike) {
+    p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)");
+    p1Params.push(searchLike, searchLike);
   }
-  if (filter === "faible") conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
-  if (filter === "epuise") conditions.push("bs.quantite = 0");
-  if (filter === "disponible") conditions.push("bs.quantite > 0");
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const [rows] = await db.query(
-    `SELECT bs.produit_id, p.nom, p.reference,
-            ${imageCol}  AS image_url,
-            ${remiseCol} AS remise,
-            p.prix_unitaire,
-            COALESCE(c.nom, '') AS categorie_nom,
-            bs.quantite, bs.seuil_alerte,
-            (bs.quantite * p.prix_unitaire) AS valeur
-     FROM boutique_stock bs
-     JOIN produits p ON p.id = bs.produit_id
+  if (filter === "faible") p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
+  if (filter === "epuise") p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL");
+  if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
+  p1Conds.push("(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)");
+  const [rows1] = await db.query(
+    `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
+            NULL AS variant_id, NULL AS variant_nom,
+            p.nom, p.reference,
+            ${imageCol} AS image_url, ${remiseCol} AS remise, p.prix_unitaire,
+            COALESCE(c.nom,'') AS categorie_nom,
+            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite,0) END AS quantite,
+            COALESCE(bs.seuil_alerte,5) AS seuil_alerte,
+            e.nom AS entrepot_nom
+     FROM produits p
+     LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
      LEFT JOIN categories c ON c.id = p.categorie_id
-     ${where}
-     ORDER BY bs.quantite ASC, p.nom ASC
-     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
-    params
+     LEFT JOIN entrepots e ON e.id = p.entrepot_id
+     WHERE ${p1Conds.join(" AND ")}`,
+    p1Params
   );
-  const [countRows] = await db.query(
-    `SELECT COUNT(*) AS cnt
-     FROM boutique_stock bs
-     JOIN produits p ON p.id = bs.produit_id
-     ${where}`,
-    params
-  );
+  const p2Conds = [];
+  const p2Params = [];
+  if (searchLike) {
+    p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)");
+    p2Params.push(searchLike, searchLike, searchLike);
+  }
+  if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");
+  if (filter === "epuise") p2Conds.push("pv.stock_boutique = 0");
+  if (filter === "faible") p2Conds.push("pv.stock_boutique > 0 AND pv.stock_boutique <= 5");
+  let rows2 = [];
+  try {
+    [rows2] = await db.query(
+      `SELECT pv.produit_id,
+              pv.id AS variant_id, pv.nom AS variant_nom,
+              CONCAT(p.nom, ' \u2014 ', pv.nom) AS nom,
+              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              COALESCE(NULLIF(pv.image_url,''), ${imageCol}) AS image_url,
+              COALESCE(NULLIF(pv.remise,0), 0) AS remise,
+              CASE WHEN pv.prix > 0 THEN pv.prix ELSE p.prix_unitaire END AS prix_unitaire,
+              COALESCE(c.nom,'') AS categorie_nom,
+              pv.stock_boutique AS quantite,
+              5 AS seuil_alerte
+       FROM product_variants pv
+       JOIN produits p ON p.id = pv.produit_id
+       LEFT JOIN categories c ON c.id = p.categorie_id
+       ${p2Conds.length ? "WHERE " + p2Conds.join(" AND ") : ""}`,
+      p2Params
+    );
+  } catch (err) {
+    if (err.code !== "ER_NO_SUCH_TABLE") throw err;
+  }
+  const mapRow = (r) => ({
+    produit_id: Number(r.produit_id),
+    variant_id: r.variant_id != null ? Number(r.variant_id) : void 0,
+    variant_nom: r.variant_nom ?? void 0,
+    nom: String(r.nom),
+    reference: String(r.reference ?? ""),
+    image_url: r.image_url ?? null,
+    categorie_nom: String(r.categorie_nom ?? ""),
+    prix_unitaire: Number(r.prix_unitaire),
+    remise: Number(r.remise ?? 0),
+    quantite: Number(r.quantite),
+    seuil_alerte: Number(r.seuil_alerte),
+    valeur: Number(r.quantite) * Number(r.prix_unitaire)
+  });
+  const all = [
+    ...rows1.map(mapRow),
+    ...rows2.map(mapRow)
+  ].sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
   return {
-    items: rows.map((r) => ({
-      produit_id: Number(r.produit_id),
-      nom: String(r.nom),
-      reference: String(r.reference ?? ""),
-      image_url: r.image_url ?? null,
-      categorie_nom: String(r.categorie_nom ?? ""),
-      prix_unitaire: Number(r.prix_unitaire),
-      remise: Number(r.remise ?? 0),
-      quantite: Number(r.quantite),
-      seuil_alerte: Number(r.seuil_alerte),
-      valeur: Number(r.valeur)
-    })),
-    total: Number(countRows[0]?.cnt ?? 0)
+    items: all.slice(offset, offset + limit),
+    total: all.length
   };
 }
 async function createBoutiqueMouvement(data) {
@@ -2405,6 +2558,26 @@ async function getFactureById(id) {
   if (!rows[0]) return null;
   const facture = rows[0];
   facture.paiements = await getFacturePaiements(id);
+  try {
+    const items = typeof facture.items === "string" ? JSON.parse(facture.items) : facture.items ?? [];
+    const produitIds = items.map((i) => Number(i.produit_id)).filter(Boolean);
+    if (produitIds.length > 0) {
+      const placeholders = produitIds.map(() => "?").join(",");
+      const [eRows] = await db.query(
+        `SELECT p.id, e.nom AS entrepot_nom
+         FROM produits p JOIN entrepots e ON e.id = p.entrepot_id
+         WHERE p.id IN (${placeholders})`,
+        produitIds
+      );
+      const eMap = /* @__PURE__ */ new Map();
+      for (const r of eRows) eMap.set(Number(r.id), r.entrepot_nom);
+      facture.items = items.map((item) => ({
+        ...item,
+        entrepot_nom: item.produit_id ? eMap.get(item.produit_id) : void 0
+      }));
+    }
+  } catch {
+  }
   return facture;
 }
 async function getClientFacturesByNom(nom, tel) {
@@ -2466,13 +2639,29 @@ async function createVenteWithStock(data) {
   try {
     await conn.beginTransaction();
     for (const item of data.items) {
-      const [rows] = await conn.execute(
-        "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1",
-        [item.produit_id]
-      );
-      const dispo = Number(rows[0]?.quantite ?? 0);
-      if (dispo < item.qty) {
-        throw new Error(`Stock insuffisant pour "${item.nom}" (dispo: ${dispo}, demand\xE9: ${item.qty})`);
+      if (item.variant_id) {
+        const [[vRow]] = await conn.execute(
+          "SELECT stock_boutique FROM product_variants WHERE id = ? LIMIT 1",
+          [item.variant_id]
+        );
+        const dispo = Number(vRow?.stock_boutique ?? 0);
+        if (dispo < item.qty) {
+          throw new Error(`Stock boutique insuffisant pour "${item.nom}" (dispo: ${dispo}, demand\xE9: ${item.qty})`);
+        }
+      } else {
+        const [[prod]] = await conn.execute(
+          "SELECT entrepot_id FROM produits WHERE id = ? LIMIT 1",
+          [item.produit_id]
+        );
+        if (prod?.entrepot_id) continue;
+        const [rows] = await conn.execute(
+          "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1",
+          [item.produit_id]
+        );
+        const dispo = Number(rows[0]?.quantite ?? 0);
+        if (dispo < item.qty) {
+          throw new Error(`Stock insuffisant pour "${item.nom}" (dispo: ${dispo}, demand\xE9: ${item.qty})`);
+        }
       }
     }
     const reference = generateVenteRef("VT");
@@ -2507,25 +2696,36 @@ async function createVenteWithStock(data) {
     );
     const factureId = result.insertId;
     for (const item of data.items) {
-      await conn.execute(
-        "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
-        [item.qty, item.produit_id]
-      );
+      if (item.variant_id) {
+        await conn.execute(
+          "UPDATE product_variants SET stock_boutique = GREATEST(0, stock_boutique - ?) WHERE id = ?",
+          [item.qty, item.variant_id]
+        );
+      } else {
+        const [[p]] = await conn.execute(
+          "SELECT entrepot_id FROM produits WHERE id = ? LIMIT 1",
+          [item.produit_id]
+        );
+        if (!p?.entrepot_id) {
+          await conn.execute(
+            "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
+            [item.qty, item.produit_id]
+          );
+          try {
+            await conn.execute(
+              `UPDATE produits p JOIN boutique_stock bs ON bs.produit_id = p.id
+             SET p.stock_boutique = bs.quantite WHERE p.id = ?`,
+              [item.produit_id]
+            );
+          } catch {
+          }
+        }
+      }
       await conn.execute(
         `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
          VALUES (?,?,?,?,?,?)`,
         [item.produit_id, "sortie", item.qty, "Vente", reference, data.admin_id ?? null]
       );
-      try {
-        await conn.execute(
-          `UPDATE produits p
-         JOIN boutique_stock bs ON bs.produit_id = p.id
-         SET p.stock_boutique = bs.quantite
-         WHERE p.id = ?`,
-          [item.produit_id]
-        );
-      } catch {
-      }
     }
     if (data.avec_livraison) {
       const livRef = generateVenteRef("LV");
@@ -2568,13 +2768,30 @@ async function createVenteWithStock(data) {
       }
     }
     if (!data.avec_livraison && data.statut_paiement && data.statut_paiement !== "non_paye") {
-      const montantFinance = data.statut_paiement === "acompte" ? data.montant_acompte ?? 0 : data.total;
+      const brut = data.statut_paiement === "acompte" ? data.montant_acompte ?? 0 : data.total;
+      let coutEntrepot = 0;
+      try {
+        const produitIds = data.items.map((i) => i.produit_id);
+        const placeholders = produitIds.map(() => "?").join(",");
+        const [eRows] = await db.query(
+          `SELECT id, prix_entrepot FROM produits WHERE id IN (${placeholders}) AND entrepot_id IS NOT NULL AND prix_entrepot IS NOT NULL`,
+          produitIds
+        );
+        const eMap = /* @__PURE__ */ new Map();
+        for (const r of eRows) eMap.set(Number(r.id), Number(r.prix_entrepot));
+        for (const item of data.items) {
+          const pe = eMap.get(item.produit_id);
+          if (pe != null) coutEntrepot += pe * item.qty;
+        }
+      } catch {
+      }
+      const montantFinance = Math.max(0, brut - coutEntrepot);
       if (montantFinance > 0) {
         await createFinanceEntry({
           type: "vente",
           mode_paiement: data.mode_paiement ?? "especes",
           categorie: "Vente boutique",
-          description: `Vente ${reference} \u2013 ${data.client_nom.trim()}`,
+          description: `Vente ${reference} \u2013 ${data.client_nom.trim()}${coutEntrepot > 0 ? ` (marge nette, co\xFBt entrep\xF4t ${coutEntrepot} FCFA d\xE9duit)` : ""}`,
           montant: montantFinance,
           date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
         }).catch(() => {
@@ -2719,7 +2936,7 @@ async function listDevis(opts = {}) {
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const [rows] = await db.query(
-    `SELECT id, reference, client_nom, client_tel, client_email,
+    `SELECT id, reference, client_nom, client_tel, client_email, items,
             sous_total, remise, total, statut, valide_jusqu, note, admin_id, created_at, updated_at
      FROM devis ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
     params
@@ -3089,7 +3306,7 @@ function invalidateVentesStats() {
 async function getVentesStats() {
   const now = Date.now();
   if (_ventesStatsCache && _ventesStatsCache.expiresAt > now) return _ventesStatsCache.data;
-  const SITE_JOIN2 = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
+  const SITE_JOIN2 = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered')";
   const SITE_COND2 = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
   const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
     db.execute(
@@ -3109,18 +3326,9 @@ async function getVentesStats() {
       `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN2} WHERE f.statut = 'paye' AND ${SITE_COND2}`
     ),
     db.execute(
-      `SELECT COUNT(*) AS cnt,
-              COALESCE(SUM(
-                CASE
-                  WHEN f.statut_paiement IN ('paye','paye_total') THEN CASE WHEN f.source = 'site_order' THEN f.sous_total ELSE f.total END
-                  WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
-                  ELSE 0
-                END
-              ), 0) AS montant
-       FROM factures f
-       LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
-       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
-         AND (lv.id IS NULL OR lv.statut = 'livre')`
+      `SELECT COALESCE(SUM(montant), 0) AS montant, COUNT(*) AS cnt
+       FROM finance_entries
+       WHERE type = 'vente' AND DATE(date_entree) = CURDATE()`
     ),
     db.execute(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
@@ -4095,6 +4303,218 @@ async function fixSiteOrderFinanceEntries() {
     }
   });
 }
+function mapTombolaRow(r) {
+  return {
+    id: Number(r.id),
+    nom: String(r.nom),
+    statut: r.statut,
+    min_montant: Number(r.min_montant),
+    min_participants: Number(r.min_participants),
+    prize_description: r.prize_description ?? null,
+    winner_facture_id: r.winner_facture_id ? Number(r.winner_facture_id) : null,
+    winner_nom: r.winner_nom ?? null,
+    winner_tel: r.winner_tel ?? null,
+    winner_montant: r.winner_montant != null ? Number(r.winner_montant) : null,
+    winner_reference: r.winner_reference ?? null,
+    notifie: Boolean(r.notifie),
+    created_at: String(r.created_at),
+    launched_at: r.launched_at ? String(r.launched_at) : null,
+    completed_at: r.completed_at ? String(r.completed_at) : null
+  };
+}
+async function ensureTombolaTable() {
+  return runOnce("tombola", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS tombola_sessions (
+        id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        nom              VARCHAR(150) NOT NULL,
+        statut           ENUM('draft','active','termine') NOT NULL DEFAULT 'draft',
+        min_montant      DECIMAL(10,2) NOT NULL DEFAULT 50000,
+        min_participants INT UNSIGNED NOT NULL DEFAULT 10,
+        prize_description TEXT NULL,
+        winner_facture_id INT UNSIGNED NULL,
+        winner_nom       VARCHAR(150) NULL,
+        winner_tel       VARCHAR(30)  NULL,
+        winner_montant   DECIMAL(10,2) NULL,
+        winner_reference VARCHAR(50)  NULL,
+        notifie          TINYINT(1) NOT NULL DEFAULT 0,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        launched_at      TIMESTAMP NULL,
+        completed_at     TIMESTAMP NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  });
+}
+async function listTombolaSessions() {
+  await ensureTombolaTable();
+  const [rows] = await db.query(
+    `SELECT * FROM tombola_sessions ORDER BY created_at DESC`
+  );
+  return rows.map(mapTombolaRow);
+}
+async function getTombolaSession(id) {
+  await ensureTombolaTable();
+  const [[row]] = await db.execute(
+    `SELECT * FROM tombola_sessions WHERE id = ?`,
+    [id]
+  );
+  if (!row) return null;
+  return mapTombolaRow(row);
+}
+async function createTombolaSession(data) {
+  await ensureTombolaTable();
+  const [result] = await db.execute(
+    `INSERT INTO tombola_sessions (nom, min_montant, min_participants, prize_description)
+     VALUES (?, ?, ?, ?)`,
+    [data.nom, data.min_montant, data.min_participants, data.prize_description ?? null]
+  );
+  return result.insertId;
+}
+async function updateTombolaSession(id, data) {
+  const entries = Object.entries(data).filter(([, v]) => v !== void 0);
+  if (entries.length === 0) return;
+  const fields = entries.map(([k]) => `${k} = ?`).join(", ");
+  const values = [...entries.map(([, v]) => v), id];
+  await db.execute(`UPDATE tombola_sessions SET ${fields} WHERE id = ?`, values);
+}
+async function deleteTombolaSession(id) {
+  await db.execute(
+    `DELETE FROM tombola_sessions WHERE id = ? AND statut = 'draft'`,
+    [id]
+  );
+}
+async function getTombolaParticipants(minMontant) {
+  const [rows] = await db.query(
+    `SELECT id AS facture_id, reference, client_nom, client_tel, total, created_at
+     FROM factures
+     WHERE statut_paiement = 'paye_total' AND total >= ?
+     ORDER BY created_at DESC`,
+    [minMontant]
+  );
+  return rows.map((r) => ({
+    facture_id: Number(r.facture_id),
+    reference: String(r.reference),
+    client_nom: String(r.client_nom),
+    client_tel: r.client_tel ?? null,
+    total: Number(r.total),
+    created_at: String(r.created_at)
+  }));
+}
+async function spinTombola(sessionId, winnerFactureId) {
+  const [[row]] = await db.execute(
+    `SELECT client_nom, client_tel, total, reference FROM factures WHERE id = ?`,
+    [winnerFactureId]
+  );
+  if (!row) throw new Error("Facture introuvable");
+  await db.execute(
+    `UPDATE tombola_sessions
+     SET statut = 'termine', winner_facture_id = ?, winner_nom = ?, winner_tel = ?,
+         winner_montant = ?, winner_reference = ?, completed_at = NOW()
+     WHERE id = ? AND statut IN ('draft','active')`,
+    [
+      winnerFactureId,
+      row.client_nom,
+      row.client_tel ?? null,
+      row.total,
+      row.reference,
+      sessionId
+    ]
+  );
+}
+async function markTombolaNotified(sessionId) {
+  await db.execute(`UPDATE tombola_sessions SET notifie = 1 WHERE id = ?`, [sessionId]);
+}
+async function fixPendingMmOrders() {
+  try {
+    const [result] = await db.execute(
+      `UPDATE orders
+       SET status = 'confirmed'
+       WHERE payment_mode IN ('moov_direct', 'yas_direct')
+         AND statut_paiement = 'paye'
+         AND status = 'pending'`
+    );
+    if (result.affectedRows > 0) {
+      console.log(`[backend] fixPendingMmOrders: confirmed ${result.affectedRows} stuck orders`);
+    }
+    await db.execute(
+      `UPDATE factures f
+       JOIN orders o ON o.id = f.order_id
+       SET f.statut_paiement = 'paye'
+       WHERE o.payment_mode IN ('moov_direct', 'yas_direct')
+         AND o.statut_paiement = 'paye'
+         AND o.status NOT IN ('delivered', 'livree', 'livr\xE9e', 'livre', 'livr\xE9')
+         AND f.statut_paiement = 'paye_total'`
+    ).catch(() => {
+    });
+    await db.execute(
+      `UPDATE factures f
+       JOIN orders o ON o.id = f.order_id
+       SET f.statut_paiement = 'paye'
+       WHERE o.payment_mode IN ('moov_direct', 'yas_direct')
+         AND o.statut_paiement = 'paye'
+         AND o.status IN ('confirmed', 'shipped')
+         AND f.statut_paiement = 'non_paye'`
+    ).catch(() => {
+    });
+  } catch (e) {
+    console.error("[backend] fixPendingMmOrders failed:", e);
+  }
+}
+async function backfillEntrepotBoutiqueFinance() {
+  let updated = 0;
+  let skipped = 0;
+  const [factures] = await db.query(
+    `SELECT id, reference, items, total, montant_acompte, statut_paiement
+     FROM factures
+     WHERE (source IS NULL OR source != 'site_order')
+       AND statut_paiement IN ('paye_total', 'acompte', 'paye')`
+  );
+  for (const f of factures) {
+    try {
+      const items = typeof f.items === "string" ? JSON.parse(f.items) : f.items ?? [];
+      const produitIds = items.map((i) => Number(i.produit_id)).filter(Boolean);
+      if (!produitIds.length) {
+        skipped++;
+        continue;
+      }
+      const placeholders = produitIds.map(() => "?").join(",");
+      const [eRows] = await db.query(
+        `SELECT id, prix_entrepot FROM produits WHERE id IN (${placeholders}) AND entrepot_id IS NOT NULL AND prix_entrepot IS NOT NULL`,
+        produitIds
+      );
+      if (!eRows.length) {
+        skipped++;
+        continue;
+      }
+      const eMap = /* @__PURE__ */ new Map();
+      for (const r of eRows) eMap.set(Number(r.id), Number(r.prix_entrepot));
+      let coutEntrepot = 0;
+      for (const item of items) {
+        const pe = eMap.get(Number(item.produit_id));
+        if (pe != null) coutEntrepot += pe * Number(item.qty ?? item.quantite ?? 1);
+      }
+      if (coutEntrepot <= 0) {
+        skipped++;
+        continue;
+      }
+      const brut = f.statut_paiement === "acompte" ? Number(f.montant_acompte ?? 0) : Number(f.total ?? 0);
+      const montantCorrige = Math.max(0, brut - coutEntrepot);
+      await db.execute(
+        `UPDATE finance_entries
+         SET montant = ?,
+             description = CONCAT(description, ' (marge nette, co\xFBt entrep\xF4t ${coutEntrepot} FCFA d\xE9duit)')
+         WHERE description LIKE ?
+           AND description NOT LIKE '%marge nette%'
+         LIMIT 1`,
+        [montantCorrige, `%${f.reference}%`]
+      );
+      updated++;
+    } catch {
+      skipped++;
+    }
+  }
+  return { updated, skipped };
+}
 var _ensurePromises, _settingsCache, _finCols, _ventesStatsCache;
 var init_admin_db = __esm({
   "../lib/admin-db.ts"() {
@@ -4114,8 +4534,8 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
-var import_path = require("path");
-var import_express43 = __toESM(require("express"));
+var import_path2 = require("path");
+var import_express45 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -4382,36 +4802,6 @@ router.post("/api/admin/auth/login", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router.post("/api/admin/auth/bootstrap-kent", async (req, res) => {
-  if (req.headers["x-bootstrap-secret"] !== "togolese-bootstrap-2025") {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  try {
-    const pool2 = db;
-    const KENT_HASH = "$2b$12$4ivze.K3jg8LW7j9RRuzReeqjR2xtXscmGkTbh7rceBFQMI7tcef.";
-    const [rows] = await pool2.execute(
-      "SELECT id, username, role FROM admin_users WHERE username = 'kent' LIMIT 1"
-    );
-    if (rows.length) {
-      await pool2.execute(
-        "UPDATE admin_users SET password_hash = ?, role = 'super_admin', actif = 1 WHERE username = 'kent'",
-        [KENT_HASH]
-      );
-      return res.json({ ok: true, action: "updated", user: rows[0] });
-    }
-    const uniqueEmail = `kent.${Date.now()}@admin.local`;
-    await pool2.execute(
-      "INSERT INTO admin_users (nom, username, email, poste, password_hash, role, actif) VALUES ('Kent','kent',?,'Administrateur',?,?,1)",
-      [uniqueEmail, KENT_HASH, "super_admin"]
-    );
-    const [newRow] = await pool2.execute(
-      "SELECT id, username, role FROM admin_users WHERE username = 'kent' LIMIT 1"
-    );
-    return res.json({ ok: true, action: "created", user: newRow[0] });
-  } catch (err) {
-    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
 router.patch("/api/admin/auth/change-password", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -4581,16 +4971,36 @@ router2.get("/api/admin/products", async (req, res) => {
   const q = req.query.q || void 0;
   const catId = req.query.category ? Number(req.query.category) : void 0;
   const brandId = req.query.brand ? Number(req.query.brand) : void 0;
+  const entrepotId = req.query.entrepot_id ? Number(req.query.entrepot_id) : void 0;
   const statut = req.query.statut || void 0;
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(500, Number(req.query.limit) || 20);
   const offset = req.query.offset !== void 0 ? Number(req.query.offset) : (page - 1) * limit;
   const statutFilter = ["disponible", "faible", "epuise"].includes(statut ?? "") ? statut : void 0;
   const [products, total] = await Promise.all([
-    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true }),
-    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true })
+    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true, entrepotId }),
+    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true, entrepotId })
   ]);
-  res.json({ products, total, page, limit });
+  const ids = products.map((p) => p.id).filter(Boolean);
+  const variantStockMap = {};
+  if (ids.length > 0) {
+    try {
+      const [vrows] = await db.query(
+        `SELECT produit_id, COALESCE(SUM(stock), 0) AS variants_stock
+         FROM product_variants
+         WHERE produit_id IN (${ids.map(() => "?").join(",")})
+         GROUP BY produit_id`,
+        ids
+      );
+      for (const row of vrows) variantStockMap[row.produit_id] = Number(row.variants_stock);
+    } catch {
+    }
+  }
+  const enriched = products.map((p) => ({
+    ...p,
+    variants_stock: Object.prototype.hasOwnProperty.call(variantStockMap, p.id) ? variantStockMap[p.id] : null
+  }));
+  res.json({ products: enriched, total, page, limit });
 });
 router2.post("/api/admin/products", async (req, res) => {
   const session = await getSession(req);
@@ -4832,7 +5242,7 @@ router2.get("/api/admin/products/export", async (req, res) => {
     const rows = products.map((p) => {
       const prix = Number(p.prix_unitaire ?? 0);
       const remise = Number(p.remise ?? 0);
-      const promo = remise > 0 ? Math.round(prix * (1 - remise / 100)) : "";
+      const promo = remise > 0 ? Math.max(0, prix - remise) : "";
       const stMag = Number(p.stock_magasin ?? 0);
       const stBout = Number(p.stock_boutique ?? p.stock ?? 0);
       const stMin = Number(p.stock_minimum ?? 0);
@@ -4923,6 +5333,7 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       "description",
       "description_longue",
       "categorie_id",
+      "marque_id",
       "prix_unitaire",
       "stock_magasin",
       "stock_boutique",
@@ -5023,25 +5434,31 @@ async function ensureTable() {
   if (_variantsReady) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS product_variants (
-      id            INT AUTO_INCREMENT PRIMARY KEY,
-      produit_id    INT NOT NULL,
-      nom           VARCHAR(255) NOT NULL DEFAULT '',
-      options       JSON,
-      prix          DECIMAL(10,2) NOT NULL DEFAULT 0,
-      remise        DECIMAL(10,2) NOT NULL DEFAULT 0,
-      stock         INT NOT NULL DEFAULT 0,
-      reference_sku VARCHAR(100),
-      image_url     VARCHAR(500),
-      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      produit_id      INT NOT NULL,
+      nom             VARCHAR(255) NOT NULL DEFAULT '',
+      options         JSON,
+      prix            DECIMAL(10,2) NOT NULL DEFAULT 0,
+      remise          DECIMAL(10,2) NOT NULL DEFAULT 0,
+      stock           INT NOT NULL DEFAULT 0,
+      stock_boutique  INT NOT NULL DEFAULT 0,
+      reference_sku   VARCHAR(100),
+      image_url       VARCHAR(500),
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_produit_id (produit_id)
     )
   `);
-  try {
-    await db.execute(
-      "ALTER TABLE product_variants ADD COLUMN remise DECIMAL(10,2) NOT NULL DEFAULT 0"
-    );
-  } catch (err) {
-    if (err?.code !== "ER_DUP_FIELDNAME") throw err;
+  for (const ddl of [
+    "ALTER TABLE product_variants ADD COLUMN remise         DECIMAL(10,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE product_variants ADD COLUMN stock_boutique INT          NOT NULL DEFAULT 0",
+    "ALTER TABLE product_variants ADD COLUMN reference_sku  VARCHAR(100)",
+    "ALTER TABLE product_variants ADD COLUMN image_url      VARCHAR(500)"
+  ]) {
+    try {
+      await db.execute(ddl);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") throw err;
+    }
   }
   _variantsReady = true;
 }
@@ -5074,10 +5491,10 @@ router3.post("/api/admin/products/:productId/variants", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
     await ensureTable();
-    const { nom, options, prix, remise, stock, reference_sku, image_url } = req.body;
+    const { nom, options, prix, remise, stock, stock_boutique, reference_sku, image_url } = req.body;
     const [result] = await db.execute(
-      `INSERT INTO product_variants (produit_id, nom, options, prix, remise, stock, reference_sku, image_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO product_variants (produit_id, nom, options, prix, remise, stock, stock_boutique, reference_sku, image_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.params.productId,
         nom || "",
@@ -5085,6 +5502,7 @@ router3.post("/api/admin/products/:productId/variants", async (req, res) => {
         Number(prix) || 0,
         Number(remise) || 0,
         Number(stock) || 0,
+        Number(stock_boutique) || 0,
         reference_sku || null,
         image_url || null
       ]
@@ -5099,9 +5517,10 @@ router3.put("/api/admin/products/:productId/variants/:id", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
     await ensureTable();
-    const { nom, options, prix, remise, stock, reference_sku, image_url } = req.body;
+    const { nom, options, prix, remise, stock, stock_boutique, reference_sku, image_url } = req.body;
     await db.execute(
-      `UPDATE product_variants SET nom=?, options=?, prix=?, remise=?, stock=?, reference_sku=?, image_url=?
+      `UPDATE product_variants
+       SET nom=?, options=?, prix=?, remise=?, stock=?, stock_boutique=?, reference_sku=?, image_url=?
        WHERE id=? AND produit_id=?`,
       [
         nom || "",
@@ -5109,6 +5528,7 @@ router3.put("/api/admin/products/:productId/variants/:id", async (req, res) => {
         Number(prix) || 0,
         Number(remise) || 0,
         Number(stock) || 0,
+        Number(stock_boutique) || 0,
         reference_sku || null,
         image_url || null,
         req.params.id,
@@ -5116,6 +5536,33 @@ router3.put("/api/admin/products/:productId/variants/:id", async (req, res) => {
       ]
     );
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.patch("/api/admin/products/:productId/variants/:id/boutique-transfer", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const qty = Number(req.body.qty);
+  if (!qty || qty <= 0) return res.status(400).json({ error: "qty requis > 0" });
+  try {
+    await ensureTable();
+    const [[row]] = await db.execute(
+      "SELECT stock, stock_boutique FROM product_variants WHERE id = ? AND produit_id = ?",
+      [req.params.id, req.params.productId]
+    );
+    if (!row) return res.status(404).json({ error: "Variante introuvable" });
+    const available = Number(row.stock);
+    if (available < qty) return res.status(400).json({ error: `Stock magasin insuffisant (dispo: ${available})` });
+    await db.execute(
+      "UPDATE product_variants SET stock = stock - ?, stock_boutique = stock_boutique + ? WHERE id = ?",
+      [qty, qty, req.params.id]
+    );
+    const [[updated]] = await db.execute(
+      "SELECT stock, stock_boutique FROM product_variants WHERE id = ?",
+      [req.params.id]
+    );
+    res.json({ ok: true, stock: Number(updated?.stock ?? 0), stock_boutique: Number(updated?.stock_boutique ?? 0) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
@@ -5173,11 +5620,18 @@ router4.post("/api/admin/stock/entree", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { produit_id, quantite, reference, note } = req.body;
+    const { produit_id, quantite, reference, note, variant_id } = req.body;
     if (!produit_id || !quantite || quantite <= 0) {
       return res.status(400).json({ error: "produit_id et quantite (> 0) requis." });
     }
-    await createStockEntree({ produit_id, quantite: Number(quantite), reference, note, user_id: session.id });
+    await createStockEntree({
+      produit_id,
+      quantite: Number(quantite),
+      reference,
+      note,
+      user_id: session.id,
+      ...variant_id ? { variant_id: Number(variant_id) } : {}
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -5188,11 +5642,18 @@ router4.post("/api/admin/stock/sortie", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { produit_id, quantite, reference, note } = req.body;
+    const { produit_id, quantite, reference, note, variant_id } = req.body;
     if (!produit_id || !quantite || quantite <= 0) {
       return res.status(400).json({ error: "produit_id et quantite (> 0) requis." });
     }
-    await createStockSortie({ produit_id, quantite: Number(quantite), reference, note, user_id: session.id });
+    await createStockSortie({
+      produit_id,
+      quantite: Number(quantite),
+      reference,
+      note,
+      user_id: session.id,
+      ...variant_id ? { variant_id: Number(variant_id) } : {}
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -5203,14 +5664,20 @@ router4.post("/api/admin/stock/ajustement", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { produit_id, quantite, motif } = req.body;
+    const { produit_id, quantite, motif, variant_id } = req.body;
     if (!produit_id || quantite === void 0 || quantite === null) {
       return res.status(400).json({ error: "produit_id et quantite requis." });
     }
     if (!motif?.trim()) {
       return res.status(400).json({ error: "Un motif est requis pour un ajustement." });
     }
-    await createStockAjustement({ produit_id, quantite: Number(quantite), motif, user_id: session.id });
+    await createStockAjustement({
+      produit_id,
+      quantite: Number(quantite),
+      motif,
+      user_id: session.id,
+      ...variant_id ? { variant_id: Number(variant_id) } : {}
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -5784,6 +6251,19 @@ router6.get("/api/admin/ventes/livraisons", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
+router6.post("/api/admin/ventes/backfill-entrepot-finance", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const result = await backfillEntrepotBoutiqueFinance();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 var ventes_default = router6;
 
 // routes/admin/livraisons.ts
@@ -6198,22 +6678,27 @@ router10.patch("/api/admin/orders/:id", async (req, res) => {
     return res.json({ ok: true });
   }
   if (req.body.field === "confirm_mm") {
-    await ensurePaymentColumn();
-    await updateOrderFields(id, { statut_paiement: "paye" });
-    const [[mmOrderRow]] = await db.execute(
-      "SELECT vente_facture_id FROM orders WHERE id = ? LIMIT 1",
-      [id]
-    );
-    if (mmOrderRow?.vente_facture_id) {
+    try {
+      await ensurePaymentColumn();
+      await updateOrderStatus(id, "confirmed");
+      await updateOrderFields(id, { statut_paiement: "paye" });
+      const actor = { id: typeof session.id === "number" ? session.id : void 0, nom: session.nom };
+      await ensureOrderVente(id, actor).catch((e) => console.error("[orders] ensureOrderVente confirm_mm:", e));
       await db.execute(
-        "UPDATE factures SET statut_paiement = 'paye_total' WHERE id = ?",
-        [mmOrderRow.vente_facture_id]
-      );
+        "UPDATE factures SET statut_paiement = 'paye' WHERE order_id = ? AND statut != 'annule'",
+        [id]
+      ).catch(() => {
+      });
+      await addOrderEvent(id, "confirmed", "Paiement Mobile Money v\xE9rifi\xE9 \u2014 commande confirm\xE9e", session.nom);
+      invalidateVentesStats();
+      emitAdminEvent("finance");
+      emitAdminEvent("commande");
+      emitAdminEvent("vente");
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[orders] confirm_mm failed:", err);
+      return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
     }
-    await addOrderEvent(id, "confirm\xE9e", "Paiement Mobile Money v\xE9rifi\xE9 et confirm\xE9", session.nom);
-    emitAdminEvent("finance");
-    emitAdminEvent("commande");
-    return res.json({ ok: true });
   }
   if (req.body.field === "update") {
     const { nom, telephone, adresse, zone_livraison, note, delivery_fee, items, lien_localisation } = req.body;
@@ -6544,6 +7029,13 @@ router15.post("/api/admin/boutique-clients", async (req, res) => {
 router15.patch("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (req.body.telephone?.trim()) {
+    const [[existing]] = await db.execute(
+      "SELECT id FROM boutique_clients WHERE telephone = ? AND id != ? LIMIT 1",
+      [req.body.telephone.trim(), Number(req.params.id)]
+    );
+    if (existing) return res.status(400).json({ error: "Un client avec ce num\xE9ro existe d\xE9j\xE0." });
+  }
   await updateBoutiqueClient(Number(req.params.id), req.body);
   res.json({ success: true });
 });
@@ -6607,6 +7099,9 @@ router17.get("/api/admin/schema/columns", async (req, res) => {
 router17.post("/api/admin/schema/migrate", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s r\xE9serv\xE9 aux administrateurs." });
+  }
   const results = {};
   try {
     const [cols] = await db.execute(
@@ -6629,7 +7124,8 @@ router17.post("/api/admin/schema/migrate", async (req, res) => {
     invalidateProduitColsCache();
     res.json({ ok: true, results });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    console.error("[schema/migrate]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 var schema_default = router17;
@@ -7285,7 +7781,8 @@ router24.get("/api/livreur/profile", async (req, res) => {
       res.json({ nom: admin?.nom ?? ctx.member.nom, telephone: admin?.telephone ?? null, numero_plaque: null, poste: "Livreur" });
     }
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router24.get("/api/livreur/stats", async (req, res) => {
@@ -7323,7 +7820,8 @@ router24.get("/api/livreur/stats", async (req, res) => {
     const tauxReussite = assigned > 0 ? Math.round(total / assigned * 100) : 0;
     res.json({ today, week, total, enCours, tauxReussite, gainToday, gainWeek, gainTotal });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router24.get("/api/livreur/orders/available", async (req, res) => {
@@ -7353,7 +7851,8 @@ router24.get("/api/livreur/orders/available", async (req, res) => {
     );
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router24.get("/api/livreur/orders/mine", async (req, res) => {
@@ -7385,7 +7884,8 @@ router24.get("/api/livreur/orders/mine", async (req, res) => {
     );
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router24.get("/api/livreur/orders/history", async (req, res) => {
@@ -7418,7 +7918,8 @@ router24.get("/api/livreur/orders/history", async (req, res) => {
     const data = [...orderRows, ...livRows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limit);
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router24.patch("/api/livreur/orders/:id/accept", async (req, res) => {
@@ -7464,7 +7965,8 @@ router24.patch("/api/livreur/orders/:id/accept", async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router24.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
@@ -7538,7 +8040,8 @@ router24.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router24.patch("/api/livreur/orders/:id/fail", async (req, res) => {
@@ -7584,7 +8087,8 @@ router24.patch("/api/livreur/orders/:id/fail", async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[livreur]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 var livreur_default = router24;
@@ -7758,7 +8262,8 @@ router25.post("/api/newsletter", async (req, res) => {
     await subscribeNewsletter(email.trim().toLowerCase());
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[newsletter]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router25.get("/api/reviews/ratings", async (req, res) => {
@@ -7797,7 +8302,8 @@ router25.get("/api/reviews", async (req, res) => {
     const reviews = await listReviews({ produit_id });
     res.json({ reviews });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    console.error("[reviews/list]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router25.post("/api/reviews", async (req, res) => {
@@ -8307,8 +8813,8 @@ router26.post("/api/account/verification", async (req, res) => {
     if (!id_card?.data || !selfie?.data) {
       return res.status(400).json({ error: "Les deux photos sont requises." });
     }
-    const { v2: cloudinary3 } = await import("cloudinary");
-    cloudinary3.config({
+    const { v2: cloudinary4 } = await import("cloudinary");
+    cloudinary4.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET
@@ -8316,7 +8822,7 @@ router26.post("/api/account/verification", async (req, res) => {
     async function uploadImg(b64) {
       const buffer = Buffer.from(b64.replace(/^data:[^;]+;base64,/, ""), "base64");
       return new Promise((resolve2, reject) => {
-        const stream = cloudinary3.uploader.upload_stream(
+        const stream = cloudinary4.uploader.upload_stream(
           { folder: "togolese-shop/verifications", resource_type: "image" },
           (err, result) => err || !result ? reject(err) : resolve2(result.secure_url)
         );
@@ -8374,7 +8880,8 @@ router26.get("/api/account/addresses", async (req, res) => {
     );
     res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+    console.error("[account]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router26.post("/api/account/addresses", async (req, res) => {
@@ -8400,7 +8907,8 @@ router26.post("/api/account/addresses", async (req, res) => {
     );
     res.json({ success: true, id: result.insertId });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+    console.error("[account]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 router26.delete("/api/account/addresses/:id", async (req, res) => {
@@ -8414,7 +8922,8 @@ router26.delete("/api/account/addresses/:id", async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+    console.error("[account]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 var account_default = router26;
@@ -8423,6 +8932,34 @@ var account_default = router26;
 var import_express27 = __toESM(require("express"));
 init_admin_db();
 init_db();
+var import_cloudinary2 = require("cloudinary");
+import_cloudinary2.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+async function uploadScreenshotToCloudinary(base64Data) {
+  const data = base64Data.replace(/^data:[^;]+;base64,/, "");
+  const buffer = Buffer.from(data, "base64");
+  if (buffer.length > 10 * 1024 * 1024) {
+    throw new Error("Image trop volumineuse (max 10 Mo).");
+  }
+  return new Promise((resolve2, reject) => {
+    const stream = import_cloudinary2.v2.uploader.upload_stream(
+      {
+        folder: "togolese-payment-proofs",
+        resource_type: "image",
+        format: "jpg",
+        quality: "auto"
+      },
+      (error, result) => {
+        if (error || !result) reject(error ?? new Error("Upload \xE9chou\xE9"));
+        else resolve2(result.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
+}
 var router27 = import_express27.default.Router();
 function normalizeTogoPhone(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -8436,7 +8973,7 @@ async function ensureOrderCols() {
   for (const ddl of [
     "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
-    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
+    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
     "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL",
     "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) NULL",
@@ -8448,7 +8985,99 @@ async function ensureOrderCols() {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
     }
   }
+  try {
+    await pool2.execute(
+      "ALTER TABLE orders MODIFY COLUMN mm_transaction_ref VARCHAR(500) NULL"
+    );
+  } catch {
+  }
   _orderColsReady = true;
+}
+var PRICE_TOLERANCE = 100;
+async function validateOrderPricing(items, zone_livraison, delivery_fee_claimed, coupon_code, coupon_remise_claimed, total_claimed) {
+  try {
+    const pool2 = db;
+    const productIds = items.map((i) => Number(i.id ?? i.produit_id)).filter((id) => id > 0);
+    if (productIds.length === 0) return { ok: false, error: "Aucun article valide." };
+    const ph = productIds.map(() => "?").join(",");
+    const [products] = await pool2.execute(
+      `SELECT id, prix_unitaire, COALESCE(remise, 0) AS remise FROM produits WHERE id IN (${ph}) AND actif = 1`,
+      productIds
+    );
+    const priceMap = /* @__PURE__ */ new Map();
+    for (const p of products) {
+      priceMap.set(Number(p.id), { prix: Number(p.prix_unitaire), remise: Number(p.remise) });
+    }
+    let serverSubtotal = 0;
+    for (const item of items) {
+      const pid = Number(item.id ?? item.produit_id);
+      const qty = Math.max(1, Number(item.qty ?? item.quantite ?? 1));
+      const prod = priceMap.get(pid);
+      if (!prod) return { ok: false, error: `Produit introuvable ou inactif : ID ${pid}` };
+      const unitPrice = prod.remise > 0 ? Math.max(0, prod.prix - prod.remise) : prod.prix;
+      serverSubtotal += unitPrice * qty;
+    }
+    let serverFee = 0;
+    if (zone_livraison) {
+      try {
+        const [zones] = await pool2.execute(
+          "SELECT fee, prix_libre FROM delivery_zones WHERE nom = ? AND actif = 1 LIMIT 1",
+          [zone_livraison]
+        );
+        const zone = zones[0];
+        if (zone) {
+          if (zone.prix_libre) {
+            serverFee = Math.min(Number(delivery_fee_claimed), 2e4);
+          } else {
+            serverFee = Number(zone.fee ?? 0);
+            if (Math.abs(Number(delivery_fee_claimed) - serverFee) > PRICE_TOLERANCE) {
+              return { ok: false, error: "Frais de livraison invalides." };
+            }
+          }
+        } else {
+          serverFee = Number(delivery_fee_claimed ?? 0);
+        }
+      } catch {
+        serverFee = Number(delivery_fee_claimed ?? 0);
+      }
+    }
+    let serverRemise = 0;
+    if (coupon_code) {
+      try {
+        const [coupons] = await pool2.execute(
+          `SELECT type, valeur, min_order, max_uses, uses_count, expires_at
+           FROM coupons WHERE code = ? AND actif = 1 LIMIT 1`,
+          [String(coupon_code).trim().toUpperCase()]
+        );
+        const coupon = coupons[0];
+        if (coupon) {
+          const expired = coupon.expires_at && new Date(coupon.expires_at) < /* @__PURE__ */ new Date();
+          const maxedOut = Number(coupon.max_uses) > 0 && Number(coupon.uses_count) >= Number(coupon.max_uses);
+          const underMin = serverSubtotal < Number(coupon.min_order);
+          if (!expired && !maxedOut && !underMin) {
+            serverRemise = coupon.type === "fixed" ? Math.min(Number(coupon.valeur), serverSubtotal) : Math.round(serverSubtotal * Number(coupon.valeur) / 100);
+          }
+        }
+        if (Number(coupon_remise_claimed) > serverRemise + PRICE_TOLERANCE) {
+          return { ok: false, error: "Remise coupon invalide." };
+        }
+      } catch {
+        serverRemise = Number(coupon_remise_claimed ?? 0);
+      }
+    }
+    const expectedTotal = serverSubtotal - serverRemise + serverFee;
+    if (Math.abs(total_claimed - expectedTotal) > PRICE_TOLERANCE) {
+      console.warn(
+        `[orders] Price mismatch: claimed=${total_claimed}, expected=${expectedTotal}`,
+        `(sub=${serverSubtotal}, fee=${serverFee}, remise=${serverRemise})`
+      );
+      return { ok: false, error: `Total invalide. Attendu : ${expectedTotal} FCFA, re\xE7u : ${total_claimed} FCFA.` };
+    }
+    return { ok: true, subtotal: serverSubtotal, fee: serverFee, remise: serverRemise };
+  } catch (err) {
+    console.error("[orders] price validation error (non-blocking):", err);
+    return { ok: true, subtotal: Number(total_claimed), fee: Number(delivery_fee_claimed), remise: Number(coupon_remise_claimed ?? 0) };
+  }
 }
 router27.post("/api/orders", async (req, res) => {
   try {
@@ -8467,10 +9096,10 @@ router27.post("/api/orders", async (req, res) => {
       total,
       payment_mode,
       nb_tranches,
-      mm_transaction_ref,
       ref_code,
       coupon_code,
-      coupon_remise
+      coupon_remise,
+      mm_screenshot_b64
     } = req.body;
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "T\xE9l\xE9phone et articles requis." });
@@ -8479,8 +9108,28 @@ router27.post("/api/orders", async (req, res) => {
     if (!cleanTelephone) {
       return res.status(400).json({ error: "Le num\xE9ro WhatsApp doit contenir exactement 8 chiffres togolais." });
     }
-    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !String(mm_transaction_ref ?? "").trim()) {
-      return res.status(400).json({ error: "La r\xE9f\xE9rence de transaction est obligatoire pour ce paiement." });
+    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !mm_screenshot_b64) {
+      return res.status(400).json({ error: "La capture d'\xE9cran de confirmation est obligatoire." });
+    }
+    let mm_transaction_ref = null;
+    if (mm_screenshot_b64) {
+      try {
+        mm_transaction_ref = await uploadScreenshotToCloudinary(mm_screenshot_b64);
+      } catch (uploadErr) {
+        console.error("[orders] screenshot upload failed:", uploadErr);
+        return res.status(500).json({ error: "\xC9chec de l'upload de la capture d'\xE9cran. R\xE9essayez." });
+      }
+    }
+    const priceCheck = await validateOrderPricing(
+      items,
+      zone_livraison,
+      Number(delivery_fee ?? 0),
+      coupon_code,
+      Number(coupon_remise ?? 0),
+      Number(total ?? 0)
+    );
+    if (!priceCheck.ok) {
+      return res.status(400).json({ error: priceCheck.error });
     }
     const isEchelonne = ["2x", "3x", "4x"].includes(payment_mode);
     const tranches = isEchelonne ? Math.max(2, Math.min(4, Number(nb_tranches) || 4)) : null;
@@ -8606,6 +9255,8 @@ router27.post("/api/orders", async (req, res) => {
       [id]
     );
     const reference = rows[0]?.reference ?? `CMD-${id}`;
+    const isCash = !["moov_direct", "yas_direct", "2x", "3x", "4x"].includes(payment_mode ?? "");
+    if (isCash) emitAdminEvent("finance");
     emitAdminEvent("commande", {
       id,
       reference,
@@ -8644,59 +9295,6 @@ var OPERATOR_MODE = {
   flooz: "moov",
   yas: "moov"
 };
-router28.get("/api/debug/fedapay-test", async (req, res) => {
-  const phone = String(req.query.phone || "90000000");
-  const log = { phone };
-  try {
-    const custRes = await fetch(`${FEDAPAY_BASE}/customers`, {
-      method: "POST",
-      headers: fedapayHeaders(),
-      body: JSON.stringify({ firstname: "Test", lastname: "Debug", phone_number: { number: phone, country: "tg" } })
-    });
-    const custData = await custRes.json();
-    log.step1_status = custRes.status;
-    log.step1_customer = custData;
-    const customerId = custData?.["v1/customer"]?.id;
-    if (!customerId) return res.json({ ok: false, error: "customer creation failed", log });
-    const txRes = await fetch(`${FEDAPAY_BASE}/transactions`, {
-      method: "POST",
-      headers: fedapayHeaders(),
-      body: JSON.stringify({
-        description: "Test diagnostic",
-        amount: 100,
-        currency: { iso: "XOF" },
-        callback_url: "https://example.com/webhook",
-        customer: { id: customerId }
-      })
-    });
-    const txData = await txRes.json();
-    log.step2_status = txRes.status;
-    log.step2_transaction = txData;
-    const txId = txData?.["v1/transaction"]?.id;
-    if (!txId) return res.json({ ok: false, error: "transaction creation failed", log });
-    const tokenRes = await fetch(`${FEDAPAY_BASE}/transactions/${txId}/token`, {
-      method: "POST",
-      headers: fedapayHeaders(),
-      body: JSON.stringify({})
-    });
-    const tokenData = await tokenRes.json();
-    log.step3_status = tokenRes.status;
-    log.step3_token = tokenData;
-    const token = tokenData.token;
-    if (!token) return res.json({ ok: false, error: "no token", log });
-    const pushRes = await fetch(`${FEDAPAY_BASE}/moov`, {
-      method: "POST",
-      headers: fedapayHeaders(),
-      body: JSON.stringify({ token })
-    });
-    const pushData = await pushRes.json();
-    log.step4_status = pushRes.status;
-    log.step4_push = pushData;
-    return res.json({ ok: pushRes.ok, log });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: String(err), log });
-  }
-});
 router28.post("/api/orders/pay/mobile-money", async (req, res) => {
   try {
     const { orderId, orderRef, operator, phone, total, nom } = req.body;
@@ -10605,10 +11203,10 @@ var whatsapp_campagne_default = router40;
 // routes/admin/livreur-inscriptions.ts
 var import_express41 = __toESM(require("express"));
 var import_bcryptjs4 = __toESM(require("bcryptjs"));
-var import_cloudinary2 = require("cloudinary");
+var import_cloudinary3 = require("cloudinary");
 init_admin_db();
 init_db();
-import_cloudinary2.v2.config({
+import_cloudinary3.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
@@ -10628,7 +11226,7 @@ async function requireAdmin(req, res) {
 }
 async function uploadBase64ToCloudinary(base64) {
   return new Promise((resolve2, reject) => {
-    import_cloudinary2.v2.uploader.upload(
+    import_cloudinary3.v2.uploader.upload(
       base64,
       { folder: "togolese-shop/livreurs-cni", resource_type: "image", format: "webp", quality: "auto" },
       (error, result) => {
@@ -10751,6 +11349,9 @@ var router42 = import_express42.default.Router();
 router42.get("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
   try {
     const entrepots = await listEntrepots();
     res.json({ entrepots });
@@ -10761,7 +11362,7 @@ router42.get("/api/admin/entrepots", async (req, res) => {
 router42.post("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
   const { id, nom, telephone, adresse, notes, actif } = req.body;
@@ -10776,7 +11377,7 @@ router42.post("/api/admin/entrepots", async (req, res) => {
 router42.delete("/api/admin/entrepots/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
   try {
@@ -10788,12 +11389,461 @@ router42.delete("/api/admin/entrepots/:id", async (req, res) => {
 });
 var entrepots_default = router42;
 
+// routes/admin/tombola.ts
+var import_express43 = __toESM(require("express"));
+init_admin_db();
+var router43 = import_express43.default.Router();
+router43.get("/api/admin/tombola", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    const sessions = await listTombolaSessions();
+    res.json({ data: sessions });
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+router43.post("/api/admin/tombola", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  const { id, nom, min_montant, min_participants, prize_description, statut } = req.body;
+  if (!nom) return res.status(400).json({ error: "nom requis" });
+  try {
+    if (id) {
+      await updateTombolaSession(Number(id), {
+        nom,
+        min_montant: Number(min_montant),
+        min_participants: Number(min_participants),
+        prize_description: prize_description ?? null,
+        statut
+      });
+      res.json({ ok: true });
+    } else {
+      const newId = await createTombolaSession({
+        nom,
+        min_montant: Number(min_montant) || 5e4,
+        min_participants: Number(min_participants) || 10,
+        prize_description: prize_description ?? null
+      });
+      res.json({ ok: true, id: newId });
+    }
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+router43.get("/api/admin/tombola/:id/participants", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    const tombola = await getTombolaSession(Number(req.params.id));
+    if (!tombola) return res.status(404).json({ error: "Tombola introuvable" });
+    const participants = await getTombolaParticipants(tombola.min_montant);
+    res.json({
+      data: participants,
+      ready: participants.length >= tombola.min_participants
+    });
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+router43.post("/api/admin/tombola/:id/spin", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  const { winner_facture_id } = req.body;
+  if (!winner_facture_id) return res.status(400).json({ error: "winner_facture_id requis" });
+  try {
+    const tombola = await getTombolaSession(Number(req.params.id));
+    if (!tombola) return res.status(404).json({ error: "Tombola introuvable" });
+    if (tombola.statut === "termine") return res.status(400).json({ error: "Tombola d\xE9j\xE0 termin\xE9e" });
+    await spinTombola(Number(req.params.id), Number(winner_facture_id));
+    const updated = await getTombolaSession(Number(req.params.id));
+    res.json({ ok: true, winner: updated });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Erreur serveur" });
+  }
+});
+router43.post("/api/admin/tombola/:id/notify", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    const tombola = await getTombolaSession(Number(req.params.id));
+    if (!tombola) return res.status(404).json({ error: "Tombola introuvable" });
+    if (!tombola.winner_tel) return res.status(400).json({ error: "Pas de t\xE9l\xE9phone gagnant" });
+    if (!tombola.winner_nom) return res.status(400).json({ error: "Pas de nom gagnant" });
+    const prize = tombola.prize_description ?? "votre lot";
+    await sendWaText({
+      to: tombola.winner_tel,
+      body: `\u{1F389} F\xE9licitations ${tombola.winner_nom} ! Vous avez gagn\xE9 la tombola Togolese Shop et remportez ${prize} ! Contactez-nous pour r\xE9cup\xE9rer votre lot. \u{1F4DE} +22890527912`
+    });
+    await markTombolaNotified(Number(req.params.id));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Erreur envoi WhatsApp" });
+  }
+});
+router43.delete("/api/admin/tombola/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    await deleteTombolaSession(Number(req.params.id));
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+var tombola_default = router43;
+
+// routes/admin/backup.ts
+var import_express44 = __toESM(require("express"));
+var import_child_process = require("child_process");
+var import_zlib = require("zlib");
+var import_fs = require("fs");
+var import_path = require("path");
+var import_promise2 = __toESM(require("mysql2/promise"));
+var router44 = import_express44.default.Router();
+var BACKUP_DIR = "/tmp/togolese-backups";
+var MAX_BACKUPS = 7;
+function ensureDir() {
+  if (!(0, import_fs.existsSync)(BACKUP_DIR)) (0, import_fs.mkdirSync)(BACKUP_DIR, { recursive: true });
+}
+function dbCfg() {
+  if (process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME) {
+    return {
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT || 3306),
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD || "",
+      database: process.env.DB_NAME
+    };
+  }
+  const rawUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.MYSQL_PUBLIC_URL;
+  if (rawUrl && (rawUrl.startsWith("mysql://") || rawUrl.startsWith("mysql2://"))) {
+    try {
+      const url = new URL(rawUrl);
+      return {
+        host: url.hostname,
+        port: Number(url.port) || 3306,
+        user: decodeURIComponent(url.username),
+        password: decodeURIComponent(url.password),
+        database: url.pathname.replace(/^\//, "")
+      };
+    } catch (e) {
+      throw new Error(`[backup] Cannot parse DATABASE_URL: ${e}`);
+    }
+  }
+  throw new Error(
+    "[backup] No DB configuration found. Set DB_HOST+DB_USER+DB_NAME or DATABASE_URL."
+  );
+}
+function listFiles() {
+  ensureDir();
+  return (0, import_fs.readdirSync)(BACKUP_DIR).filter((f) => f.startsWith("backup_") && f.endsWith(".sql.gz")).map((f) => {
+    const stat = (0, import_fs.statSync)((0, import_path.join)(BACKUP_DIR, f));
+    return { filename: f, size: stat.size, createdAt: stat.mtime.toISOString() };
+  }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+function cleanOld() {
+  listFiles().slice(MAX_BACKUPS).forEach((f) => {
+    try {
+      (0, import_fs.unlinkSync)((0, import_path.join)(BACKUP_DIR, f.filename));
+    } catch {
+    }
+  });
+}
+function backupViaBinary(cfg, filepath) {
+  return new Promise((resolve2, reject) => {
+    const dump = (0, import_child_process.spawn)("mysqldump", [
+      `-h${cfg.host}`,
+      `-P${cfg.port}`,
+      `-u${cfg.user}`,
+      `-p${cfg.password}`,
+      "--single-transaction",
+      "--routines",
+      "--triggers",
+      cfg.database
+    ]);
+    const gz = (0, import_zlib.createGzip)();
+    const out = (0, import_fs.createWriteStream)(filepath);
+    dump.stdout.pipe(gz).pipe(out);
+    dump.stderr.on("data", (d) => {
+      const msg = d.toString();
+      if (!msg.toLowerCase().includes("using a password")) {
+        console.error("[backup:binary] stderr:", msg.trim());
+      }
+    });
+    dump.on("error", (err) => reject(new Error(`mysqldump binary unavailable: ${err.message}`)));
+    out.on("finish", resolve2);
+    out.on("error", reject);
+  });
+}
+function escapeValue(v) {
+  if (v === null || v === void 0) return "NULL";
+  if (typeof v === "number" || typeof v === "bigint") return String(v);
+  if (v instanceof Date) {
+    try {
+      return `'${v.toISOString().slice(0, 19).replace("T", " ")}'`;
+    } catch {
+      return "NULL";
+    }
+  }
+  if (Buffer.isBuffer(v)) return `0x${v.toString("hex")}`;
+  return `'${String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "\\r")}'`;
+}
+async function backupViaNodeJs(cfg, filepath) {
+  const conn = await import_promise2.default.createConnection({
+    host: cfg.host,
+    port: cfg.port,
+    user: cfg.user,
+    password: cfg.password,
+    database: cfg.database,
+    multipleStatements: false
+  });
+  try {
+    const tmpSql = filepath.replace(".sql.gz", ".sql");
+    (0, import_fs.writeFileSync)(tmpSql, [
+      "-- Togolese Shop \u2014 Database backup",
+      `-- Generated: ${(/* @__PURE__ */ new Date()).toISOString()}`,
+      `-- Database: ${cfg.database}`,
+      "",
+      "SET FOREIGN_KEY_CHECKS=0;",
+      "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO';",
+      "SET NAMES utf8mb4;",
+      ""
+    ].join("\n"), "utf8");
+    const [tables] = await conn.query("SHOW TABLES");
+    const tableKey = `Tables_in_${cfg.database}`;
+    for (const row of tables) {
+      const tableName = row[tableKey];
+      const [[createRow]] = await conn.query(
+        `SHOW CREATE TABLE \`${tableName}\``
+      );
+      const createSql = createRow["Create Table"].replace(/AUTO_INCREMENT=\d+/g, "");
+      (0, import_fs.appendFileSync)(tmpSql, [
+        `-- Table: \`${tableName}\``,
+        `DROP TABLE IF EXISTS \`${tableName}\`;`,
+        `${createSql};`,
+        ""
+      ].join("\n"), "utf8");
+      const BATCH = 500;
+      let offset = 0;
+      while (true) {
+        const [rows] = await conn.query(
+          `SELECT * FROM \`${tableName}\` LIMIT ${BATCH} OFFSET ${offset}`
+        );
+        if (rows.length === 0) break;
+        const inserts = rows.map((r) => {
+          const vals = Object.values(r).map(escapeValue).join(", ");
+          return `INSERT INTO \`${tableName}\` VALUES (${vals});`;
+        });
+        (0, import_fs.appendFileSync)(tmpSql, inserts.join("\n") + "\n", "utf8");
+        offset += BATCH;
+        if (rows.length < BATCH) break;
+      }
+      (0, import_fs.appendFileSync)(tmpSql, "\n", "utf8");
+    }
+    (0, import_fs.appendFileSync)(tmpSql, "SET FOREIGN_KEY_CHECKS=1;\n", "utf8");
+    await new Promise((resolve2, reject) => {
+      const src = (0, import_fs.createReadStream)(tmpSql);
+      const gz = (0, import_zlib.createGzip)();
+      const out = (0, import_fs.createWriteStream)(filepath);
+      src.pipe(gz).pipe(out);
+      out.on("finish", resolve2);
+      out.on("error", reject);
+    });
+    try {
+      (0, import_fs.unlinkSync)(tmpSql);
+    } catch {
+    }
+  } finally {
+    await conn.end().catch(() => {
+    });
+  }
+}
+async function runBackup() {
+  ensureDir();
+  const cfg = dbCfg();
+  const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const filename = `backup_${ts}.sql.gz`;
+  const filepath = (0, import_path.join)(BACKUP_DIR, filename);
+  try {
+    await backupViaBinary(cfg, filepath);
+    console.log("[backup] Used mysqldump binary.");
+  } catch (binaryErr) {
+    console.warn("[backup] mysqldump binary unavailable, falling back to Node.js driver:", binaryErr.message);
+    try {
+      (0, import_fs.unlinkSync)(filepath);
+    } catch {
+    }
+    await backupViaNodeJs(cfg, filepath);
+    console.log("[backup] Used Node.js fallback.");
+  }
+  const { size } = (0, import_fs.statSync)(filepath);
+  return { filename, filepath, size };
+}
+router44.post("/api/admin/backup", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  if (lastManualBackup && Date.now() - lastManualBackup.getTime() < BACKUP_COOLDOWN_MS) {
+    const wait = Math.ceil((BACKUP_COOLDOWN_MS - (Date.now() - lastManualBackup.getTime())) / 1e3);
+    return res.status(429).json({ error: `Attendez ${wait}s avant la prochaine sauvegarde.` });
+  }
+  try {
+    lastManualBackup = /* @__PURE__ */ new Date();
+    const { filename, filepath } = await runBackup();
+    cleanOld();
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/gzip");
+    (0, import_fs.createReadStream)(filepath).pipe(res);
+  } catch (err) {
+    console.error("[backup] manual backup failed:", err);
+    res.status(500).json({ error: "\xC9chec de la sauvegarde : " + err.message });
+  }
+});
+router44.get("/api/admin/backups", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  res.json({
+    backups: listFiles(),
+    nextScheduled: "02:00 UTC",
+    lastNightly: lastNightlyRun ? lastNightlyRun.toISOString() : null
+  });
+});
+router44.get("/api/admin/backups/:filename", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  const { filename } = req.params;
+  if (!/^backup_[\dT\-]+\.sql\.gz$/.test(filename)) {
+    return res.status(400).json({ error: "Nom de fichier invalide." });
+  }
+  const filepath = (0, import_path.join)(BACKUP_DIR, filename);
+  if (!(0, import_fs.existsSync)(filepath)) {
+    return res.status(404).json({ error: "Fichier introuvable." });
+  }
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Content-Type", "application/gzip");
+  (0, import_fs.createReadStream)(filepath).pipe(res);
+});
+var BACKUP_COOLDOWN_MS = 60 * 1e3;
+var lastManualBackup = null;
+var lastNightlyRun = null;
+function startNightlyScheduler() {
+  setInterval(async () => {
+    const now = /* @__PURE__ */ new Date();
+    const hour = now.getUTCHours();
+    const today = now.toISOString().slice(0, 10);
+    const alreadyRanToday = lastNightlyRun !== null && lastNightlyRun.toISOString().slice(0, 10) === today;
+    if (hour === 2 && !alreadyRanToday) {
+      console.log("[backup] Starting nightly backup\u2026");
+      try {
+        const { filename, size } = await runBackup();
+        cleanOld();
+        lastNightlyRun = /* @__PURE__ */ new Date();
+        console.log(`[backup] Nightly backup done: ${filename} (${Math.round(size / 1024)} KB)`);
+      } catch (err) {
+        console.error("[backup] Nightly backup failed:", err);
+      }
+    }
+  }, 60 * 60 * 1e3);
+}
+startNightlyScheduler();
+var backup_default = router44;
+
+// lib/review-notifier.ts
+init_db();
+var SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
+var DELAY_HOURS = 48;
+async function ensureReviewNotifierCols() {
+  for (const ddl of [
+    "ALTER TABLE orders ADD COLUMN delivered_at   TIMESTAMP NULL    AFTER status",
+    "ALTER TABLE orders ADD COLUMN review_wa_sent TINYINT(1) NOT NULL DEFAULT 0"
+  ]) {
+    try {
+      await db.execute(ddl);
+    } catch (e) {
+      const code = e.code;
+      if (code !== "ER_DUP_FIELDNAME") {
+        console.warn("[review-notifier] migration warn:", e.message);
+      }
+    }
+  }
+  console.log("[review-notifier] columns OK");
+}
+async function runReviewNotifier() {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, reference, nom, client_tel, items
+       FROM orders
+       WHERE status = 'delivered'
+         AND delivered_at IS NOT NULL
+         AND delivered_at <= NOW() - INTERVAL ${DELAY_HOURS} HOUR
+         AND review_wa_sent = 0
+         AND client_tel IS NOT NULL
+         AND client_tel != ''
+       LIMIT 50`
+    );
+    if (rows.length === 0) return;
+    console.log(`[review-notifier] ${rows.length} order(s) to notify`);
+    for (const row of rows) {
+      const nom = String(row.nom || "Client");
+      const ref = String(row.reference);
+      const tel = String(row.client_tel);
+      const trackUrl = `${SITE_URL}/suivi-commande?ref=${encodeURIComponent(ref)}`;
+      let reviewUrl = trackUrl;
+      try {
+        const items = typeof row.items === "string" ? JSON.parse(row.items) : row.items;
+        if (Array.isArray(items) && items.length > 0) {
+          const firstSlug = items[0].slug ?? items[0].reference;
+          if (firstSlug) reviewUrl = `${SITE_URL}/products/${firstSlug}#reviews`;
+        }
+      } catch {
+      }
+      const body = `\u{1F44B} Bonjour ${nom} !
+
+Votre commande *${ref}* a bien \xE9t\xE9 livr\xE9e. Nous esp\xE9rons qu'elle vous a plu ! \u{1F60A}
+
+\u2B50 Donnez votre avis sur votre achat :
+${reviewUrl}
+
+Merci pour votre confiance \u2014 Togolese Shop \u{1F6CD}\uFE0F`;
+      try {
+        await sendWaText({ to: tel, body });
+        await db.execute(
+          "UPDATE orders SET review_wa_sent = 1 WHERE id = ?",
+          [row.id]
+        );
+        console.log(`[review-notifier] sent to ${tel} for ${ref}`);
+      } catch (e) {
+        console.error(`[review-notifier] failed for ${ref}:`, e.message);
+      }
+    }
+  } catch (e) {
+    console.error("[review-notifier] job error:", e.message);
+  }
+}
+function startReviewNotifier() {
+  const INTERVAL_MS = 60 * 60 * 1e3;
+  ensureReviewNotifierCols().then(() => {
+    runReviewNotifier();
+    setInterval(runReviewNotifier, INTERVAL_MS);
+    console.log("[review-notifier] scheduler started (interval: 1h)");
+  }).catch((e) => console.error("[review-notifier] startup error:", e));
+}
+
 // index.ts
-(0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), "../.env.local") });
-(0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
-(0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
-(0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express43.default)();
+(0, import_dotenv.config)({ path: (0, import_path2.resolve)(process.cwd(), "../.env.local") });
+(0, import_dotenv.config)({ path: (0, import_path2.resolve)(process.cwd(), ".env") });
+(0, import_dotenv.config)({ path: (0, import_path2.resolve)(__dirname, "../.env.local") });
+(0, import_dotenv.config)({ path: (0, import_path2.resolve)(__dirname, "../.env") });
+var app = (0, import_express45.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -10866,8 +11916,16 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express43.default.json({ limit: "5mb" }));
-app.use(import_express43.default.urlencoded({ extended: true, limit: "5mb" }));
+var reviewsLimiter = (0, import_express_rate_limit.rateLimit)({
+  windowMs: 10 * 60 * 1e3,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop d'avis soumis. R\xE9essayez dans 10 minutes." }
+});
+app.use("/api/reviews", reviewsLimiter);
+app.use(import_express45.default.json({ limit: "15mb" }));
+app.use(import_express45.default.urlencoded({ extended: true, limit: "15mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -10911,6 +11969,8 @@ app.use(social_default);
 app.use(whatsapp_campagne_default);
 app.use(livreur_inscriptions_default);
 app.use(entrepots_default);
+app.use(tombola_default);
+app.use(backup_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {
@@ -10987,5 +12047,7 @@ app.listen(PORT, async () => {
   }
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
+  startReviewNotifier();
+  fixPendingMmOrders();
 });
 var index_default = app;
