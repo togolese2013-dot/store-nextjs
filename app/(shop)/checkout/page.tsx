@@ -494,7 +494,7 @@ export default function CheckoutPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
       {/* Breadcrumb */}
       <div className="bg-white border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -515,7 +515,7 @@ export default function CheckoutPage() {
           <div className="grid lg:grid-cols-3 gap-8 items-start">
 
             {/* ── Form ── */}
-            <div className="lg:col-span-2 space-y-5">
+            <div className="lg:col-span-2 space-y-5 min-w-0">
 
               {/* Contact */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
@@ -609,7 +609,7 @@ export default function CheckoutPage() {
                           <select
                             value={phonePrefix}
                             onChange={e => setPhonePrefix(e.target.value)}
-                            className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800"
+                            className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800 max-w-[110px]"
                           >
                             {PHONE_PREFIXES.map(p => (
                               <option key={p.code} value={p.code}>

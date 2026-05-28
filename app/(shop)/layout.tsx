@@ -21,7 +21,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <ReferralBanner />
       <AnnouncementBar />
       <Header />
-      <main className="flex-1">
+      <main className="flex-1 w-full overflow-x-hidden">
         {children}
       </main>
       <Footer />
