@@ -846,6 +846,11 @@ export default function VentesManager({
                               <p className="text-[10px] text-violet-600 font-semibold">{p.variant_nom}</p>
                             )}
                             <p className="text-xs text-slate-400 font-mono">{p.reference}</p>
+                            {p.entrepot_nom && (
+                              <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-600 rounded">
+                                Ext. {p.entrepot_nom}
+                              </span>
+                            )}
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-sm font-bold text-amber-700">{formatPrice(p.prix_unitaire)}</p>

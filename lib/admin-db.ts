@@ -1744,6 +1744,7 @@ export interface BoutiqueStockItem {
   quantite:      number;
   seuil_alerte:  number;
   valeur:        number;
+  entrepot_nom?: string;
 }
 
 export interface BoutiqueStats {
@@ -1878,10 +1879,12 @@ export async function getStockBoutiqueList(opts: {
             ${imageCol} AS image_url, ${remiseCol} AS remise, p.prix_unitaire,
             COALESCE(c.nom,'') AS categorie_nom,
             CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite,0) END AS quantite,
-            COALESCE(bs.seuil_alerte,5) AS seuil_alerte
+            COALESCE(bs.seuil_alerte,5) AS seuil_alerte,
+            e.nom AS entrepot_nom
      FROM produits p
      LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
      LEFT JOIN categories c ON c.id = p.categorie_id
+     LEFT JOIN entrepots e ON e.id = p.entrepot_id
      WHERE ${p1Conds.join(" AND ")}`,
     p1Params
   );
