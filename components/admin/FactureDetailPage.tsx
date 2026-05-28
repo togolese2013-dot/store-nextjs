@@ -236,6 +236,11 @@ export default function FactureDetailPage({ facture: initial, canAddPaiement = t
                       <td className="px-6 py-4">
                         <p className="font-semibold text-slate-900">{item.nom}</p>
                         <p className="text-xs text-slate-400 font-mono mt-0.5">{item.reference}</p>
+                        {item.entrepot_nom && (
+                          <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-600 rounded">
+                            Ext. {item.entrepot_nom}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-right text-slate-700 tabular-nums">
                         {formatPrice(item.prix)}

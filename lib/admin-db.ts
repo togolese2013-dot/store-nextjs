@@ -1989,11 +1989,14 @@ export async function getRecentBoutiqueMovements(limit = 30): Promise<BoutiqueMo
 
 /* ─── Ventes : Factures ─── */
 export interface FactureItem {
-  nom:       string;
-  reference: string;
-  qty:       number;
-  prix:      number;
-  total:     number;
+  nom:          string;
+  reference:    string;
+  qty:          number;
+  prix:         number;
+  total:        number;
+  produit_id?:  number;
+  variant_id?:  number;
+  entrepot_nom?: string;
 }
 
 export interface FacturePaiement {
@@ -2112,6 +2115,30 @@ export async function getFactureById(id: number): Promise<Facture | null> {
   if (!rows[0]) return null;
   const facture = rows[0] as Facture;
   facture.paiements = await getFacturePaiements(id);
+
+  // Enrich items with entrepot_nom
+  try {
+    const items: FactureItem[] = typeof facture.items === "string"
+      ? JSON.parse(facture.items)
+      : (facture.items ?? []);
+    const produitIds = items.map(i => Number(i.produit_id)).filter(Boolean);
+    if (produitIds.length > 0) {
+      const placeholders = produitIds.map(() => "?").join(",");
+      const [eRows] = await db.query<mysql.RowDataPacket[]>(
+        `SELECT p.id, e.nom AS entrepot_nom
+         FROM produits p JOIN entrepots e ON e.id = p.entrepot_id
+         WHERE p.id IN (${placeholders})`,
+        produitIds
+      );
+      const eMap = new Map<number, string>();
+      for (const r of eRows as mysql.RowDataPacket[]) eMap.set(Number(r.id), r.entrepot_nom as string);
+      facture.items = items.map(item => ({
+        ...item,
+        entrepot_nom: item.produit_id ? eMap.get(item.produit_id) : undefined,
+      })) as unknown as typeof facture.items;
+    }
+  } catch { /* non-fatal */ }
+
   return facture;
 }
 
