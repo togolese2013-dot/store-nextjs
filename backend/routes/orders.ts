@@ -6,39 +6,6 @@ import { db } from "@/lib/db";
 import { getClientSession } from "../lib/client-auth";
 import { ensurePaymentTables } from "./admin/payment-plans";
 import type mysql from "mysql2/promise";
-import { v2 as cloudinary } from "cloudinary";
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-async function uploadScreenshotToCloudinary(base64Data: string): Promise<string> {
-  // Strip data URL prefix if present
-  const data = base64Data.replace(/^data:[^;]+;base64,/, "");
-  const buffer = Buffer.from(data, "base64");
-
-  if (buffer.length > 10 * 1024 * 1024) {
-    throw new Error("Image trop volumineuse (max 10 Mo).");
-  }
-
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder:        "togolese-payment-proofs",
-        resource_type: "image",
-        format:        "jpg",
-        quality:       "auto",
-      },
-      (error, result) => {
-        if (error || !result) reject(error ?? new Error("Upload échoué"));
-        else resolve(result.secure_url);
-      }
-    );
-    stream.end(buffer);
-  });
-}
 
 const router = express.Router();
 
@@ -55,7 +22,7 @@ async function ensureOrderCols() {
   for (const ddl of [
     "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
-    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(500) NULL",
+    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
     "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
     "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL",
     "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) NULL",
@@ -65,137 +32,7 @@ async function ensureOrderCols() {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
     }
   }
-  // Migrate existing VARCHAR(100) → VARCHAR(500) to fit Cloudinary URLs
-  try {
-    await pool.execute(
-      "ALTER TABLE orders MODIFY COLUMN mm_transaction_ref VARCHAR(500) NULL"
-    );
-  } catch {}
   _orderColsReady = true;
-}
-
-// ── Server-side price validation ─────────────────────────────────────────────
-// Prevents client-side price manipulation (e.g. submitting total: 1 FCFA)
-// Best-effort: if DB query fails (e.g. table missing), logs and allows order.
-const PRICE_TOLERANCE = 100; // FCFA — rounding tolerance
-
-async function validateOrderPricing(
-  items: Array<{ id?: number; produit_id?: number; qty?: number; quantite?: number }>,
-  zone_livraison: string | undefined,
-  delivery_fee_claimed: number,
-  coupon_code: string | undefined,
-  coupon_remise_claimed: number,
-  total_claimed: number,
-): Promise<{ ok: true; subtotal: number; fee: number; remise: number } | { ok: false; error: string }> {
-  try {
-    const pool = db as mysql.Pool;
-
-    // 1. Recalculate subtotal from DB prices
-    const productIds = items
-      .map(i => Number(i.id ?? i.produit_id))
-      .filter(id => id > 0);
-
-    if (productIds.length === 0) return { ok: false, error: "Aucun article valide." };
-
-    const ph = productIds.map(() => "?").join(",");
-    const [products] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT id, prix_unitaire, COALESCE(remise, 0) AS remise FROM produits WHERE id IN (${ph}) AND actif = 1`,
-      productIds
-    );
-    const priceMap = new Map<number, { prix: number; remise: number }>();
-    for (const p of products) {
-      priceMap.set(Number(p.id), { prix: Number(p.prix_unitaire), remise: Number(p.remise) });
-    }
-
-    let serverSubtotal = 0;
-    for (const item of items) {
-      const pid = Number(item.id ?? item.produit_id);
-      const qty = Math.max(1, Number(item.qty ?? item.quantite ?? 1));
-      const prod = priceMap.get(pid);
-      if (!prod) return { ok: false, error: `Produit introuvable ou inactif : ID ${pid}` };
-      // remise is stored in FCFA (not %), matching frontend calcPrice logic
-      const unitPrice = prod.remise > 0
-        ? Math.max(0, prod.prix - prod.remise)
-        : prod.prix;
-      serverSubtotal += unitPrice * qty;
-    }
-
-    // 2. Validate delivery fee
-    let serverFee = 0;
-    if (zone_livraison) {
-      try {
-        const [zones] = await pool.execute<mysql.RowDataPacket[]>(
-          "SELECT fee, prix_libre FROM delivery_zones WHERE nom = ? AND actif = 1 LIMIT 1",
-          [zone_livraison]
-        );
-        const zone = zones[0];
-        if (zone) {
-          if (zone.prix_libre) {
-            // "Prix à confirmer" — accept claimed fee up to 20 000 FCFA
-            serverFee = Math.min(Number(delivery_fee_claimed), 20000);
-          } else {
-            serverFee = Number(zone.fee ?? 0);
-            if (Math.abs(Number(delivery_fee_claimed) - serverFee) > PRICE_TOLERANCE) {
-              return { ok: false, error: "Frais de livraison invalides." };
-            }
-          }
-        } else {
-          // Zone not found — accept claimed fee (might be a custom/new zone)
-          serverFee = Number(delivery_fee_claimed ?? 0);
-        }
-      } catch {
-        // delivery_zones table might not exist yet — accept claimed fee
-        serverFee = Number(delivery_fee_claimed ?? 0);
-      }
-    }
-
-    // 3. Validate coupon discount
-    let serverRemise = 0;
-    if (coupon_code) {
-      try {
-        const [coupons] = await pool.execute<mysql.RowDataPacket[]>(
-          `SELECT type, valeur, min_order, max_uses, uses_count, expires_at
-           FROM coupons WHERE code = ? AND actif = 1 LIMIT 1`,
-          [String(coupon_code).trim().toUpperCase()]
-        );
-        const coupon = coupons[0];
-        if (coupon) {
-          const expired    = coupon.expires_at && new Date(coupon.expires_at) < new Date();
-          const maxedOut   = Number(coupon.max_uses) > 0 && Number(coupon.uses_count) >= Number(coupon.max_uses);
-          const underMin   = serverSubtotal < Number(coupon.min_order);
-          if (!expired && !maxedOut && !underMin) {
-            serverRemise = coupon.type === "fixed"
-              ? Math.min(Number(coupon.valeur), serverSubtotal)
-              : Math.round(serverSubtotal * Number(coupon.valeur) / 100);
-          }
-        }
-        // If coupon_remise_claimed > server-calculated remise → fraud attempt
-        if (Number(coupon_remise_claimed) > serverRemise + PRICE_TOLERANCE) {
-          return { ok: false, error: "Remise coupon invalide." };
-        }
-        // Use server-calculated remise (authoritative)
-      } catch {
-        // coupons table might not exist → accept claimed remise
-        serverRemise = Number(coupon_remise_claimed ?? 0);
-      }
-    }
-
-    // 4. Compare totals
-    const expectedTotal = serverSubtotal - serverRemise + serverFee;
-    if (Math.abs(total_claimed - expectedTotal) > PRICE_TOLERANCE) {
-      console.warn(
-        `[orders] Price mismatch: claimed=${total_claimed}, expected=${expectedTotal}`,
-        `(sub=${serverSubtotal}, fee=${serverFee}, remise=${serverRemise})`
-      );
-      return { ok: false, error: `Total invalide. Attendu : ${expectedTotal} FCFA, reçu : ${total_claimed} FCFA.` };
-    }
-
-    return { ok: true, subtotal: serverSubtotal, fee: serverFee, remise: serverRemise };
-  } catch (err) {
-    // Validation error (e.g. missing column) — log and allow order to proceed
-    console.error("[orders] price validation error (non-blocking):", err);
-    return { ok: true, subtotal: Number(total_claimed), fee: Number(delivery_fee_claimed), remise: Number(coupon_remise_claimed ?? 0) };
-  }
 }
 
 // POST /api/orders  — public, no auth required
@@ -207,9 +44,8 @@ router.post("/api/orders", async (req, res) => {
     const {
       nom, telephone, adresse, zone_livraison, delivery_fee,
       note, lien_localisation, items, subtotal, total,
-      payment_mode, nb_tranches, ref_code,
+      payment_mode, nb_tranches, mm_transaction_ref, ref_code,
       coupon_code, coupon_remise,
-      mm_screenshot_b64,
     } = req.body;
 
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
@@ -219,32 +55,8 @@ router.post("/api/orders", async (req, res) => {
     if (!cleanTelephone) {
       return res.status(400).json({ error: "Le numéro WhatsApp doit contenir exactement 8 chiffres togolais." });
     }
-    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !mm_screenshot_b64) {
-      return res.status(400).json({ error: "La capture d'écran de confirmation est obligatoire." });
-    }
-
-    // Upload payment screenshot to Cloudinary
-    let mm_transaction_ref: string | null = null;
-    if (mm_screenshot_b64) {
-      try {
-        mm_transaction_ref = await uploadScreenshotToCloudinary(mm_screenshot_b64);
-      } catch (uploadErr) {
-        console.error("[orders] screenshot upload failed:", uploadErr);
-        return res.status(500).json({ error: "Échec de l'upload de la capture d'écran. Réessayez." });
-      }
-    }
-
-    // Server-side price validation — prevents client-side total manipulation
-    const priceCheck = await validateOrderPricing(
-      items,
-      zone_livraison,
-      Number(delivery_fee ?? 0),
-      coupon_code,
-      Number(coupon_remise ?? 0),
-      Number(total ?? 0),
-    );
-    if (!priceCheck.ok) {
-      return res.status(400).json({ error: priceCheck.error });
+    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !String(mm_transaction_ref ?? "").trim()) {
+      return res.status(400).json({ error: "La référence de transaction est obligatoire pour ce paiement." });
     }
 
     // Validate installment params
@@ -363,10 +175,6 @@ router.post("/api/orders", async (req, res) => {
       "SELECT reference, created_at FROM orders WHERE id = ? LIMIT 1", [id]
     );
     const reference = (rows[0]?.reference as string) ?? `CMD-${id}`;
-
-    // Refresh ventes card — cash orders are confirmed immediately so finance data changes at creation
-    const isCash = !["moov_direct", "yas_direct", "2x", "3x", "4x"].includes(payment_mode ?? "");
-    if (isCash) emitAdminEvent("finance");
 
     emitAdminEvent("commande", {
       id,

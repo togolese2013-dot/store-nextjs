@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { calcPrice } from "@/context/CartContext";
 import { formatPrice } from "@/lib/utils";
@@ -9,7 +9,6 @@ import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
   User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2, ShieldCheck, Package,
-  Camera, X as XIcon,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -18,16 +17,8 @@ const PHONE_PREFIXES = [
   { code: "+225", flag: "🇨🇮", label: "Côte d'Ivoire" },
   { code: "+229", flag: "🇧🇯", label: "Bénin" },
   { code: "+226", flag: "🇧🇫", label: "Burkina Faso" },
-  { code: "+223", flag: "🇲🇱", label: "Mali" },
-  { code: "+227", flag: "🇳🇪", label: "Niger" },
   { code: "+233", flag: "🇬🇭", label: "Ghana" },
   { code: "+221", flag: "🇸🇳", label: "Sénégal" },
-  { code: "+224", flag: "🇬🇳", label: "Guinée" },
-  { code: "+220", flag: "🇬🇲", label: "Gambie" },
-  { code: "+245", flag: "🇬🇼", label: "Guinée-Bissau" },
-  { code: "+232", flag: "🇸🇱", label: "Sierra Leone" },
-  { code: "+231", flag: "🇱🇷", label: "Libéria" },
-  { code: "+238", flag: "🇨🇻", label: "Cap-Vert" },
   { code: "+234", flag: "🇳🇬", label: "Nigeria" },
   { code: "+237", flag: "🇨🇲", label: "Cameroun" },
   { code: "+33",  flag: "🇫🇷", label: "France" },
@@ -147,7 +138,6 @@ export default function CheckoutPage() {
   const [phoneNumber,  setPhoneNumber]  = useState("");
   const [submitted,    setSubmitted]    = useState(false);
   const [loading,      setLoading]      = useState(false);
-  const submittingRef = useRef(false); // sync guard against double-submit
   const [errors,       setErrors]       = useState<Partial<Form & { telephone: string; reference: string }>>({});
   const [submitError,  setSubmitError]  = useState("");
   const [orderedItems, setOrderedItems] = useState<typeof items>([]);
@@ -162,8 +152,7 @@ export default function CheckoutPage() {
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
   const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
   const [payMode,      setPayMode]      = useState<"livraison" | "flooz" | "yas" | "echelonne">("livraison");
-  const [mmScreenshot,        setMmScreenshot]        = useState<File | null>(null);
-  const [mmScreenshotB64,     setMmScreenshotB64]     = useState<string>("");
+  const [mmRef,        setMmRef]        = useState("");
 
   /* ── Saved addresses ── */
   interface SavedAddress { id: number; nom: string; telephone: string; adresse: string; zone_livraison: string; is_default: number }
@@ -247,35 +236,6 @@ export default function CheckoutPage() {
     }
   }
 
-  // Compress screenshot before upload (max 1200px wide, JPEG 0.75)
-  function handleScreenshotChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setErrors(err => ({ ...err, reference: "Image trop lourde (max 10 Mo)." }));
-      return;
-    }
-    setMmScreenshot(file);
-    setMmScreenshotB64("");
-    setErrors(err => ({ ...err, reference: undefined }));
-    // Compress immediately so submit is instant
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new window.Image();
-      img.onload = () => {
-        const MAX_W  = 1200;
-        const ratio  = Math.min(1, MAX_W / img.width);
-        const canvas = document.createElement("canvas");
-        canvas.width  = Math.round(img.width  * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setMmScreenshotB64(canvas.toDataURL("image/jpeg", 0.75));
-      };
-      img.src = ev.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  }
-
   async function applyCoupon() {
     const code = couponInput.trim().toUpperCase();
     if (!code) return;
@@ -303,12 +263,8 @@ export default function CheckoutPage() {
     }
     if (!form.adresse.trim())   e.adresse   = "Votre adresse est requise.";
     if (!form.zone)             e.zone      = "Choisissez une zone de livraison.";
-    if (payMode === "flooz" || payMode === "yas") {
-      if (!mmScreenshot) {
-        e.reference = "La capture d'écran de confirmation est obligatoire.";
-      } else if (!mmScreenshotB64) {
-        e.reference = "Compression en cours, patientez quelques secondes…";
-      }
+    if ((payMode === "flooz" || payMode === "yas") && !mmRef.trim()) {
+      e.reference = "La référence de transaction est obligatoire.";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -322,10 +278,8 @@ export default function CheckoutPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (submittingRef.current) return; // sync guard — blocks before React re-render
     if (!validate()) return;
     if (selectedItems.length === 0) return;
-    submittingRef.current = true;
     setLoading(true);
     setSubmitError("");
     try {
@@ -338,9 +292,6 @@ export default function CheckoutPage() {
         qty:          i.qty,
         total:        calcPrice(i) * i.qty,
       }));
-      // Screenshot already compressed at file-selection time
-      const mmScreenshotPayload = (payMode === "flooz" || payMode === "yas") ? mmScreenshotB64 || null : null;
-
       const res = await fetch("/api/orders", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -360,7 +311,7 @@ export default function CheckoutPage() {
           coupon_remise:     couponDiscount > 0 ? couponDiscount : undefined,
           payment_mode:      payMode === "flooz" ? "moov_direct" : payMode === "yas" ? "yas_direct" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
-          mm_screenshot_b64: mmScreenshotPayload,
+          mm_transaction_ref: (payMode === "flooz" || payMode === "yas") ? mmRef.trim() : null,
         }),
       });
       const data = await res.json();
@@ -375,7 +326,6 @@ export default function CheckoutPage() {
       setSubmitError("Erreur réseau. Vérifiez votre connexion et réessayez.");
     } finally {
       setLoading(false);
-      submittingRef.current = false;
     }
   }
 
@@ -494,7 +444,7 @@ export default function CheckoutPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50">
       {/* Breadcrumb */}
       <div className="bg-white border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -515,7 +465,7 @@ export default function CheckoutPage() {
           <div className="grid lg:grid-cols-3 gap-8 items-start">
 
             {/* ── Form ── */}
-            <div className="lg:col-span-2 space-y-5 min-w-0">
+            <div className="lg:col-span-2 space-y-5">
 
               {/* Contact */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
@@ -609,7 +559,7 @@ export default function CheckoutPage() {
                           <select
                             value={phonePrefix}
                             onChange={e => setPhonePrefix(e.target.value)}
-                            className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800 max-w-[110px]"
+                            className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800"
                           >
                             {PHONE_PREFIXES.map(p => (
                               <option key={p.code} value={p.code}>
@@ -778,19 +728,23 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="relative">
+                  <div className="flex gap-2">
                     <input
                       type="text"
                       value={couponInput}
                       onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
                       onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCoupon())}
-                      onBlur={applyCoupon}
                       placeholder="Code promo"
-                      className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white pr-10"
+                      className="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white"
                     />
-                    {couponLoading && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
-                    )}
+                    <button
+                      type="button"
+                      onClick={applyCoupon}
+                      disabled={couponLoading || !couponInput.trim()}
+                      className="px-5 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Appliquer"}
+                    </button>
                   </div>
                 )}
                 {couponError && <p className="text-xs text-red-500 mt-2">{couponError}</p>}
@@ -829,7 +783,7 @@ export default function CheckoutPage() {
                     {
                       id: "yas",
                       label: "Mixx by Yas",
-                      sub: "Yas Togo",
+                      sub: "Moov Africa Togo",
                       locked: false,
                       logo: (
                         <img src="/logo-mixx-by-yas.svg" alt="Mixx by Yas" className="w-14 h-8 object-contain" />
@@ -966,37 +920,23 @@ export default function CheckoutPage() {
                             </div>
                           </details>
 
-                          {/* Capture d'écran confirmation */}
+                          {/* Référence transaction */}
                           <div className="pt-2 border-t border-slate-100">
-                            <p className="text-xs font-bold text-slate-600 mb-1.5">
-                              Capture d'écran de confirmation{" "}
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                              Référence de transaction reçue par SMS{" "}
                               <span className="text-red-500">*</span>
-                            </p>
-                            <label className={`flex items-center gap-3 cursor-pointer rounded-xl border px-3 py-2.5 transition-colors ${errors.reference ? "border-red-300 bg-red-50" : mmScreenshot ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}>
-                              <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${mmScreenshot ? "bg-emerald-100" : "bg-slate-100"}`}>
-                                {mmScreenshot
-                                  ? <Check className="w-4 h-4 text-emerald-600" />
-                                  : <Camera className="w-4 h-4 text-slate-400" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-medium truncate ${mmScreenshot ? "text-emerald-700" : "text-slate-600"}`}>
-                                  {mmScreenshot ? mmScreenshot.name : "Ajouter la capture d'écran"}
-                                </p>
-                                <p className="text-[11px] text-slate-400">
-                                  {mmScreenshot ? (mmScreenshotB64 ? "Prête à envoyer" : "Compression…") : "JPG, PNG · max 10 Mo"}
-                                </p>
-                              </div>
-                              {mmScreenshot && (
-                                <button type="button" onClick={(ev) => { ev.preventDefault(); setMmScreenshot(null); setMmScreenshotB64(""); }}
-                                  className="text-slate-400 hover:text-red-500 transition-colors shrink-0">
-                                  <XIcon className="w-4 h-4" />
-                                </button>
-                              )}
-                              <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotChange} />
                             </label>
+                            <input
+                              type="text"
+                              value={mmRef}
+                              onChange={e => { setMmRef(e.target.value); setErrors(err => ({ ...err, reference: undefined })); }}
+                              placeholder={refPlaceholder}
+                              className={inputCls(errors.reference)}
+                              autoComplete="off"
+                            />
                             {errors.reference && <p className="text-xs text-red-500 mt-1">{errors.reference}</p>}
-                            <p className="text-[11px] text-slate-400 mt-1.5">
-                              Faites une capture du SMS de confirmation reçu après votre virement {isMoov ? "Moov" : "Yas"}.
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              Entrez la référence reçue après paiement pour valider la commande.
                             </p>
                           </div>
                         </div>
