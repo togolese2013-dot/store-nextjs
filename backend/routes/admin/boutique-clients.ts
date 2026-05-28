@@ -71,6 +71,13 @@ router.post("/api/admin/boutique-clients", async (req, res) => {
 router.patch("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (req.body.telephone?.trim()) {
+    const [[existing]] = await db.execute<any[]>(
+      "SELECT id FROM boutique_clients WHERE telephone = ? AND id != ? LIMIT 1",
+      [req.body.telephone.trim(), Number(req.params.id)]
+    );
+    if (existing) return res.status(400).json({ error: "Un client avec ce numéro existe déjà." });
+  }
   await updateBoutiqueClient(Number(req.params.id), req.body);
   res.json({ success: true });
 });
