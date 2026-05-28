@@ -996,7 +996,7 @@ export default function CheckoutPage() {
                                   <XIcon className="w-4 h-4" />
                                 </button>
                               )}
-                              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScreenshotChange} />
+                              <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotChange} />
                             </label>
                             {errors.reference && <p className="text-xs text-red-500 mt-1">{errors.reference}</p>}
                             <p className="text-[11px] text-slate-400 mt-1.5">
