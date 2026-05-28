@@ -829,7 +829,7 @@ export default function CheckoutPage() {
                     {
                       id: "yas",
                       label: "Mixx by Yas",
-                      sub: "Moov Africa Togo",
+                      sub: "Yas Togo",
                       locked: false,
                       logo: (
                         <img src="/logo-mixx-by-yas.svg" alt="Mixx by Yas" className="w-14 h-8 object-contain" />
