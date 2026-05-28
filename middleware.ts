@@ -2,19 +2,28 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const SECRET      = new TextEncoder().encode(
-  process.env.JWT_SECRET || "togolese-shop-secret-change-in-production-2024"
-);
+// Absence of JWT_SECRET must deny access, never silently use a known fallback
+const _jwtSecretRaw = process.env.JWT_SECRET;
+if (!_jwtSecretRaw) {
+  console.error("[middleware] CRITICAL: JWT_SECRET is not set — all admin sessions will be rejected.");
+}
+// Empty string as fallback: all jwtVerify() calls will fail → redirect to login (safe deny)
+const SECRET = new TextEncoder().encode(_jwtSecretRaw ?? "");
 const COOKIE_NAME = "ts_admin_token";
 
 function buildCsp(nonce: string): string {
+  const dev = process.env.NODE_ENV === "development";
   return [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    dev
+      ? `script-src 'self' 'unsafe-eval' 'unsafe-inline' 'nonce-${nonce}'`
+      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com`,
     `img-src 'self' https: data: blob:`,
-    `connect-src 'self'`,
+    dev
+      ? `connect-src 'self' ws://localhost:* http://localhost:*`
+      : `connect-src 'self'`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
@@ -135,6 +144,7 @@ export async function middleware(request: NextRequest) {
   // Pass nonce + shop context to Server Components via request headers
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("x-pathname", pathname);
   if (shopSlug)    requestHeaders.set("x-shop-slug",     shopSlug);
   if (customDomain) requestHeaders.set("x-custom-domain", customDomain);
 
