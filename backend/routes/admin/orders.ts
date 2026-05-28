@@ -195,22 +195,28 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
 
   /* ── Confirm Mobile Money direct payment ── */
   if (req.body.field === "confirm_mm") {
-    await ensurePaymentColumn();
-    await updateOrderFields(id, { statut_paiement: "paye" });
-    // Sync linked boutique facture
-    const [[mmOrderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
-      "SELECT vente_facture_id FROM orders WHERE id = ? LIMIT 1", [id]
-    );
-    if (mmOrderRow?.vente_facture_id) {
+    try {
+      await ensurePaymentColumn();
+      await updateOrderStatus(id, "confirmed");
+      await updateOrderFields(id, { statut_paiement: "paye" });
+      const actor = { id: typeof session.id === "number" ? session.id : undefined, nom: session.nom };
+      await ensureOrderVente(id, actor).catch(e => console.error("[orders] ensureOrderVente confirm_mm:", e));
+      // Payment received but not yet delivered — mark as 'paye', not 'paye_total'
+      // 'paye_total' (Complet) is only set when delivery is confirmed
       await (db as mysql.Pool).execute(
-        "UPDATE factures SET statut_paiement = 'paye_total' WHERE id = ?",
-        [mmOrderRow.vente_facture_id]
-      );
+        "UPDATE factures SET statut_paiement = 'paye' WHERE order_id = ? AND statut != 'annule'",
+        [id]
+      ).catch(() => {});
+      await addOrderEvent(id, "confirmed", "Paiement Mobile Money vérifié — commande confirmée", session.nom);
+      invalidateVentesStats();
+      emitAdminEvent("finance");
+      emitAdminEvent("commande");
+      emitAdminEvent("vente");
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[orders] confirm_mm failed:", err);
+      return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
     }
-    await addOrderEvent(id, "confirmée", "Paiement Mobile Money vérifié et confirmé", session.nom);
-    emitAdminEvent("finance");
-    emitAdminEvent("commande");
-    return res.json({ ok: true });
   }
 
   /* ── Full order update ── */
