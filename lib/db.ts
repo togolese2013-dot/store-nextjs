@@ -294,7 +294,10 @@ export async function getProducts(opts?: {
   if (categoryId)      { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
   if (marqueId)        { conditions.push("p.marque_id = ?");    params.push(marqueId); }
   if (referenceExact)  { conditions.push("p.reference = ?");    params.push(referenceExact); }
-  if (search)          { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (search)          {
+    conditions.push("(p.nom LIKE ? OR p.description LIKE ? OR EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id AND (pv.nom LIKE ? OR pv.reference_sku LIKE ?)))");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+  }
   if (promoOnly && cols.remise)  { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)    { conditions.push("p.neuf = 1"); }
   if (statut === "disponible")   { conditions.push("COALESCE(p.stock_boutique, 0) > 5"); }
@@ -517,7 +520,10 @@ export async function getProductCount(opts?: {
 
   if (categoryId) { conditions.push("p.categorie_id = ?"); params.push(categoryId); }
   if (marqueId)   { conditions.push("p.marque_id = ?");    params.push(marqueId); }
-  if (search)     { conditions.push("(p.nom LIKE ? OR p.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (search)     {
+    conditions.push("(p.nom LIKE ? OR p.description LIKE ? OR EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id AND (pv.nom LIKE ? OR pv.reference_sku LIKE ?)))");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+  }
   if (promoOnly && cols.remise) { conditions.push("p.remise > 0"); }
   if (newOnly   && cols.neuf)   { conditions.push("p.neuf = 1"); }
   if (inStock)  { conditions.push("COALESCE(p.stock_boutique, 0) > 0"); }
