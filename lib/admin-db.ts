@@ -2310,15 +2310,34 @@ export async function createVenteWithStock(data: {
 
     // Auto-create finance entry for paid/partial sales (skip if delivery pending — entry created on delivery confirmation)
     if (!data.avec_livraison && data.statut_paiement && data.statut_paiement !== "non_paye") {
-      const montantFinance = data.statut_paiement === "acompte"
+      const brut = data.statut_paiement === "acompte"
         ? (data.montant_acompte ?? 0)
         : data.total;
+
+      // Deduct entrepôt cost so only the margin hits the cash register
+      let coutEntrepot = 0;
+      try {
+        const produitIds = data.items.map(i => i.produit_id);
+        const placeholders = produitIds.map(() => "?").join(",");
+        const [eRows] = await db.query<mysql.RowDataPacket[]>(
+          `SELECT id, prix_entrepot FROM produits WHERE id IN (${placeholders}) AND entrepot_id IS NOT NULL AND prix_entrepot IS NOT NULL`,
+          produitIds
+        );
+        const eMap = new Map<number, number>();
+        for (const r of eRows as mysql.RowDataPacket[]) eMap.set(Number(r.id), Number(r.prix_entrepot));
+        for (const item of data.items) {
+          const pe = eMap.get(item.produit_id);
+          if (pe != null) coutEntrepot += pe * item.qty;
+        }
+      } catch { /* non-fatal — proceed with full amount */ }
+
+      const montantFinance = Math.max(0, brut - coutEntrepot);
       if (montantFinance > 0) {
         await createFinanceEntry({
           type:          "vente",
           mode_paiement: data.mode_paiement ?? "especes",
           categorie:     "Vente boutique",
-          description:   `Vente ${reference} – ${data.client_nom.trim()}`,
+          description:   `Vente ${reference} – ${data.client_nom.trim()}${coutEntrepot > 0 ? ` (marge nette, coût entrepôt ${coutEntrepot} FCFA déduit)` : ""}`,
           montant:       montantFinance,
           date_entree:   new Date().toISOString().slice(0, 10),
         }).catch(() => {});
@@ -4295,4 +4314,64 @@ export async function fixPendingMmOrders(): Promise<void> {
   } catch (e) {
     console.error("[backend] fixPendingMmOrders failed:", e);
   }
+}
+
+export async function backfillEntrepotBoutiqueFinance(): Promise<{ updated: number; skipped: number }> {
+  let updated = 0;
+  let skipped = 0;
+
+  // Only boutique ventes (not site_order), already paid
+  const [factures] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT id, reference, items, total, montant_acompte, statut_paiement
+     FROM factures
+     WHERE (source IS NULL OR source != 'site_order')
+       AND statut_paiement IN ('paye_total', 'acompte', 'paye')`
+  );
+
+  for (const f of factures as mysql.RowDataPacket[]) {
+    try {
+      const items: { produit_id?: number; qty?: number; quantite?: number }[] =
+        typeof f.items === "string" ? JSON.parse(f.items) : (f.items ?? []);
+      const produitIds = items.map(i => Number(i.produit_id)).filter(Boolean);
+      if (!produitIds.length) { skipped++; continue; }
+
+      const placeholders = produitIds.map(() => "?").join(",");
+      const [eRows] = await db.query<mysql.RowDataPacket[]>(
+        `SELECT id, prix_entrepot FROM produits WHERE id IN (${placeholders}) AND entrepot_id IS NOT NULL AND prix_entrepot IS NOT NULL`,
+        produitIds
+      );
+      if (!(eRows as mysql.RowDataPacket[]).length) { skipped++; continue; }
+
+      const eMap = new Map<number, number>();
+      for (const r of eRows as mysql.RowDataPacket[]) eMap.set(Number(r.id), Number(r.prix_entrepot));
+
+      let coutEntrepot = 0;
+      for (const item of items) {
+        const pe = eMap.get(Number(item.produit_id));
+        if (pe != null) coutEntrepot += pe * Number(item.qty ?? item.quantite ?? 1);
+      }
+      if (coutEntrepot <= 0) { skipped++; continue; }
+
+      const brut = f.statut_paiement === "acompte"
+        ? Number(f.montant_acompte ?? 0)
+        : Number(f.total ?? 0);
+      const montantCorrige = Math.max(0, brut - coutEntrepot);
+
+      // Update finance entry — skip already-adjusted entries
+      await db.execute(
+        `UPDATE finance_entries
+         SET montant = ?,
+             description = CONCAT(description, ' (marge nette, coût entrepôt ${coutEntrepot} FCFA déduit)')
+         WHERE description LIKE ?
+           AND description NOT LIKE '%marge nette%'
+         LIMIT 1`,
+        [montantCorrige, `%${f.reference}%`]
+      );
+      updated++;
+    } catch {
+      skipped++;
+    }
+  }
+
+  return { updated, skipped };
 }

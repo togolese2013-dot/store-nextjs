@@ -8,6 +8,7 @@ import {
   updateFactureStatut, updateFacture, deleteFacture, getFactureById,
   listDevis, createDevis, listLivraisons,
   getFinanceStats, getStockBoutiqueStats,
+  backfillEntrepotBoutiqueFinance,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -167,6 +168,21 @@ router.get("/api/admin/ventes/livraisons", async (req, res) => {
     const offset = Math.max(0, Number(req.query.offset)  || 0);
     const { items, total } = await listLivraisons({ limit, offset });
     res.json({ items, total });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// One-shot backfill — call once via curl or Postman, super_admin only
+router.post("/api/admin/ventes/backfill-entrepot-finance", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
+  try {
+    const result = await backfillEntrepotBoutiqueFinance();
+    res.json({ ok: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
