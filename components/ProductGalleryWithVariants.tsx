@@ -29,9 +29,9 @@ export default function ProductGalleryWithVariants({
   const handleVariantChange = useCallback((v: Variant | null) => {
     const img = v?.image_url ? resolveUrl(v.image_url) : null;
     setVariantImage(img);
-    // Mobile only — scroll gallery into view so user sees the updated image
-    if (typeof window !== "undefined" && window.innerWidth < 1024 && galleryRef.current) {
-      galleryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Mobile only — scroll to top so user sees the updated image
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, []);
 
