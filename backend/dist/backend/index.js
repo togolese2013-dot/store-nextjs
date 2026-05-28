@@ -2431,7 +2431,8 @@ async function getStockBoutiqueList(opts) {
     remise: Number(r.remise ?? 0),
     quantite: Number(r.quantite),
     seuil_alerte: Number(r.seuil_alerte),
-    valeur: Number(r.quantite) * Number(r.prix_unitaire)
+    valeur: Number(r.quantite) * Number(r.prix_unitaire),
+    entrepot_nom: r.entrepot_nom ?? void 0
   });
   const all = [
     ...rows1.map(mapRow),

@@ -1936,6 +1936,7 @@ export async function getStockBoutiqueList(opts: {
     quantite:      Number(r.quantite),
     seuil_alerte:  Number(r.seuil_alerte),
     valeur:        Number(r.quantite) * Number(r.prix_unitaire),
+    entrepot_nom:  r.entrepot_nom ?? undefined,
   });
 
   const all = [
