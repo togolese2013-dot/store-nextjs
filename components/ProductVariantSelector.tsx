@@ -138,7 +138,29 @@ export default function ProductVariantSelector({ product, variants, onVariantCha
               <span className="ml-2 font-normal text-slate-400">— non sélectionné</span>
             )}
           </p>
-          <div className="flex flex-wrap gap-2">
+
+          {/* Mobile — native select */}
+          <div className="sm:hidden">
+            <select
+              value={selection[axis] ?? ""}
+              onChange={e => setSelection(s => ({ ...s, [axis]: e.target.value }))}
+              className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none bg-white text-slate-800 font-semibold appearance-none"
+              style={{ fontSize: "16px" }}
+            >
+              <option value="">— Choisir {axis}</option>
+              {axes[axis].map((val) => {
+                const available = isAvailable(axis, val);
+                return (
+                  <option key={val} value={val} disabled={!available}>
+                    {val}{!available ? " (épuisé)" : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Desktop — buttons */}
+          <div className="hidden sm:flex flex-wrap gap-2">
             {axes[axis].map((val) => {
               const available = isAvailable(axis, val);
               const active = selection[axis] === val;
