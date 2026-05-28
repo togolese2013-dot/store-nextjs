@@ -778,23 +778,19 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="relative">
                     <input
                       type="text"
                       value={couponInput}
                       onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
                       onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCoupon())}
+                      onBlur={applyCoupon}
                       placeholder="Code promo"
-                      className="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white"
+                      className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white pr-10"
                     />
-                    <button
-                      type="button"
-                      onClick={applyCoupon}
-                      disabled={couponLoading || !couponInput.trim()}
-                      className="px-5 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 disabled:opacity-50 transition-colors shrink-0"
-                    >
-                      {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Appliquer"}
-                    </button>
+                    {couponLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
+                    )}
                   </div>
                 )}
                 {couponError && <p className="text-xs text-red-500 mt-2">{couponError}</p>}
