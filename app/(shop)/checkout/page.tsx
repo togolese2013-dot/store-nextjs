@@ -279,9 +279,13 @@ export default function CheckoutPage() {
   async function applyCoupon() {
     const code = couponInput.trim().toUpperCase();
     if (!code) return;
-    setCouponLoading(true);
     setCouponError("");
     setCoupon(null);
+    if (selectedItems.some(i => i.remise > 0)) {
+      setCouponError("Les codes promo ne sont pas applicables sur les articles déjà en promotion.");
+      return;
+    }
+    setCouponLoading(true);
     try {
       const res  = await fetch(`/api/public/coupons/validate?code=${encodeURIComponent(code)}&total=${selectedTotal}`);
       const data = await res.json();
