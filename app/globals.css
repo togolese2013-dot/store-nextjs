@@ -70,6 +70,11 @@
 /* ─── Base ─── */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Prevent iOS Safari auto-zoom on input focus */
+@media (max-width: 768px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
