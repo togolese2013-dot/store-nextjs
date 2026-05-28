@@ -2961,20 +2961,9 @@ export async function getVentesStats(): Promise<{
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE f.statut = 'paye' AND ${SITE_COND}`),
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt,
-              COALESCE(SUM(
-                CASE
-                  WHEN f.statut_paiement IN ('paye','paye_total') THEN CASE WHEN f.source = 'site_order' THEN f.sous_total ELSE f.total END
-                  WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
-                  ELSE 0
-                END
-              ), 0) AS montant
-       FROM factures f
-       LEFT JOIN orders _soj ON _soj.id = f.order_id AND _soj.status IN ('confirmed','shipped','delivered')
-       LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
-       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule'
-         AND (f.source IS NULL OR f.source != 'site_order' OR (_soj.id IS NOT NULL AND f.statut_paiement IN ('paye','paye_total')))
-         AND (lv.id IS NULL OR lv.statut = 'livre')`),
+      `SELECT COALESCE(SUM(montant), 0) AS montant, COUNT(*) AS cnt
+       FROM finance_entries
+       WHERE type = 'vente' AND DATE(date_entree) = CURDATE()`),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
