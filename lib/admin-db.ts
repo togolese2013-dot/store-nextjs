@@ -2184,7 +2184,7 @@ export async function createVenteWithStock(data: {
   try {
     await conn.beginTransaction();
 
-    // 1. Verify boutique stock for each item
+    // 1. Verify boutique stock for each item (skip external/entrepôt products)
     for (const item of data.items) {
       if (item.variant_id) {
         // Variant product: check product_variants.stock_boutique
@@ -2196,6 +2196,10 @@ export async function createVenteWithStock(data: {
           throw new Error(`Stock boutique insuffisant pour "${item.nom}" (dispo: ${dispo}, demandé: ${item.qty})`);
         }
       } else {
+        const [[prod]] = await conn.execute<mysql.RowDataPacket[]>(
+          "SELECT entrepot_id FROM produits WHERE id = ? LIMIT 1", [item.produit_id]
+        );
+        if (prod?.entrepot_id) continue; // external product — no boutique stock check
         const [rows] = await conn.execute<mysql.RowDataPacket[]>(
           "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1", [item.produit_id]
         );
@@ -2229,7 +2233,7 @@ export async function createVenteWithStock(data: {
     );
     const factureId = result.insertId;
 
-    // 3. Decrement boutique stock + log mouvements
+    // 3. Decrement boutique stock + log mouvements (skip external/entrepôt products)
     for (const item of data.items) {
       if (item.variant_id) {
         // Variant product: decrement product_variants.stock_boutique
@@ -2238,17 +2242,22 @@ export async function createVenteWithStock(data: {
           [item.qty, item.variant_id]
         );
       } else {
-        // Regular product: decrement boutique_stock
-        await conn.execute(
-          "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
-          [item.qty, item.produit_id]
+        const [[p]] = await conn.execute<mysql.RowDataPacket[]>(
+          "SELECT entrepot_id FROM produits WHERE id = ? LIMIT 1", [item.produit_id]
         );
-        // Sync produits.stock_boutique (ignore if column missing)
-        try { await conn.execute(
-          `UPDATE produits p JOIN boutique_stock bs ON bs.produit_id = p.id
-           SET p.stock_boutique = bs.quantite WHERE p.id = ?`,
-          [item.produit_id]
-        ); } catch { /* ignore */ }
+        if (!p?.entrepot_id) {
+          // Regular product: decrement boutique_stock
+          await conn.execute(
+            "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
+            [item.qty, item.produit_id]
+          );
+          // Sync produits.stock_boutique (ignore if column missing)
+          try { await conn.execute(
+            `UPDATE produits p JOIN boutique_stock bs ON bs.produit_id = p.id
+             SET p.stock_boutique = bs.quantite WHERE p.id = ?`,
+            [item.produit_id]
+          ); } catch { /* ignore */ }
+        }
       }
       await conn.execute(
         `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
