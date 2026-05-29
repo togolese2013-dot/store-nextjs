@@ -1,12 +1,59 @@
 /**
  * ReglagesPage — Store workspace settings
  * Sections: boutique info, paiements, notifications, danger zone
+ * Persistence: localStorage key "store_reglages"
  */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CogIcon, CheckIcon } from './icons';
 import styles from './Store.module.css';
+
+/* ─── Persisted shape ────────────────────────────────────────────── */
+interface StoreSettings {
+  nomBoutique:   string;
+  emailContact:  string;
+  telephone:     string;
+  devise:        string;
+  wave:          boolean;
+  orangeMoney:   boolean;
+  carte:         boolean;
+  cash:          boolean;
+  notifWhatsapp: boolean;
+  notifEmail:    boolean;
+  boutiqueActive: boolean;
+}
+
+const LS_KEY = 'store_reglages';
+
+const DEFAULTS: StoreSettings = {
+  nomBoutique:    'Maison Diallo',
+  emailContact:   'contact@maisondiallo.com',
+  telephone:      '+228 90 00 00 00',
+  devise:         'XOF',
+  wave:           true,
+  orangeMoney:    true,
+  carte:          false,
+  cash:           true,
+  notifWhatsapp:  true,
+  notifEmail:     true,
+  boutiqueActive: true,
+};
+
+function loadSettings(): StoreSettings {
+  if (typeof window === 'undefined') return DEFAULTS;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return DEFAULTS;
+    return { ...DEFAULTS, ...JSON.parse(raw) } as StoreSettings;
+  } catch {
+    return DEFAULTS;
+  }
+}
+
+function saveSettings(s: StoreSettings) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch { /* quota */ }
+}
 
 /* ─── Toggle ─────────────────────────────────────────────────────── */
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
@@ -31,9 +78,7 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
         <div className={styles.settingsSectionTitle}>{title}</div>
         {desc && <div className={styles.settingsSectionDesc}>{desc}</div>}
       </div>
-      <div className={styles.settingsCard}>
-        {children}
-      </div>
+      <div className={styles.settingsCard}>{children}</div>
     </div>
   );
 }
@@ -66,27 +111,18 @@ function ToggleRow({ label, desc, on, onChange }: { label: string; desc?: string
 
 /* ─── Main page ──────────────────────────────────────────────────── */
 export default function ReglagesPage() {
-  /* --- Boutique info --- */
-  const [nomBoutique,  setNomBoutique]  = useState('Maison Diallo');
-  const [emailContact, setEmailContact] = useState('contact@maisondiallo.com');
-  const [telephone,    setTelephone]    = useState('+228 90 00 00 00');
-  const [devise,       setDevise]       = useState('XOF');
+  const [s, setS] = useState<StoreSettings>(DEFAULTS);
   const [saved, setSaved] = useState(false);
 
-  /* --- Paiements --- */
-  const [wave,         setWave]         = useState(true);
-  const [orangeMoney,  setOrangeMoney]  = useState(true);
-  const [carte,        setCarte]        = useState(false);
-  const [cash,         setCash]         = useState(true);
+  /* Load from localStorage on mount */
+  useEffect(() => {
+    setS(loadSettings());
+  }, []);
 
-  /* --- Notifications --- */
-  const [notifWhatsapp, setNotifWhatsapp] = useState(true);
-  const [notifEmail,    setNotifEmail]    = useState(true);
-
-  /* --- Boutique active --- */
-  const [boutiqueActive, setBoutiqueActive] = useState(true);
+  const patch = (partial: Partial<StoreSettings>) => setS(prev => ({ ...prev, ...partial }));
 
   const handleSave = () => {
+    saveSettings(s);
     setSaved(true);
     setTimeout(() => setSaved(false), 2200);
   };
@@ -107,7 +143,7 @@ export default function ReglagesPage() {
             onClick={handleSave}
           >
             {saved ? <CheckIcon size={14} /> : <CogIcon size={14} />}
-            {saved ? 'Enregistré' : 'Enregistrer'}
+            {saved ? 'Enregistré !' : 'Enregistrer'}
           </button>
         </div>
       </div>
@@ -123,8 +159,8 @@ export default function ReglagesPage() {
           <Field label="Nom de la boutique">
             <input
               className={styles.settingsInput}
-              value={nomBoutique}
-              onChange={e => setNomBoutique(e.target.value)}
+              value={s.nomBoutique}
+              onChange={e => patch({ nomBoutique: e.target.value })}
               placeholder="Nom de la boutique"
             />
           </Field>
@@ -132,8 +168,8 @@ export default function ReglagesPage() {
             <input
               className={styles.settingsInput}
               type="email"
-              value={emailContact}
-              onChange={e => setEmailContact(e.target.value)}
+              value={s.emailContact}
+              onChange={e => patch({ emailContact: e.target.value })}
               placeholder="contact@example.com"
             />
           </Field>
@@ -141,16 +177,16 @@ export default function ReglagesPage() {
             <input
               className={styles.settingsInput}
               type="tel"
-              value={telephone}
-              onChange={e => setTelephone(e.target.value)}
+              value={s.telephone}
+              onChange={e => patch({ telephone: e.target.value })}
               placeholder="+228 90 00 00 00"
             />
           </Field>
           <Field label="Devise" hint="Utilisée sur toutes les commandes en ligne">
             <select
               className={styles.settingsSelect}
-              value={devise}
-              onChange={e => setDevise(e.target.value)}
+              value={s.devise}
+              onChange={e => patch({ devise: e.target.value })}
             >
               <option value="XOF">XOF — Franc CFA (BCEAO)</option>
               <option value="EUR">EUR — Euro</option>
@@ -165,30 +201,14 @@ export default function ReglagesPage() {
           title="Méthodes de paiement"
           desc="Activez les modes de règlement acceptés sur votre boutique."
         >
-          <ToggleRow
-            label="Wave"
-            desc="Paiement mobile Wave (numéro Wave du client)"
-            on={wave}
-            onChange={setWave}
-          />
-          <ToggleRow
-            label="Orange Money"
-            desc="Paiement mobile Orange Money"
-            on={orangeMoney}
-            onChange={setOrangeMoney}
-          />
-          <ToggleRow
-            label="Carte bancaire"
-            desc="Visa / Mastercard via passerelle de paiement"
-            on={carte}
-            onChange={setCarte}
-          />
-          <ToggleRow
-            label="Paiement à la livraison"
-            desc="Le client règle en espèces à la réception"
-            on={cash}
-            onChange={setCash}
-          />
+          <ToggleRow label="Wave" desc="Paiement mobile Wave (numéro Wave du client)"
+            on={s.wave} onChange={v => patch({ wave: v })} />
+          <ToggleRow label="Orange Money" desc="Paiement mobile Orange Money"
+            on={s.orangeMoney} onChange={v => patch({ orangeMoney: v })} />
+          <ToggleRow label="Carte bancaire" desc="Visa / Mastercard via passerelle de paiement"
+            on={s.carte} onChange={v => patch({ carte: v })} />
+          <ToggleRow label="Paiement à la livraison" desc="Le client règle en espèces à la réception"
+            on={s.cash} onChange={v => patch({ cash: v })} />
         </Section>
 
         {/* ── Notifications ─────────────────────────────────────── */}
@@ -196,18 +216,10 @@ export default function ReglagesPage() {
           title="Notifications"
           desc="Choisissez comment vous êtes alerté à chaque nouvelle commande."
         >
-          <ToggleRow
-            label="WhatsApp"
-            desc="Message WhatsApp au numéro de la boutique"
-            on={notifWhatsapp}
-            onChange={setNotifWhatsapp}
-          />
-          <ToggleRow
-            label="Email"
-            desc="Email envoyé à l'adresse de contact"
-            on={notifEmail}
-            onChange={setNotifEmail}
-          />
+          <ToggleRow label="WhatsApp" desc="Message WhatsApp au numéro de la boutique"
+            on={s.notifWhatsapp} onChange={v => patch({ notifWhatsapp: v })} />
+          <ToggleRow label="Email" desc="Email envoyé à l'adresse de contact"
+            on={s.notifEmail} onChange={v => patch({ notifEmail: v })} />
         </Section>
 
         {/* ── Zone danger ────────────────────────────────────────── */}
@@ -215,20 +227,24 @@ export default function ReglagesPage() {
           <div className={styles.settingsRow}>
             <div className={styles.settingsRowLabel}>
               <div className={styles.settingsRowLabelText} style={{ color: 'var(--danger)' }}>
-                {boutiqueActive ? 'Désactiver la boutique' : 'Réactiver la boutique'}
+                {s.boutiqueActive ? 'Désactiver la boutique' : 'Réactiver la boutique'}
               </div>
               <div className={styles.settingsRowLabelHint}>
-                {boutiqueActive
+                {s.boutiqueActive
                   ? 'La boutique ne sera plus visible — les commandes en cours restent accessibles.'
                   : 'La boutique redevient accessible à vos clients.'}
               </div>
             </div>
             <button
               type="button"
-              className={`${styles.btn} ${boutiqueActive ? styles.danger : ''}`}
-              onClick={() => setBoutiqueActive(v => !v)}
+              className={`${styles.btn} ${s.boutiqueActive ? styles.danger : ''}`}
+              onClick={() => {
+                const next = { ...s, boutiqueActive: !s.boutiqueActive };
+                setS(next);
+                saveSettings(next); // save immediately for danger action
+              }}
             >
-              {boutiqueActive ? 'Désactiver' : 'Réactiver'}
+              {s.boutiqueActive ? 'Désactiver' : 'Réactiver'}
             </button>
           </div>
         </Section>
