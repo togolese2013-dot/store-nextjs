@@ -43,6 +43,7 @@ function createPool() {
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME     || "togol2600657",
     ...shared,
+    ssl: isProduction ? { rejectUnauthorized: false } : undefined,
   });
 }
 
