@@ -29,7 +29,7 @@ export default function AdminWorkspaceClient({
           boutique: '/admin/boutique',
           store:    '/admin/store',
           crm:      '/admin/crm',
-          admin:    '/admin/config',
+          admin:    '/admin/admin-ws',
         };
         router.push(routes[ws.id] ?? `/admin/${ws.id}`);
       }}
