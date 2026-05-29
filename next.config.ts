@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
     }
     // Proxy Séréna AI widget — JS + chat via Next.js (pas de CORS)
     // Note: widget.css intentionnellement NON proxié — on utilise notre CSS inliné
-    const SERENA = "https://serena-togolese-production.up.railway.app";
+    const SERENA = "https://serena.togolese.tg";
     rules.push({ source: "/static/widget.js", destination: `${SERENA}/static/widget.js` });
     rules.push({ source: "/chat",             destination: `${SERENA}/chat` });
     return rules;
