@@ -39,11 +39,12 @@ import CommandesPage from './CommandesPage';
 import CouponsPage from './CouponsPage';
 import LivraisonsPage from './LivraisonsPage';
 import PaiementsPage from './PaiementsPage';
+import ReglagesPage from './ReglagesPage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
 import styles from './Store.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
-type PageId = 'overview' | 'commandes' | 'coupons' | 'livraisons' | 'paiements';
+type PageId = 'overview' | 'commandes' | 'coupons' | 'livraisons' | 'paiements' | 'settings';
 
 const PAGE_LABELS: Record<PageId, string> = {
   overview:   "Vue d'ensemble",
@@ -51,6 +52,7 @@ const PAGE_LABELS: Record<PageId, string> = {
   coupons:    'Coupons',
   livraisons: 'Livraisons',
   paiements:  'Paiements',
+  settings:   'Réglages boutique',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
@@ -59,6 +61,7 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   coupons:    'Rechercher un code promo…',
   livraisons: 'Rechercher une zone de livraison…',
   paiements:  'Rechercher une transaction, client…',
+  settings:   'Rechercher un réglage…',
 };
 
 const NAV_TO_PAGE: Record<string, PageId> = {
@@ -67,6 +70,7 @@ const NAV_TO_PAGE: Record<string, PageId> = {
   coupons:    'coupons',
   livraisons: 'livraisons',
   paiements:  'paiements',
+  settings:   'settings',
 };
 
 /* ─── Props ─────────────────────────────────────────────────────── */
@@ -145,6 +149,7 @@ export default function StoreShell({
         {page === 'coupons'    && <CouponsPage coupons={coupons} />}
         {page === 'livraisons' && <LivraisonsPage zones={zones} />}
         {page === 'paiements'  && <PaiementsPage payments={payments} />}
+        {page === 'settings'   && <ReglagesPage />}
       </main>
     </div>
   );

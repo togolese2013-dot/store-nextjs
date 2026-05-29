@@ -222,3 +222,71 @@
 .zStatValue { font-family: "Geist Mono", monospace; font-size: 14px; font-weight: 500; letter-spacing: -.01em; }
 .zStatLabel { font-size: 10px; color: var(--muted-2); letter-spacing: .06em; text-transform: uppercase; }
 .zoneFoot   { display: flex; align-items: center; font-size: 12px; color: var(--muted); gap: 5px; }
+
+/* ─── Settings / Réglages ──────────────────────────────────────── */
+.settingsBody { padding: 0 28px 40px; display: flex; flex-direction: column; gap: 28px; margin-top: 8px; }
+
+.settingsSection { display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
+@media (max-width: 860px) { .settingsSection { grid-template-columns: 1fr; } }
+
+.settingsSectionHead { padding-top: 4px; }
+.settingsSectionTitle { font-size: 14px; font-weight: 600; letter-spacing: -.015em; margin-bottom: 6px; }
+.settingsSectionDesc  { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+.settingsCard {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+}
+
+.settingsRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 16px 20px;
+}
+.settingsRow + .settingsRow { border-top: 1px solid var(--border); }
+
+.settingsRowLabel { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.settingsRowLabelText { font-size: 13.5px; font-weight: 500; }
+.settingsRowLabelHint { font-size: 12px; color: var(--muted); }
+
+.settingsRowControl { flex-shrink: 0; }
+
+.settingsInput {
+  height: 36px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--bg); color: var(--ink);
+  font: inherit; font-size: 13.5px;
+  width: 260px; outline: none;
+  transition: border-color .15s;
+}
+.settingsInput:focus { border-color: var(--accent); }
+.settingsInput::placeholder { color: var(--muted-2); }
+
+.settingsSelect {
+  height: 36px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--bg); color: var(--ink);
+  font: inherit; font-size: 13.5px;
+  width: 260px; outline: none; cursor: pointer;
+  transition: border-color .15s;
+}
+.settingsSelect:focus { border-color: var(--accent); }
+
+/* Toggle */
+.toggle {
+  width: 40px; height: 24px; border-radius: 999px;
+  background: rgba(20,17,14,.12); border: 0; cursor: pointer;
+  position: relative; flex-shrink: 0;
+  transition: background .2s ease;
+}
+.toggle.toggleOn { background: var(--accent); }
+.toggleKnob {
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: white; box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.toggle.toggleOn .toggleKnob { transform: translateX(16px); }
+
+/* Danger button */
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: var(--danger-bg); }
