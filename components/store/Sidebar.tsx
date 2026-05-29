@@ -56,8 +56,8 @@ export default function Sidebar({
           <CartIcon size={16} />
         </div>
         <div className={styles.workspaceMeta}>
-          <div className="l1">Store</div>
-          <div className="l2">E-commerce</div>
+          <div className={styles.l1}>Store</div>
+          <div className={styles.l2}>E-commerce</div>
         </div>
         <ChevDownIcon size={12} />
       </button>
@@ -98,8 +98,8 @@ export default function Sidebar({
         <div className={styles.userRow}>
           <div className={styles.avatar}>{userName.charAt(0).toUpperCase()}</div>
           <div className={styles.userMeta}>
-            <div className="n">{userName}</div>
-            <div className="r">{userRole}</div>
+            <div className={styles.n}>{userName}</div>
+            <div className={styles.r}>{userRole}</div>
           </div>
           <CogIcon size={14} />
         </div>

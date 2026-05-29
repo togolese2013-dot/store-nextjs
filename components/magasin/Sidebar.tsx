@@ -77,8 +77,8 @@ export default function Sidebar({
         <button type="button" className={styles.workspaceSwitcher} onClick={onSwitchWorkspace}>
           <div className={styles.workspaceIcon}><BoxIcon size={16} /></div>
           <div className={styles.workspaceMeta}>
-            <div className="l1">Magasin</div>
-            <div className="l2">Gestion des stocks</div>
+            <div className={styles.l1}>Magasin</div>
+            <div className={styles.l2}>Gestion des stocks</div>
           </div>
           <ChevDownIcon size={12} />
         </button>
@@ -118,8 +118,8 @@ export default function Sidebar({
         <div className={styles.userRow}>
           <div className={styles.avatar}>{userName.charAt(0).toUpperCase()}</div>
           <div className={styles.userMeta}>
-            <div className="n">{userName}</div>
-            <div className="r">{userRole}</div>
+            <div className={styles.n}>{userName}</div>
+            <div className={styles.r}>{userRole}</div>
           </div>
           <CogIcon size={14} />
         </div>
