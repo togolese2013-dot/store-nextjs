@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: afrisika-backend
+    restart: unless-stopped
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:3002:3000"
+    networks:
+      - afrisika
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: afrisika-frontend
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      - BACKEND_URL=http://afrisika-backend:3000
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      - backend
+    networks:
+      - afrisika
+
+networks:
+  afrisika:
+    driver: bridge
