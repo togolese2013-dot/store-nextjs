@@ -171,6 +171,17 @@ async function produitCols() {
     )`);
   } catch {
   }
+  for (const [col, def] of [
+    ["telephone", "VARCHAR(30) NULL"],
+    ["adresse", "TEXT NULL"],
+    ["notes", "TEXT NULL"],
+    ["actif", "TINYINT(1) NOT NULL DEFAULT 1"]
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE entrepots ADD COLUMN ${col} ${def}`);
+    } catch {
+    }
+  }
   if (!names.has("entrepot_id")) {
     try {
       await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`);
@@ -218,6 +229,31 @@ async function produitCols() {
     } catch {
     }
   }
+  if (!names.has("shop_id")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN shop_id INT UNSIGNED NOT NULL DEFAULT 1`);
+      names.add("shop_id");
+      try {
+        await db.execute(`ALTER TABLE produits ADD INDEX idx_produits_shop_id (shop_id)`);
+      } catch {
+      }
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("shop_id");
+      }
+    }
+  }
+  if (names.has("slug") && names.has("shop_id")) {
+    try {
+      await db.execute(`ALTER TABLE produits DROP INDEX idx_produits_slug`);
+    } catch {
+    }
+    try {
+      await db.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_shop_slug (shop_id, slug)`);
+    } catch {
+    }
+  }
   _cols = {
     remise: names.has("remise"),
     neuf: names.has("neuf"),
@@ -233,7 +269,8 @@ async function produitCols() {
     marque_id: names.has("marque_id"),
     slug: names.has("slug"),
     entrepot_id: names.has("entrepot_id"),
-    prix_entrepot: names.has("prix_entrepot")
+    prix_entrepot: names.has("prix_entrepot"),
+    shop_id: names.has("shop_id")
   };
   return _cols;
 }
@@ -283,11 +320,17 @@ async function getProducts(opts) {
     limit = 60,
     offset = 0,
     statut,
-    includeInactive = false
+    includeInactive = false,
+    entrepotId,
+    shopId = 1
   } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
   const params = [];
+  if (cols.shop_id) {
+    conditions.push("p.shop_id = ?");
+    params.push(shopId);
+  }
   if (categoryId) {
     conditions.push("p.categorie_id = ?");
     params.push(categoryId);
@@ -330,10 +373,14 @@ async function getProducts(opts) {
     conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?");
     params.push(maxPrice);
   }
+  if (entrepotId != null) {
+    conditions.push("p.entrepot_id = ?");
+    params.push(entrepotId);
+  }
   const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END" : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol = cols.stock_magasin ? "COALESCE(p.stock_magasin, 0)" : "0";
   const safeLimit = Math.max(1, Math.min(200, Number(limit)));
   const safeOffset = Math.max(0, Number(offset));
@@ -397,7 +444,7 @@ async function getProductsByIds(ids) {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END" : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol = cols.stock_magasin ? "COALESCE(p.stock_magasin, 0)" : "0";
   const placeholders = ids.map(() => "?").join(",");
   const [rows] = await db.query(
@@ -442,11 +489,11 @@ async function getProductsByIds(ids) {
     marque_nom: r.marque_nom ?? null
   }));
 }
-async function getProductBySlug(slugOrRef) {
+async function getProductBySlug(slugOrRef, shopId = 1) {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
-  const stockBoutiqueCol = cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
+  const stockBoutiqueCol = cols.stock_boutique && cols.entrepot_id ? "CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE CAST(p.stock_boutique AS SIGNED) END" : cols.stock_boutique ? "CAST(p.stock_boutique AS SIGNED)" : "0";
   const stockMagasinCol = cols.stock_magasin ? "COALESCE(p.stock_magasin, 0)" : "0";
   const selectSql = `SELECT
        p.id, p.reference, ${cols.slug ? "p.slug" : "NULL"} AS slug, p.nom, p.description, p.categorie_id,
@@ -465,18 +512,20 @@ async function getProductBySlug(slugOrRef) {
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}`;
+  const shopCondition = cols.shop_id ? " AND p.shop_id = ?" : "";
+  const shopParams = cols.shop_id ? [shopId] : [];
   let rows = [];
   if (cols.slug) {
     const [r1] = await db.execute(
-      `${selectSql} WHERE p.slug = ? AND p.actif = 1 LIMIT 1`,
-      [slugOrRef]
+      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      [slugOrRef, ...shopParams]
     );
     rows = r1;
   }
   if (!rows.length) {
     const [r2] = await db.execute(
-      `${selectSql} WHERE p.reference = ? AND p.actif = 1 LIMIT 1`,
-      [slugOrRef]
+      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      [slugOrRef, ...shopParams]
     );
     rows = r2;
   }
@@ -504,10 +553,14 @@ async function getProductBySlug(slugOrRef) {
   };
 }
 async function getProductCount(opts) {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1 } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
   const params = [];
+  if (cols.shop_id) {
+    conditions.push("p.shop_id = ?");
+    params.push(shopId);
+  }
   if (categoryId) {
     conditions.push("p.categorie_id = ?");
     params.push(categoryId);
@@ -546,6 +599,10 @@ async function getProductCount(opts) {
     conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?");
     params.push(maxPrice);
   }
+  if (entrepotId != null) {
+    conditions.push("p.entrepot_id = ?");
+    params.push(entrepotId);
+  }
   const [rows] = await db.execute(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,
     params
@@ -569,13 +626,15 @@ async function getProductStatusCounts() {
     epuise: Number(r?.epuise ?? 0)
   };
 }
-async function getCategories() {
+async function getCategories(shopId = 1) {
   const [rows] = await db.execute(
     `SELECT c.id, c.nom, c.description, COUNT(p.id) AS product_count
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
+     WHERE c.shop_id = ?
      GROUP BY c.id, c.nom, c.description
-     ORDER BY product_count DESC`
+     ORDER BY product_count DESC`,
+    [shopId]
   );
   return rows;
 }
@@ -605,8 +664,11 @@ async function getProductVariants(productId) {
       nom: r.nom,
       options: typeof r.options === "string" ? JSON.parse(r.options) : r.options ?? {},
       prix: Number(r.prix),
+      remise: Number(r.remise ?? 0),
       stock: Number(r.stock),
-      reference_sku: r.reference_sku ?? null
+      stock_boutique: Number(r.stock_boutique ?? 0),
+      reference_sku: r.reference_sku ?? null,
+      image_url: r.image_url ?? null
     }));
   } catch {
     return [];
@@ -658,6 +720,7 @@ __export(admin_db_exports, {
   createStockAjustement: () => createStockAjustement,
   createStockEntree: () => createStockEntree,
   createStockSortie: () => createStockSortie,
+  createTombolaSession: () => createTombolaSession,
   createUtilisateur: () => createUtilisateur,
   createVenteWithStock: () => createVenteWithStock,
   deleteAchat: () => deleteAchat,
@@ -678,6 +741,7 @@ __export(admin_db_exports, {
   deleteNewsletterSubscriber: () => deleteNewsletterSubscriber,
   deleteOrder: () => deleteOrder,
   deleteReview: () => deleteReview,
+  deleteTombolaSession: () => deleteTombolaSession,
   deleteUtilisateur: () => deleteUtilisateur,
   ensureAdminUsersCols: () => ensureAdminUsersCols,
   ensureEntrepotsTable: () => ensureEntrepotsTable,
@@ -686,7 +750,9 @@ __export(admin_db_exports, {
   ensureLivreurInscriptionsTable: () => ensureLivreurInscriptionsTable,
   ensureOrderLivreurCols: () => ensureOrderLivreurCols,
   ensureOrderVente: () => ensureOrderVente,
+  ensureShopIdCols: () => ensureShopIdCols,
   ensureTokenVersionCols: () => ensureTokenVersionCols,
+  ensureTombolaTable: () => ensureTombolaTable,
   ensureUtilisateursCols: () => ensureUtilisateursCols,
   fixSiteOrderFinanceEntries: () => fixSiteOrderFinanceEntries,
   getAchatById: () => getAchatById,
@@ -728,6 +794,8 @@ __export(admin_db_exports, {
   getStockMovements: () => getStockMovements,
   getStockStats: () => getStockStats,
   getTokenVersion: () => getTokenVersion,
+  getTombolaParticipants: () => getTombolaParticipants,
+  getTombolaSession: () => getTombolaSession,
   getUtilisateurById: () => getUtilisateurById,
   getUtilisateurByUsername: () => getUtilisateurByUsername,
   getUtilisateurPermissions: () => getUtilisateurPermissions,
@@ -759,9 +827,11 @@ __export(admin_db_exports, {
   listReferrals: () => listReferrals,
   listReviews: () => listReviews,
   listSiteClients: () => listSiteClients,
+  listTombolaSessions: () => listTombolaSessions,
   listUtilisateurs: () => listUtilisateurs,
   listWaMessages: () => listWaMessages,
   markMessagesRead: () => markMessagesRead,
+  markTombolaNotified: () => markTombolaNotified,
   markTranchePaid: () => markTranchePaid,
   markTrancheUnpaid: () => markTrancheUnpaid,
   migrateAdminLivreursToTeam: () => migrateAdminLivreursToTeam,
@@ -770,6 +840,7 @@ __export(admin_db_exports, {
   setSetting: () => setSetting,
   setSettings: () => setSettings,
   setUtilisateurPermissions: () => setUtilisateurPermissions,
+  spinTombola: () => spinTombola,
   subscribeNewsletter: () => subscribeNewsletter,
   updateAchat: () => updateAchat,
   updateAchatStatut: () => updateAchatStatut,
@@ -791,6 +862,7 @@ __export(admin_db_exports, {
   updateOrderFields: () => updateOrderFields,
   updateOrderStatus: () => updateOrderStatus,
   updateProductStock: () => updateProductStock,
+  updateTombolaSession: () => updateTombolaSession,
   updateUtilisateur: () => updateUtilisateur,
   updateUtilisateurPassword: () => updateUtilisateurPassword,
   upsertClient: () => upsertClient,
@@ -803,12 +875,45 @@ function runOnce(key, fn) {
   return _ensurePromises.get(key);
 }
 async function getProduitsWithStock() {
+  let hasVariantsTable = false;
+  try {
+    await db.execute("SELECT 1 FROM product_variants LIMIT 0");
+    hasVariantsTable = true;
+  } catch {
+  }
+  if (!hasVariantsTable) {
+    const [rows2] = await db.query(
+      `SELECT p.id AS produit_id, p.nom, p.reference,
+              COALESCE(p.stock_magasin, 0) AS stock,
+              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+       FROM produits p WHERE p.actif = 1 ORDER BY p.nom`
+    );
+    return rows2;
+  }
   const [rows] = await db.query(
-    `SELECT id AS produit_id, nom, reference,
-            COALESCE(stock_magasin, 0) AS stock
-     FROM produits
-     WHERE actif = 1
-     ORDER BY nom`
+    `SELECT * FROM (
+       SELECT p.id AS produit_id, p.nom,
+              p.reference,
+              COALESCE(p.stock_magasin, 0) AS stock,
+              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+       FROM produits p
+       WHERE p.actif = 1
+         AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
+
+       UNION ALL
+
+       SELECT p.id AS produit_id,
+              CONCAT(p.nom, ' \u2014 ', pv.nom) AS nom,
+              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              pv.stock AS stock,
+              1 AS variants_count,
+              pv.id AS variant_id,
+              pv.nom AS variant_nom
+       FROM product_variants pv
+       JOIN produits p ON p.id = pv.produit_id
+       WHERE p.actif = 1
+     ) AS combined
+     ORDER BY nom ASC`
   );
   return rows;
 }
@@ -816,19 +921,33 @@ async function createStockEntree(data) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.execute(
-      `UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?`,
-      [data.quantite, data.produit_id]
-    );
-    const [[stockRow]] = await conn.execute(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const stockApres = Number(stockRow?.stock ?? 0);
+    let stockApres;
+    if (data.variant_id) {
+      await conn.execute(
+        `UPDATE product_variants SET stock = stock + ? WHERE id = ? AND produit_id = ?`,
+        [data.quantite, data.variant_id, data.produit_id]
+      );
+      const [[vRow]] = await conn.execute(
+        `SELECT stock FROM product_variants WHERE id = ?`,
+        [data.variant_id]
+      );
+      stockApres = Number(vRow?.stock ?? 0);
+    } else {
+      await conn.execute(
+        `UPDATE produits SET stock_magasin = COALESCE(stock_magasin, 0) + ? WHERE id = ?`,
+        [data.quantite, data.produit_id]
+      );
+      const [[stockRow]] = await conn.execute(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      stockApres = Number(stockRow?.stock ?? 0);
+    }
+    const noteWithVariant = data.variant_id && !data.note ? null : data.note ?? null;
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
        VALUES (?, 'entree', ?, ?, ?, ?, ?)`,
-      [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
+      [data.produit_id, data.quantite, stockApres, data.reference ?? null, noteWithVariant, data.user_id ?? null]
     );
     await conn.commit();
   } catch (err) {
@@ -842,37 +961,56 @@ async function createStockSortie(data) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [[row]] = await conn.execute(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const available = Number(row?.stock ?? 0);
-    if (available < data.quantite) {
-      throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demand\xE9(s)`);
+    let stockApres;
+    if (data.variant_id) {
+      const [[vRow]] = await conn.execute(
+        `SELECT stock FROM product_variants WHERE id = ? AND produit_id = ?`,
+        [data.variant_id, data.produit_id]
+      );
+      const available = Number(vRow?.stock ?? 0);
+      if (available < data.quantite) {
+        throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demand\xE9(s)`);
+      }
+      await conn.execute(
+        `UPDATE product_variants
+         SET stock = stock - ?, stock_boutique = stock_boutique + ?
+         WHERE id = ?`,
+        [data.quantite, data.quantite, data.variant_id]
+      );
+      stockApres = available - data.quantite;
+    } else {
+      const [[row]] = await conn.execute(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      const available = Number(row?.stock ?? 0);
+      if (available < data.quantite) {
+        throw new Error(`Stock insuffisant : ${available} disponible(s), ${data.quantite} demand\xE9(s)`);
+      }
+      await conn.execute(
+        `UPDATE produits
+         SET stock_magasin  = GREATEST(0, COALESCE(stock_magasin, 0) - ?),
+             stock_boutique = COALESCE(stock_boutique, 0) + ?
+         WHERE id = ?`,
+        [data.quantite, data.quantite, data.produit_id]
+      );
+      stockApres = available - data.quantite;
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
+        [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
+      );
+      await conn.execute(
+        `INSERT INTO boutique_stock (produit_id, quantite)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE quantite = quantite + VALUES(quantite), updated_at = NOW()`,
+        [data.produit_id, data.quantite]
+      );
     }
-    await conn.execute(
-      `UPDATE produits
-       SET stock_magasin  = GREATEST(0, COALESCE(stock_magasin, 0) - ?),
-           stock_boutique = COALESCE(stock_boutique, 0) + ?
-       WHERE id = ?`,
-      [data.quantite, data.quantite, data.produit_id]
-    );
-    const stockApres = available - data.quantite;
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, reference, note, user_id)
        VALUES (?, 'retrait', ?, ?, ?, ?, ?)`,
       [data.produit_id, data.quantite, stockApres, data.reference ?? null, data.note ?? null, data.user_id ?? null]
-    );
-    await conn.execute(
-      `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
-       VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
-      [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
-    );
-    await conn.execute(
-      `INSERT INTO boutique_stock (produit_id, quantite)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE quantite = quantite + VALUES(quantite), updated_at = NOW()`,
-      [data.produit_id, data.quantite]
     );
     await conn.commit();
   } catch (err) {
@@ -888,17 +1026,30 @@ async function createStockAjustement(data) {
     await conn.beginTransaction();
     const abs = Math.abs(data.quantite);
     const type = data.quantite >= 0 ? "entree" : "retrait";
-    await conn.execute(
-      `UPDATE produits
-       SET stock_magasin = GREATEST(0, COALESCE(stock_magasin, 0) + ?)
-       WHERE id = ?`,
-      [data.quantite, data.produit_id]
-    );
-    const [[stockRow]] = await conn.execute(
-      `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
-      [data.produit_id]
-    );
-    const stockApres = Number(stockRow?.stock ?? 0);
+    let stockApres;
+    if (data.variant_id) {
+      await conn.execute(
+        `UPDATE product_variants SET stock = GREATEST(0, stock + ?) WHERE id = ? AND produit_id = ?`,
+        [data.quantite, data.variant_id, data.produit_id]
+      );
+      const [[vRow]] = await conn.execute(
+        `SELECT stock FROM product_variants WHERE id = ?`,
+        [data.variant_id]
+      );
+      stockApres = Number(vRow?.stock ?? 0);
+    } else {
+      await conn.execute(
+        `UPDATE produits
+         SET stock_magasin = GREATEST(0, COALESCE(stock_magasin, 0) + ?)
+         WHERE id = ?`,
+        [data.quantite, data.produit_id]
+      );
+      const [[stockRow]] = await conn.execute(
+        `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
+        [data.produit_id]
+      );
+      stockApres = Number(stockRow?.stock ?? 0);
+    }
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note, user_id)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -1004,17 +1155,65 @@ async function ensureAdminUsersCols() {
     console.error("[ensureAdminUsersCols] kent seed failed:", e);
   }
 }
-async function getAdminByEmail(email) {
+async function ensureShopIdCols() {
+  return runOnce("shop_id_cols", async () => {
+    const tables = [
+      ["admin_users"],
+      ["orders"],
+      ["factures"],
+      ["categories"],
+      ["delivery_zones"],
+      ["coupons"],
+      ["settings"],
+      ["entrepots"],
+      ["marques"],
+      ["finance_entries"],
+      ["devis"],
+      ["livraisons_ventes"],
+      ["boutique_mouvements"],
+      ["boutique_clients"]
+    ];
+    for (const [table, extra] of tables) {
+      try {
+        await db.execute(
+          `ALTER TABLE \`${table}\` ADD COLUMN shop_id INT UNSIGNED NOT NULL DEFAULT 1`
+        );
+        try {
+          await db.execute(
+            `ALTER TABLE \`${table}\` ADD INDEX idx_${table}_shop_id (shop_id)`
+          );
+        } catch {
+        }
+        void extra;
+      } catch (e) {
+        const err = e;
+        const msg = String(err?.message ?? "");
+        if (err?.code !== "ER_DUP_FIELDNAME" && !msg.includes("Duplicate column") && err?.code !== "ER_NO_SUCH_TABLE") {
+          console.warn(`[ensureShopIdCols] ${table}:`, err?.code ?? msg);
+        }
+      }
+    }
+    try {
+      await db.execute("ALTER TABLE settings DROP INDEX `key`");
+    } catch {
+    }
+    try {
+      await db.execute("ALTER TABLE settings ADD UNIQUE KEY `key_shop` (`key`, shop_id)");
+    } catch {
+    }
+  });
+}
+async function getAdminByEmail(email, shopId = 1) {
   const [rows] = await db.execute(
-    "SELECT * FROM admin_users WHERE email = ? AND actif = 1 LIMIT 1",
-    [email]
+    "SELECT * FROM admin_users WHERE email = ? AND shop_id = ? AND actif = 1 LIMIT 1",
+    [email, shopId]
   );
   return rows[0] ?? null;
 }
-async function getAdminByUsername(username) {
+async function getAdminByUsername(username, shopId = 1) {
   const [rows] = await db.execute(
-    "SELECT * FROM admin_users WHERE username = ? AND actif = 1 LIMIT 1",
-    [username]
+    "SELECT * FROM admin_users WHERE username = ? AND shop_id = ? AND actif = 1 LIMIT 1",
+    [username, shopId]
   );
   return rows[0] ?? null;
 }
@@ -1025,16 +1224,17 @@ async function getAdminById(id) {
   );
   return rows[0] ?? null;
 }
-async function listAdminUsers() {
+async function listAdminUsers(shopId = 1) {
   const [rows] = await db.execute(
-    "SELECT id, nom, username, email, telephone, poste, role, actif, permissions, created_at, last_login FROM admin_users ORDER BY id ASC"
+    "SELECT id, nom, username, email, telephone, poste, role, actif, permissions, created_at, last_login FROM admin_users WHERE shop_id = ? ORDER BY id ASC",
+    [shopId]
   );
   return rows;
 }
 async function createAdminUser(data) {
   await db.execute(
-    "INSERT INTO admin_users (nom, username, email, telephone, poste, password_hash, role, must_change_password) VALUES (?,?,?,?,?,?,?,?)",
-    [data.nom, data.username, data.email ?? null, data.telephone ?? null, data.poste ?? "staff", data.password_hash, data.role, data.must_change_password ? 1 : 0]
+    "INSERT INTO admin_users (nom, username, email, telephone, poste, password_hash, role, must_change_password, shop_id) VALUES (?,?,?,?,?,?,?,?,?)",
+    [data.nom, data.username, data.email ?? null, data.telephone ?? null, data.poste ?? "staff", data.password_hash, data.role, data.must_change_password ? 1 : 0, data.shop_id ?? 1]
   );
 }
 async function updateAdminLastLogin(id) {
@@ -1265,82 +1465,90 @@ async function setUtilisateurPermissions(utilisateurId, permissionIds) {
     conn.release();
   }
 }
-function invalidateSettingsCache() {
-  _settingsCache = null;
+function invalidateSettingsCache(shopId) {
+  if (shopId !== void 0) _settingsCacheMap.delete(shopId);
+  else _settingsCacheMap.clear();
 }
-async function loadSettings() {
+async function loadSettings(shopId = 1) {
   const now = Date.now();
-  if (_settingsCache && _settingsCache.expiresAt > now) return _settingsCache.data;
-  const [rows] = await db.execute("SELECT `key`, `value` FROM settings");
+  const cached = _settingsCacheMap.get(shopId);
+  if (cached && cached.expiresAt > now) return cached.data;
+  const [rows] = await db.execute(
+    "SELECT `key`, `value` FROM settings WHERE shop_id = ?",
+    [shopId]
+  );
   const data = Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
-  _settingsCache = { data, expiresAt: now + 5 * 6e4 };
+  _settingsCacheMap.set(shopId, { data, expiresAt: now + 5 * 6e4 });
   return data;
 }
-async function getSettings() {
-  return loadSettings();
+async function getSettings(shopId = 1) {
+  return loadSettings(shopId);
 }
-async function getSetting(key) {
-  const all = await loadSettings();
+async function getSetting(key, shopId = 1) {
+  const all = await loadSettings(shopId);
   if (key in all) return all[key] ?? "";
   const [rows] = await db.execute(
-    "SELECT `value` FROM settings WHERE `key` = ?",
-    [key]
+    "SELECT `value` FROM settings WHERE `key` = ? AND shop_id = ?",
+    [key, shopId]
   );
   return rows[0]?.value ?? "";
 }
-async function setSetting(key, value) {
+async function setSetting(key, value, shopId = 1) {
   await db.execute(
-    "INSERT INTO settings (`key`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-    [key, value]
+    "INSERT INTO settings (`key`, `value`, shop_id) VALUES (?,?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+    [key, value, shopId]
   );
-  invalidateSettingsCache();
+  invalidateSettingsCache(shopId);
 }
-async function setSettings(entries) {
+async function setSettings(entries, shopId = 1) {
   const pairs = Object.entries(entries);
   if (!pairs.length) return;
-  const placeholders = pairs.map(() => "(?,?)").join(",");
-  const values = pairs.flatMap(([k, v]) => [k, v]);
+  const placeholders = pairs.map(() => "(?,?,?)").join(",");
+  const values = pairs.flatMap(([k, v]) => [k, v, shopId]);
   await db.execute(
-    `INSERT INTO settings (\`key\`, \`value\`) VALUES ${placeholders} ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
+    `INSERT INTO settings (\`key\`, \`value\`, shop_id) VALUES ${placeholders} ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
     values
   );
-  invalidateSettingsCache();
+  invalidateSettingsCache(shopId);
 }
-async function getDeliveryZones(activeOnly = false) {
-  const where = activeOnly ? "WHERE actif = 1" : "";
+async function getDeliveryZones(activeOnly = false, shopId = 1) {
+  const conds = [`shop_id = ${Number(shopId)}`];
+  if (activeOnly) conds.push("actif = 1");
   const [rows] = await db.execute(
-    `SELECT * FROM delivery_zones ${where} ORDER BY sort_order ASC, id ASC`
+    `SELECT * FROM delivery_zones WHERE ${conds.join(" AND ")} ORDER BY sort_order ASC, id ASC`
   );
   return rows.map((r) => ({ ...r, actif: Boolean(r.actif), prix_libre: Boolean(r.prix_libre) }));
 }
-async function upsertDeliveryZone(zone) {
+async function upsertDeliveryZone(zone, shopId = 1) {
   if (zone.id) {
     await db.execute(
-      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=?",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id]
+      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=? AND shop_id=?",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id, shopId]
     );
   } else {
     await db.execute(
-      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre) VALUES (?,?,?,?,?)",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0]
+      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre, shop_id) VALUES (?,?,?,?,?,?)",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, shopId]
     );
   }
 }
-async function deleteDeliveryZone(id) {
-  await db.execute("DELETE FROM delivery_zones WHERE id = ?", [id]);
+async function deleteDeliveryZone(id, shopId = 1) {
+  await db.execute("DELETE FROM delivery_zones WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
-async function listOrders(limit = 50, offset = 0) {
+async function listOrders(limit = 50, offset = 0, shopId = 1) {
   const [rows] = await db.query(
     `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
             items, subtotal, total, status, statut_paiement,
             livreur_id, livraison_statut, created_at, updated_at
-     FROM orders ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+     FROM orders WHERE shop_id = ${Number(shopId)}
+     ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
   );
   return rows;
 }
-async function countOrders() {
+async function countOrders(shopId = 1) {
   const [rows] = await db.execute(
-    "SELECT COUNT(*) as cnt FROM orders"
+    "SELECT COUNT(*) as cnt FROM orders WHERE shop_id = ?",
+    [shopId]
   );
   return Number(rows[0]?.cnt ?? 0);
 }
@@ -1362,7 +1570,14 @@ async function ensureOrderLifecycleCols() {
   }
 }
 async function updateOrderStatus(id, status) {
-  await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
+  if (status === "delivered") {
+    await db.execute(
+      "UPDATE orders SET status = ?, delivered_at = NOW() WHERE id = ?",
+      [status, id]
+    );
+  } else {
+    await db.execute("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
+  }
 }
 async function ensureEntrepotsTable() {
   return runOnce("entrepots", async () => {
@@ -1535,8 +1750,8 @@ async function createOrder(data) {
   const rand = Math.floor(1e3 + Math.random() * 9e3);
   const reference = `CMD-${dateStr}-${rand}`;
   const [result] = await db.execute(
-    `INSERT INTO orders (reference, nom, telephone, adresse, zone_livraison, delivery_fee, note, items, subtotal, total, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    `INSERT INTO orders (reference, nom, telephone, adresse, zone_livraison, delivery_fee, note, items, subtotal, total, status, shop_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [
       reference,
       data.nom,
@@ -1547,7 +1762,8 @@ async function createOrder(data) {
       data.note,
       JSON.stringify(data.items),
       data.subtotal,
-      data.total
+      data.total,
+      data.shop_id ?? 1
     ]
   );
   return result.insertId;
@@ -1628,11 +1844,12 @@ async function ensureOrderVente(orderId, actor) {
     factureId = result.insertId;
     await db.execute("UPDATE orders SET vente_facture_id = ? WHERE id = ?", [factureId, orderId]);
     if (order.nom && order.telephone) {
+      const _sId = Number(order.shop_id ?? 1);
       await db.execute(
-        `INSERT INTO boutique_clients (nom, telephone, type_client)
-         SELECT ?, ?, 'particulier' FROM DUAL
-         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
-        [String(order.nom).trim(), String(order.telephone).trim(), String(order.telephone).trim()]
+        `INSERT INTO boutique_clients (nom, telephone, type_client, shop_id)
+         SELECT ?, ?, 'particulier', ? FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ? AND shop_id = ?)`,
+        [String(order.nom).trim(), String(order.telephone).trim(), _sId, String(order.telephone).trim(), _sId]
       ).catch(() => {
       });
     }
@@ -1864,17 +2081,17 @@ async function getOrdersStats() {
     recentOrders: recentRows[0]
   };
 }
-async function listWaMessages(limit = 100) {
+async function listWaMessages(limit = 100, shopId = 1) {
   const modern = `SELECT id, wa_message_id, from_number, to_number, contact_name, direction, type,
                          COALESCE(content, body, '') as content, COALESCE(media_url,'') as media_url,
                          status, read_at, created_at
-                  FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`;
+                  FROM whatsapp_messages WHERE shop_id = ${Number(shopId)} ORDER BY created_at DESC LIMIT ${limit}`;
   const legacy = `SELECT id, COALESCE(wa_message_id,'') as wa_message_id, from_number,
                          COALESCE(to_number,'') as to_number, COALESCE(contact_name,'') as contact_name,
                          COALESCE(direction,'in') as direction, COALESCE(type,'text') as type,
                          COALESCE(body,'') as content, '' as media_url, COALESCE(status,'received') as status,
                          read_at, created_at
-                  FROM whatsapp_messages ORDER BY created_at DESC LIMIT ${limit}`;
+                  FROM whatsapp_messages WHERE shop_id = ${Number(shopId)} ORDER BY created_at DESC LIMIT ${limit}`;
   const [rows] = await db.query(modern).catch(() => db.query(legacy)).catch(() => [[], []]);
   return rows;
 }
@@ -1953,55 +2170,58 @@ async function ensureCouponsTable() {
   `).then(() => {
   }));
 }
-async function listCoupons() {
+async function listCoupons(shopId = 1) {
   await ensureCouponsTable();
   const [rows] = await db.execute(
-    "SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif, created_at FROM coupons ORDER BY created_at DESC LIMIT 500"
+    "SELECT id, code, type, valeur, min_order, max_uses, uses_count, expires_at, actif, created_at FROM coupons WHERE shop_id = ? ORDER BY created_at DESC LIMIT 500",
+    [shopId]
   );
   return rows.map((r) => ({ ...r, actif: Boolean(r.actif) }));
 }
-async function upsertCoupon(c) {
+async function upsertCoupon(c, shopId = 1) {
   if (c.id) {
     await db.execute(
-      "UPDATE coupons SET code=?,type=?,valeur=?,min_order=?,max_uses=?,expires_at=?,actif=? WHERE id=?",
-      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0, c.id]
+      "UPDATE coupons SET code=?,type=?,valeur=?,min_order=?,max_uses=?,expires_at=?,actif=? WHERE id=? AND shop_id=?",
+      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0, c.id, shopId]
     );
   } else {
     await db.execute(
-      "INSERT INTO coupons (code,type,valeur,min_order,max_uses,expires_at,actif) VALUES (?,?,?,?,?,?,?)",
-      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0]
+      "INSERT INTO coupons (code,type,valeur,min_order,max_uses,expires_at,actif,shop_id) VALUES (?,?,?,?,?,?,?,?)",
+      [c.code, c.type, c.valeur, c.min_order, c.max_uses, c.expires_at || null, c.actif ? 1 : 0, shopId]
     );
   }
 }
-async function deleteCoupon(id) {
-  await db.execute("DELETE FROM coupons WHERE id = ?", [id]);
+async function deleteCoupon(id, shopId = 1) {
+  await db.execute("DELETE FROM coupons WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
-async function listAdminCategories() {
+async function listAdminCategories(shopId = 1) {
   const [rows] = await db.execute(
     `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
             COUNT(p.id) AS nb_produits
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
+     WHERE c.shop_id = ?
      GROUP BY c.id
-     ORDER BY c.nom ASC`
+     ORDER BY c.nom ASC`,
+    [shopId]
   );
   return rows.map((r) => ({ ...r, nb_produits: Number(r.nb_produits) }));
 }
-async function createCategory(nom, description) {
+async function createCategory(nom, description, shopId = 1) {
   const [result] = await db.execute(
-    "INSERT INTO categories (nom, description) VALUES (?,?)",
-    [nom, description]
+    "INSERT INTO categories (nom, description, shop_id) VALUES (?,?,?)",
+    [nom, description, shopId]
   );
   return result.insertId;
 }
-async function updateCategory(id, nom, description) {
+async function updateCategory(id, nom, description, shopId = 1) {
   await db.execute(
-    "UPDATE categories SET nom=?, description=? WHERE id=?",
-    [nom, description, id]
+    "UPDATE categories SET nom=?, description=? WHERE id=? AND shop_id=?",
+    [nom, description, id, shopId]
   );
 }
-async function deleteCategory(id) {
-  await db.execute("DELETE FROM categories WHERE id = ?", [id]);
+async function deleteCategory(id, shopId = 1) {
+  await db.execute("DELETE FROM categories WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 async function listClients(limit = 50, offset = 0, search = "") {
   const where = search ? "WHERE telephone LIKE ? OR nom LIKE ?" : "";
@@ -2215,17 +2435,18 @@ async function ensureBoutiqueStockPopulated() {
     }
   });
 }
-async function getStockBoutiqueStats() {
+async function getStockBoutiqueStats(shopId = 1) {
   await ensureBoutiqueStockPopulated();
   const [rows] = await db.execute(`
     SELECT
-      (SELECT COUNT(*) FROM produits)                                                        AS total_produits,
+      (SELECT COUNT(*) FROM produits WHERE shop_id = ?)                                     AS total_produits,
       COALESCE(SUM(bs.quantite * p.prix_unitaire), 0)                                      AS valeur_boutique,
       SUM(CASE WHEN bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte THEN 1 ELSE 0 END) AS stock_faible,
       SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
     FROM boutique_stock bs
     JOIN produits p ON p.id = bs.produit_id
-  `);
+    WHERE p.shop_id = ?
+  `, [shopId, shopId]);
   const r = rows[0] ?? {};
   return {
     total_produits: Number(r.total_produits ?? 0),
@@ -2235,71 +2456,102 @@ async function getStockBoutiqueStats() {
   };
 }
 async function getStockBoutiqueList(opts) {
-  const { search, filter = "all", limit = 50, offset = 0 } = opts;
+  const { search, filter = "all", limit = 50, offset = 0, shopId = 1 } = opts;
   await ensureBoutiqueStockPopulated();
   const cols = await getProduitColsAdmin();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
-  const conditions = [];
-  const params = [];
-  if (search) {
-    conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`);
+  const searchLike = search ? `%${search}%` : null;
+  const p1Conds = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
+  const p1Params = [];
+  if (searchLike) {
+    p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)");
+    p1Params.push(searchLike, searchLike);
   }
-  if (filter === "faible") conditions.push("bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte");
-  if (filter === "epuise") conditions.push("bs.quantite = 0");
-  if (filter === "disponible") conditions.push("bs.quantite > 0");
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const [rows] = await db.query(
-    `SELECT bs.produit_id, p.nom, p.reference,
-            ${imageCol}  AS image_url,
-            ${remiseCol} AS remise,
-            p.prix_unitaire,
-            COALESCE(c.nom, '') AS categorie_nom,
-            bs.quantite, bs.seuil_alerte,
-            (bs.quantite * p.prix_unitaire) AS valeur
-     FROM boutique_stock bs
-     JOIN produits p ON p.id = bs.produit_id
+  if (filter === "faible") p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
+  if (filter === "epuise") p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL");
+  if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
+  p1Conds.push("(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)");
+  const [rows1] = await db.query(
+    `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
+            NULL AS variant_id, NULL AS variant_nom,
+            p.nom, p.reference,
+            ${imageCol} AS image_url, ${remiseCol} AS remise, p.prix_unitaire,
+            COALESCE(c.nom,'') AS categorie_nom,
+            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite,0) END AS quantite,
+            COALESCE(bs.seuil_alerte,5) AS seuil_alerte
+     FROM produits p
+     LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
      LEFT JOIN categories c ON c.id = p.categorie_id
-     ${where}
-     ORDER BY bs.quantite ASC, p.nom ASC
-     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
-    params
+     WHERE ${p1Conds.join(" AND ")}`,
+    p1Params
   );
-  const [countRows] = await db.query(
-    `SELECT COUNT(*) AS cnt
-     FROM boutique_stock bs
-     JOIN produits p ON p.id = bs.produit_id
-     ${where}`,
-    params
-  );
+  const p2Conds = [`p.shop_id = ${Number(shopId)}`];
+  const p2Params = [];
+  if (searchLike) {
+    p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)");
+    p2Params.push(searchLike, searchLike, searchLike);
+  }
+  if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");
+  if (filter === "epuise") p2Conds.push("pv.stock_boutique = 0");
+  if (filter === "faible") p2Conds.push("pv.stock_boutique > 0 AND pv.stock_boutique <= 5");
+  let rows2 = [];
+  try {
+    [rows2] = await db.query(
+      `SELECT pv.produit_id,
+              pv.id AS variant_id, pv.nom AS variant_nom,
+              CONCAT(p.nom, ' \u2014 ', pv.nom) AS nom,
+              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              COALESCE(NULLIF(pv.image_url,''), ${imageCol}) AS image_url,
+              COALESCE(NULLIF(pv.remise,0), 0) AS remise,
+              CASE WHEN pv.prix > 0 THEN pv.prix ELSE p.prix_unitaire END AS prix_unitaire,
+              COALESCE(c.nom,'') AS categorie_nom,
+              pv.stock_boutique AS quantite,
+              5 AS seuil_alerte
+       FROM product_variants pv
+       JOIN produits p ON p.id = pv.produit_id
+       LEFT JOIN categories c ON c.id = p.categorie_id
+       ${p2Conds.length ? "WHERE " + p2Conds.join(" AND ") : ""}`,
+      p2Params
+    );
+  } catch (err) {
+    if (err.code !== "ER_NO_SUCH_TABLE") throw err;
+  }
+  const mapRow = (r) => ({
+    produit_id: Number(r.produit_id),
+    variant_id: r.variant_id != null ? Number(r.variant_id) : void 0,
+    variant_nom: r.variant_nom ?? void 0,
+    nom: String(r.nom),
+    reference: String(r.reference ?? ""),
+    image_url: r.image_url ?? null,
+    categorie_nom: String(r.categorie_nom ?? ""),
+    prix_unitaire: Number(r.prix_unitaire),
+    remise: Number(r.remise ?? 0),
+    quantite: Number(r.quantite),
+    seuil_alerte: Number(r.seuil_alerte),
+    valeur: Number(r.quantite) * Number(r.prix_unitaire)
+  });
+  const all = [
+    ...rows1.map(mapRow),
+    ...rows2.map(mapRow)
+  ].sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
   return {
-    items: rows.map((r) => ({
-      produit_id: Number(r.produit_id),
-      nom: String(r.nom),
-      reference: String(r.reference ?? ""),
-      image_url: r.image_url ?? null,
-      categorie_nom: String(r.categorie_nom ?? ""),
-      prix_unitaire: Number(r.prix_unitaire),
-      remise: Number(r.remise ?? 0),
-      quantite: Number(r.quantite),
-      seuil_alerte: Number(r.seuil_alerte),
-      valeur: Number(r.valeur)
-    })),
-    total: Number(countRows[0]?.cnt ?? 0)
+    items: all.slice(offset, offset + limit),
+    total: all.length
   };
 }
 async function createBoutiqueMouvement(data) {
   await db.execute(
-    `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
-     VALUES (?,?,?,?,?,?)`,
+    `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id, shop_id)
+     VALUES (?,?,?,?,?,?,?)`,
     [
       data.produit_id,
       data.type,
       Math.abs(data.quantite),
       data.motif ?? null,
       data.ref_commande ?? null,
-      data.admin_id ?? null
+      data.admin_id ?? null,
+      data.shop_id ?? 1
     ]
   );
   const delta = data.type === "entree" ? Math.abs(data.quantite) : -Math.abs(data.quantite);
@@ -2315,7 +2567,7 @@ async function createBoutiqueMouvement(data) {
   } catch {
   }
 }
-async function getRecentBoutiqueMovements(limit = 30) {
+async function getRecentBoutiqueMovements(limit = 30, shopId = 1) {
   const [rows] = await db.query(
     `SELECT bm.*, p.nom AS nom_produit,
             COALESCE(au.nom, u.nom) AS admin_nom
@@ -2323,15 +2575,17 @@ async function getRecentBoutiqueMovements(limit = 30) {
      JOIN produits p ON p.id = bm.produit_id
      LEFT JOIN admin_users au ON au.id = bm.admin_id
      LEFT JOIN utilisateurs u ON u.id = bm.admin_id
+     WHERE p.shop_id = ?
      ORDER BY bm.created_at DESC
-     LIMIT ${Number(limit)}`
+     LIMIT ${Number(limit)}`,
+    [shopId]
   );
   return rows;
 }
 async function listFactures(opts = {}) {
-  const { limit = 50, offset = 0, search, statut } = opts;
-  const conditions = [];
-  const params = [];
+  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+  const conditions = ["f.shop_id = ?"];
+  const params = [shopId];
   if (search) {
     conditions.push("(client_nom LIKE ? OR reference LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
@@ -2341,7 +2595,7 @@ async function listFactures(opts = {}) {
     params.push(statut);
   }
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
     `SELECT f.*, COALESCE(_so.coupon_remise, 0) AS coupon_remise, _so.status AS order_status,
             CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
@@ -2434,8 +2688,8 @@ function generateVenteRef(prefix) {
 async function createFacture(data) {
   const reference = generateVenteRef("FV");
   const [result] = await db.execute(
-    `INSERT INTO factures (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, note, admin_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO factures (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, note, admin_id, shop_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       reference,
       data.client_nom,
@@ -2447,15 +2701,17 @@ async function createFacture(data) {
       data.total,
       data.statut ?? "brouillon",
       data.note ?? null,
-      data.admin_id ?? null
+      data.admin_id ?? null,
+      data.shop_id ?? 1
     ]
   );
   if (data.client_nom?.trim() && data.client_tel?.trim()) {
+    const _sId = data.shop_id ?? 1;
     await db.execute(
-      `INSERT INTO boutique_clients (nom, telephone, email, type_client)
-       SELECT ?, ?, ?, 'particulier' FROM DUAL
-       WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
-      [data.client_nom.trim(), data.client_tel.trim(), data.client_email ?? null, data.client_tel.trim()]
+      `INSERT INTO boutique_clients (nom, telephone, email, type_client, shop_id)
+       SELECT ?, ?, ?, 'particulier', ? FROM DUAL
+       WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ? AND shop_id = ?)`,
+      [data.client_nom.trim(), data.client_tel.trim(), data.client_email ?? null, _sId, data.client_tel.trim(), _sId]
     ).catch(() => {
     });
   }
@@ -2466,13 +2722,24 @@ async function createVenteWithStock(data) {
   try {
     await conn.beginTransaction();
     for (const item of data.items) {
-      const [rows] = await conn.execute(
-        "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1",
-        [item.produit_id]
-      );
-      const dispo = Number(rows[0]?.quantite ?? 0);
-      if (dispo < item.qty) {
-        throw new Error(`Stock insuffisant pour "${item.nom}" (dispo: ${dispo}, demand\xE9: ${item.qty})`);
+      if (item.variant_id) {
+        const [[vRow]] = await conn.execute(
+          "SELECT stock_boutique FROM product_variants WHERE id = ? LIMIT 1",
+          [item.variant_id]
+        );
+        const dispo = Number(vRow?.stock_boutique ?? 0);
+        if (dispo < item.qty) {
+          throw new Error(`Stock boutique insuffisant pour "${item.nom}" (dispo: ${dispo}, demand\xE9: ${item.qty})`);
+        }
+      } else {
+        const [rows] = await conn.execute(
+          "SELECT quantite FROM boutique_stock WHERE produit_id = ? LIMIT 1",
+          [item.produit_id]
+        );
+        const dispo = Number(rows[0]?.quantite ?? 0);
+        if (dispo < item.qty) {
+          throw new Error(`Stock insuffisant pour "${item.nom}" (dispo: ${dispo}, demand\xE9: ${item.qty})`);
+        }
       }
     }
     const reference = generateVenteRef("VT");
@@ -2483,8 +2750,8 @@ async function createVenteWithStock(data) {
           sous_total, remise, total,
           avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
           mode_paiement, statut_paiement, montant_acompte,
-          statut, note, admin_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          statut, note, admin_id, shop_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         reference,
         data.client_nom,
@@ -2502,30 +2769,36 @@ async function createVenteWithStock(data) {
         data.montant_acompte ?? null,
         "valide",
         data.note ?? null,
-        data.admin_id ?? null
+        data.admin_id ?? null,
+        data.shop_id ?? 1
       ]
     );
     const factureId = result.insertId;
     for (const item of data.items) {
-      await conn.execute(
-        "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
-        [item.qty, item.produit_id]
-      );
+      if (item.variant_id) {
+        await conn.execute(
+          "UPDATE product_variants SET stock_boutique = GREATEST(0, stock_boutique - ?) WHERE id = ?",
+          [item.qty, item.variant_id]
+        );
+      } else {
+        await conn.execute(
+          "UPDATE boutique_stock SET quantite = GREATEST(0, quantite - ?), updated_at = NOW() WHERE produit_id = ?",
+          [item.qty, item.produit_id]
+        );
+        try {
+          await conn.execute(
+            `UPDATE produits p JOIN boutique_stock bs ON bs.produit_id = p.id
+           SET p.stock_boutique = bs.quantite WHERE p.id = ?`,
+            [item.produit_id]
+          );
+        } catch {
+        }
+      }
       await conn.execute(
         `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
          VALUES (?,?,?,?,?,?)`,
         [item.produit_id, "sortie", item.qty, "Vente", reference, data.admin_id ?? null]
       );
-      try {
-        await conn.execute(
-          `UPDATE produits p
-         JOIN boutique_stock bs ON bs.produit_id = p.id
-         SET p.stock_boutique = bs.quantite
-         WHERE p.id = ?`,
-          [item.produit_id]
-        );
-      } catch {
-      }
     }
     if (data.avec_livraison) {
       const livRef = generateVenteRef("LV");
@@ -2547,11 +2820,12 @@ async function createVenteWithStock(data) {
     }
     await conn.commit();
     if (data.client_nom?.trim() && data.client_tel?.trim()) {
+      const _sId = data.shop_id ?? 1;
       await db.execute(
-        `INSERT INTO boutique_clients (nom, telephone, type_client)
-         SELECT ?, ?, 'particulier' FROM DUAL
-         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ?)`,
-        [data.client_nom.trim(), data.client_tel.trim(), data.client_tel.trim()]
+        `INSERT INTO boutique_clients (nom, telephone, type_client, shop_id)
+         SELECT ?, ?, 'particulier', ? FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM boutique_clients WHERE telephone = ? AND shop_id = ?)`,
+        [data.client_nom.trim(), data.client_tel.trim(), _sId, data.client_tel.trim(), _sId]
       ).catch(() => {
       });
     }
@@ -2576,7 +2850,8 @@ async function createVenteWithStock(data) {
           categorie: "Vente boutique",
           description: `Vente ${reference} \u2013 ${data.client_nom.trim()}`,
           montant: montantFinance,
-          date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
+          date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+          shop_id: data.shop_id ?? 1
         }).catch(() => {
         });
       }
@@ -2643,7 +2918,8 @@ async function updateFacture(id, data) {
           categorie: "Vente boutique",
           description: `Paiement ${factureRow.reference} \u2013 ${factureRow.client_nom}`,
           montant: data.montant_paiement,
-          date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
+          date_entree: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+          shop_id: data.shop_id ?? 1
         });
       } catch (err) {
         console.error("[updateFacture/createFinanceEntry]", err);
@@ -2706,9 +2982,9 @@ async function deleteFacture(id) {
   invalidateVentesStats();
 }
 async function listDevis(opts = {}) {
-  const { limit = 50, offset = 0, search, statut } = opts;
-  const conditions = [];
-  const params = [];
+  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+  const conditions = ["shop_id = ?"];
+  const params = [shopId];
   if (search) {
     conditions.push("(client_nom LIKE ? OR reference LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
@@ -2717,9 +2993,9 @@ async function listDevis(opts = {}) {
     conditions.push("statut = ?");
     params.push(statut);
   }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
-    `SELECT id, reference, client_nom, client_tel, client_email,
+    `SELECT id, reference, client_nom, client_tel, client_email, items,
             sous_total, remise, total, statut, valide_jusqu, note, admin_id, created_at, updated_at
      FROM devis ${where} ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
     params
@@ -2730,8 +3006,8 @@ async function listDevis(opts = {}) {
 async function createDevis(data) {
   const reference = generateVenteRef("DV");
   const [result] = await db.execute(
-    `INSERT INTO devis (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, valide_jusqu, note, admin_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO devis (reference, client_nom, client_tel, client_email, items, sous_total, remise, total, statut, valide_jusqu, note, admin_id, shop_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       reference,
       data.client_nom,
@@ -2744,7 +3020,8 @@ async function createDevis(data) {
       data.statut ?? "brouillon",
       data.valide_jusqu ?? null,
       data.note ?? null,
-      data.admin_id ?? null
+      data.admin_id ?? null,
+      data.shop_id ?? 1
     ]
   );
   return result.insertId;
@@ -2848,9 +3125,9 @@ async function deleteDevis(id) {
   await db.execute("DELETE FROM devis WHERE id = ?", [id]);
 }
 async function listLivraisons(opts = {}) {
-  const { limit = 50, offset = 0, search, statut } = opts;
-  const conditions = [];
-  const params = [];
+  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+  const conditions = ["shop_id = ?"];
+  const params = [shopId];
   if (search) {
     conditions.push("(client_nom LIKE ? OR reference LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
@@ -2859,7 +3136,7 @@ async function listLivraisons(opts = {}) {
     conditions.push("statut = ?");
     params.push(statut);
   }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
     `SELECT id, reference, facture_id, client_nom, client_tel, adresse,
             contact_livraison, lien_localisation, statut, livreur,
@@ -2877,10 +3154,10 @@ async function deleteLivraison(id) {
   await db.execute("DELETE FROM livraisons_ventes WHERE id = ?", [id]);
 }
 async function listFinanceEntries(opts = {}) {
-  const { limit = 50, offset = 0, type, search } = opts;
+  const { limit = 50, offset = 0, type, search, shopId = 1 } = opts;
   await financeEntrieCols();
-  const conditions = ["f.type != 'vente'"];
-  const params = [];
+  const conditions = ["f.type != 'vente'", "f.shop_id = ?"];
+  const params = [shopId];
   if (type) {
     conditions.push("f.type = ?");
     params.push(type);
@@ -2955,7 +3232,7 @@ async function financeEntrieCols() {
   };
   return _finCols;
 }
-async function getFinanceStats() {
+async function getFinanceStats(shopId = 1) {
   const cols = await financeEntrieCols();
   const [netRows, transfersOut, transfersIn, summaryRow] = await Promise.all([
     // NET balance per account: ventes+rentrees+caisse as credits, depenses as debits
@@ -2967,27 +3244,31 @@ async function getFinanceStats() {
                     ELSE 0
                   END) AS net
            FROM finance_entries
-           WHERE type != 'transfert'
-           GROUP BY COALESCE(mode_paiement, 'especes')`
+           WHERE type != 'transfert' AND shop_id = ?
+           GROUP BY COALESCE(mode_paiement, 'especes')`,
+      [shopId]
     ).then(([rows]) => rows) : Promise.resolve([]),
     // Transfer outflows (debit from source account)
     cols.mode_paiement ? db.query(
       `SELECT mode_paiement, SUM(montant) AS total
-           FROM finance_entries WHERE type = 'transfert'
-           GROUP BY mode_paiement`
+           FROM finance_entries WHERE type = 'transfert' AND shop_id = ?
+           GROUP BY mode_paiement`,
+      [shopId]
     ).then(([rows]) => rows) : Promise.resolve([]),
     // Transfer inflows (credit to destination account)
     cols.compte_destination ? db.query(
       `SELECT compte_destination AS mode_paiement, SUM(montant) AS total
-           FROM finance_entries WHERE type = 'transfert' AND compte_destination IS NOT NULL
-           GROUP BY compte_destination`
+           FROM finance_entries WHERE type = 'transfert' AND compte_destination IS NOT NULL AND shop_id = ?
+           GROUP BY compte_destination`,
+      [shopId]
     ).then(([rows]) => rows) : Promise.resolve([]),
     // Summary totals (manual entries only, not ventes)
     db.query(
       `SELECT
          SUM(CASE WHEN type IN ('caisse','rentree') THEN montant ELSE 0 END) AS recettes,
          SUM(CASE WHEN type = 'depense'             THEN montant ELSE 0 END) AS depenses
-       FROM finance_entries`
+       FROM finance_entries WHERE shop_id = ?`,
+      [shopId]
     ).then(([[row]]) => row)
   ]);
   const modeMap = {};
@@ -3021,14 +3302,15 @@ function genFinanceRef(type) {
 async function createFinanceEntry(data) {
   const cols = await financeEntrieCols();
   const reference = genFinanceRef(data.type);
-  const colNames = ["reference", "type", "categorie", "description", "montant", "date_entree"];
+  const colNames = ["reference", "type", "categorie", "description", "montant", "date_entree", "shop_id"];
   const colVals = [
     reference,
     data.type,
     data.categorie ?? null,
     data.description ?? null,
     data.montant,
-    data.date_entree
+    data.date_entree,
+    data.shop_id ?? 1
   ];
   if (cols.mode_paiement) {
     colNames.push("mode_paiement");
@@ -3691,10 +3973,12 @@ async function ensureBoutiqueClientsTable() {
         type_client  ENUM('particulier','professionnel') NOT NULL DEFAULT 'particulier',
         solde        DECIMAL(15,2) NOT NULL DEFAULT 0,
         notes        TEXT,
+        shop_id      INT UNSIGNED NOT NULL DEFAULT 1,
         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_nom       (nom),
-        INDEX idx_telephone (telephone)
+        INDEX idx_telephone (telephone),
+        INDEX idx_shop_id   (shop_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     const [[cnt]] = await db.execute(
@@ -3711,10 +3995,10 @@ async function ensureBoutiqueClientsTable() {
     }
   });
 }
-async function listBoutiqueClients(limit, offset, search, filtre) {
+async function listBoutiqueClients(limit, offset, search, filtre, shopId = 1) {
   await ensureBoutiqueClientsTable();
-  const conditions = [];
-  const params = [];
+  const conditions = ["shop_id = ?"];
+  const params = [shopId];
   if (search) {
     conditions.push("(nom LIKE ? OR telephone LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
@@ -3724,16 +4008,16 @@ async function listBoutiqueClients(limit, offset, search, filtre) {
   } else if (filtre === "dettes") {
     conditions.push("solde > 0");
   }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
     `SELECT * FROM boutique_clients ${where} ORDER BY nom ASC LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
   return rows;
 }
-async function countBoutiqueClients(search, filtre) {
-  const conditions = [];
-  const params = [];
+async function countBoutiqueClients(search, filtre, shopId = 1) {
+  const conditions = ["shop_id = ?"];
+  const params = [shopId];
   if (search) {
     conditions.push("(nom LIKE ? OR telephone LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
@@ -3743,24 +4027,24 @@ async function countBoutiqueClients(search, filtre) {
   } else if (filtre === "dettes") {
     conditions.push("solde > 0");
   }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
     `SELECT COUNT(*) AS cnt FROM boutique_clients ${where}`,
     params
   );
   return rows[0].cnt;
 }
-async function getBoutiqueClientById(id) {
+async function getBoutiqueClientById(id, shopId = 1) {
   const [rows] = await db.execute(
-    "SELECT * FROM boutique_clients WHERE id = ?",
-    [id]
+    "SELECT * FROM boutique_clients WHERE id = ? AND shop_id = ?",
+    [id, shopId]
   );
   return rows[0] ?? null;
 }
 async function createBoutiqueClient(data) {
   const [result] = await db.execute(
-    `INSERT INTO boutique_clients (nom, telephone, email, localisation, type_client, solde, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO boutique_clients (nom, telephone, email, localisation, type_client, solde, notes, shop_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.nom ?? "",
       data.telephone ?? null,
@@ -3768,12 +4052,13 @@ async function createBoutiqueClient(data) {
       data.localisation ?? null,
       data.type_client ?? "particulier",
       data.solde ?? 0,
-      data.notes ?? null
+      data.notes ?? null,
+      data.shop_id ?? 1
     ]
   );
   return result.insertId;
 }
-async function updateBoutiqueClient(id, data) {
+async function updateBoutiqueClient(id, data, shopId = 1) {
   const fields = [];
   const values = [];
   if (data.nom !== void 0) {
@@ -3805,13 +4090,13 @@ async function updateBoutiqueClient(id, data) {
     values.push(data.notes);
   }
   if (fields.length === 0) return;
-  values.push(id);
-  await db.execute(`UPDATE boutique_clients SET ${fields.join(", ")} WHERE id = ?`, values);
+  values.push(id, shopId);
+  await db.execute(`UPDATE boutique_clients SET ${fields.join(", ")} WHERE id = ? AND shop_id = ?`, values);
 }
-async function deleteBoutiqueClient(id) {
-  await db.execute("DELETE FROM boutique_clients WHERE id = ?", [id]);
+async function deleteBoutiqueClient(id, shopId = 1) {
+  await db.execute("DELETE FROM boutique_clients WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
-async function getBoutiqueClientsStats() {
+async function getBoutiqueClientsStats(shopId = 1) {
   const [[kpis], [segments], [acquisitions], [topDebiteurs], [topDepensiers], [derniers]] = await Promise.all([
     // KPIs
     db.query(
@@ -3820,42 +4105,48 @@ async function getBoutiqueClientsStats() {
            SUM(solde > 0) AS en_avance,
            SUM(solde < 0) AS debiteurs,
            ROUND(AVG(solde), 2) AS solde_moyen
-         FROM boutique_clients`
+         FROM boutique_clients WHERE shop_id = ?`,
+      [shopId]
     ),
     // Segment distribution
     db.query(
       `SELECT type_client, COUNT(*) AS count
-         FROM boutique_clients
-         GROUP BY type_client`
+         FROM boutique_clients WHERE shop_id = ?
+         GROUP BY type_client`,
+      [shopId]
     ),
     // New acquisitions last 6 months
     db.query(
       `SELECT DATE_FORMAT(created_at, '%b') AS mois,
                 COUNT(*) AS count
          FROM boutique_clients
-         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+         WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
          GROUP BY YEAR(created_at), MONTH(created_at), mois
-         ORDER BY YEAR(created_at), MONTH(created_at)`
+         ORDER BY YEAR(created_at), MONTH(created_at)`,
+      [shopId]
     ),
     // Top debiteurs (solde le plus négatif)
     db.query(
       `SELECT id, nom, telephone, type_client, solde
          FROM boutique_clients
-         WHERE solde < 0
+         WHERE shop_id = ? AND solde < 0
          ORDER BY solde ASC
-         LIMIT 5`
+         LIMIT 5`,
+      [shopId]
     ),
     // Top dépensiers (solde le plus positif = en avance = ont payé le plus)
     db.query(
       `SELECT id, nom, telephone, type_client, solde AS total_achats
          FROM boutique_clients
-         WHERE solde > 0
+         WHERE shop_id = ? AND solde > 0
          ORDER BY solde DESC
-         LIMIT 5`
+         LIMIT 5`,
+      [shopId]
     ),
     // Derniers clients ajoutés
     db.query(
-      `SELECT * FROM boutique_clients ORDER BY created_at DESC LIMIT 8`
+      `SELECT * FROM boutique_clients WHERE shop_id = ? ORDER BY created_at DESC LIMIT 8`,
+      [shopId]
     )
   ]);
   const kpi = kpis[0];
@@ -4095,13 +4386,134 @@ async function fixSiteOrderFinanceEntries() {
     }
   });
 }
-var _ensurePromises, _settingsCache, _finCols, _ventesStatsCache;
+function mapTombolaRow(r) {
+  return {
+    id: Number(r.id),
+    nom: String(r.nom),
+    statut: r.statut,
+    min_montant: Number(r.min_montant),
+    min_participants: Number(r.min_participants),
+    prize_description: r.prize_description ?? null,
+    winner_facture_id: r.winner_facture_id ? Number(r.winner_facture_id) : null,
+    winner_nom: r.winner_nom ?? null,
+    winner_tel: r.winner_tel ?? null,
+    winner_montant: r.winner_montant != null ? Number(r.winner_montant) : null,
+    winner_reference: r.winner_reference ?? null,
+    notifie: Boolean(r.notifie),
+    created_at: String(r.created_at),
+    launched_at: r.launched_at ? String(r.launched_at) : null,
+    completed_at: r.completed_at ? String(r.completed_at) : null
+  };
+}
+async function ensureTombolaTable() {
+  return runOnce("tombola", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS tombola_sessions (
+        id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        nom              VARCHAR(150) NOT NULL,
+        statut           ENUM('draft','active','termine') NOT NULL DEFAULT 'draft',
+        min_montant      DECIMAL(10,2) NOT NULL DEFAULT 50000,
+        min_participants INT UNSIGNED NOT NULL DEFAULT 10,
+        prize_description TEXT NULL,
+        winner_facture_id INT UNSIGNED NULL,
+        winner_nom       VARCHAR(150) NULL,
+        winner_tel       VARCHAR(30)  NULL,
+        winner_montant   DECIMAL(10,2) NULL,
+        winner_reference VARCHAR(50)  NULL,
+        notifie          TINYINT(1) NOT NULL DEFAULT 0,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        launched_at      TIMESTAMP NULL,
+        completed_at     TIMESTAMP NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  });
+}
+async function listTombolaSessions() {
+  await ensureTombolaTable();
+  const [rows] = await db.query(
+    `SELECT * FROM tombola_sessions ORDER BY created_at DESC`
+  );
+  return rows.map(mapTombolaRow);
+}
+async function getTombolaSession(id) {
+  await ensureTombolaTable();
+  const [[row]] = await db.execute(
+    `SELECT * FROM tombola_sessions WHERE id = ?`,
+    [id]
+  );
+  if (!row) return null;
+  return mapTombolaRow(row);
+}
+async function createTombolaSession(data) {
+  await ensureTombolaTable();
+  const [result] = await db.execute(
+    `INSERT INTO tombola_sessions (nom, min_montant, min_participants, prize_description)
+     VALUES (?, ?, ?, ?)`,
+    [data.nom, data.min_montant, data.min_participants, data.prize_description ?? null]
+  );
+  return result.insertId;
+}
+async function updateTombolaSession(id, data) {
+  const entries = Object.entries(data).filter(([, v]) => v !== void 0);
+  if (entries.length === 0) return;
+  const fields = entries.map(([k]) => `${k} = ?`).join(", ");
+  const values = [...entries.map(([, v]) => v), id];
+  await db.execute(`UPDATE tombola_sessions SET ${fields} WHERE id = ?`, values);
+}
+async function deleteTombolaSession(id) {
+  await db.execute(
+    `DELETE FROM tombola_sessions WHERE id = ? AND statut = 'draft'`,
+    [id]
+  );
+}
+async function getTombolaParticipants(minMontant) {
+  const [rows] = await db.query(
+    `SELECT id AS facture_id, reference, client_nom, client_tel, total, created_at
+     FROM factures
+     WHERE statut_paiement = 'paye_total' AND total >= ?
+     ORDER BY created_at DESC`,
+    [minMontant]
+  );
+  return rows.map((r) => ({
+    facture_id: Number(r.facture_id),
+    reference: String(r.reference),
+    client_nom: String(r.client_nom),
+    client_tel: r.client_tel ?? null,
+    total: Number(r.total),
+    created_at: String(r.created_at)
+  }));
+}
+async function spinTombola(sessionId, winnerFactureId) {
+  const [[row]] = await db.execute(
+    `SELECT client_nom, client_tel, total, reference FROM factures WHERE id = ?`,
+    [winnerFactureId]
+  );
+  if (!row) throw new Error("Facture introuvable");
+  await db.execute(
+    `UPDATE tombola_sessions
+     SET statut = 'termine', winner_facture_id = ?, winner_nom = ?, winner_tel = ?,
+         winner_montant = ?, winner_reference = ?, completed_at = NOW()
+     WHERE id = ? AND statut IN ('draft','active')`,
+    [
+      winnerFactureId,
+      row.client_nom,
+      row.client_tel ?? null,
+      row.total,
+      row.reference,
+      sessionId
+    ]
+  );
+}
+async function markTombolaNotified(sessionId) {
+  await db.execute(`UPDATE tombola_sessions SET notifie = 1 WHERE id = ?`, [sessionId]);
+}
+var _ensurePromises, _settingsCacheMap, _finCols, _ventesStatsCache;
 var init_admin_db = __esm({
   "../lib/admin-db.ts"() {
     "use strict";
     init_db();
     _ensurePromises = /* @__PURE__ */ new Map();
-    _settingsCache = null;
+    _settingsCacheMap = /* @__PURE__ */ new Map();
     _finCols = null;
     _ventesStatsCache = null;
   }
@@ -4115,7 +4527,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express43 = __toESM(require("express"));
+var import_express47 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -4126,6 +4538,214 @@ var import_express = __toESM(require("express"));
 var import_bcryptjs = __toESM(require("bcryptjs"));
 init_admin_db();
 init_db();
+
+// ../lib/shops.ts
+init_db();
+var _ensured = false;
+async function ensureShopsTable() {
+  if (_ensured) return;
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS shops (
+      id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom                 VARCHAR(150)                                          NOT NULL,
+      slug                VARCHAR(100)                                          NOT NULL UNIQUE,
+      email               VARCHAR(150)                                          NOT NULL,
+      plan                ENUM('free','basic','pro')                            NOT NULL DEFAULT 'basic',
+      actif               TINYINT(1)                                            NOT NULL DEFAULT 1,
+      custom_domain       VARCHAR(255)                                          NULL UNIQUE,
+      subscription_status ENUM('trial','active','expired','suspended')         NOT NULL DEFAULT 'trial',
+      trial_ends_at       DATETIME                                              NULL,
+      current_period_end  DATETIME                                              NULL,
+      created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  const alterCols = [
+    `ALTER TABLE shops ADD COLUMN custom_domain VARCHAR(255) NULL UNIQUE`,
+    `ALTER TABLE shops ADD COLUMN subscription_status ENUM('trial','active','expired','suspended') NOT NULL DEFAULT 'trial'`,
+    `ALTER TABLE shops ADD COLUMN trial_ends_at DATETIME NULL`,
+    `ALTER TABLE shops ADD COLUMN current_period_end DATETIME NULL`,
+    `ALTER TABLE shops ADD COLUMN pays VARCHAR(100) NULL`
+  ];
+  for (const sql of alterCols) {
+    try {
+      await db.execute(sql);
+    } catch {
+    }
+  }
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS shop_payments (
+      id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      shop_id         INT UNSIGNED       NOT NULL,
+      transaction_id  VARCHAR(100)       NOT NULL UNIQUE,
+      plan            ENUM('basic','pro') NOT NULL,
+      amount          INT UNSIGNED        NOT NULL,
+      duration_months TINYINT UNSIGNED   NOT NULL DEFAULT 1,
+      status          ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',
+      operator        VARCHAR(10)        NULL,
+      mm_reference    VARCHAR(100)       NULL,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      paid_at         DATETIME           NULL,
+      INDEX idx_sp_shop (shop_id)
+    )
+  `);
+  const spAlter = [
+    `ALTER TABLE shop_payments ADD COLUMN operator VARCHAR(10) NULL`,
+    `ALTER TABLE shop_payments ADD COLUMN mm_reference VARCHAR(100) NULL`
+  ];
+  for (const sql of spAlter) {
+    try {
+      await db.execute(sql);
+    } catch {
+    }
+  }
+  await db.execute(
+    `INSERT IGNORE INTO shops (id, nom, slug, email, subscription_status) VALUES (1, 'Default Shop', 'default', 'admin@shop.com', 'active')`
+  );
+  await db.execute(
+    `UPDATE shops SET subscription_status = 'active' WHERE id = 1 AND subscription_status != 'active'`
+  );
+  _ensured = true;
+}
+async function getShopBySlug(slug) {
+  await ensureShopsTable();
+  const [rows] = await db.execute(
+    "SELECT * FROM shops WHERE slug = ? AND actif = 1 LIMIT 1",
+    [slug]
+  );
+  if (!rows.length) return null;
+  const r = rows[0];
+  return { ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null };
+}
+async function getShopById(id) {
+  await ensureShopsTable();
+  const [rows] = await db.execute(
+    "SELECT * FROM shops WHERE id = ? LIMIT 1",
+    [id]
+  );
+  if (!rows.length) return null;
+  const r = rows[0];
+  return { ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null };
+}
+async function getShopByDomain(domain) {
+  await ensureShopsTable();
+  const normalized = domain.toLowerCase().replace(/^www\./, "").split(":")[0];
+  const [rows] = await db.execute(
+    "SELECT * FROM shops WHERE custom_domain = ? AND actif = 1 LIMIT 1",
+    [normalized]
+  );
+  if (!rows.length) return null;
+  const r = rows[0];
+  return { ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null };
+}
+async function setShopDomain(id, domain) {
+  await ensureShopsTable();
+  const normalized = domain ? domain.toLowerCase().replace(/^www\./, "").split(":")[0] : null;
+  await db.execute("UPDATE shops SET custom_domain = ? WHERE id = ?", [normalized, id]);
+}
+async function createShop(data) {
+  await ensureShopsTable();
+  const [result] = await db.execute(
+    `INSERT INTO shops (nom, slug, email, plan) VALUES (?, ?, ?, ?)`,
+    [data.nom, data.slug, data.email, data.plan ?? "basic"]
+  );
+  return result.insertId;
+}
+async function updateShop(id, data) {
+  await ensureShopsTable();
+  const sets = [];
+  const vals = [];
+  if (data.nom !== void 0) {
+    sets.push("nom = ?");
+    vals.push(data.nom);
+  }
+  if (data.email !== void 0) {
+    sets.push("email = ?");
+    vals.push(data.email);
+  }
+  if (data.plan !== void 0) {
+    sets.push("plan = ?");
+    vals.push(data.plan);
+  }
+  if (data.actif !== void 0) {
+    sets.push("actif = ?");
+    vals.push(data.actif ? 1 : 0);
+  }
+  if (!sets.length) return;
+  vals.push(id);
+  await db.execute(`UPDATE shops SET ${sets.join(", ")} WHERE id = ?`, vals);
+}
+async function listShopsWithStats() {
+  await ensureShopsTable();
+  const [rows] = await db.execute(`
+    SELECT
+      s.*,
+      COALESCE(p.cnt, 0)  AS product_count,
+      COALESCE(a.cnt, 0)  AS admin_count
+    FROM shops s
+    LEFT JOIN (SELECT shop_id, COUNT(*) AS cnt FROM produits GROUP BY shop_id) p ON p.shop_id = s.id
+    LEFT JOIN (SELECT shop_id, COUNT(*) AS cnt FROM admin_users GROUP BY shop_id) a ON a.shop_id = s.id
+    ORDER BY s.created_at DESC
+  `);
+  return rows.map((r) => ({
+    ...r,
+    actif: Boolean(r.actif),
+    custom_domain: r.custom_domain ?? null,
+    product_count: Number(r.product_count),
+    admin_count: Number(r.admin_count)
+  }));
+}
+async function activateShopSubscription(shopId, plan, durationMonths) {
+  await ensureShopsTable();
+  const [rows] = await db.execute(
+    "SELECT current_period_end, subscription_status FROM shops WHERE id = ?",
+    [shopId]
+  );
+  const row = rows[0];
+  const base2 = row?.subscription_status === "active" && row?.current_period_end ? new Date(row.current_period_end) : /* @__PURE__ */ new Date();
+  const newEnd = new Date(base2);
+  newEnd.setMonth(newEnd.getMonth() + durationMonths);
+  await db.execute(
+    `UPDATE shops SET plan = ?, subscription_status = 'active', current_period_end = ? WHERE id = ?`,
+    [plan, newEnd.toISOString().slice(0, 19).replace("T", " "), shopId]
+  );
+}
+async function recordShopPayment(data) {
+  await ensureShopsTable();
+  await db.execute(
+    `INSERT INTO shop_payments (shop_id, transaction_id, plan, amount, duration_months, status, operator, mm_reference, paid_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE status = VALUES(status), operator = VALUES(operator), mm_reference = VALUES(mm_reference), paid_at = VALUES(paid_at)`,
+    [
+      data.shopId,
+      data.transactionId,
+      data.plan,
+      data.amount,
+      data.durationMonths,
+      data.status,
+      data.operator ?? null,
+      data.mmReference ?? null,
+      data.paidAt ? data.paidAt.toISOString().slice(0, 19).replace("T", " ") : null
+    ]
+  );
+}
+async function getShopPayments(shopId) {
+  await ensureShopsTable();
+  const [rows] = await db.execute(
+    "SELECT * FROM shop_payments WHERE shop_id = ? ORDER BY created_at DESC LIMIT 20",
+    [shopId]
+  );
+  return rows;
+}
+async function expireShopSubscriptions() {
+  await db.execute(`
+    UPDATE shops
+    SET subscription_status = 'expired'
+    WHERE subscription_status = 'active'
+      AND current_period_end IS NOT NULL
+      AND current_period_end < NOW()
+      AND id != 1
+  `);
+}
 
 // lib/auth.ts
 var import_jose = require("jose");
@@ -4142,15 +4762,16 @@ function cookieDomain() {
   if (process.env.NODE_ENV !== "production") return void 0;
   if (process.env.AUTH_COOKIE_DOMAIN) return process.env.AUTH_COOKIE_DOMAIN;
   const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  if (siteUrl) {
-    try {
-      const host = new URL(siteUrl).hostname;
-      if (host === "togolese.tg" || host.endsWith(".togolese.tg")) return ".togolese.tg";
-      if (host === "togolese.fr" || host.endsWith(".togolese.fr")) return ".togolese.fr";
-    } catch {
-    }
+  if (!siteUrl) return void 0;
+  try {
+    const host = new URL(siteUrl).hostname;
+    if (host === "localhost" || /^\d+[\d.:]+$/.test(host)) return void 0;
+    const parts = host.split(".");
+    if (parts.length < 2) return void 0;
+    return `.${parts.slice(-2).join(".")}`;
+  } catch {
+    return void 0;
   }
-  return void 0;
 }
 async function signToken(payload) {
   return new import_jose.SignJWT({ ...payload }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(`${TTL}s`).sign(SECRET);
@@ -4275,10 +4896,14 @@ function attemptsLeft(slug) {
 }
 router.post("/api/admin/auth/login", async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, shop_slug } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: "Nom d'utilisateur et mot de passe requis." });
     }
+    await ensureShopsTable();
+    const rawSlug = shop_slug ?? req.headers["x-shop-slug"] ?? "default";
+    const shop = await getShopBySlug(rawSlug);
+    const shopId = shop?.id ?? 1;
     const slug = username.trim().toLowerCase();
     const lock = isLocked(slug);
     if (lock.locked) {
@@ -4287,7 +4912,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
         error: `Compte temporairement verrouill\xE9. R\xE9essayez dans ${lock.minutesLeft} minute${lock.minutesLeft > 1 ? "s" : ""}.`
       });
     }
-    let user = await getAdminByUsername(slug) ?? await getAdminByEmail(slug);
+    let user = await getAdminByUsername(slug, shopId) ?? await getAdminByEmail(slug, shopId);
     if (!user) {
       const [rows] = await db.execute(
         "SELECT COUNT(*) as cnt FROM admin_users"
@@ -4334,7 +4959,8 @@ router.post("/api/admin/auth/login", async (req, res) => {
           poste: teamMember.poste,
           permissions: permissions2,
           must_change_password: mustChange2,
-          token_version: tokenVersion2
+          token_version: tokenVersion2,
+          shop_id: shopId
         });
         setAuthCookie(res, token2);
         logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], "role=staff");
@@ -4371,7 +4997,8 @@ router.post("/api/admin/auth/login", async (req, res) => {
       poste: user.poste ?? void 0,
       permissions,
       must_change_password: mustChange,
-      token_version: tokenVersion
+      token_version: tokenVersion,
+      shop_id: shopId
     });
     await updateAdminLastLogin(user.id);
     setAuthCookie(res, token);
@@ -4380,36 +5007,6 @@ router.post("/api/admin/auth/login", async (req, res) => {
   } catch (err) {
     console.error("[admin login]", err);
     return res.status(500).json({ error: "Erreur serveur." });
-  }
-});
-router.post("/api/admin/auth/bootstrap-kent", async (req, res) => {
-  if (req.headers["x-bootstrap-secret"] !== "togolese-bootstrap-2025") {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  try {
-    const pool2 = db;
-    const KENT_HASH = "$2b$12$4ivze.K3jg8LW7j9RRuzReeqjR2xtXscmGkTbh7rceBFQMI7tcef.";
-    const [rows] = await pool2.execute(
-      "SELECT id, username, role FROM admin_users WHERE username = 'kent' LIMIT 1"
-    );
-    if (rows.length) {
-      await pool2.execute(
-        "UPDATE admin_users SET password_hash = ?, role = 'super_admin', actif = 1 WHERE username = 'kent'",
-        [KENT_HASH]
-      );
-      return res.json({ ok: true, action: "updated", user: rows[0] });
-    }
-    const uniqueEmail = `kent.${Date.now()}@admin.local`;
-    await pool2.execute(
-      "INSERT INTO admin_users (nom, username, email, poste, password_hash, role, actif) VALUES ('Kent','kent',?,'Administrateur',?,?,1)",
-      [uniqueEmail, KENT_HASH, "super_admin"]
-    );
-    const [newRow] = await pool2.execute(
-      "SELECT id, username, role FROM admin_users WHERE username = 'kent' LIMIT 1"
-    );
-    return res.json({ ok: true, action: "created", user: newRow[0] });
-  } catch (err) {
-    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 router.patch("/api/admin/auth/change-password", async (req, res) => {
@@ -4460,7 +5057,8 @@ router.patch("/api/admin/auth/change-password", async (req, res) => {
       poste: session.poste,
       permissions,
       must_change_password: false,
-      token_version: newVersion
+      token_version: newVersion,
+      shop_id: session.shop_id
     });
     setAuthCookie(res, newToken);
     logSecurityEvent("password_change", session.username, getIp(req), req.headers["user-agent"]);
@@ -4545,6 +5143,22 @@ function hasPageAccess(role, permissions, module2, pageId) {
 // routes/admin/products.ts
 init_db();
 init_admin_db();
+
+// lib/plan-limits.ts
+var PLAN_LIMITS = {
+  free: 50,
+  basic: 500,
+  pro: Infinity
+};
+function planLimit(plan) {
+  return PLAN_LIMITS[plan] ?? 50;
+}
+function planLimitLabel(plan) {
+  const limit = planLimit(plan);
+  return limit === Infinity ? "illimit\xE9" : String(limit);
+}
+
+// routes/admin/products.ts
 var router2 = import_express2.default.Router();
 function validateImageUrl(url) {
   if (!url || typeof url !== "string" || url.trim() === "") return null;
@@ -4581,16 +5195,37 @@ router2.get("/api/admin/products", async (req, res) => {
   const q = req.query.q || void 0;
   const catId = req.query.category ? Number(req.query.category) : void 0;
   const brandId = req.query.brand ? Number(req.query.brand) : void 0;
+  const entrepotId = req.query.entrepot_id ? Number(req.query.entrepot_id) : void 0;
   const statut = req.query.statut || void 0;
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(500, Number(req.query.limit) || 20);
   const offset = req.query.offset !== void 0 ? Number(req.query.offset) : (page - 1) * limit;
   const statutFilter = ["disponible", "faible", "epuise"].includes(statut ?? "") ? statut : void 0;
+  const shopId = session.shop_id ?? 1;
   const [products, total] = await Promise.all([
-    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true }),
-    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true })
+    getProducts({ search: q, categoryId: catId, marqueId: brandId, limit, offset, statut: statutFilter, includeInactive: true, entrepotId, shopId }),
+    getProductCount({ search: q, categoryId: catId, marqueId: brandId, statut: statutFilter, includeInactive: true, entrepotId, shopId })
   ]);
-  res.json({ products, total, page, limit });
+  const ids = products.map((p) => p.id).filter(Boolean);
+  const variantStockMap = {};
+  if (ids.length > 0) {
+    try {
+      const [vrows] = await db.query(
+        `SELECT produit_id, COALESCE(SUM(stock), 0) AS variants_stock
+         FROM product_variants
+         WHERE produit_id IN (${ids.map(() => "?").join(",")})
+         GROUP BY produit_id`,
+        ids
+      );
+      for (const row of vrows) variantStockMap[row.produit_id] = Number(row.variants_stock);
+    } catch {
+    }
+  }
+  const enriched = products.map((p) => ({
+    ...p,
+    variants_stock: Object.prototype.hasOwnProperty.call(variantStockMap, p.id) ? variantStockMap[p.id] : null
+  }));
+  res.json({ products: enriched, total, page, limit });
 });
 router2.post("/api/admin/products", async (req, res) => {
   const session = await getSession(req);
@@ -4622,6 +5257,23 @@ router2.post("/api/admin/products", async (req, res) => {
     const autoSlug = rawSlug ? rawSlug.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") : "";
     if (!nom || prix_unitaire == null) {
       return res.status(400).json({ error: "Champs obligatoires manquants." });
+    }
+    const shopId = session.shop_id ?? 1;
+    const shop = await getShopById(shopId);
+    const limit = planLimit(shop?.plan ?? "free");
+    if (limit !== Infinity) {
+      const [[countRow]] = await db.execute(
+        "SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?",
+        [shopId]
+      );
+      const currentCount = Number(countRow.cnt ?? 0);
+      if (currentCount >= limit) {
+        return res.status(403).json({
+          error: `Limite atteinte : votre plan ${shop?.plan ?? "free"} autorise ${limit} produits maximum. Passez \xE0 un plan sup\xE9rieur pour en ajouter.`,
+          plan_limit: limit,
+          current: currentCount
+        });
+      }
     }
     try {
       validateImageUrl(image_url);
@@ -4713,6 +5365,8 @@ router2.post("/api/admin/products", async (req, res) => {
       columns.push("prix_entrepot");
       values.push(Number(body.prix_entrepot) || null);
     }
+    columns.push("shop_id");
+    values.push(shopId);
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await db.execute(
       `INSERT INTO produits (${columns.join(", ")}) VALUES (${placeholders})`,
@@ -4765,12 +5419,12 @@ router2.post("/api/admin/products/generate-slugs", async (req, res) => {
     );
     let updated = 0;
     for (const row of rows) {
-      const base = toSlug(row.nom || row.reference);
-      if (!base) continue;
-      let slug = base;
+      const base2 = toSlug(row.nom || row.reference);
+      if (!base2) continue;
+      let slug = base2;
       let attempt = 0;
       for (; ; ) {
-        const candidate = attempt === 0 ? slug : `${base}_${attempt}`;
+        const candidate = attempt === 0 ? slug : `${base2}_${attempt}`;
         const [dup] = await pool2.execute(
           "SELECT id FROM produits WHERE slug = ? AND id != ? LIMIT 1",
           [candidate, row.id]
@@ -4923,6 +5577,7 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       "description",
       "description_longue",
       "categorie_id",
+      "marque_id",
       "prix_unitaire",
       "stock_magasin",
       "stock_boutique",
@@ -5023,25 +5678,31 @@ async function ensureTable() {
   if (_variantsReady) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS product_variants (
-      id            INT AUTO_INCREMENT PRIMARY KEY,
-      produit_id    INT NOT NULL,
-      nom           VARCHAR(255) NOT NULL DEFAULT '',
-      options       JSON,
-      prix          DECIMAL(10,2) NOT NULL DEFAULT 0,
-      remise        DECIMAL(10,2) NOT NULL DEFAULT 0,
-      stock         INT NOT NULL DEFAULT 0,
-      reference_sku VARCHAR(100),
-      image_url     VARCHAR(500),
-      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      produit_id      INT NOT NULL,
+      nom             VARCHAR(255) NOT NULL DEFAULT '',
+      options         JSON,
+      prix            DECIMAL(10,2) NOT NULL DEFAULT 0,
+      remise          DECIMAL(10,2) NOT NULL DEFAULT 0,
+      stock           INT NOT NULL DEFAULT 0,
+      stock_boutique  INT NOT NULL DEFAULT 0,
+      reference_sku   VARCHAR(100),
+      image_url       VARCHAR(500),
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_produit_id (produit_id)
     )
   `);
-  try {
-    await db.execute(
-      "ALTER TABLE product_variants ADD COLUMN remise DECIMAL(10,2) NOT NULL DEFAULT 0"
-    );
-  } catch (err) {
-    if (err?.code !== "ER_DUP_FIELDNAME") throw err;
+  for (const ddl of [
+    "ALTER TABLE product_variants ADD COLUMN remise         DECIMAL(10,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE product_variants ADD COLUMN stock_boutique INT          NOT NULL DEFAULT 0",
+    "ALTER TABLE product_variants ADD COLUMN reference_sku  VARCHAR(100)",
+    "ALTER TABLE product_variants ADD COLUMN image_url      VARCHAR(500)"
+  ]) {
+    try {
+      await db.execute(ddl);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") throw err;
+    }
   }
   _variantsReady = true;
 }
@@ -5074,10 +5735,10 @@ router3.post("/api/admin/products/:productId/variants", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
     await ensureTable();
-    const { nom, options, prix, remise, stock, reference_sku, image_url } = req.body;
+    const { nom, options, prix, remise, stock, stock_boutique, reference_sku, image_url } = req.body;
     const [result] = await db.execute(
-      `INSERT INTO product_variants (produit_id, nom, options, prix, remise, stock, reference_sku, image_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO product_variants (produit_id, nom, options, prix, remise, stock, stock_boutique, reference_sku, image_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.params.productId,
         nom || "",
@@ -5085,6 +5746,7 @@ router3.post("/api/admin/products/:productId/variants", async (req, res) => {
         Number(prix) || 0,
         Number(remise) || 0,
         Number(stock) || 0,
+        Number(stock_boutique) || 0,
         reference_sku || null,
         image_url || null
       ]
@@ -5099,9 +5761,10 @@ router3.put("/api/admin/products/:productId/variants/:id", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
     await ensureTable();
-    const { nom, options, prix, remise, stock, reference_sku, image_url } = req.body;
+    const { nom, options, prix, remise, stock, stock_boutique, reference_sku, image_url } = req.body;
     await db.execute(
-      `UPDATE product_variants SET nom=?, options=?, prix=?, remise=?, stock=?, reference_sku=?, image_url=?
+      `UPDATE product_variants
+       SET nom=?, options=?, prix=?, remise=?, stock=?, stock_boutique=?, reference_sku=?, image_url=?
        WHERE id=? AND produit_id=?`,
       [
         nom || "",
@@ -5109,6 +5772,7 @@ router3.put("/api/admin/products/:productId/variants/:id", async (req, res) => {
         Number(prix) || 0,
         Number(remise) || 0,
         Number(stock) || 0,
+        Number(stock_boutique) || 0,
         reference_sku || null,
         image_url || null,
         req.params.id,
@@ -5116,6 +5780,33 @@ router3.put("/api/admin/products/:productId/variants/:id", async (req, res) => {
       ]
     );
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.patch("/api/admin/products/:productId/variants/:id/boutique-transfer", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const qty = Number(req.body.qty);
+  if (!qty || qty <= 0) return res.status(400).json({ error: "qty requis > 0" });
+  try {
+    await ensureTable();
+    const [[row]] = await db.execute(
+      "SELECT stock, stock_boutique FROM product_variants WHERE id = ? AND produit_id = ?",
+      [req.params.id, req.params.productId]
+    );
+    if (!row) return res.status(404).json({ error: "Variante introuvable" });
+    const available = Number(row.stock);
+    if (available < qty) return res.status(400).json({ error: `Stock magasin insuffisant (dispo: ${available})` });
+    await db.execute(
+      "UPDATE product_variants SET stock = stock - ?, stock_boutique = stock_boutique + ? WHERE id = ?",
+      [qty, qty, req.params.id]
+    );
+    const [[updated]] = await db.execute(
+      "SELECT stock, stock_boutique FROM product_variants WHERE id = ?",
+      [req.params.id]
+    );
+    res.json({ ok: true, stock: Number(updated?.stock ?? 0), stock_boutique: Number(updated?.stock_boutique ?? 0) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
@@ -5173,11 +5864,18 @@ router4.post("/api/admin/stock/entree", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { produit_id, quantite, reference, note } = req.body;
+    const { produit_id, quantite, reference, note, variant_id } = req.body;
     if (!produit_id || !quantite || quantite <= 0) {
       return res.status(400).json({ error: "produit_id et quantite (> 0) requis." });
     }
-    await createStockEntree({ produit_id, quantite: Number(quantite), reference, note, user_id: session.id });
+    await createStockEntree({
+      produit_id,
+      quantite: Number(quantite),
+      reference,
+      note,
+      user_id: session.id,
+      ...variant_id ? { variant_id: Number(variant_id) } : {}
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -5188,11 +5886,18 @@ router4.post("/api/admin/stock/sortie", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { produit_id, quantite, reference, note } = req.body;
+    const { produit_id, quantite, reference, note, variant_id } = req.body;
     if (!produit_id || !quantite || quantite <= 0) {
       return res.status(400).json({ error: "produit_id et quantite (> 0) requis." });
     }
-    await createStockSortie({ produit_id, quantite: Number(quantite), reference, note, user_id: session.id });
+    await createStockSortie({
+      produit_id,
+      quantite: Number(quantite),
+      reference,
+      note,
+      user_id: session.id,
+      ...variant_id ? { variant_id: Number(variant_id) } : {}
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -5203,14 +5908,20 @@ router4.post("/api/admin/stock/ajustement", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { produit_id, quantite, motif } = req.body;
+    const { produit_id, quantite, motif, variant_id } = req.body;
     if (!produit_id || quantite === void 0 || quantite === null) {
       return res.status(400).json({ error: "produit_id et quantite requis." });
     }
     if (!motif?.trim()) {
       return res.status(400).json({ error: "Un motif est requis pour un ajustement." });
     }
-    await createStockAjustement({ produit_id, quantite: Number(quantite), motif, user_id: session.id });
+    await createStockAjustement({
+      produit_id,
+      quantite: Number(quantite),
+      motif,
+      user_id: session.id,
+      ...variant_id ? { variant_id: Number(variant_id) } : {}
+    });
     emitAdminEvent("stock");
     res.json({ ok: true });
   } catch (err) {
@@ -5232,11 +5943,12 @@ router5.get("/api/admin/stock-boutique", async (req, res) => {
     const filter = req.query.filter || "all";
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
+    const shopId = session.shop_id ?? 1;
     const [stats, { items, total }, movements, prodCount] = await Promise.all([
-      getStockBoutiqueStats(),
-      getStockBoutiqueList({ search: q, filter, limit, offset }),
-      getRecentBoutiqueMovements(20),
-      db.execute("SELECT COUNT(*) AS cnt FROM produits")
+      getStockBoutiqueStats(shopId),
+      getStockBoutiqueList({ search: q, filter, limit, offset, shopId }),
+      getRecentBoutiqueMovements(20, shopId),
+      db.execute("SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId])
     ]);
     stats.total_produits = Number(prodCount[0][0]?.cnt ?? stats.total_produits);
     res.json({ stats, items, total, movements });
@@ -5271,7 +5983,8 @@ router5.post("/api/admin/stock-boutique/mouvement", async (req, res) => {
       quantite: Number(quantite),
       motif: motif || void 0,
       ref_commande: ref_commande || void 0,
-      admin_id: session.id
+      admin_id: session.id,
+      shop_id: session.shop_id ?? 1
     });
     res.json({ ok: true });
   } catch (err) {
@@ -5285,8 +5998,9 @@ router5.get("/api/admin/stock-boutique/entrees", async (req, res) => {
     const q = req.query.q || "";
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
-    const conditions = ["bm.type = 'entree'"];
-    const params = [];
+    const shopId2 = session.shop_id ?? 1;
+    const conditions = ["bm.type = 'entree'", "p.shop_id = ?"];
+    const params = [shopId2];
     if (q) {
       conditions.push("(p.nom LIKE ? OR p.reference LIKE ?)");
       params.push(`%${q}%`, `%${q}%`);
@@ -5643,11 +6357,12 @@ router6.get("/api/admin/ventes/factures", async (req, res) => {
     const statut = req.query.statut || void 0;
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
+    const shopId = session.shop_id ?? 1;
     const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
-      listFactures({ search, statut, limit, offset }),
+      listFactures({ search, statut, limit, offset, shopId }),
       getVentesStats(),
-      getFinanceStats().catch(() => null),
-      getStockBoutiqueStats().catch(() => null)
+      getFinanceStats(shopId).catch(() => null),
+      getStockBoutiqueStats(shopId).catch(() => null)
     ]);
     const stats = {
       ...ventesStats,
@@ -5677,7 +6392,7 @@ router6.post("/api/admin/ventes/factures", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id });
+    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: session.shop_id ?? 1 });
     emitAdminEvent("vente");
     if (body.client_tel) {
       const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];
@@ -5726,7 +6441,8 @@ router6.patch("/api/admin/ventes/factures/:id", async (req, res) => {
         mode_paiement,
         montant_acompte,
         montant_paiement: montant_paiement ? Number(montant_paiement) : void 0,
-        admin_id: session.id
+        admin_id: session.id,
+        shop_id: session.shop_id ?? 1
       });
     }
     emitAdminEvent("vente");
@@ -5752,7 +6468,7 @@ router6.get("/api/admin/ventes/devis", async (req, res) => {
     const statut = req.query.statut || void 0;
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
-    const { items, total } = await listDevis({ search, statut, limit, offset });
+    const { items, total } = await listDevis({ search, statut, limit, offset, shopId: session.shop_id ?? 1 });
     res.json({ items, total });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -5766,7 +6482,7 @@ router6.post("/api/admin/ventes/devis", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const id = await createDevis({ ...body, admin_id: session.id });
+    const id = await createDevis({ ...body, admin_id: session.id, shop_id: session.shop_id ?? 1 });
     res.json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -5778,7 +6494,7 @@ router6.get("/api/admin/ventes/livraisons", async (req, res) => {
   try {
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
-    const { items, total } = await listLivraisons({ limit, offset });
+    const { items, total } = await listLivraisons({ limit, offset, shopId: session.shop_id ?? 1 });
     res.json({ items, total });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -5881,9 +6597,10 @@ router8.get("/api/admin/finance", async (req, res) => {
     const search = req.query.q || void 0;
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
+    const shopId = session.shop_id ?? 1;
     const [{ items, total }, stats] = await Promise.all([
-      listFinanceEntries({ type, search, limit, offset }),
-      getFinanceStats()
+      listFinanceEntries({ type, search, limit, offset, shopId }),
+      getFinanceStats(shopId)
     ]);
     res.json({ items, total, stats });
   } catch (err) {
@@ -5903,7 +6620,7 @@ router8.post("/api/admin/finance", async (req, res) => {
     }
     const admin_id = typeof session.id === "number" ? session.id : void 0;
     const admin_nom = typeof session.nom === "string" ? session.nom : void 0;
-    const id = await createFinanceEntry({ type, mode_paiement, compte_destination, categorie, description, montant: Number(montant), date_entree, admin_id, admin_nom });
+    const id = await createFinanceEntry({ type, mode_paiement, compte_destination, categorie, description, montant: Number(montant), date_entree, admin_id, admin_nom, shop_id: session.shop_id ?? 1 });
     emitAdminEvent("finance");
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -6081,10 +6798,11 @@ var router10 = import_express10.default.Router();
 router10.get("/api/admin/orders", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const page = Math.max(1, Number(req.query.page ?? 1));
   const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 25)));
   const offset = (page - 1) * limit;
-  const [orders, total] = await Promise.all([listOrders(limit, offset), countOrders()]);
+  const [orders, total] = await Promise.all([listOrders(limit, offset, shopId), countOrders(shopId)]);
   res.json({ success: true, data: orders, total, page, limit });
 });
 router10.post("/api/admin/orders", async (req, res) => {
@@ -6096,7 +6814,7 @@ router10.post("/api/admin/orders", async (req, res) => {
   }
   const subtotal = items.reduce((s, i) => s + i.total, 0);
   const total = subtotal + Number(delivery_fee ?? 0);
-  const id = await createOrder({ nom, telephone, adresse, zone_livraison, delivery_fee: Number(delivery_fee ?? 0), note, items, subtotal, total });
+  const id = await createOrder({ nom, telephone, adresse, zone_livraison, delivery_fee: Number(delivery_fee ?? 0), note, items, subtotal, total, shop_id: session.shop_id ?? 1 });
   await addOrderEvent(id, "pending", "Commande cr\xE9\xE9e par l'admin", session.nom);
   const [rows] = await db.execute(
     "SELECT reference, created_at FROM orders WHERE id = ? LIMIT 1",
@@ -6311,11 +7029,75 @@ var upload_default = router11;
 // routes/admin/settings.ts
 var import_express12 = __toESM(require("express"));
 init_admin_db();
+
+// lib/vercel-domains.ts
+var TOKEN = process.env.VERCEL_TOKEN;
+var PROJECT_ID = process.env.VERCEL_PROJECT_ID;
+var TEAM_ID = process.env.VERCEL_TEAM_ID;
+function vercelApi(path, opts = {}) {
+  const teamParam = TEAM_ID ? `?teamId=${TEAM_ID}` : "";
+  return fetch(`https://api.vercel.com${path}${teamParam}`, {
+    ...opts,
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      "Content-Type": "application/json",
+      ...opts.headers ?? {}
+    }
+  });
+}
+async function addVercelDomain(domain) {
+  if (!TOKEN || !PROJECT_ID) {
+    console.warn("[vercel-domains] VERCEL_TOKEN or VERCEL_PROJECT_ID not set \u2014 skipping");
+    return { ok: true };
+  }
+  try {
+    const res = await vercelApi(`/v10/projects/${PROJECT_ID}/domains`, {
+      method: "POST",
+      body: JSON.stringify({ name: domain })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (res.status === 409) return { ok: true };
+      return { ok: false, error: data?.error?.message ?? `Vercel error ${res.status}` };
+    }
+    if (data.verification?.length) {
+      return { ok: true, verification: data.verification };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Vercel API unreachable" };
+  }
+}
+async function removeVercelDomain(domain) {
+  if (!TOKEN || !PROJECT_ID) return;
+  try {
+    await vercelApi(`/v10/projects/${PROJECT_ID}/domains/${encodeURIComponent(domain)}`, {
+      method: "DELETE"
+    });
+  } catch {
+  }
+}
+async function checkVercelDomain(domain) {
+  if (!TOKEN || !PROJECT_ID) return { configured: true };
+  try {
+    const res = await vercelApi(`/v9/projects/${PROJECT_ID}/domains/${encodeURIComponent(domain)}`);
+    const data = await res.json();
+    if (!res.ok) return { configured: false };
+    return {
+      configured: data.verified ?? false,
+      verification: data.verification ?? []
+    };
+  } catch {
+    return { configured: false };
+  }
+}
+
+// routes/admin/settings.ts
 var router12 = import_express12.default.Router();
 router12.get("/api/admin/settings", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  const settings = await getSettings();
+  const settings = await getSettings(session.shop_id ?? 1);
   res.json(settings);
 });
 router12.post("/api/admin/settings", async (req, res) => {
@@ -6324,8 +7106,85 @@ router12.post("/api/admin/settings", async (req, res) => {
   if (!["super_admin", "admin"].includes(session.role)) {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
-  await setSettings(req.body);
+  await setSettings(req.body, session.shop_id ?? 1);
   res.json({ ok: true });
+});
+router12.get("/api/admin/settings/domain", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const shopId = session.shop_id ?? 1;
+    const shop = await getShopById(shopId);
+    if (!shop) return res.status(404).json({ error: "Boutique introuvable." });
+    let vercel = { configured: false };
+    if (shop.custom_domain) {
+      vercel = await checkVercelDomain(shop.custom_domain);
+    }
+    res.json({
+      custom_domain: shop.custom_domain ?? null,
+      slug: shop.slug,
+      vercel
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.post("/api/admin/settings/domain", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const shopId = session.shop_id ?? 1;
+    const raw = String(req.body.domain ?? "").trim().toLowerCase().replace(/^www\./, "").replace(/^https?:\/\//, "");
+    const domain = raw.split("/")[0];
+    if (!domain) return res.status(400).json({ error: "Domaine requis." });
+    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
+      return res.status(400).json({ error: "Format de domaine invalide." });
+    }
+    const shop = await getShopById(shopId);
+    if (shop?.custom_domain && shop.custom_domain !== domain) {
+      await removeVercelDomain(shop.custom_domain);
+    }
+    const vercelResult = await addVercelDomain(domain);
+    if (!vercelResult.ok) {
+      return res.status(400).json({ error: `Vercel: ${vercelResult.error}` });
+    }
+    await setShopDomain(shopId, domain);
+    res.json({
+      ok: true,
+      domain,
+      verification: vercelResult.verification ?? []
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur";
+    if (msg.includes("Duplicate entry")) {
+      return res.status(409).json({ error: "Ce domaine est d\xE9j\xE0 utilis\xE9 par une autre boutique." });
+    }
+    res.status(500).json({ error: msg });
+  }
+});
+router12.delete("/api/admin/settings/domain", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const shopId = session.shop_id ?? 1;
+    const shop = await getShopById(shopId);
+    if (shop?.custom_domain) {
+      await removeVercelDomain(shop.custom_domain);
+    }
+    await setShopDomain(shopId, null);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
 });
 var settings_default = router12;
 
@@ -6431,7 +7290,7 @@ var router14 = import_express14.default.Router();
 router14.get("/api/admin/categories", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  const categories = await listAdminCategories();
+  const categories = await listAdminCategories(session.shop_id ?? 1);
   res.json({ success: true, data: categories });
 });
 router14.post("/api/admin/categories", async (req, res) => {
@@ -6440,19 +7299,20 @@ router14.post("/api/admin/categories", async (req, res) => {
   if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Droits insuffisants." });
   const { nom, description = "" } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createCategory(nom.trim(), description.trim());
+  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1);
   res.json({ success: true, id });
 });
 router14.patch("/api/admin/categories/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await updateCategory(Number(req.params.id), req.body);
+  const { nom, description = "" } = req.body;
+  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1);
   res.json({ success: true });
 });
 router14.delete("/api/admin/categories/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await deleteCategory(Number(req.params.id));
+  await deleteCategory(Number(req.params.id), session.shop_id ?? 1);
   res.json({ success: true });
 });
 router14.get("/api/admin/marques", async (req, res) => {
@@ -6497,9 +7357,10 @@ router15.get("/api/admin/boutique-clients", async (req, res) => {
   const search = req.query.q ?? "";
   const filtre = req.query.filtre ?? "tous";
   const stats = req.query.stats === "1";
+  const shopId = session.shop_id ?? 1;
   if (stats) {
     try {
-      const data = await getBoutiqueClientsStats();
+      const data = await getBoutiqueClientsStats(shopId);
       return res.json({ success: true, data });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -6509,8 +7370,8 @@ router15.get("/api/admin/boutique-clients", async (req, res) => {
   }
   try {
     const [clients, total] = await Promise.all([
-      listBoutiqueClients(limit, offset, search, filtre),
-      countBoutiqueClients(search, filtre)
+      listBoutiqueClients(limit, offset, search, filtre, shopId),
+      countBoutiqueClients(search, filtre, shopId)
     ]);
     res.json({ success: true, data: clients, total, page, limit });
   } catch (err) {
@@ -6523,7 +7384,8 @@ router15.get("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const client = await getBoutiqueClientById(Number(req.params.id));
+    const shopId = session.shop_id ?? 1;
+    const client = await getBoutiqueClientById(Number(req.params.id), shopId);
     if (!client) return res.status(404).json({ error: "Client introuvable." });
     const factures = await getClientFacturesByNom(client.nom, client.telephone);
     res.json({ client, factures });
@@ -6536,21 +7398,25 @@ router15.post("/api/admin/boutique-clients", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!req.body.nom?.trim()) return res.status(400).json({ error: "Nom requis." });
   if (!req.body.telephone?.trim()) return res.status(400).json({ error: "T\xE9l\xE9phone requis." });
-  const [[existing]] = await db.execute("SELECT id FROM boutique_clients WHERE telephone = ? LIMIT 1", [req.body.telephone.trim()]);
+  const shopId = session.shop_id ?? 1;
+  const [[existing]] = await db.execute(
+    "SELECT id FROM boutique_clients WHERE telephone = ? AND shop_id = ? LIMIT 1",
+    [req.body.telephone.trim(), shopId]
+  );
   if (existing) return res.status(400).json({ error: "Un client avec ce num\xE9ro existe d\xE9j\xE0." });
-  const id = await createBoutiqueClient(req.body);
+  const id = await createBoutiqueClient({ ...req.body, shop_id: shopId });
   res.json({ success: true, id });
 });
 router15.patch("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await updateBoutiqueClient(Number(req.params.id), req.body);
+  await updateBoutiqueClient(Number(req.params.id), req.body, session.shop_id ?? 1);
   res.json({ success: true });
 });
 router15.delete("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await deleteBoutiqueClient(Number(req.params.id));
+  await deleteBoutiqueClient(Number(req.params.id), session.shop_id ?? 1);
   res.json({ success: true });
 });
 var boutique_clients_default = router15;
@@ -7594,6 +8460,39 @@ var import_express25 = __toESM(require("express"));
 init_db();
 init_admin_db();
 var router25 = import_express25.default.Router();
+var _shopCache = /* @__PURE__ */ new Map();
+var SHOP_CACHE_TTL = 6e4;
+async function resolveShopId(req) {
+  const slug = req.headers["x-shop-slug"]?.trim();
+  if (slug && slug !== "default") {
+    const cacheKey = `slug:${slug}`;
+    const cached = _shopCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < SHOP_CACHE_TTL) return cached.id;
+    try {
+      const shop = await getShopBySlug(slug);
+      const id = shop?.id ?? 1;
+      _shopCache.set(cacheKey, { id, slug, ts: Date.now() });
+      return id;
+    } catch {
+      return 1;
+    }
+  }
+  const customDomain = req.headers["x-custom-domain"]?.trim();
+  if (customDomain) {
+    const cacheKey = `domain:${customDomain}`;
+    const cached = _shopCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < SHOP_CACHE_TTL) return cached.id;
+    try {
+      const shop = await getShopByDomain(customDomain);
+      const id = shop?.id ?? 1;
+      _shopCache.set(cacheKey, { id, slug: shop?.slug ?? "", ts: Date.now() });
+      return id;
+    } catch {
+      return 1;
+    }
+  }
+  return 1;
+}
 function seededShuffle(arr, seed) {
   const result = [...arr];
   let s = seed | 0;
@@ -7604,10 +8503,11 @@ function seededShuffle(arr, seed) {
   }
   return result;
 }
-var _bsCache = null;
+var _bsCacheMap = /* @__PURE__ */ new Map();
 var BS_TTL = 6e4;
-async function loadBestsellerProducts(limit) {
-  if (_bsCache && Date.now() - _bsCache.ts < BS_TTL) return _bsCache.data;
+async function loadBestsellerProducts(limit, shopId = 1) {
+  const cached = _bsCacheMap.get(shopId);
+  if (cached && Date.now() - cached.ts < BS_TTL) return cached.data;
   const pool2 = db;
   const salesMap = /* @__PURE__ */ new Map();
   try {
@@ -7673,8 +8573,9 @@ async function loadBestsellerProducts(limit) {
        FROM produits p
        LEFT JOIN categories c ON c.id = p.categorie_id
        WHERE p.id IN (${placeholders})
-         AND p.actif = 1`,
-      ids
+         AND p.actif = 1
+         AND p.shop_id = ?`,
+      [...ids, shopId]
     );
     prodRows.sort((a, b) => (salesMap.get(b.id) ?? 0) - (salesMap.get(a.id) ?? 0));
     const poolSize = Math.min(prodRows.length, Math.max(limit + 8, 16));
@@ -7685,7 +8586,7 @@ async function loadBestsellerProducts(limit) {
     }
     products = topPool.slice(0, limit);
   }
-  _bsCache = { data: products, ts: Date.now() };
+  _bsCacheMap.set(shopId, { data: products, ts: Date.now() });
   return products;
 }
 router25.get("/api/health", async (_req, res) => {
@@ -7704,6 +8605,7 @@ router25.get("/api/health", async (_req, res) => {
 });
 router25.get("/api/products", async (req, res) => {
   try {
+    const shopId = await resolveShopId(req);
     const idsParam = req.query.ids;
     if (idsParam) {
       const ids = idsParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0).slice(0, 50);
@@ -7724,17 +8626,17 @@ router25.get("/api/products", async (req, res) => {
     const limit = req.query.limit ? Number(req.query.limit) : 60;
     const offset = req.query.offset ? Number(req.query.offset) : 0;
     if (bestOnly) {
-      const products2 = await loadBestsellerProducts(limit);
+      const products2 = await loadBestsellerProducts(limit, shopId);
       return res.json({ success: true, data: products2, total: products2.length });
     }
     if (slugExact) {
       const { getProductBySlug: getProductBySlug2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const product = await getProductBySlug2(slugExact);
+      const product = await getProductBySlug2(slugExact, shopId);
       return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset }),
-      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice })
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId }),
+      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId })
     ]);
     const isFiltered = search || categoryId || promoOnly || newOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
     const data = isFiltered ? products : seededShuffle(products, Math.floor(Date.now() / (1e3 * 60 * 60)));
@@ -7743,9 +8645,10 @@ router25.get("/api/products", async (req, res) => {
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }
 });
-router25.get("/api/categories", async (_req, res) => {
+router25.get("/api/categories", async (req, res) => {
   try {
-    const categories = await getCategories();
+    const shopId = await resolveShopId(req);
+    const categories = await getCategories(shopId);
     res.json({ success: true, data: categories });
   } catch (err) {
     res.status(500).json({ success: false, error: "Erreur serveur." });
@@ -7811,9 +8714,10 @@ router25.post("/api/reviews", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router25.get("/api/settings/public", async (_req, res) => {
+router25.get("/api/settings/public", async (req, res) => {
   try {
-    const settings = await getSettings();
+    const shopId = await resolveShopId(req);
+    const settings = await getSettings(shopId);
     res.json({ settings });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -7821,8 +8725,9 @@ router25.get("/api/settings/public", async (_req, res) => {
 });
 router25.get("/api/products/bestsellers", async (req, res) => {
   try {
+    const shopId = await resolveShopId(req);
     const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 8)));
-    const products = await loadBestsellerProducts(limit);
+    const products = await loadBestsellerProducts(limit, shopId);
     res.json({ success: true, data: products });
   } catch (err) {
     res.status(500).json({ success: false, error: err instanceof Error ? err.message : "Erreur" });
@@ -7926,12 +8831,24 @@ router25.get("/api/public/coupons/validate", async (req, res) => {
     res.status(500).json({ valid: false, error: "Erreur serveur." });
   }
 });
-router25.get("/api/public/delivery-zones", async (_req, res) => {
+router25.get("/api/public/delivery-zones", async (req, res) => {
   try {
-    const zones = await getDeliveryZones(true);
+    const shopId = await resolveShopId(req);
+    const zones = await getDeliveryZones(true, shopId);
     res.json(zones);
   } catch {
     res.json([]);
+  }
+});
+router25.get("/api/resolve-domain", async (req, res) => {
+  const h = String(req.query.h ?? "").toLowerCase().trim().replace(/^www\./, "");
+  if (!h) return res.json({ slug: null });
+  try {
+    const shop = await getShopByDomain(h);
+    if (!shop) return res.json({ slug: null });
+    res.json({ slug: shop.slug, shop_id: shop.id });
+  } catch {
+    res.json({ slug: null });
   }
 });
 var public_default = router25;
@@ -9528,7 +10445,8 @@ async function ensureWaMessagesCols() {
     "ALTER TABLE wa_messages ADD COLUMN media_id    VARCHAR(100) NULL",
     "ALTER TABLE wa_messages ADD COLUMN media_type  VARCHAR(30)  NOT NULL DEFAULT 'text'",
     "ALTER TABLE wa_messages ADD COLUMN mime_type   VARCHAR(100) NULL",
-    "ALTER TABLE wa_messages ADD COLUMN notre_numero VARCHAR(30) NULL"
+    "ALTER TABLE wa_messages ADD COLUMN notre_numero VARCHAR(30) NULL",
+    "ALTER TABLE wa_messages ADD COLUMN shop_id     INT UNSIGNED NOT NULL DEFAULT 1"
   ];
   for (const sql of alters) {
     try {
@@ -9541,7 +10459,7 @@ router33.get("/api/admin/whatsapp/webhook", async (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  const savedToken = await getSetting("wa_webhook_verify_token").catch(() => null);
+  const savedToken = await getSetting("wa_webhook_verify_token", 1).catch(() => null);
   const expected = savedToken || process.env.WA_VERIFY_TOKEN || "";
   if (mode === "subscribe" && token === expected && expected) {
     return res.status(200).send(challenge);
@@ -9599,6 +10517,7 @@ router33.post("/api/admin/whatsapp/webhook", async (req, res) => {
 router33.get("/api/admin/whatsapp/threads", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
+  const shopId = session.shop_id ?? 1;
   try {
     const [rows] = await db.execute(`
       SELECT
@@ -9619,11 +10538,13 @@ router33.get("/api/admin/whatsapp/threads", async (req, res) => {
           COUNT(*)                                                           AS total_messages,
           SUM(CASE WHEN direction = 'inbound' AND lu = 0 THEN 1 ELSE 0 END) AS unread
         FROM wa_messages
+        WHERE shop_id = ?
         GROUP BY telephone
       ) t ON t.telephone = m.telephone AND t.last_id = m.id
+      WHERE m.shop_id = ?
       ORDER BY last_at DESC
       LIMIT 200
-    `);
+    `, [shopId, shopId]);
     res.json({ threads: rows });
   } catch (err) {
     console.error("[whatsapp/threads]", err);
@@ -9634,19 +10555,20 @@ router33.get("/api/admin/whatsapp/threads/:phone", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { phone } = req.params;
+  const shopId2 = session.shop_id ?? 1;
   try {
     const [rows] = await db.execute(
       `SELECT id, direction, body, sent_by, contact_name, lu, media_id, media_type, mime_type, created_at
        FROM wa_messages
-       WHERE telephone = ?
+       WHERE telephone = ? AND shop_id = ?
        ORDER BY created_at ASC
        LIMIT 500`,
-      [phone]
+      [phone, shopId2]
     );
     res.json({ messages: rows });
     await db.execute(
-      "UPDATE wa_messages SET lu = 1 WHERE telephone = ? AND direction = 'inbound' AND lu = 0",
-      [phone]
+      "UPDATE wa_messages SET lu = 1 WHERE telephone = ? AND shop_id = ? AND direction = 'inbound' AND lu = 0",
+      [phone, shopId2]
     ).catch(() => {
     });
   } catch (err) {
@@ -9658,7 +10580,7 @@ router33.get("/api/admin/whatsapp/media/:mediaId", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).end();
   try {
-    const token = await getSetting("wa_access_token");
+    const token = await getSetting("wa_access_token", session.shop_id ?? 1);
     if (!token) return res.status(503).end();
     const infoRes = await fetch(`${WA_GRAPH}/${req.params.mediaId}`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -9689,9 +10611,9 @@ router33.post("/api/admin/whatsapp/threads/:phone/send", async (req, res) => {
   const result = await sendWaText({ to: phone, body: body.trim() });
   if (!result.success) return res.status(502).json({ error: result.error });
   await db.execute(
-    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_type)
-     VALUES (?, 'outbound', ?, ?, 'text')`,
-    [phone, body.trim(), session.nom ?? session.username ?? "admin"]
+    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_type, shop_id)
+     VALUES (?, 'outbound', ?, ?, 'text', ?)`,
+    [phone, body.trim(), session.nom ?? session.username ?? "admin", session.shop_id ?? 1]
   ).catch(() => {
   });
   emitAdminEvent("message", { type_action: "sent", to: phone });
@@ -9714,9 +10636,9 @@ router33.post("/api/admin/whatsapp/threads/:phone/send-image", async (req, res) 
   const send = await sendWaImage({ to: phone, mediaId: up.mediaId, caption });
   if (!send.success) return res.status(502).json({ error: send.error });
   await db.execute(
-    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type)
-     VALUES (?, 'outbound', ?, ?, ?, 'image', ?)`,
-    [phone, caption || "[Image]", session.nom ?? "admin", up.mediaId, mimeType]
+    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type, shop_id)
+     VALUES (?, 'outbound', ?, ?, ?, 'image', ?, ?)`,
+    [phone, caption || "[Image]", session.nom ?? "admin", up.mediaId, mimeType, session.shop_id ?? 1]
   ).catch(() => {
   });
   res.json({ ok: true });
@@ -9737,9 +10659,9 @@ router33.post("/api/admin/whatsapp/threads/:phone/send-audio", async (req, res) 
   const send = await sendWaAudio({ to: phone, mediaId: up.mediaId });
   if (!send.success) return res.status(502).json({ error: send.error });
   await db.execute(
-    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type)
-     VALUES (?, 'outbound', '[Message vocal]', ?, ?, 'audio', ?)`,
-    [phone, session.nom ?? "admin", up.mediaId, mimeType]
+    `INSERT INTO wa_messages (telephone, direction, body, sent_by, media_id, media_type, mime_type, shop_id)
+     VALUES (?, 'outbound', '[Message vocal]', ?, ?, 'audio', ?, ?)`,
+    [phone, session.nom ?? "admin", up.mediaId, mimeType, session.shop_id ?? 1]
   ).catch(() => {
   });
   res.json({ ok: true });
@@ -9749,7 +10671,7 @@ router33.delete("/api/admin/whatsapp/threads/:phone", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { phone } = req.params;
   try {
-    await db.execute("DELETE FROM wa_messages WHERE telephone = ?", [phone]);
+    await db.execute("DELETE FROM wa_messages WHERE telephone = ? AND shop_id = ?", [phone, session.shop_id ?? 1]);
     res.json({ ok: true });
   } catch (err) {
     console.error("[whatsapp/delete thread]", err);
@@ -10149,9 +11071,9 @@ async function ensureReferralsTable() {
 }
 ensureReferralsTable().catch(console.error);
 function generateCode2(nom) {
-  const base = nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+  const base2 = nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `${base}${suffix}`;
+  return `${base2}${suffix}`;
 }
 async function uniqueCode(nom) {
   for (let i = 0; i < 10; i++) {
@@ -10254,7 +11176,7 @@ router37.get("/api/admin/delivery-zones", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-    const zones = await getDeliveryZones();
+    const zones = await getDeliveryZones(false, session.shop_id ?? 1);
     res.json(zones);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -10268,8 +11190,9 @@ router37.post("/api/admin/delivery-zones", async (req, res) => {
       return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
     }
     const body = req.body;
+    const shopId = session.shop_id ?? 1;
     if (body._delete && body.id) {
-      await deleteDeliveryZone(Number(body.id));
+      await deleteDeliveryZone(Number(body.id), shopId);
       return res.json({ ok: true, deleted: true });
     }
     if (!body.nom?.trim()) {
@@ -10282,7 +11205,7 @@ router37.post("/api/admin/delivery-zones", async (req, res) => {
       actif: body.actif !== false && body.actif !== 0,
       sort_order: Number(body.sort_order ?? 0),
       prix_libre: Boolean(body.prix_libre)
-    });
+    }, shopId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -10295,7 +11218,7 @@ router37.delete("/api/admin/delivery-zones/:id", async (req, res) => {
     if (!["super_admin", "admin"].includes(session.role)) {
       return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
     }
-    await deleteDeliveryZone(Number(req.params.id));
+    await deleteDeliveryZone(Number(req.params.id), session.shop_id ?? 1);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -10342,7 +11265,7 @@ router38.get("/api/admin/coupons", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-    const coupons = await listCoupons();
+    const coupons = await listCoupons(session.shop_id ?? 1);
     res.json(coupons);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -10357,8 +11280,9 @@ router38.post("/api/admin/coupons", async (req, res) => {
     }
     await ensureCouponsTable2();
     const body = req.body;
+    const shopId = session.shop_id ?? 1;
     if (body._delete && body.id) {
-      await deleteCoupon(Number(body.id));
+      await deleteCoupon(Number(body.id), shopId);
       return res.json({ ok: true, deleted: true });
     }
     if (!body.code?.trim()) {
@@ -10373,7 +11297,7 @@ router38.post("/api/admin/coupons", async (req, res) => {
       max_uses: Number(body.max_uses ?? 0),
       expires_at: body.expires_at || null,
       actif: body.actif !== false && body.actif !== 0
-    });
+    }, shopId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -10751,6 +11675,9 @@ var router42 = import_express42.default.Router();
 router42.get("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
   try {
     const entrepots = await listEntrepots();
     res.json({ entrepots });
@@ -10761,7 +11688,7 @@ router42.get("/api/admin/entrepots", async (req, res) => {
 router42.post("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
   const { id, nom, telephone, adresse, notes, actif } = req.body;
@@ -10776,7 +11703,7 @@ router42.post("/api/admin/entrepots", async (req, res) => {
 router42.delete("/api/admin/entrepots/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  if (!["super_admin", "admin"].includes(session.role)) {
+  if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
   try {
@@ -10788,12 +11715,602 @@ router42.delete("/api/admin/entrepots/:id", async (req, res) => {
 });
 var entrepots_default = router42;
 
+// routes/admin/tombola.ts
+var import_express43 = __toESM(require("express"));
+init_admin_db();
+var router43 = import_express43.default.Router();
+router43.get("/api/admin/tombola", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    const sessions = await listTombolaSessions();
+    res.json({ data: sessions });
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+router43.post("/api/admin/tombola", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  const { id, nom, min_montant, min_participants, prize_description, statut } = req.body;
+  if (!nom) return res.status(400).json({ error: "nom requis" });
+  try {
+    if (id) {
+      await updateTombolaSession(Number(id), {
+        nom,
+        min_montant: Number(min_montant),
+        min_participants: Number(min_participants),
+        prize_description: prize_description ?? null,
+        statut
+      });
+      res.json({ ok: true });
+    } else {
+      const newId = await createTombolaSession({
+        nom,
+        min_montant: Number(min_montant) || 5e4,
+        min_participants: Number(min_participants) || 10,
+        prize_description: prize_description ?? null
+      });
+      res.json({ ok: true, id: newId });
+    }
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+router43.get("/api/admin/tombola/:id/participants", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    const tombola = await getTombolaSession(Number(req.params.id));
+    if (!tombola) return res.status(404).json({ error: "Tombola introuvable" });
+    const participants = await getTombolaParticipants(tombola.min_montant);
+    res.json({
+      data: participants,
+      ready: participants.length >= tombola.min_participants
+    });
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+router43.post("/api/admin/tombola/:id/spin", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  const { winner_facture_id } = req.body;
+  if (!winner_facture_id) return res.status(400).json({ error: "winner_facture_id requis" });
+  try {
+    const tombola = await getTombolaSession(Number(req.params.id));
+    if (!tombola) return res.status(404).json({ error: "Tombola introuvable" });
+    if (tombola.statut === "termine") return res.status(400).json({ error: "Tombola d\xE9j\xE0 termin\xE9e" });
+    await spinTombola(Number(req.params.id), Number(winner_facture_id));
+    const updated = await getTombolaSession(Number(req.params.id));
+    res.json({ ok: true, winner: updated });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Erreur serveur" });
+  }
+});
+router43.post("/api/admin/tombola/:id/notify", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    const tombola = await getTombolaSession(Number(req.params.id));
+    if (!tombola) return res.status(404).json({ error: "Tombola introuvable" });
+    if (!tombola.winner_tel) return res.status(400).json({ error: "Pas de t\xE9l\xE9phone gagnant" });
+    if (!tombola.winner_nom) return res.status(400).json({ error: "Pas de nom gagnant" });
+    const prize = tombola.prize_description ?? "votre lot";
+    await sendWaText({
+      to: tombola.winner_tel,
+      body: `\u{1F389} F\xE9licitations ${tombola.winner_nom} ! Vous avez gagn\xE9 la tombola Togolese Shop et remportez ${prize} ! Contactez-nous pour r\xE9cup\xE9rer votre lot. \u{1F4DE} +22890527912`
+    });
+    await markTombolaNotified(Number(req.params.id));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Erreur envoi WhatsApp" });
+  }
+});
+router43.delete("/api/admin/tombola/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
+  try {
+    await deleteTombolaSession(Number(req.params.id));
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+var tombola_default = router43;
+
+// routes/admin/onboarding.ts
+var import_express44 = __toESM(require("express"));
+var import_bcryptjs5 = __toESM(require("bcryptjs"));
+init_admin_db();
+
+// lib/mailer.ts
+var import_resend = require("resend");
+var RESEND_API_KEY = process.env.RESEND_API_KEY;
+var FROM_ADDRESS = process.env.RESEND_FROM || "onboarding@resend.dev";
+var _client = null;
+function getClient() {
+  if (!_client) {
+    if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not set");
+    _client = new import_resend.Resend(RESEND_API_KEY);
+  }
+  return _client;
+}
+async function sendMail(opts) {
+  if (!RESEND_API_KEY) {
+    console.warn("[mailer] RESEND_API_KEY not set \u2014 email skipped:", opts.subject);
+    return;
+  }
+  const resend = getClient();
+  const { error } = await resend.emails.send({
+    from: FROM_ADDRESS,
+    to: Array.isArray(opts.to) ? opts.to : [opts.to],
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.text
+  });
+  if (error) {
+    console.error("[mailer] Resend error:", error);
+    throw new Error(`Email send failed: ${error.message}`);
+  }
+}
+
+// lib/email-templates.ts
+var BRAND_COLOR = "#6366f1";
+function base(title, body) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+        <!-- Header -->
+        <tr>
+          <td style="background:${BRAND_COLOR};padding:28px 40px;text-align:center;">
+            <span style="color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">ShopSaaS</span>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr><td style="padding:36px 40px 28px;">${body}</td></tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 40px;background:#f9fafb;border-top:1px solid #e5e7eb;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">
+              ShopSaaS \xB7 Votre boutique en ligne, simplement<br/>
+              Pour toute question : <a href="mailto:support@togolese.tg" style="color:${BRAND_COLOR};">support@togolese.tg</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+function welcomeShopEmail(opts) {
+  const { adminNom, shopNom, shopSlug, adminUrl, loginUrl, plan } = opts;
+  const planLabel = plan === "pro" ? "Pro" : plan === "basic" ? "Basic" : "Gratuit";
+  const html = base(
+    `Bienvenue sur ShopSaaS \u2014 ${shopNom}`,
+    `
+    <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">Bienvenue, ${adminNom} \u{1F44B}</h1>
+    <p style="margin:0 0 24px;font-size:16px;color:#6b7280;">Votre boutique <strong>${shopNom}</strong> est pr\xEAte !</p>
+
+    <table width="100%" cellpadding="12" style="background:#f9fafb;border-radius:8px;margin-bottom:28px;border:1px solid #e5e7eb;">
+      <tr>
+        <td style="font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Nom de la boutique</td>
+        <td style="font-size:14px;color:#111827;font-weight:600;border-bottom:1px solid #e5e7eb;">${shopNom}</td>
+      </tr>
+      <tr>
+        <td style="font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Identifiant (slug)</td>
+        <td style="font-size:14px;color:#111827;font-family:monospace;border-bottom:1px solid #e5e7eb;">${shopSlug}</td>
+      </tr>
+      <tr>
+        <td style="font-size:13px;color:#6b7280;">Plan</td>
+        <td style="font-size:14px;color:#111827;font-weight:600;">${planLabel}</td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 20px;font-size:14px;color:#374151;">Connectez-vous \xE0 votre interface admin pour commencer \xE0 g\xE9rer vos produits, ventes et clients.</p>
+
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr>
+        <td>
+          <a href="${loginUrl}"
+             style="display:inline-block;background:${BRAND_COLOR};color:#fff;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;text-decoration:none;">
+            Acc\xE9der \xE0 mon admin \u2192
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0;font-size:13px;color:#9ca3af;">
+      URL directe : <a href="${adminUrl}" style="color:${BRAND_COLOR};">${adminUrl}</a>
+    </p>
+    `
+  );
+  const text = `Bienvenue ${adminNom} !
+
+Votre boutique "${shopNom}" (${shopSlug}) est pr\xEAte sur le plan ${planLabel}.
+
+Connectez-vous ici : ${loginUrl}
+
+Pour toute aide : support@togolese.tg`;
+  return { subject: `\u{1F389} Votre boutique ${shopNom} est pr\xEAte \u2014 ShopSaaS`, html, text };
+}
+
+// routes/admin/onboarding.ts
+var router44 = import_express44.default.Router();
+var SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
+router44.post("/api/admin/onboarding", async (req, res) => {
+  try {
+    const {
+      shop_nom,
+      shop_slug,
+      shop_email,
+      shop_plan,
+      admin_nom,
+      admin_username,
+      admin_email,
+      admin_password
+    } = req.body;
+    if (!shop_nom?.trim()) return res.status(400).json({ error: "Nom de boutique requis." });
+    if (!shop_slug?.trim()) return res.status(400).json({ error: "Slug requis." });
+    if (!shop_email?.trim()) return res.status(400).json({ error: "Email boutique requis." });
+    if (!admin_nom?.trim()) return res.status(400).json({ error: "Nom admin requis." });
+    if (!admin_username?.trim()) return res.status(400).json({ error: "Nom d'utilisateur requis." });
+    if (!admin_password || admin_password.length < 8) {
+      return res.status(400).json({ error: "Mot de passe : 8 caract\xE8res minimum." });
+    }
+    const slug = shop_slug.trim().toLowerCase();
+    if (!SLUG_RE.test(slug)) {
+      return res.status(400).json({ error: "Slug invalide. Lettres minuscules, chiffres et tirets uniquement (3\u201350 caract\xE8res)." });
+    }
+    if (["admin", "api", "www", "mail", "default", "app"].includes(slug)) {
+      return res.status(400).json({ error: "Ce slug est r\xE9serv\xE9." });
+    }
+    const existing = await getShopBySlug(slug);
+    if (existing) return res.status(409).json({ error: "Ce slug est d\xE9j\xE0 utilis\xE9. Choisissez-en un autre." });
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(admin_username.trim())) {
+      return res.status(400).json({ error: "Nom d'utilisateur : 3\u201330 caract\xE8res, lettres/chiffres/underscore." });
+    }
+    const plan = ["free", "basic", "pro"].includes(shop_plan) ? shop_plan : "free";
+    const shopId = await createShop({ nom: shop_nom.trim(), slug, email: shop_email.trim(), plan });
+    const password_hash = await import_bcryptjs5.default.hash(admin_password, 12);
+    await createAdminUser({
+      nom: admin_nom.trim(),
+      username: admin_username.trim().toLowerCase(),
+      email: admin_email?.trim() || null,
+      role: "admin",
+      password_hash,
+      shop_id: shopId
+    });
+    const siteBase = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const adminUrl = `${siteBase}/admin`;
+    const loginUrl = `${siteBase}/admin/login`;
+    const emailTo = admin_email?.trim() || shop_email.trim();
+    const { subject, html, text } = welcomeShopEmail({
+      adminNom: admin_nom.trim(),
+      shopNom: shop_nom.trim(),
+      shopSlug: slug,
+      adminUrl,
+      loginUrl,
+      plan
+    });
+    sendMail({ to: emailTo, subject, html, text }).catch(
+      (e) => console.error("[onboarding] welcome email failed:", e)
+    );
+    res.status(201).json({ ok: true, shop_id: shopId, slug });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    if (msg.includes("Duplicate entry") && msg.includes("slug")) {
+      return res.status(409).json({ error: "Ce slug est d\xE9j\xE0 utilis\xE9." });
+    }
+    res.status(500).json({ error: msg });
+  }
+});
+router44.get("/api/admin/onboarding/check-slug", async (req, res) => {
+  const slug = String(req.query.slug ?? "").toLowerCase();
+  if (!SLUG_RE.test(slug)) return res.json({ available: false, reason: "format" });
+  if (["admin", "api", "www", "mail", "default", "app"].includes(slug)) {
+    return res.json({ available: false, reason: "reserved" });
+  }
+  const existing = await getShopBySlug(slug);
+  res.json({ available: !existing });
+});
+var onboarding_default = router44;
+
+// routes/admin/saas-dashboard.ts
+var import_express45 = __toESM(require("express"));
+init_db();
+var router45 = import_express45.default.Router();
+function requireSuperAdmin2(session, res) {
+  if (!session) {
+    res.status(401).json({ error: "Non autoris\xE9." });
+    return false;
+  }
+  if (session.role !== "super_admin") {
+    res.status(403).json({ error: "R\xE9serv\xE9 au super-admin." });
+    return false;
+  }
+  return true;
+}
+router45.get("/api/admin/saas/shops", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  try {
+    const shops = await listShopsWithStats();
+    const data = shops.map((s) => ({
+      ...s,
+      plan_limit: planLimitLabel(s.plan)
+    }));
+    res.json({ shops: data });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.patch("/api/admin/saas/shops/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID invalide." });
+  if (id === 1 && req.body.actif === false) {
+    return res.status(400).json({ error: "La boutique par d\xE9faut ne peut pas \xEAtre suspendue." });
+  }
+  try {
+    const { plan, actif, nom, email } = req.body;
+    const update = {};
+    if (nom !== void 0) update.nom = String(nom);
+    if (email !== void 0) update.email = String(email);
+    if (plan !== void 0 && ["free", "basic", "pro"].includes(String(plan))) {
+      update.plan = plan;
+    }
+    if (actif !== void 0) update.actif = Boolean(actif);
+    await updateShop(id, update);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.get("/api/admin/saas/stats", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  try {
+    const [rows] = await db.execute(`
+      SELECT
+        (SELECT COUNT(*) FROM shops)                                   AS total_shops,
+        (SELECT COUNT(*) FROM shops WHERE actif = 1)                  AS active_shops,
+        (SELECT COUNT(*) FROM shops WHERE plan = 'free')              AS plan_free,
+        (SELECT COUNT(*) FROM shops WHERE plan = 'basic')             AS plan_basic,
+        (SELECT COUNT(*) FROM shops WHERE plan = 'pro')               AS plan_pro,
+        (SELECT COUNT(*) FROM produits)                               AS total_products,
+        (SELECT COUNT(*) FROM admin_users WHERE role != 'super_admin') AS total_admins
+    `);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.get("/api/admin/saas/payments", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  try {
+    const [rows] = await db.execute(`
+      SELECT sp.*, s.nom AS shop_nom, s.slug AS shop_slug, s.email AS shop_email
+      FROM shop_payments sp
+      JOIN shops s ON s.id = sp.shop_id
+      WHERE sp.status = 'pending'
+      ORDER BY sp.created_at DESC
+    `);
+    res.json({ payments: rows });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.patch("/api/admin/saas/payments/:id/approve", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID invalide." });
+  try {
+    const [rows] = await db.execute(
+      "SELECT * FROM shop_payments WHERE id = ? LIMIT 1",
+      [id]
+    );
+    const payment = rows[0];
+    if (!payment) return res.status(404).json({ error: "Paiement introuvable." });
+    if (payment.status === "paid") return res.status(400).json({ error: "D\xE9j\xE0 valid\xE9." });
+    await activateShopSubscription(payment.shop_id, payment.plan, payment.duration_months);
+    await db.execute(
+      "UPDATE shop_payments SET status = 'paid', paid_at = NOW() WHERE id = ?",
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const id = Number(req.params.id);
+  try {
+    await db.execute(
+      "UPDATE shop_payments SET status = 'failed' WHERE id = ? AND status = 'pending'",
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+var saas_dashboard_default = router45;
+
+// routes/admin/billing.ts
+var import_express46 = __toESM(require("express"));
+
+// lib/cinetpay.ts
+var PLAN_PRICES = {
+  basic: 9900,
+  pro: 24900
+};
+
+// routes/admin/billing.ts
+var router46 = import_express46.default.Router();
+var MERCHANT_NUMBERS = {
+  moov: process.env.MERCHANT_MOOV ?? "98165380",
+  yas: process.env.MERCHANT_YAS ?? "90226491"
+};
+router46.get("/api/admin/billing", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const shop = await getShopById(session.shop_id);
+    if (!shop) return res.status(404).json({ error: "Boutique introuvable." });
+    const payments = await getShopPayments(session.shop_id);
+    res.json({
+      shop_id: shop.id,
+      nom: shop.nom,
+      plan: shop.plan,
+      subscription_status: shop.subscription_status,
+      trial_ends_at: shop.trial_ends_at,
+      current_period_end: shop.current_period_end,
+      actif: shop.actif,
+      merchant_moov: MERCHANT_NUMBERS.moov,
+      merchant_yas: MERCHANT_NUMBERS.yas,
+      payments
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router46.post("/api/admin/billing/initiate", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const { plan, duration_months = 1, operator, mm_reference } = req.body;
+  if (!plan || !["basic", "pro"].includes(plan)) {
+    return res.status(400).json({ error: "Plan invalide." });
+  }
+  if (!operator || !["moov", "yas"].includes(operator)) {
+    return res.status(400).json({ error: "Op\xE9rateur invalide (moov ou yas)." });
+  }
+  if (!mm_reference || mm_reference.trim().length < 3) {
+    return res.status(400).json({ error: "R\xE9f\xE9rence de transaction requise." });
+  }
+  const months = Math.min(Math.max(Number(duration_months) || 1, 1), 12);
+  const planKey = plan;
+  const amount = PLAN_PRICES[planKey] * months;
+  const transactionId = `SAAS-${session.shop_id}-${planKey.toUpperCase()}-${Date.now()}`;
+  try {
+    await recordShopPayment({
+      shopId: session.shop_id,
+      transactionId,
+      plan: planKey,
+      amount,
+      durationMonths: months,
+      status: "pending",
+      operator,
+      mmReference: mm_reference.trim()
+    });
+    res.json({ ok: true, transactionId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+var billing_default = router46;
+
+// lib/review-notifier.ts
+init_db();
+var SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
+var DELAY_HOURS = 48;
+async function ensureReviewNotifierCols() {
+  for (const ddl of [
+    "ALTER TABLE orders ADD COLUMN delivered_at   TIMESTAMP NULL    AFTER status",
+    "ALTER TABLE orders ADD COLUMN review_wa_sent TINYINT(1) NOT NULL DEFAULT 0"
+  ]) {
+    try {
+      await db.execute(ddl);
+    } catch (e) {
+      const code = e.code;
+      if (code !== "ER_DUP_FIELDNAME") {
+        console.warn("[review-notifier] migration warn:", e.message);
+      }
+    }
+  }
+  console.log("[review-notifier] columns OK");
+}
+async function runReviewNotifier() {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, reference, nom, client_tel, items
+       FROM orders
+       WHERE status = 'delivered'
+         AND delivered_at IS NOT NULL
+         AND delivered_at <= NOW() - INTERVAL ${DELAY_HOURS} HOUR
+         AND review_wa_sent = 0
+         AND client_tel IS NOT NULL
+         AND client_tel != ''
+       LIMIT 50`
+    );
+    if (rows.length === 0) return;
+    console.log(`[review-notifier] ${rows.length} order(s) to notify`);
+    for (const row of rows) {
+      const nom = String(row.nom || "Client");
+      const ref = String(row.reference);
+      const tel = String(row.client_tel);
+      const trackUrl = `${SITE_URL}/suivi-commande?ref=${encodeURIComponent(ref)}`;
+      let reviewUrl = trackUrl;
+      try {
+        const items = typeof row.items === "string" ? JSON.parse(row.items) : row.items;
+        if (Array.isArray(items) && items.length > 0) {
+          const firstSlug = items[0].slug ?? items[0].reference;
+          if (firstSlug) reviewUrl = `${SITE_URL}/products/${firstSlug}#reviews`;
+        }
+      } catch {
+      }
+      const body = `\u{1F44B} Bonjour ${nom} !
+
+Votre commande *${ref}* a bien \xE9t\xE9 livr\xE9e. Nous esp\xE9rons qu'elle vous a plu ! \u{1F60A}
+
+\u2B50 Donnez votre avis sur votre achat :
+${reviewUrl}
+
+Merci pour votre confiance \u2014 Togolese Shop \u{1F6CD}\uFE0F`;
+      try {
+        await sendWaText({ to: tel, body });
+        await db.execute(
+          "UPDATE orders SET review_wa_sent = 1 WHERE id = ?",
+          [row.id]
+        );
+        console.log(`[review-notifier] sent to ${tel} for ${ref}`);
+      } catch (e) {
+        console.error(`[review-notifier] failed for ${ref}:`, e.message);
+      }
+    }
+  } catch (e) {
+    console.error("[review-notifier] job error:", e.message);
+  }
+}
+function startReviewNotifier() {
+  const INTERVAL_MS = 60 * 60 * 1e3;
+  ensureReviewNotifierCols().then(() => {
+    runReviewNotifier();
+    setInterval(runReviewNotifier, INTERVAL_MS);
+    console.log("[review-notifier] scheduler started (interval: 1h)");
+  }).catch((e) => console.error("[review-notifier] startup error:", e));
+}
+
 // index.ts
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express43.default)();
+var app = (0, import_express47.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -10866,8 +12383,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express43.default.json({ limit: "5mb" }));
-app.use(import_express43.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express47.default.json({ limit: "5mb" }));
+app.use(import_express47.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -10911,6 +12428,10 @@ app.use(social_default);
 app.use(whatsapp_campagne_default);
 app.use(livreur_inscriptions_default);
 app.use(entrepots_default);
+app.use(tombola_default);
+app.use(onboarding_default);
+app.use(saas_dashboard_default);
+app.use(billing_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {
@@ -10985,7 +12506,16 @@ app.listen(PORT, async () => {
   } catch (e) {
     console.error("[backend] ensureEntrepotsTable failed:", e);
   }
+  try {
+    await ensureShopIdCols();
+    console.log("[backend] shop_id cols OK");
+  } catch (e) {
+    console.error("[backend] ensureShopIdCols failed:", e);
+  }
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
+  startReviewNotifier();
+  expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e));
+  setInterval(() => expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e)), 6 * 60 * 60 * 1e3);
 });
 var index_default = app;

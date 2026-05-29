@@ -359,34 +359,44 @@ export default function CheckoutPage() {
   /* Success screen */
   if (submitted) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-16 text-center">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
-          <Check className="w-10 h-10 text-green-600" />
+      <div className="max-w-lg mx-auto px-6 py-16 text-center">
+        {/* Big check circle */}
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
+          style={{ background: "#DDEBE2" }}>
+          <Check className="w-10 h-10" style={{ color: "#2D6A4F" }} strokeWidth={2.5} />
         </div>
-        <h1 className="font-display text-2xl font-800 text-slate-900 mb-3">Commande confirmée !</h1>
+        <h1 className="text-[28px] leading-[1.1] tracking-[-0.01em] mb-2"
+          style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontStyle: "italic", color: "#14110E" }}>
+          Commande confirmée !
+        </h1>
+        <p className="text-[14px] mb-1" style={{ color: "#6B635B" }}>Order confirmed!</p>
         {orderRef && (
-          <p className="text-xs font-mono bg-slate-100 text-slate-600 inline-block px-3 py-1 rounded-lg mb-4">
+          <p className="text-[12.5px] font-mono inline-block px-3 py-1 rounded-full border mb-6"
+            style={{ color: "#8A8278", borderColor: "#E8E1D4", background: "#FBF7F1" }}>
             Réf. {orderRef}
           </p>
         )}
-        <p className="text-slate-600 text-sm max-w-sm mx-auto mb-6">
+        <p className="text-[14px] max-w-sm mx-auto mb-6" style={{ color: "#6B635B" }}>
           Votre commande a bien été enregistrée. Notre équipe vous contactera très bientôt pour confirmer la livraison.
         </p>
 
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-50 border border-brand-100 text-brand-800 text-sm font-semibold mb-8">
-          <Star className="w-4 h-4 text-brand-600" fill="currentColor" />
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold mb-8"
+          style={{ background: "#DDEBE2", borderColor: "#2D6A4F20", color: "#2D6A4F" }}>
+          <Star className="w-4 h-4" fill="currentColor" />
           ~{Math.floor(orderedTotal / 100)} points fidélité à recevoir après livraison
-          <Link href="/fidelite" className="text-xs text-brand-600 hover:underline ml-1">En savoir plus →</Link>
+          <Link href="/fidelite" className="text-xs hover:underline ml-1" style={{ color: "#2D6A4F" }}>En savoir plus →</Link>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
           <Link href="/"
-            className="px-6 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-brand-300 transition-colors"
+            className="px-6 py-3 rounded-[14px] border text-[14px] font-medium"
+            style={{ borderColor: "#E8E1D4", color: "#14110E" }}
           >
             Retour à l'accueil
           </Link>
           <Link href="/products"
-            className="px-6 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
+            className="px-6 py-3 rounded-[14px] text-white text-[14px] font-medium"
+            style={{ background: "#14110E" }}
           >
             Continuer les achats
           </Link>
@@ -444,22 +454,16 @@ export default function CheckoutPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Breadcrumb */}
-      <div className="bg-white border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <nav className="flex items-center gap-2 text-sm text-slate-500">
-            <Link href="/" className="hover:text-brand-700 transition-colors">Accueil</Link>
-            <span>/</span>
-            <Link href="/cart" className="hover:text-brand-700 transition-colors">Panier</Link>
-            <span>/</span>
-            <span className="text-slate-900 font-medium">Commande</span>
-          </nav>
-        </div>
+    <div className="min-h-screen" style={{ background: "#FBF7F1" }}>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b bg-white/80" style={{ borderColor: "#E8E1D4" }}>
+        <Link href="/cart" className="p-1 grid place-items-center" style={{ color: "#14110E" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </Link>
+        <h1 className="flex-1 text-[17px] font-medium tracking-[-0.025em]" style={{ color: "#14110E" }}>Finaliser ma commande</h1>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="font-display text-2xl font-800 text-slate-900 mb-7">Finaliser ma commande</h1>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="grid lg:grid-cols-3 gap-8 items-start">

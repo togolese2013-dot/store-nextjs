@@ -103,6 +103,7 @@ const MODULES: Record<string, {
       { label: "Domaine & URL",        href: "/admin/settings/domain",   icon: Link2 },
       { label: "WhatsApp API",         href: "/admin/settings/whatsapp", icon: MessageCircle },
       { label: "Utilisateurs",         href: "/admin/users",             icon: Users },
+      { label: "Abonnement",           href: "/admin/billing",           icon: CreditCard },
     ],
   },
 };
@@ -136,6 +137,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/settings/payment",      "store"],
   ["/admin/settings",              "admin"],
   ["/admin/users",                 "admin"],
+  ["/admin/billing",               "admin"],
   ["/admin/rapports",              "admin"],
   ["/admin/tendances",             "admin"],
   ["/admin/analytics",             "admin"],

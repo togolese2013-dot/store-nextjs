@@ -60,6 +60,8 @@ import adminEntrepotsRoutes, { ensureEntrepotsTable } from "./routes/admin/entre
 import adminTombolaRoutes from "./routes/admin/tombola";
 import adminOnboardingRoutes from "./routes/admin/onboarding";
 import adminSaasDashboardRoutes from "./routes/admin/saas-dashboard";
+import adminBillingRoutes from "./routes/admin/billing";
+import { expireShopSubscriptions } from "@/lib/shops";
 import { startReviewNotifier } from "./lib/review-notifier";
 
 const app  = express();
@@ -201,6 +203,7 @@ app.use(adminEntrepotsRoutes);
 app.use(adminTombolaRoutes);
 app.use(adminOnboardingRoutes);
 app.use(adminSaasDashboardRoutes);
+app.use(adminBillingRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);
@@ -285,6 +288,9 @@ try {
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
   startReviewNotifier();
+  // Expire overdue subscriptions on startup + every 6 hours
+  expireShopSubscriptions().catch(e => console.error("[billing] expireShopSubscriptions:", e));
+  setInterval(() => expireShopSubscriptions().catch(e => console.error("[billing] expireShopSubscriptions:", e)), 6 * 60 * 60 * 1000);
 });
 
 export default app;

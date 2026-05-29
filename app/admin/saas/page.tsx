@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Store, Users, Package, TrendingUp,
   CheckCircle, XCircle, RefreshCw, ChevronDown,
-  Shield, BarChart2,
+  Shield, BarChart2, CreditCard, Clock,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
@@ -31,6 +31,20 @@ interface Stats {
   plan_pro:       number;
   total_products: number;
   total_admins:   number;
+}
+
+interface PendingPayment {
+  id:              number;
+  shop_id:         number;
+  shop_nom:        string;
+  shop_slug:       string;
+  shop_email:      string;
+  plan:            "basic" | "pro";
+  amount:          number;
+  duration_months: number;
+  operator:        "moov" | "yas" | null;
+  mm_reference:    string | null;
+  created_at:      string;
 }
 
 // ── Plan badge ─────────────────────────────────────────────────────────────
@@ -71,13 +85,21 @@ function StatCard({ label, value, icon: Icon, color }: {
   );
 }
 
+function formatPrice(n: number) { return n.toLocaleString("fr-FR") + " FCFA"; }
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function SaasDashboardPage() {
+  const [tab,     setTab]     = useState<"shops" | "payments">("shops");
   const [shops,   setShops]   = useState<ShopRow[]>([]);
   const [stats,   setStats]   = useState<Stats | null>(null);
+  const [pending, setPending] = useState<PendingPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
-  const [saving,  setSaving]  = useState<number | null>(null); // shop id being saved
+  const [saving,  setSaving]  = useState<number | null>(null);
+  const [actioning, setActioning] = useState<number | null>(null);
 
   // Plan dropdown state per row
   const [editPlan, setEditPlan] = useState<Record<number, string>>({});
@@ -86,19 +108,18 @@ export default function SaasDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [shopsRes, statsRes] = await Promise.all([
-        fetch(`${API}/api/admin/saas/shops`,  { credentials: "include" }),
-        fetch(`${API}/api/admin/saas/stats`,  { credentials: "include" }),
+      const [shopsRes, statsRes, paymentsRes] = await Promise.all([
+        fetch(`${API}/api/admin/saas/shops`,    { credentials: "include" }),
+        fetch(`${API}/api/admin/saas/stats`,    { credentials: "include" }),
+        fetch(`${API}/api/admin/saas/payments`, { credentials: "include" }),
       ]);
-      if (shopsRes.status === 403) {
-        setError("Accès réservé au super-admin.");
-        return;
-      }
-      const shopsData = await shopsRes.json();
-      const statsData = await statsRes.json();
+      if (shopsRes.status === 403) { setError("Accès réservé au super-admin."); return; }
+      const shopsData    = await shopsRes.json();
+      const statsData    = await statsRes.json();
+      const paymentsData = await paymentsRes.json();
       setShops(shopsData.shops ?? []);
       setStats(statsData);
-      // Init plan edit state
+      setPending(paymentsData.payments ?? []);
       const planMap: Record<number, string> = {};
       (shopsData.shops ?? []).forEach((s: ShopRow) => { planMap[s.id] = s.plan; });
       setEditPlan(planMap);
@@ -146,6 +167,31 @@ export default function SaasDashboardPage() {
     patchShop(shop.id, { actif: !shop.actif });
   }
 
+  async function approvePayment(id: number) {
+    setActioning(id);
+    try {
+      const res = await fetch(`${API}/api/admin/saas/payments/${id}/approve`, {
+        method: "PATCH", credentials: "include",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      await fetchAll();
+    } catch (e) { alert(e instanceof Error ? e.message : "Erreur"); }
+    finally { setActioning(null); }
+  }
+
+  async function rejectPayment(id: number) {
+    if (!confirm("Rejeter ce paiement ?")) return;
+    setActioning(id);
+    try {
+      await fetch(`${API}/api/admin/saas/payments/${id}/reject`, {
+        method: "PATCH", credentials: "include",
+      });
+      await fetchAll();
+    } catch { /* ignore */ }
+    finally { setActioning(null); }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────
   if (error) {
     return (
@@ -161,23 +207,39 @@ export default function SaasDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <BarChart2 size={24} className="text-indigo-600" />
-            Super-admin — Toutes les boutiques
+            Super-admin
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Gérez les plans et le statut de chaque boutique.</p>
+          <p className="text-sm text-gray-500 mt-1">Gérez les boutiques et validez les paiements.</p>
         </div>
-        <button
-          onClick={fetchAll}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
-        >
+        <button onClick={fetchAll} disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-50">
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           Actualiser
         </button>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b">
+        <button onClick={() => setTab("shops")}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${tab === "shops" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          <Store size={14} className="inline mr-1.5" />Boutiques
+        </button>
+        <button onClick={() => setTab("payments")}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${tab === "payments" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          <CreditCard size={14} />
+          Paiements en attente
+          {pending.length > 0 && (
+            <span className="bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{pending.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Shops tab ───────────────────────────────────────────────────────── */}
+      {tab === "shops" && <>
 
       {/* Stats */}
       {stats && (
@@ -204,7 +266,7 @@ export default function SaasDashboardPage() {
         </div>
       )}
 
-      {/* Table */}
+      {/* Shops table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -313,6 +375,71 @@ export default function SaasDashboardPage() {
           </div>
         )}
       </div>
+      </>}
+
+      {/* ── Payments tab ─────────────────────────────────────────────────── */}
+      {tab === "payments" && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {pending.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <Clock size={36} className="mx-auto mb-3 opacity-30" />
+              <p>Aucun paiement en attente</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="text-left px-4 py-3">Boutique</th>
+                    <th className="text-left px-4 py-3">Plan</th>
+                    <th className="text-center px-4 py-3">Durée</th>
+                    <th className="text-right px-4 py-3">Montant</th>
+                    <th className="text-left px-4 py-3">Opérateur</th>
+                    <th className="text-left px-4 py-3">Référence SMS</th>
+                    <th className="text-left px-4 py-3">Soumis le</th>
+                    <th className="text-right px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pending.map(p => (
+                    <tr key={p.id} className="border-b hover:bg-amber-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{p.shop_nom}</div>
+                        <div className="text-xs text-gray-400">{p.shop_email}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${p.plan === "pro" ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"}`}>{p.plan}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600">{p.duration_months} mois</td>
+                      <td className="px-4 py-3 text-right font-semibold">{formatPrice(p.amount)}</td>
+                      <td className="px-4 py-3 capitalize text-gray-600">{p.operator ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <code className="bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-xs font-mono text-gray-900 select-all">
+                          {p.mm_reference ?? "—"}
+                        </code>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDate(p.created_at)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => approvePayment(p.id)} disabled={actioning === p.id}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50">
+                            {actioning === p.id ? "…" : "✓ Valider"}
+                          </button>
+                          <button onClick={() => rejectPayment(p.id)} disabled={actioning === p.id}
+                            className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50">
+                            Rejeter
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }

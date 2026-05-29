@@ -2,29 +2,22 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { apiGet } from "@/lib/api";
 import type { Product, Category } from "@/lib/utils";
-import ProductCard from "@/components/ProductCard";
+import ShopProductCard from "@/components/shop/ShopProductCard";
 import CatalogueFilters from "@/components/CatalogueFilters";
 import Link from "next/link";
-import { SlidersHorizontal, Search, Tag, Sparkles, LayoutGrid } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { getSiteUrl, getSiteName } from "@/lib/site-settings";
 
 export async function generateMetadata(): Promise<Metadata> {
   const [siteUrl, siteName] = await Promise.all([getSiteUrl(), getSiteName()]);
   const title       = `Catalogue — ${siteName}`;
-  const description = `Parcourez le catalogue complet de ${siteName} : électronique, accessoires, audio, gaming et plus encore. Livraison rapide au Togo.`;
+  const description = `Parcourez le catalogue complet de ${siteName} — livraison rapide au Togo.`;
   const canonical   = `${siteUrl}/products`;
   return {
     title,
     description,
     alternates: { canonical },
-    openGraph: {
-      type:        "website",
-      url:         canonical,
-      siteName,
-      title,
-      description,
-      locale:      "fr_TG",
-    },
+    openGraph: { type: "website", url: canonical, siteName, title, description, locale: "fr_TG" },
   };
 }
 
@@ -45,21 +38,10 @@ interface PageProps {
   }>;
 }
 
-function ActiveFilter({ label, href }: { label: string; href: string }) {
-  return (
-    <Link href={href}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-100 text-brand-800 text-xs font-semibold hover:bg-brand-200 transition-colors"
-    >
-      {label}
-      <span className="text-brand-500 font-bold ml-0.5">×</span>
-    </Link>
-  );
-}
-
 export default async function ProductsPage({ searchParams }: PageProps) {
-  const params   = await searchParams;
-  const q        = params.q?.trim() || undefined;
-  const catId    = params.category ? Number(params.category) : undefined;
+  const params    = await searchParams;
+  const q         = params.q?.trim() || undefined;
+  const catId     = params.category ? Number(params.category) : undefined;
   const promoOnly = params.promo   === "true";
   const newOnly   = params.new     === "true";
   const bestOnly  = params.best    === "true";
@@ -94,13 +76,12 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     products   = productsRes.data   ?? [];
     total      = productsRes.total  ?? products.length;
   } catch {
-    /* backend unreachable — show empty catalogue */
+    /* backend unreachable */
   }
 
   const totalPages = Math.ceil(total / PER_PAGE);
   const activeCat  = categories.find(c => c.id === catId);
 
-  /* Build URL helper for pagination (preserving other params) */
   function pageUrl(p: number) {
     const sp = new URLSearchParams();
     if (q)         sp.set("q", q);
@@ -112,24 +93,8 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     if (minPrice != null) sp.set("minPrice", String(minPrice));
     if (maxPrice != null) sp.set("maxPrice", String(maxPrice));
     if (p > 1) sp.set("page", String(p));
-    const qs = sp.toString();
-    return `/products${qs ? `?${qs}` : ""}`;
-  }
-
-  /* Active filters strip */
-  const activeFilters: { label: string; clearKey: string }[] = [];
-  if (q)        activeFilters.push({ label: `"${q}"`, clearKey: "q" });
-  if (activeCat) activeFilters.push({ label: activeCat.nom, clearKey: "category" });
-  if (promoOnly) activeFilters.push({ label: "Promotions", clearKey: "promo" });
-  if (newOnly)   activeFilters.push({ label: "Nouveautés", clearKey: "new" });
-  if (bestOnly)  activeFilters.push({ label: "Meilleures ventes", clearKey: "best" });
-  if (inStock)   activeFilters.push({ label: "En stock", clearKey: "inStock" });
-  if (minPrice != null || maxPrice != null) {
-    const label = minPrice != null && maxPrice != null
-      ? `${minPrice.toLocaleString("fr-FR")} – ${maxPrice.toLocaleString("fr-FR")} FCFA`
-      : minPrice != null ? `≥ ${minPrice.toLocaleString("fr-FR")} FCFA`
-      : `≤ ${maxPrice!.toLocaleString("fr-FR")} FCFA`;
-    activeFilters.push({ label, clearKey: "price" });
+    const s = sp.toString();
+    return `/products${s ? `?${s}` : ""}`;
   }
 
   function clearFilterUrl(key: string) {
@@ -144,37 +109,128 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       if (minPrice != null) sp.set("minPrice", String(minPrice));
       if (maxPrice != null) sp.set("maxPrice", String(maxPrice));
     }
-    const qs = sp.toString();
-    return `/products${qs ? `?${qs}` : ""}`;
+    const s = sp.toString();
+    return `/products${s ? `?${s}` : ""}`;
   }
 
-  /* Page title */
-  let pageTitle = "Tous les produits";
-  if (q)       pageTitle = `Résultats pour "${q}"`;
+  const activeFilters: { label: string; clearKey: string }[] = [];
+  if (q)         activeFilters.push({ label: `"${q}"`, clearKey: "q" });
+  if (activeCat) activeFilters.push({ label: activeCat.nom, clearKey: "category" });
+  if (promoOnly) activeFilters.push({ label: "Promotions", clearKey: "promo" });
+  if (newOnly)   activeFilters.push({ label: "Nouveautés", clearKey: "new" });
+  if (bestOnly)  activeFilters.push({ label: "Meilleures ventes", clearKey: "best" });
+  if (inStock)   activeFilters.push({ label: "En stock", clearKey: "inStock" });
+  if (minPrice != null || maxPrice != null) {
+    const label =
+      minPrice != null && maxPrice != null
+        ? `${minPrice.toLocaleString("fr-FR")} – ${maxPrice.toLocaleString("fr-FR")} FCFA`
+        : minPrice != null
+        ? `≥ ${minPrice.toLocaleString("fr-FR")} FCFA`
+        : `≤ ${maxPrice!.toLocaleString("fr-FR")} FCFA`;
+    activeFilters.push({ label, clearKey: "price" });
+  }
+
+  let pageTitle = "Catalogue";
+  if (q)          pageTitle = `"${q}"`;
   else if (activeCat) pageTitle = activeCat.nom;
   else if (bestOnly)  pageTitle = "Meilleures ventes";
   else if (promoOnly) pageTitle = "Promotions";
   else if (newOnly)   pageTitle = "Nouveaux arrivages";
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* ── Breadcrumb ── */}
-      <div className="bg-white border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <nav className="flex items-center gap-2 text-sm text-slate-500">
-            <Link href="/" className="hover:text-brand-700 transition-colors">Accueil</Link>
-            <span>/</span>
-            <span className="text-slate-900 font-medium">{pageTitle}</span>
-          </nav>
+    <div className="min-h-screen" style={{ background: "#FBF7F1" }}>
+
+      {/* ── Nav header ── */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E8E1D4] bg-white/80">
+        <Link href="/" className="p-1 text-[#14110E] grid place-items-center" aria-label="Retour">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </Link>
+        <h1 className="flex-1 text-[17px] font-medium text-[#14110E] tracking-[-0.025em]">{pageTitle}</h1>
+        <Suspense fallback={null}>
+          <CatalogueFilters
+            categories={categories}
+            currentCategoryId={catId}
+            currentSearch={q}
+            promoOnly={promoOnly}
+            newOnly={newOnly}
+            bestOnly={bestOnly}
+            inStock={inStock}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            mobileOnly
+          />
+        </Suspense>
+      </div>
+
+      {/* ── Search bar ── */}
+      <div className="px-4 pt-3 pb-2">
+        <Link href="/products" className="flex items-center gap-[10px] bg-white border border-[#E8E1D4] rounded-xl px-[14px] py-[10px]">
+          <Search className="w-[17px] h-[17px] text-[#8A8278] shrink-0" strokeWidth={1.85} />
+          <span className="text-[13.5px] text-[#8A8278] flex-1">
+            {q ? q : "Rechercher un produit…"}
+          </span>
+        </Link>
+      </div>
+
+      {/* ── Category chips ── */}
+      <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        <div className="flex gap-[7px] px-4 pb-3 pt-1 w-max">
+          {[{ id: 0, nom: "Tous" }, ...categories.slice(0, 8)].map((c) => {
+            const isActive = c.id === 0 ? !catId && !promoOnly && !newOnly && !bestOnly : c.id === catId;
+            const href = c.id === 0 ? "/products" : `/products?category=${c.id}`;
+            return (
+              <Link
+                key={c.id}
+                href={href}
+                className="px-[13px] py-[6px] rounded-full text-[12px] font-medium whitespace-nowrap border-[1.5px] transition-colors"
+                style={{
+                  border: `1.5px solid ${isActive ? "#14110E" : "#E8E1D4"}`,
+                  background: isActive ? "#14110E" : "transparent",
+                  color: isActive ? "#fff" : "#6B635B",
+                }}
+              >
+                {c.nom}
+                {c.id === 0 && (
+                  <span className="ml-[5px] opacity-70">{total || ""}</span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
+      {/* ── Active filters strip ── */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+          {activeFilters.map((f) => (
+            <Link
+              key={f.clearKey}
+              href={clearFilterUrl(f.clearKey)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold"
+              style={{ background: "#FBE9D6", color: "#E07A2C" }}
+            >
+              {f.label} <span className="font-bold ml-0.5">×</span>
+            </Link>
+          ))}
+          <Link href="/products" className="text-[11px] text-[#8A8278] underline">
+            Tout effacer
+          </Link>
+        </div>
+      )}
 
-          {/* ── Sidebar filters (desktop) ── */}
-          <aside className="hidden lg:block w-64 shrink-0">
-            <div className="sticky top-24">
+      {/* ── Results count ── */}
+      <p className="px-4 pb-[10px] text-[12px] text-[#8A8278]">
+        {total === 0
+          ? "Aucun produit trouvé"
+          : `${total} produit${total > 1 ? "s" : ""}`}
+      </p>
+
+      {/* ── Desktop layout: sidebar + grid ── */}
+      <div className="max-w-7xl mx-auto px-4 lg:flex lg:gap-8">
+        {/* Sidebar (desktop only) */}
+        <aside className="hidden lg:block w-64 shrink-0">
+          <div className="sticky top-24">
+            <Suspense fallback={null}>
               <CatalogueFilters
                 categories={categories}
                 currentCategoryId={catId}
@@ -186,151 +242,68 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 minPrice={minPrice}
                 maxPrice={maxPrice}
               />
-            </div>
-          </aside>
-
-          {/* ── Main content ── */}
-          <div className="flex-1 min-w-0">
-
-            {/* Header row */}
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-              <div>
-                <h1 className="font-display text-2xl font-800 text-slate-900">{pageTitle}</h1>
-                <p className="text-slate-500 text-sm mt-0.5">
-                  {total === 0
-                    ? "Aucun produit trouvé"
-                    : `${total} produit${total > 1 ? "s" : ""}`
-                  }
-                </p>
-              </div>
-
-              {/* Mobile filter button */}
-              <CatalogueFilters
-                categories={categories}
-                currentCategoryId={catId}
-                currentSearch={q}
-                promoOnly={promoOnly}
-                newOnly={newOnly}
-                bestOnly={bestOnly}
-                inStock={inStock}
-                minPrice={minPrice}
-                maxPrice={maxPrice}
-                mobileOnly
-              />
-            </div>
-
-            {/* Active filters */}
-            {activeFilters.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 mb-5">
-                <span className="text-xs text-slate-400 font-medium">Filtres actifs :</span>
-                {activeFilters.map(f => (
-                  <ActiveFilter key={f.clearKey} label={f.label} href={clearFilterUrl(f.clearKey)} />
-                ))}
-                <Link href="/products" className="text-xs text-slate-400 hover:text-slate-700 transition-colors ml-1">
-                  Tout effacer
-                </Link>
-              </div>
-            )}
-
-            {/* Quick filter pills (mobile-friendly) */}
-            {!promoOnly && !newOnly && !bestOnly && !q && !catId && (
-              <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none lg:hidden">
-                <Link href="/products?promo=true"
-                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-50 text-accent-700 text-sm font-semibold border border-accent-200 hover:bg-accent-100 transition-colors"
-                >
-                  <Tag className="w-3.5 h-3.5" /> Promos
-                </Link>
-                <Link href="/products?new=true"
-                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-50 text-brand-700 text-sm font-semibold border border-brand-200 hover:bg-brand-100 transition-colors"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Nouveautés
-                </Link>
-                <Link href="/products?best=true"
-                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200 hover:bg-emerald-100 transition-colors"
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" /> Meilleures ventes
-                </Link>
-                {categories.slice(0, 6).map(cat => (
-                  <Link key={cat.id} href={`/products?category=${cat.id}`}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-200 hover:border-brand-300 hover:text-brand-700 transition-colors"
-                  >
-                    {cat.nom}
-                  </Link>
-                ))}
-              </div>
-            )}
-
-            {/* Grid */}
-            {products.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                  <Search className="w-8 h-8 text-slate-300" />
-                </div>
-                <h2 className="font-display text-xl font-700 text-slate-700 mb-2">Aucun produit trouvé</h2>
-                <p className="text-slate-500 text-sm mb-6 max-w-xs">
-                  {q ? `Aucun résultat pour "${q}". Essayez d'autres mots-clés.` : "Aucun produit correspond à ces filtres."}
-                </p>
-                <Link href="/products"
-                  className="px-6 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
-                >
-                  Voir tous les produits
-                </Link>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
-                  {products.map(p => <ProductCard key={p.id} product={p} />)}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-10">
-                    {page > 1 && (
-                      <Link href={pageUrl(page - 1)}
-                        className="px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-700 transition-all"
-                      >
-                        ← Précédent
-                      </Link>
-                    )}
-
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-                        .reduce<(number | "…")[]>((acc, p, i, arr) => {
-                          if (i > 0 && p - (arr[i-1] as number) > 1) acc.push("…");
-                          acc.push(p);
-                          return acc;
-                        }, [])
-                        .map((p, i) =>
-                          p === "…" ? (
-                            <span key={`e${i}`} className="px-2 text-slate-400">…</span>
-                          ) : (
-                            <Link key={p} href={pageUrl(p as number)}
-                              className={`w-10 h-10 flex items-center justify-center rounded-2xl text-sm font-bold transition-all ${
-                                p === page
-                                  ? "bg-brand-900 text-white shadow-brand"
-                                  : "border-2 border-slate-200 text-slate-600 hover:border-brand-400 hover:text-brand-700"
-                              }`}
-                            >
-                              {p}
-                            </Link>
-                          )
-                        )
-                      }
-                    </div>
-
-                    {page < totalPages && (
-                      <Link href={pageUrl(page + 1)}
-                        className="px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-700 transition-all"
-                      >
-                        Suivant →
-                      </Link>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+            </Suspense>
           </div>
+        </aside>
+
+        {/* ── Product grid ── */}
+        <div className="flex-1 min-w-0">
+          {products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background: "#E8E1D4" }}
+              >
+                <Search className="w-8 h-8 text-[#8A8278]" />
+              </div>
+              <h2 className="text-[18px] font-medium text-[#14110E] mb-2">Aucun produit trouvé</h2>
+              <p className="text-[#6B635B] text-sm mb-6 max-w-xs">
+                {q
+                  ? `Aucun résultat pour "${q}". Essayez d'autres mots-clés.`
+                  : "Aucun produit correspond à ces filtres."}
+              </p>
+              <Link
+                href="/products"
+                className="px-6 py-3 rounded-[14px] text-[14px] font-medium text-white"
+                style={{ background: "#14110E" }}
+              >
+                Voir tous les produits
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-[10px] lg:gap-4 pb-4">
+                {products.map((p) => (
+                  <ShopProductCard key={p.id} product={p} />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 py-8">
+                  {page > 1 && (
+                    <Link
+                      href={pageUrl(page - 1)}
+                      className="px-4 py-2.5 rounded-[10px] text-sm font-medium border border-[#E8E1D4] text-[#6B635B] bg-white"
+                    >
+                      ← Précédent
+                    </Link>
+                  )}
+                  <span className="text-sm text-[#8A8278] px-3">
+                    {page} / {totalPages}
+                  </span>
+                  {page < totalPages && (
+                    <Link
+                      href={pageUrl(page + 1)}
+                      className="px-4 py-2.5 rounded-[10px] text-sm font-medium border border-[#E8E1D4] text-[#14110E] bg-white"
+                    >
+                      Suivant →
+                    </Link>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -1,0 +1,325 @@
+'use client';
+/**
+ * WorkspaceSelector
+ * ─────────────────────────────────────────────────────────────────────
+ * Modern workspace picker — 5 cards (Magasin, Boutique, Store, CRM, Admin)
+ * with keyboard nav (1–5 to enter, ⌘K to search), hover lift, and an
+ * accent-colored entry overlay.
+ *
+ * Drop into Next.js / Vite / CRA. Bring your own router for navigation —
+ * pass an `onEnter(ws)` handler (e.g. `router.push(`/admin/${ws.id}`)`).
+ *
+ * Requires:
+ *  - React 18+
+ *  - The companion `WorkspaceSelector.module.css`
+ *  - Optionally Google Fonts: Geist, Geist Mono, Instrument Serif
+ *
+ * Author note: the `count` field is illustrative (it's just a string the
+ * card displays in the footer). Feed it from your live stats — e.g.
+ *   { ...w, count: `${productCount} produits` }
+ */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Workspace, WorkspaceWithIcon } from './types';
+import {
+  PackageIcon, BagIcon, StorefrontIcon, UsersIcon, GaugeIcon,
+  ArrowRightIcon, SearchIcon,
+} from './icons';
+import styles from './WorkspaceSelector.module.css';
+
+/* ─── Default workspaces ─────────────────────────────────────────── */
+export const DEFAULT_WORKSPACES: WorkspaceWithIcon[] = [
+  { id: 'magasin',  name: 'Magasin',  tag: 'Gestion des stocks', desc: 'Produits, catégories, marques, fournisseurs et achats',          tint: '#3B6A8F', tintBg: '#E8F0F7', count: '248 produits',  icon: PackageIcon },
+  { id: 'boutique', name: 'Boutique', tag: 'Ventes & caisse',    desc: 'Ventes du jour, stock boutique, finance, clients physiques',     tint: '#C9601E', tintBg: '#FBE9D6', count: '12 ventes auj.', icon: BagIcon },
+  { id: 'store',    name: 'Store',    tag: 'E-commerce',         desc: 'Commandes en ligne, coupons, zones de livraison, paiements',     tint: '#2D6A4F', tintBg: '#DDEBE2', count: '3 commandes',    icon: StorefrontIcon },
+  { id: 'crm',      name: 'CRM',      tag: 'Relation client',    desc: 'Comptes clients, fidélité, parrainage, newsletter, WhatsApp',    tint: '#5C4A88', tintBg: '#E6E0F0', count: '1 421 clients',  icon: UsersIcon },
+  { id: 'admin',    name: 'Admin',    tag: 'Config & rapports',  desc: 'Utilisateurs, rôles, paramètres, rapports avancés, intégrations', tint: '#2A2522', tintBg: '#EBE4D6', count: '4 équipiers',    icon: GaugeIcon },
+];
+
+/* ─── Component props ────────────────────────────────────────────── */
+export interface WorkspaceSelectorProps {
+  workspaces?: WorkspaceWithIcon[];
+  /** Shown in the topbar next to the brand: "Maison Diallo · Lomé" */
+  shopName?: string;
+  shopLocation?: string;
+  /** User name + initial for the avatar pill */
+  userName?: string;
+  /** Called when a card / palette row is selected. Wire to your router. */
+  onEnter: (workspace: Workspace) => void;
+}
+
+/* ─── Card ───────────────────────────────────────────────────────── */
+function WorkspaceCard({
+  ws, index, onEnter,
+}: { ws: WorkspaceWithIcon; index: number; onEnter: (ws: Workspace) => void }) {
+  const Icon = ws.icon;
+  return (
+    <button
+      type="button"
+      className={styles.ws}
+      style={{ ['--accent' as any]: ws.tint, ['--tint-bg' as any]: ws.tintBg }}
+      onClick={() => onEnter(ws)}
+      aria-label={`Ouvrir l'espace ${ws.name}`}
+    >
+      <span className={styles.wsKey}>{index + 1}</span>
+      <div className={styles.wsTop}>
+        <div className={styles.wsIcon}><Icon size={20} /></div>
+        <div className={styles.wsTag}>{ws.tag}</div>
+      </div>
+      <h3 className={styles.wsName}>{ws.name}</h3>
+      <p className={styles.wsDesc}>{ws.desc}</p>
+      <div className={styles.wsFoot}>
+        <div className={styles.wsCount}>
+          <span className="dot" /> <span>{ws.count}</span>
+        </div>
+        <div className={styles.wsCta} aria-hidden="true">
+          <ArrowRightIcon size={15} />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* ─── Main component ─────────────────────────────────────────────── */
+export default function WorkspaceSelector({
+  workspaces = DEFAULT_WORKSPACES,
+  shopName = 'Maison Diallo',
+  shopLocation = '',
+  userName = 'Kent',
+  onEnter,
+}: WorkspaceSelectorProps) {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [entering, setEntering] = useState<Workspace | null>(null);
+
+  const enter = useCallback((ws: Workspace) => {
+    setPaletteOpen(false);
+    setEntering(ws);
+    // small delay lets the overlay paint before route change
+    window.setTimeout(() => {
+      setEntering(null);
+      onEnter(ws);
+    }, 450);
+  }, [onEnter]);
+
+  // ⌘K + 1–5 shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault(); setPaletteOpen(o => !o); return;
+      }
+      if (!paletteOpen && !entering && /^[1-5]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const ws = workspaces[parseInt(e.key, 10) - 1];
+        if (ws) enter(ws);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [paletteOpen, entering, workspaces, enter]);
+
+  const userInitial = userName.charAt(0).toUpperCase();
+
+  return (
+    <div className={styles.page}>
+      {/* Topbar */}
+      <header className={styles.topbar}>
+        <div className={styles.brand}>
+          <span className={styles.brandMark}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#14110E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9h18l-1.5-4.5A1 1 0 0 0 18.55 4H5.45a1 1 0 0 0-.95.7L3 9z" />
+              <path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+              <path d="M9 13h6" />
+            </svg>
+          </span>
+          <span className={styles.brandName}>Afrisika</span>
+          <span className={styles.brandDivider} />
+          <span className={styles.brandShop}><b>{shopName}</b>{shopLocation ? ` · ${shopLocation}` : ''}</span>
+        </div>
+
+        <div className={styles.topActions}>
+          <button type="button" className={styles.searchBtn} onClick={() => setPaletteOpen(true)}>
+            <SearchIcon size={13} />
+            Rechercher un espace
+            <span className={styles.kbd}>⌘K</span>
+          </button>
+          <div className={styles.userPill}>
+            <div className={styles.avatar}>{userInitial}</div>
+            {userName}
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8A8278" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 2 }}>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </header>
+
+      {/* Heading */}
+      <div className={styles.headingWrap}>
+        <div className={styles.eyebrow}>Espaces de travail</div>
+        <h1 className={styles.h1}>Que souhaitez-vous <span className={styles.serif}>gérer&nbsp;?</span></h1>
+        <p className={styles.lede}>Sélectionnez un espace pour continuer — vos accès se synchronisent en temps réel.</p>
+      </div>
+
+      {/* Grid */}
+      <div className={styles.gridWrap}>
+        <div className={styles.grid}>
+          {workspaces.map((ws, i) => (
+            <WorkspaceCard key={ws.id} ws={ws} index={i} onEnter={enter} />
+          ))}
+        </div>
+      </div>
+
+      {/* Footer hints */}
+      <div className={styles.pageFoot}>
+        <span className={styles.mono} style={{ fontSize: 11 }}>{workspaces.length} espaces · synchronisés</span>
+        <span>
+          <span className={styles.kbd}>1</span>–<span className={styles.kbd}>{workspaces.length}</span> pour ouvrir directement &nbsp;·&nbsp;
+          <span className={styles.kbd}>⌘</span><span className={styles.kbd}>K</span> pour rechercher
+        </span>
+      </div>
+
+      {/* Palette */}
+      <CommandPalette
+        open={paletteOpen}
+        workspaces={workspaces}
+        onClose={() => setPaletteOpen(false)}
+        onPick={enter}
+      />
+
+      {/* Entry overlay */}
+      <EnterOverlay workspace={entering} />
+    </div>
+  );
+}
+
+/* ─── Command palette (extracted) ────────────────────────────────── */
+function CommandPalette({
+  open, workspaces, onClose, onPick,
+}: {
+  open: boolean;
+  workspaces: WorkspaceWithIcon[];
+  onClose: () => void;
+  onPick: (ws: Workspace) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!q) return workspaces;
+    const k = q.toLowerCase();
+    return workspaces.filter(w =>
+      w.name.toLowerCase().includes(k) ||
+      w.tag.toLowerCase().includes(k) ||
+      w.desc.toLowerCase().includes(k)
+    );
+  }, [q, workspaces]);
+
+  useEffect(() => {
+    if (open) {
+      window.setTimeout(() => inputRef.current?.focus(), 30);
+      setQ(''); setActive(0);
+    }
+  }, [open]);
+
+  useEffect(() => { setActive(0); }, [q]);
+
+  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, filtered.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (filtered[active]) onPick(filtered[active]); }
+    else if (e.key === 'Escape') { onClose(); }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(20,17,14,0.4)', backdropFilter: 'blur(6px)',
+        display: open ? 'grid' : 'none',
+        placeItems: 'flex-start center', paddingTop: '18vh', zIndex: 100,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 'min(560px, 92vw)',
+          background: 'white', borderRadius: 16,
+          boxShadow: '0 30px 80px -20px rgba(20,17,14,0.45)',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid #E8E1D4' }}>
+          <SearchIcon size={16} />
+          <input
+            ref={inputRef} value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="Rechercher un espace — Magasin, Boutique, CRM…"
+            style={{ flex: 1, border: 0, background: 'transparent', font: 'inherit', outline: 0, fontSize: 15 }}
+          />
+        </div>
+        <div style={{ maxHeight: 360, overflowY: 'auto', padding: 6 }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: '#8A8278' }}>
+              Aucun espace trouvé pour « {q} »
+            </div>
+          )}
+          {filtered.map((w, i) => {
+            const Icon = w.icon;
+            return (
+              <div
+                key={w.id}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => onPick(w)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  background: i === active ? '#F4EFE6' : 'transparent',
+                }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 9,
+                  background: w.tintBg, color: w.tint,
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  <Icon size={16} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>{w.name}</div>
+                  <div style={{ fontSize: 12, color: '#6B635B' }}>{w.tag}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Enter overlay ──────────────────────────────────────────────── */
+function EnterOverlay({ workspace }: { workspace: Workspace | null }) {
+  if (!workspace) return null;
+  const bg = workspace.id === 'admin' ? '#14110E' : workspace.tint;
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: bg, color: 'white',
+      display: 'grid', placeItems: 'center',
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 56, fontWeight: 500, letterSpacing: '-0.03em', marginBottom: 8 }}>
+          {workspace.name}
+        </div>
+        <div style={{
+          fontSize: 14, opacity: 0.7,
+          fontFamily: '"Geist Mono", monospace',
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+        }}>
+          {workspace.tag}
+        </div>
+      </div>
+    </div>
+  );
+}

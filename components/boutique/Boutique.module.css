@@ -1,0 +1,177 @@
+/* Boutique module — scoped styles (CSS Modules) */
+/* Accent: orange #C9601E — Boutique workspace identity */
+
+.page {
+  --bg: #FBF7F1; --bg-2: #F4EFE6; --surface: #FFFFFF;
+  --border: #E8E1D4; --border-strong: #D6CCBA;
+  --ink: #14110E; --ink-2: #2A2522; --muted: #6B635B; --muted-2: #8A8278;
+  /* Boutique accent: warm orange */
+  --accent: #C9601E; --accent-2: #A34A10; --accent-bg: #FBE9D6;
+  --warn: #C9601E; --warn-bg: #FBE9D6;
+  --danger: #9C3A14; --danger-bg: #F7DCCB;
+  --ok: #2D6A4F; --ok-bg: #DDEBE2;
+  --blue: #3B6A8F; --blue-bg: #E8F0F7;
+  --purple: #5C4A88; --purple-bg: #E6E0F0;
+
+  min-height: 100vh;
+  display: grid; grid-template-columns: 264px 1fr;
+  background: var(--bg); color: var(--ink);
+  font-family: "Geist", system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.005em; -webkit-font-smoothing: antialiased;
+}
+.serif { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; }
+.mono  { font-family: "Geist Mono", ui-monospace, monospace; }
+
+/* ─── Sidebar ──────────────────────────────────────────────────── */
+.sidebar { position: sticky; top: 0; height: 100vh; padding: 18px 14px 14px; background: var(--bg-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+.workspaceSwitcher { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: border-color .15s; width: 100%; text-align: left; font: inherit; color: inherit; }
+.workspaceSwitcher:hover { border-color: rgba(20,17,14,.18); }
+.workspaceIcon { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-bg); color: var(--accent); display: grid; place-items: center; flex-shrink: 0; }
+.workspaceMeta { flex: 1; min-width: 0; }
+.workspaceMeta .l1 { font-size: 13px; font-weight: 600; letter-spacing: -.01em; line-height: 1.1; }
+.workspaceMeta .l2 { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.nav { display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
+.navGroup { display: flex; flex-direction: column; gap: 1px; }
+.navHeading { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-2); padding: 0 12px 6px; }
+.navItem { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 9px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; width: 100%; text-align: left; background: transparent; border: 0; font: inherit; transition: background .15s, color .15s; }
+.navItem:hover { background: rgba(20,17,14,.04); color: var(--ink); }
+.navItem.active { background: var(--surface); color: var(--ink); font-weight: 500; box-shadow: 0 1px 0 rgba(20,17,14,.03); }
+.navItem .icon { color: var(--muted); display: grid; place-items: center; }
+.navItem.active .icon { color: var(--accent); }
+.navItem .count { margin-left: auto; font-family: "Geist Mono", monospace; font-size: 11px; color: var(--muted-2); padding: 1px 7px; background: rgba(20,17,14,.05); border-radius: 999px; }
+.navItem .count.badge { color: white; background: var(--danger); }
+
+.sidebarFoot { margin-top: auto; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.userRow { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 30px; height: 30px; border-radius: 999px; background: var(--ink); color: white; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.userMeta { flex: 1; min-width: 0; }
+.userMeta .n { font-size: 13px; font-weight: 500; line-height: 1.1; }
+.userMeta .r { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ─── Main ─────────────────────────────────────────────────────── */
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 14px 28px; background: rgba(251,247,241,.85); backdrop-filter: saturate(140%) blur(14px); border-bottom: 1px solid var(--border); }
+.crumbs { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.crumbs .sep { color: var(--border-strong); }
+.crumbs .here { color: var(--ink); font-weight: 500; }
+.search { margin-left: auto; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 7px 12px; width: 340px; font-size: 13px; color: var(--muted); }
+.search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink); }
+.search input::placeholder { color: var(--muted-2); }
+.search .kbd { font-family: "Geist Mono", monospace; font-size: 10.5px; padding: 1px 5px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); color: var(--muted-2); }
+.iconBtn { width: 34px; height: 34px; border-radius: 9px; background: transparent; border: 0; display: grid; place-items: center; color: var(--ink); cursor: pointer; position: relative; transition: background .15s; }
+.iconBtn:hover { background: rgba(20,17,14,.05); }
+.iconBtn .pip { position: absolute; top: 7px; right: 8px; width: 6px; height: 6px; border-radius: 99px; background: var(--danger); box-shadow: 0 0 0 2px var(--bg); }
+
+/* ─── Page header ──────────────────────────────────────────────── */
+.header { padding: 28px 28px 8px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.headerLeft { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 500; }
+.eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
+.title { font-size: 34px; font-weight: 500; letter-spacing: -.025em; line-height: 1.05; margin: 0; }
+.subtitle { font-size: 14px; color: var(--muted); margin: 0; max-width: 60ch; }
+.headerActions { display: flex; align-items: center; gap: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 9px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer; transition: background .15s, border-color .15s; }
+.btn:hover { border-color: rgba(20,17,14,.18); }
+.btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-2); }
+.btn.sm { padding: 5px 10px !important; font-size: 12px !important; }
+
+/* ─── KPI strip ────────────────────────────────────────────────── */
+.kpis  { padding: 16px 28px 0; display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+.kpis3 { padding: 16px 28px 0; display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 124px; }
+.kpiHead { display: flex; align-items: center; justify-content: space-between; }
+.kpiLabel { font-size: 11.5px; color: var(--muted); }
+/* ⚠️ color-mix() forbidden in CSS Modules (Turbopack MIME crash) — use rgba() */
+.kpiDelta { display: inline-flex; align-items: center; gap: 4px; font-family: "Geist Mono", monospace; font-size: 10.5px; font-weight: 500; padding: 2px 7px; border-radius: 999px; background: rgba(0,0,0,0.08); }
+.kpiValueRow { display: flex; align-items: baseline; gap: 6px; }
+.kpiValue { font-size: 28px; font-weight: 500; letter-spacing: -.025em; line-height: 1; }
+.kpiSerif { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; font-size: 22px; letter-spacing: -.01em; line-height: 1.1; }
+.kpiUnit { font-size: 14px; color: var(--muted); }
+.kpiFoot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.kpiSub { font-size: 11.5px; color: var(--muted-2); }
+
+/* ─── Tabs ─────────────────────────────────────────────────────── */
+.tabsRow { padding: 24px 28px 0; display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--border); }
+.tab { display: inline-flex; align-items: center; gap: 7px; padding: 10px 14px; font-size: 13px; color: var(--muted); background: transparent; border: 0; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font: inherit; font-weight: 500; transition: color .15s, border-color .15s; }
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+.tab .pill { font-family: "Geist Mono", monospace; font-size: 10.5px; font-weight: 500; padding: 1px 7px; border-radius: 999px; background: rgba(20,17,14,.06); color: var(--muted); }
+.tab.active .pill { background: var(--accent-bg); color: var(--accent); }
+
+/* ─── Toolbar ──────────────────────────────────────────────────── */
+.toolbar { padding: 14px 28px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; font-size: 12.5px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font: inherit; font-weight: 500; transition: border-color .15s; }
+.chip:hover { border-color: rgba(20,17,14,.18); }
+.chip.add { color: var(--muted); border-style: dashed; background: transparent; }
+
+/* ─── Table ────────────────────────────────────────────────────── */
+.tableWrap { margin: 0 28px 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.tableScroll { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table thead th { text-align: left; font-size: 10.5px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); padding: 12px 14px; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table tbody tr { transition: background .12s; }
+.table tbody tr + tr td { border-top: 1px solid var(--border); }
+.table tbody tr:hover { background: #FBF8F3; }
+.table td { padding: 12px 14px; vertical-align: middle; }
+.actionsCell { width: 40px; text-align: right; }
+.rowMenu { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: var(--muted); border: 0; background: transparent; cursor: pointer; }
+.rowMenu:hover { background: rgba(20,17,14,.06); color: var(--ink); }
+.tableFoot { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg); border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.pager { display: flex; align-items: center; gap: 2px; }
+.pager button { min-width: 30px; height: 30px; border-radius: 7px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; font: inherit; font-size: 12.5px; }
+.pager button:hover { background: rgba(20,17,14,.06); }
+.pager button.on { background: var(--surface); border: 1px solid var(--border); color: var(--ink); }
+
+.tag { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 500; background: rgba(20,17,14,.06); color: var(--ink-2); }
+.productName { font-weight: 500; color: var(--ink); }
+.stockBar { margin-top: 5px; height: 4px; background: var(--bg-2); border-radius: 99px; overflow: hidden; }
+.stockBar > div { height: 100%; border-radius: inherit; }
+
+/* Client loyalty badges */
+.cliVip    { background: #F5E6D0; color: #8B5E2E; display: inline-flex; align-items: center; gap: 4px; }
+.cliFidele { background: var(--accent-bg); color: var(--accent); }
+.cliReg    { background: var(--blue-bg); color: var(--blue); }
+.cliNew    { background: rgba(20,17,14,.06); color: var(--muted); }
+
+/* ─── Overview ─────────────────────────────────────────────────── */
+.ovGrid { padding: 16px 28px; display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+.ovBot  { padding: 0 28px 28px; }
+.ovSide { display: flex; flex-direction: column; gap: 14px; }
+.ovCard { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+.ovCardHead { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 14px; }
+.miniTable { width: 100%; font-size: 13px; border-collapse: collapse; margin-top: 2px; }
+.miniTable th { text-align: left; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); padding: 8px 12px; border-bottom: 1px solid var(--border); font-weight: 500; }
+.miniTable td { padding: 10px 12px; vertical-align: middle; }
+.miniTable tbody tr + tr td { border-top: 1px solid var(--border); }
+.miniTable tbody tr:hover td { background: #FBF8F3; }
+
+.payRow { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.payRow + .payRow { border-top: 1px solid var(--border); }
+.payName { font-size: 12.5px; width: 120px; flex-shrink: 0; display: flex; align-items: center; gap: 7px; }
+.payBar  { flex: 1; height: 5px; background: var(--bg-2); border-radius: 99px; overflow: hidden; }
+.payFill { height: 100%; border-radius: 99px; transition: width .4s; }
+.payPct  { font-family: "Geist Mono", monospace; font-size: 11px; color: var(--muted); width: 40px; text-align: right; flex-shrink: 0; }
+.payAmt  { font-family: "Geist Mono", monospace; font-size: 11px; color: var(--muted-2); width: 84px; text-align: right; flex-shrink: 0; }
+.eventItem { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.eventItem + .eventItem { border-top: 1px solid var(--border); }
+
+/* ─── Finance cash hero ────────────────────────────────────────── */
+.caisseHero { margin: 16px 28px 0; background: var(--ink); color: white; border-radius: 18px; padding: 28px 32px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.caisseLabel { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; opacity: .6; margin-bottom: 8px; }
+.caisseValue { font-family: "Geist Mono", monospace; font-size: 48px; font-weight: 500; letter-spacing: -.03em; line-height: 1; }
+.caisseSub { font-size: 13px; opacity: .5; margin-top: 6px; }
+.weekHead { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; opacity: .5; margin-bottom: 10px; }
+.weekBars { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+.weekBarWrap { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+.weekBar { width: 100%; border-radius: 5px 5px 0 0; background: rgba(255,255,255,.25); transition: height .4s; min-height: 4px; }
+.weekBar.today { background: var(--accent-bg); }
+.weekLabel { font-family: "Geist Mono", monospace; font-size: 10px; opacity: .5; white-space: nowrap; }
+.weekTotal { font-family: "Geist Mono", monospace; font-size: 12px; opacity: .5; margin-top: 6px; }
+
+/* ─── l1/l2/n/r — scoped descendant helpers ───────────────────── */
+.l1 { font-size: 13px; font-weight: 600; letter-spacing: -.01em; line-height: 1.1; }
+.l2 { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.n  { font-size: 13px; font-weight: 500; line-height: 1.1; }
+.r  { font-size: 11px; color: var(--muted); margin-top: 2px; }

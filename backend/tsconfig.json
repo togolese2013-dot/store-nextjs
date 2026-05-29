@@ -18,6 +18,7 @@
     "compilerOptions": {
       "module": "CommonJS"
     },
+    "require": ["tsconfig-paths/register"],
     "esm": false,
     "experimentalEsm": false
   },

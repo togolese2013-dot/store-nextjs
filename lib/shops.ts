@@ -2,14 +2,32 @@ import { db } from "./db";
 import mysql from "mysql2/promise";
 
 export interface Shop {
-  id:            number;
-  nom:           string;
-  slug:          string;
-  email:         string;
-  plan:          "free" | "basic" | "pro";
-  actif:         boolean;
-  custom_domain: string | null;
-  created_at:    string;
+  id:                  number;
+  nom:                 string;
+  slug:                string;
+  email:               string;
+  plan:                "free" | "basic" | "pro";
+  actif:               boolean;
+  custom_domain:       string | null;
+  subscription_status: "trial" | "active" | "expired" | "suspended";
+  trial_ends_at:       string | null;
+  current_period_end:  string | null;
+  pays:                string | null;
+  created_at:          string;
+}
+
+export interface ShopPayment {
+  id:              number;
+  shop_id:         number;
+  transaction_id:  string;
+  plan:            "basic" | "pro";
+  amount:          number;
+  duration_months: number;
+  status:          "pending" | "paid" | "failed" | "cancelled";
+  operator:        "moov" | "yas" | null;
+  mm_reference:    string | null;
+  created_at:      string;
+  paid_at:         string | null;
 }
 
 let _ensured = false;
@@ -18,23 +36,64 @@ export async function ensureShopsTable(): Promise<void> {
   if (_ensured) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS shops (
-      id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      nom           VARCHAR(150)                       NOT NULL,
-      slug          VARCHAR(100)                       NOT NULL UNIQUE,
-      email         VARCHAR(150)                       NOT NULL,
-      plan          ENUM('free','basic','pro')         NOT NULL DEFAULT 'basic',
-      actif         TINYINT(1)                         NOT NULL DEFAULT 1,
-      custom_domain VARCHAR(255)                       NULL UNIQUE,
-      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom                 VARCHAR(150)                                          NOT NULL,
+      slug                VARCHAR(100)                                          NOT NULL UNIQUE,
+      email               VARCHAR(150)                                          NOT NULL,
+      plan                ENUM('free','basic','pro')                            NOT NULL DEFAULT 'basic',
+      actif               TINYINT(1)                                            NOT NULL DEFAULT 1,
+      custom_domain       VARCHAR(255)                                          NULL UNIQUE,
+      subscription_status ENUM('trial','active','expired','suspended')         NOT NULL DEFAULT 'trial',
+      trial_ends_at       DATETIME                                              NULL,
+      current_period_end  DATETIME                                              NULL,
+      created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  // Add custom_domain column if table already existed without it
-  try {
-    await db.execute(`ALTER TABLE shops ADD COLUMN custom_domain VARCHAR(255) NULL UNIQUE`);
-  } catch { /* already exists */ }
-  // Shop #1 = legacy single-tenant data
+  // Idempotent column additions for existing installations
+  const alterCols = [
+    `ALTER TABLE shops ADD COLUMN custom_domain VARCHAR(255) NULL UNIQUE`,
+    `ALTER TABLE shops ADD COLUMN subscription_status ENUM('trial','active','expired','suspended') NOT NULL DEFAULT 'trial'`,
+    `ALTER TABLE shops ADD COLUMN trial_ends_at DATETIME NULL`,
+    `ALTER TABLE shops ADD COLUMN current_period_end DATETIME NULL`,
+    `ALTER TABLE shops ADD COLUMN pays VARCHAR(100) NULL`,
+  ];
+  for (const sql of alterCols) {
+    try { await db.execute(sql); } catch { /* already exists */ }
+  }
+
+  // shop_payments table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS shop_payments (
+      id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      shop_id         INT UNSIGNED       NOT NULL,
+      transaction_id  VARCHAR(100)       NOT NULL UNIQUE,
+      plan            ENUM('basic','pro') NOT NULL,
+      amount          INT UNSIGNED        NOT NULL,
+      duration_months TINYINT UNSIGNED   NOT NULL DEFAULT 1,
+      status          ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',
+      operator        VARCHAR(10)        NULL,
+      mm_reference    VARCHAR(100)       NULL,
+      created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      paid_at         DATETIME           NULL,
+      INDEX idx_sp_shop (shop_id)
+    )
+  `);
+  // Idempotent additions for existing shop_payments tables
+  const spAlter = [
+    `ALTER TABLE shop_payments ADD COLUMN operator VARCHAR(10) NULL`,
+    `ALTER TABLE shop_payments ADD COLUMN mm_reference VARCHAR(100) NULL`,
+  ];
+  for (const sql of spAlter) {
+    try { await db.execute(sql); } catch { /* already exists */ }
+  }
+
+  // Shop #1 = legacy single-tenant data — always active, no billing
   await db.execute(
-    `INSERT IGNORE INTO shops (id, nom, slug, email) VALUES (1, 'Default Shop', 'default', 'admin@shop.com')`
+    `INSERT IGNORE INTO shops (id, nom, slug, email, subscription_status) VALUES (1, 'Default Shop', 'default', 'admin@shop.com', 'active')`
+  );
+  // Ensure shop #1 is always active
+  await db.execute(
+    `UPDATE shops SET subscription_status = 'active' WHERE id = 1 AND subscription_status != 'active'`
   );
   _ensured = true;
 }
@@ -141,4 +200,100 @@ export async function listShopsWithStats(): Promise<
     product_count: Number(r.product_count),
     admin_count:   Number(r.admin_count),
   })) as (Shop & { product_count: number; admin_count: number })[];
+}
+
+// ── Billing helpers ──────────────────────────────────────────────────────────
+
+/** true = shop can access admin (not suspended) */
+export function isShopAccessAllowed(shop: Shop): boolean {
+  if (shop.id === 1) return true;
+  if (shop.plan === "free") return true;
+  if (!shop.actif) return false;
+  if (shop.subscription_status === "suspended") return false;
+  if (shop.subscription_status === "trial") {
+    if (!shop.trial_ends_at) return true;
+    return new Date(shop.trial_ends_at) > new Date();
+  }
+  if (shop.subscription_status === "active") {
+    if (!shop.current_period_end) return true;
+    return new Date(shop.current_period_end) > new Date();
+  }
+  // expired — allow with banner, hard block only when suspended
+  return true;
+}
+
+export async function activateShopSubscription(
+  shopId: number,
+  plan: "basic" | "pro",
+  durationMonths: number
+): Promise<void> {
+  await ensureShopsTable();
+  // Extend from current_period_end if still active, otherwise from now
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT current_period_end, subscription_status FROM shops WHERE id = ?",
+    [shopId]
+  );
+  const row = rows[0];
+  const base =
+    row?.subscription_status === "active" && row?.current_period_end
+      ? new Date(row.current_period_end)
+      : new Date();
+  const newEnd = new Date(base);
+  newEnd.setMonth(newEnd.getMonth() + durationMonths);
+
+  await db.execute(
+    `UPDATE shops SET plan = ?, subscription_status = 'active', current_period_end = ? WHERE id = ?`,
+    [plan, newEnd.toISOString().slice(0, 19).replace("T", " "), shopId]
+  );
+}
+
+export async function recordShopPayment(data: {
+  shopId:         number;
+  transactionId:  string;
+  plan:           "basic" | "pro";
+  amount:         number;
+  durationMonths: number;
+  status:         "pending" | "paid" | "failed" | "cancelled";
+  operator?:      "moov" | "yas";
+  mmReference?:   string;
+  paidAt?:        Date;
+}): Promise<void> {
+  await ensureShopsTable();
+  await db.execute(
+    `INSERT INTO shop_payments (shop_id, transaction_id, plan, amount, duration_months, status, operator, mm_reference, paid_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE status = VALUES(status), operator = VALUES(operator), mm_reference = VALUES(mm_reference), paid_at = VALUES(paid_at)`,
+    [
+      data.shopId,
+      data.transactionId,
+      data.plan,
+      data.amount,
+      data.durationMonths,
+      data.status,
+      data.operator ?? null,
+      data.mmReference ?? null,
+      data.paidAt ? data.paidAt.toISOString().slice(0, 19).replace("T", " ") : null,
+    ]
+  );
+}
+
+export async function getShopPayments(shopId: number): Promise<ShopPayment[]> {
+  await ensureShopsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM shop_payments WHERE shop_id = ? ORDER BY created_at DESC LIMIT 20",
+    [shopId]
+  );
+  return rows as ShopPayment[];
+}
+
+/** Mark expired shops (subscription_status = 'active' but current_period_end past). */
+export async function expireShopSubscriptions(): Promise<void> {
+  await db.execute(`
+    UPDATE shops
+    SET subscription_status = 'expired'
+    WHERE subscription_status = 'active'
+      AND current_period_end IS NOT NULL
+      AND current_period_end < NOW()
+      AND id != 1
+  `);
 }

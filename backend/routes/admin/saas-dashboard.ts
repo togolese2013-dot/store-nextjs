@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
-import { listShopsWithStats, updateShop } from "@/lib/shops";
+import { listShopsWithStats, updateShop, activateShopSubscription } from "@/lib/shops";
 import { planLimitLabel } from "../../lib/plan-limits";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
@@ -72,6 +72,63 @@ router.get("/api/admin/saas/stats", async (req, res) => {
         (SELECT COUNT(*) FROM admin_users WHERE role != 'super_admin') AS total_admins
     `);
     res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── GET /api/admin/saas/payments — paiements en attente de validation ────────
+router.get("/api/admin/saas/payments", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  try {
+    const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(`
+      SELECT sp.*, s.nom AS shop_nom, s.slug AS shop_slug, s.email AS shop_email
+      FROM shop_payments sp
+      JOIN shops s ON s.id = sp.shop_id
+      WHERE sp.status = 'pending'
+      ORDER BY sp.created_at DESC
+    `);
+    res.json({ payments: rows });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── PATCH /api/admin/saas/payments/:id/approve — valider manuellement ────────
+router.patch("/api/admin/saas/payments/:id/approve", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID invalide." });
+  try {
+    const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+      "SELECT * FROM shop_payments WHERE id = ? LIMIT 1", [id]
+    );
+    const payment = rows[0];
+    if (!payment) return res.status(404).json({ error: "Paiement introuvable." });
+    if (payment.status === "paid") return res.status(400).json({ error: "Déjà validé." });
+
+    await activateShopSubscription(payment.shop_id, payment.plan, payment.duration_months);
+    await (db as mysql.Pool).execute(
+      "UPDATE shop_payments SET status = 'paid', paid_at = NOW() WHERE id = ?", [id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── PATCH /api/admin/saas/payments/:id/reject — rejeter un paiement ──────────
+router.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  const id = Number(req.params.id);
+  try {
+    await (db as mysql.Pool).execute(
+      "UPDATE shop_payments SET status = 'failed' WHERE id = ? AND status = 'pending'", [id]
+    );
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
