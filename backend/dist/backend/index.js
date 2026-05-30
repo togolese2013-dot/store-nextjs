@@ -84,7 +84,8 @@ function createPool() {
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "togol2600657",
-    ...shared
+    ...shared,
+    ssl: isProduction ? { rejectUnauthorized: false } : void 0
   });
 }
 function getOrCreatePool() {
@@ -10183,13 +10184,10 @@ router33.post("/api/admin/whatsapp/webhook", async (req, res) => {
       } else {
         continue;
       }
-      await db.execute(
-        `INSERT IGNORE INTO wa_messages
-           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type, notre_numero)
-         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?)`,
-        [from, body, waId, contactName, mediaId || null, type, mimeType || null, notreNumero]
-      );
-      emitAdminEvent("message", { from, body, nom: contactName ?? from });
+      await sendWaText({
+        to: from,
+        body: "\u26A0\uFE0F Ce num\xE9ro est r\xE9serv\xE9 aux notifications automatiques, merci de ne pas y r\xE9pondre.\n\nPour nous contacter, \xE9crivez-nous directement sur WhatsApp :\n\u{1F4F1} +22890527912"
+      }).catch((err) => console.error("[webhook/whatsapp/autoreply]", err));
     }
   } catch (err) {
     console.error("[webhook/whatsapp/inbound]", err);

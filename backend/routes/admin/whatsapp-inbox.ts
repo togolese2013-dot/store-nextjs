@@ -79,13 +79,11 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
         continue;
       }
 
-      await db.execute(
-        `INSERT IGNORE INTO wa_messages
-           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type, notre_numero)
-         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?)`,
-        [from, body, waId, contactName, mediaId || null, type, mimeType || null, notreNumero],
-      );
-      emitAdminEvent("message", { from, body, nom: contactName ?? from });
+      // Auto-reply only — do not record inbound messages from notification replies
+      await sendWaText({
+        to: from,
+        body: "⚠️ Ce numéro est réservé aux notifications automatiques, merci de ne pas y répondre.\n\nPour nous contacter, écrivez-nous directement sur WhatsApp :\n📱 +22890527912",
+      }).catch((err: unknown) => console.error("[webhook/whatsapp/autoreply]", err));
     }
   } catch (err) {
     console.error("[webhook/whatsapp/inbound]", err);
