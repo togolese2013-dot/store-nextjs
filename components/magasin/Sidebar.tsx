@@ -177,7 +177,9 @@ export default function Sidebar({
               <div className={styles.n}>{userName}</div>
               <div className={styles.r}>{userRole}</div>
             </div>
-            <ChevDownIcon size={12} style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+            <span style={{ display: 'grid', transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+              <ChevDownIcon size={12} />
+            </span>
           </button>
         </div>
       </div>
