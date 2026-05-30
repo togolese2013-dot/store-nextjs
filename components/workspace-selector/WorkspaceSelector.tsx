@@ -108,6 +108,86 @@ function PlanBadge({
   );
 }
 
+/* ─── Expiry banner (B) ──────────────────────────────────────────── */
+function ExpiryBanner({
+  plan, status, trialEndsAt, periodEnd,
+}: {
+  plan: string; status: string;
+  trialEndsAt?: string | null; periodEnd?: string | null;
+}) {
+  const isTrial   = status === 'trial';
+  const isExpired = status === 'expired' || status === 'suspended';
+  const isSuspended = status === 'suspended';
+  const days      = isTrial ? daysUntil(trialEndsAt) : daysUntil(periodEnd);
+  const isWarn    = !isExpired && days !== null && days <= 14;
+
+  if (!isExpired && !isWarn) return null;
+
+  let icon: string;
+  let text: React.ReactNode;
+  let bg: string;
+  let border: string;
+  let textColor: string;
+  let ctaLabel: string;
+
+  if (isSuspended) {
+    icon = '🔒'; bg = '#F7DCCB'; border = 'rgba(156,58,20,.25)'; textColor = '#7D2D0E';
+    ctaLabel = 'Contacter le support';
+    text = <><strong>Boutique suspendue.</strong> L'accès public est bloqué.</>;
+  } else if (isExpired) {
+    icon = '⚠'; bg = '#FBE9D6'; border = 'rgba(201,96,30,.25)'; textColor = '#7D3B0E';
+    ctaLabel = 'Renouveler';
+    text = <><strong>Abonnement expiré.</strong> Renouvelez pour maintenir l'accès.</>;
+  } else if (isTrial) {
+    const d = days ?? 0;
+    const isDanger = d <= 3;
+    bg = isDanger ? '#F7DCCB' : '#FBE9D6';
+    border = isDanger ? 'rgba(156,58,20,.25)' : 'rgba(201,96,30,.25)';
+    textColor = isDanger ? '#7D2D0E' : '#7D3B0E';
+    icon = isDanger ? '⏳' : '⏱';
+    ctaLabel = 'Choisir un plan';
+    text = d > 0
+      ? <><strong>Essai gratuit — {d} jour{d > 1 ? 's' : ''} restant{d > 1 ? 's' : ''}.</strong> Choisissez un plan avant expiration.</>
+      : <><strong>Essai terminé.</strong> Choisissez un plan pour continuer.</>;
+  } else {
+    const d = days ?? 0;
+    bg = '#FBE9D6'; border = 'rgba(201,96,30,.25)'; textColor = '#7D3B0E';
+    icon = '⏱'; ctaLabel = 'Renouveler';
+    text = <><strong>Plan {planLabel(plan)} — expire dans {d} jour{d > 1 ? 's' : ''}.</strong> Renouvelez pour éviter l'interruption.</>;
+  }
+
+  return (
+    <div style={{
+      maxWidth: 1180, margin: '0 auto 20px', padding: '0 36px', width: '100%',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 16px',
+        background: bg, border: `1px solid ${border}`,
+        borderRadius: 12, color: textColor,
+        fontSize: 13.5,
+      }}>
+        <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+        <span style={{ flex: 1, lineHeight: 1.4 }}>{text}</span>
+        <a
+          href="/admin/billing"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', borderRadius: 8,
+            background: 'rgba(0,0,0,.08)', color: textColor,
+            fontSize: 12.5, fontWeight: 600, textDecoration: 'none',
+            flexShrink: 0, whiteSpace: 'nowrap',
+            border: `1px solid ${border}`,
+            transition: 'background .15s',
+          }}
+        >
+          {ctaLabel} →
+        </a>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Subscription card (grid) ───────────────────────────────────── */
 function SubscriptionCard({
   plan, status, trialEndsAt, periodEnd,
@@ -441,6 +521,16 @@ export default function WorkspaceSelector({
         <h1 className={styles.h1}>Que souhaitez-vous <span className={styles.serif}>gérer&nbsp;?</span></h1>
         <p className={styles.lede}>Sélectionnez un espace pour continuer — vos accès se synchronisent en temps réel.</p>
       </div>
+
+      {/* Expiry banner (B) — only renders when relevant */}
+      {shopPlan && shopStatus && (
+        <ExpiryBanner
+          plan={shopPlan}
+          status={shopStatus}
+          trialEndsAt={shopTrialEndsAt}
+          periodEnd={shopPeriodEnd}
+        />
+      )}
 
       {/* Grid */}
       <div className={styles.gridWrap}>
