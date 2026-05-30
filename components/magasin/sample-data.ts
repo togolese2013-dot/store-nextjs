@@ -10,10 +10,10 @@ export const ACCENT_BG = '#E8F0F7';
 export const SAMPLE_PRODUCTS: Product[] = [];
 
 export const SAMPLE_KPIS: KpiCard[] = [
-  { label: 'Total produits',  value: '0',   delta: '',     deltaColor: '#2D6A4F', sub: 'ce mois',          spark: [], color: ACCENT },
-  { label: 'Valeur stock',    value: '0',   unit: 'F',     delta: '',             deltaColor: '#2D6A4F', sub: 'vs mois dernier',  spark: [], color: '#2D6A4F' },
-  { label: 'Stock bas',       value: '0',   delta: '',     deltaColor: '#9C3A14', sub: '< seuil critique', spark: [], color: '#C9601E' },
-  { label: 'Marge moyenne',   value: '0',   unit: '%',     delta: '',             deltaColor: '#2D6A4F', sub: 'sur 30 j',         spark: [], color: '#5C4A88' },
+  { label: 'Total produits',  value: '—',   delta: '',     deltaColor: '#2D6A4F', sub: 'ce mois',          spark: [], color: ACCENT },
+  { label: 'Valeur stock',    value: '—',   unit: 'F',     delta: '',             deltaColor: '#2D6A4F', sub: 'vs mois dernier',  spark: [], color: '#2D6A4F' },
+  { label: 'Stock bas',       value: '—',   delta: '',     deltaColor: '#9C3A14', sub: '< seuil critique', spark: [], color: '#C9601E' },
+  { label: 'Marge moyenne',   value: '—',   unit: '%',     delta: '',             deltaColor: '#2D6A4F', sub: 'sur 30 j',         spark: [], color: '#5C4A88' },
 ];
 
 export const DEFAULT_TABS: TabSpec[] = [

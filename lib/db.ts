@@ -359,7 +359,8 @@ export async function getProducts(opts?: {
        ${cols.entrepot_id     ? "e.nom"                                        : "NULL" } AS entrepot_nom,
        ${cols.entrepot_id     ? "e.telephone"                                  : "NULL" } AS entrepot_telephone,
        ${orderCol}                                                                          AS sort_col,
-       c.nom AS categorie_nom
+       c.nom AS categorie_nom,
+       p.actif
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
      ${cols.marque_id   ? "LEFT JOIN marques m ON p.marque_id = m.id"     : ""}

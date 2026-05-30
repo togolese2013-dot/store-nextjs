@@ -9,17 +9,31 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
 
-const KPIS = [
-  { label: 'Fournisseurs actifs',   value: '24',           delta: '+2',  deltaColor: '#2D6A4F', sub: 'sur 26 référencés',       spark: [18,19,20,20,21,22,22,23,23,24,24], color: '#3B6A8F' },
-  { label: 'Fournisseur principal', value: 'Wax Distrib.', serif: true,                         sub: '58 produits · 2 450 000 F' },
-  { label: 'Délai moyen livraison', value: '14', unit: 'j', delta: '−2j', deltaColor: '#2D6A4F', sub: 'vs 16j mois dernier',     spark: [20,18,19,17,16,15,16,14,15,14,14], color: '#5C4A88' },
-];
+type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 export interface FournisseursPageProps {
   suppliers?: Supplier[];
 }
 
 export default function FournisseursPage({ suppliers = SAMPLE_SUPPLIERS }: FournisseursPageProps) {
+  const actifs      = suppliers.filter(s => s.status === 'Actif').length;
+  const totalCA     = suppliers.reduce((s, sup) => s + sup.total, 0);
+  const countries   = new Set(suppliers.map(s => s.country)).size;
+  const main        = [...suppliers].sort((a, b) => b.products - a.products)[0];
+  const avgDelay    = suppliers.length > 0
+    ? Math.round(suppliers.reduce((s, sup) => s + sup.delay, 0) / suppliers.length)
+    : 0;
+
+  const KPIS: LocalKpi[] = [
+    { label: 'Fournisseurs actifs',   value: String(actifs),          sub: `sur ${suppliers.length} référencés`,    color: '#3B6A8F' },
+    { label: 'Fournisseur principal', value: main?.name ?? '—', serif: true, sub: main ? `${main.products} produits · ${main.total.toLocaleString('fr-FR')} F` : '—' },
+    { label: 'Délai moyen livraison', value: String(avgDelay || '—'), unit: avgDelay > 0 ? 'j' : undefined, sub: 'moyenne fournisseurs actifs', color: '#5C4A88' },
+  ];
+
+  const subtitle = suppliers.length === 0
+    ? 'Aucun fournisseur enregistré'
+    : `${actifs} fournisseur${actifs > 1 ? 's' : ''} actif${actifs > 1 ? 's' : ''}${totalCA > 0 ? ` · ${totalCA.toLocaleString('fr-FR')} F CA total` : ''} · ${countries} pays partenaire${countries > 1 ? 's' : ''}`;
+
   return (
     <>
       <div className={styles.header}>
@@ -28,9 +42,7 @@ export default function FournisseursPage({ suppliers = SAMPLE_SUPPLIERS }: Fourn
           <h1 className={styles.title}>
             Gestion des <span className={styles.serif}>fournisseurs</span>
           </h1>
-          <p className={styles.subtitle}>
-            24 fournisseurs actifs · 4 455 000 F CA total · 5 pays partenaires
-          </p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -115,7 +127,7 @@ export default function FournisseursPage({ suppliers = SAMPLE_SUPPLIERS }: Fourn
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>24 fournisseurs actifs</span>
+          <span>{actifs} fournisseur{actifs !== 1 ? 's' : ''} actif{actifs !== 1 ? 's' : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

@@ -43,6 +43,7 @@ export interface WorkspaceSelectorProps {
   shopLocation?: string;
   /** User name + initial for the avatar pill */
   userName?: string;
+  userRole?: string;
   /** Called when a card / palette row is selected. Wire to your router. */
   onEnter: (workspace: Workspace) => void;
 }
@@ -85,10 +86,28 @@ export default function WorkspaceSelector({
   shopName = 'Maison Diallo',
   shopLocation = '',
   userName = 'Kent',
+  userRole = 'Propriétaire',
   onEnter,
 }: WorkspaceSelectorProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [entering, setEntering] = useState<Workspace | null>(null);
+  const [entering,    setEntering]    = useState<Workspace | null>(null);
+  const [menuOpen,    setMenuOpen]    = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
+  async function logout() {
+    setMenuOpen(false);
+    await fetch('/api/admin/auth/logout', { method: 'POST' });
+    window.location.href = '/admin/login';
+  }
 
   const enter = useCallback((ws: Workspace) => {
     setPaletteOpen(false);
@@ -142,12 +161,45 @@ export default function WorkspaceSelector({
             Rechercher un espace
             <span className={styles.kbd}>⌘K</span>
           </button>
-          <div className={styles.userPill}>
-            <div className={styles.avatar}>{userInitial}</div>
-            {userName}
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8A8278" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 2 }}>
-              <path d="m6 9 6 6 6-6" />
-            </svg>
+          <div className={styles.userPillWrap} ref={menuRef}>
+            <button type="button" className={styles.userPill} onClick={() => setMenuOpen(o => !o)}>
+              <div className={styles.avatar}>{userInitial}</div>
+              {userName}
+              <svg
+                width="11" height="11" viewBox="0 0 24 24" fill="none"
+                stroke="#8A8278" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+                style={{ marginLeft: 2, transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div className={styles.userMenu}>
+                <div className={styles.userMenuHeader}>
+                  <div className={styles.userMenuAvatar}>{userInitial}</div>
+                  <div>
+                    <div className={styles.userMenuName}>{userName}</div>
+                    <div className={styles.userMenuRole}>{userRole}</div>
+                  </div>
+                </div>
+                <div className={styles.userMenuBody}>
+                  <a href="/admin/settings" className={styles.userMenuItem} onClick={() => setMenuOpen(false)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Paramètres
+                  </a>
+                  <a href="/" target="_blank" rel="noreferrer" className={styles.userMenuItem} onClick={() => setMenuOpen(false)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    Voir le site
+                  </a>
+                  <div className={styles.userMenuDivider} />
+                  <button type="button" className={`${styles.userMenuItem} ${styles.userMenuItemDanger}`} onClick={logout}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Déconnexion
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>

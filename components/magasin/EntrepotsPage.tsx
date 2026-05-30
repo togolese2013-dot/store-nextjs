@@ -9,11 +9,7 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon, MapPinIcon } from './icons';
 import styles from './Magasin.module.css';
 
-const KPIS = [
-  { label: 'Entrepôts actifs',   value: '3',   sub: '2 à Lomé · 1 à Kara' },
-  { label: 'Occupation moyenne', value: '73', unit: '%', delta: '+5%', deltaColor: '#C9601E', sub: 'vs 68% mois dernier', spark: [62,64,66,68,68,70,71,72,72,73,73], color: '#C9601E' },
-  { label: 'Produits stockés',   value: '248',              delta: '+12', deltaColor: '#2D6A4F', sub: 'répartis sur 3 sites', spark: [220,224,228,230,232,236,238,240,242,245,248], color: '#2D6A4F' },
-];
+type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 function occupancyColor(pct: number): string {
   if (pct > 0.9)  return '#9C3A14';
@@ -26,6 +22,21 @@ export interface EntrepotsPageProps {
 }
 
 export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: EntrepotsPageProps) {
+  const totalCap      = warehouses.reduce((s, w) => s + w.capacity, 0);
+  const totalOccupied = warehouses.reduce((s, w) => s + w.occupied, 0);
+  const totalProducts = warehouses.reduce((s, w) => s + w.products, 0);
+  const avgPct        = totalCap > 0 ? Math.round((totalOccupied / totalCap) * 100) : 0;
+
+  const KPIS: LocalKpi[] = [
+    { label: 'Entrepôts actifs',   value: String(warehouses.length),  sub: warehouses.map(w => w.location).join(' · ') || 'Aucun entrepôt' },
+    { label: 'Occupation moyenne', value: String(avgPct), unit: '%',  sub: `${totalOccupied.toLocaleString('fr-FR')} / ${totalCap.toLocaleString('fr-FR')} unités`, color: '#C9601E' },
+    { label: 'Produits stockés',   value: String(totalProducts),       sub: `répartis sur ${warehouses.length} site${warehouses.length > 1 ? 's' : ''}`, color: '#2D6A4F' },
+  ];
+
+  const subtitle = warehouses.length === 0
+    ? 'Aucun entrepôt configuré'
+    : `${warehouses.length} entrepôt${warehouses.length > 1 ? 's' : ''} · capacité totale ${totalCap.toLocaleString('fr-FR')} unités · ${totalOccupied.toLocaleString('fr-FR')} occupées (${avgPct}%)`;
+
   return (
     <>
       <div className={styles.header}>
@@ -34,9 +45,7 @@ export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: Entrep
           <h1 className={styles.title}>
             Gestion des <span className={styles.serif}>entrepôts</span>
           </h1>
-          <p className={styles.subtitle}>
-            3 entrepôts · capacité totale 2 200 unités · 1 513 occupées (73%)
-          </p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Rapport capacité</button>

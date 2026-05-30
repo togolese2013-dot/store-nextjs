@@ -10,11 +10,6 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, FilterIcon, ChevDownIcon, PrinterIcon, TrendIcon } from './icons';
 import styles from './Boutique.module.css';
 
-const PERIOD_TABS = [
-  { id: 'today', label: "Aujourd'hui",   count:   7 },
-  { id: 'week',  label: 'Cette semaine', count:  32 },
-  { id: 'month', label: 'Ce mois',       count: 124 },
-];
 
 export interface VentesPageProps {
   sales?: Sale[];
@@ -23,6 +18,12 @@ export interface VentesPageProps {
 
 export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPageProps) {
   const [period, setPeriod] = useState('today');
+  const totalCA = sales.reduce((s, i) => s + i.amount, 0);
+  const PERIOD_TABS = [
+    { id: 'today', label: "Aujourd'hui",   count: sales.length },
+    { id: 'week',  label: 'Cette semaine', count: sales.length },
+    { id: 'month', label: 'Ce mois',       count: sales.length },
+  ];
 
   return (
     <>
@@ -30,7 +31,7 @@ export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPa
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Ventes</div>
           <h1 className={styles.title}>Registre des <span className={styles.serif}>ventes</span></h1>
-          <p className={styles.subtitle}>7 ventes aujourd&apos;hui · 112 000 F encaissés · caisse ouverte</p>
+          <p className={styles.subtitle}>{sales.length} vente{sales.length !== 1 ? 's' : ''} · {totalCA.toLocaleString('fr-FR')} F encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -119,7 +120,7 @@ export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPa
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>7 ventes ce jour</span>
+          <span>{sales.length} vente{sales.length !== 1 ? 's' : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

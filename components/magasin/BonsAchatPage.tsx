@@ -9,11 +9,7 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
 
-const KPIS = [
-  { label: 'Bons en cours',         value: '6',       delta: '2 en attente', deltaColor: '#C9601E', sub: 'à traiter',            spark: [3,4,4,5,5,6,5,6,6,6,6],               color: '#C9601E' },
-  { label: 'Valeur totale en cours', value: '845 000', unit: 'F', delta: '+18%', deltaColor: '#2D6A4F', sub: 'vs mois dernier', spark: [520,580,610,640,700,720,760,800,820,830,845], color: '#3B6A8F' },
-  { label: 'Reçus ce mois',          value: '4',       delta: '+1',            deltaColor: '#2D6A4F', sub: 'sur 6 bons émis',    spark: [1,2,2,2,3,3,3,4,4,4,4],               color: '#2D6A4F' },
-];
+type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 const STATUS_STYLE: Record<PurchaseOrderStatus, React.CSSProperties> = {
   'En attente': { background: 'var(--warn-bg)',      color: 'var(--warn)' },
@@ -28,6 +24,21 @@ export interface BonsAchatPageProps {
 }
 
 export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsAchatPageProps) {
+  const enCours    = orders.filter(o => o.status !== 'Reçu' && o.status !== 'Annulé').length;
+  const enAttente  = orders.filter(o => o.status === 'En attente').length;
+  const recus      = orders.filter(o => o.status === 'Reçu').length;
+  const totalVal   = orders.filter(o => o.status !== 'Annulé').reduce((s, o) => s + o.amount, 0);
+
+  const KPIS: LocalKpi[] = [
+    { label: 'Bons en cours',         value: String(enCours),  unit: undefined, sub: 'à traiter',            color: '#C9601E' },
+    { label: 'Valeur totale en cours', value: totalVal > 0 ? totalVal.toLocaleString('fr-FR') : '—', unit: totalVal > 0 ? 'F' : undefined, sub: 'bons non annulés', color: '#3B6A8F' },
+    { label: 'Reçus ce mois',          value: String(recus),   unit: undefined, sub: `sur ${orders.length} bons émis`, color: '#2D6A4F' },
+  ];
+
+  const subtitle = orders.length === 0
+    ? 'Aucun bon d\'achat'
+    : `${enCours} bon${enCours > 1 ? 's' : ''} en cours · ${enAttente} en attente${totalVal > 0 ? ` · ${totalVal.toLocaleString('fr-FR')} F engagés` : ''}`;
+
   return (
     <>
       <div className={styles.header}>
@@ -36,9 +47,7 @@ export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsA
           <h1 className={styles.title}>
             Bons d&apos;<span className={styles.serif}>achat</span>
           </h1>
-          <p className={styles.subtitle}>
-            6 bons en cours · 2 en attente de confirmation · 845 000 F engagés
-          </p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -111,7 +120,7 @@ export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsA
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>6 bons d&apos;achat</span>
+          <span>{orders.length} bon{orders.length !== 1 ? 's' : ''} d&apos;achat</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

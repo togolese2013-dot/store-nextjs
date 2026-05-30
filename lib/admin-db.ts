@@ -466,6 +466,23 @@ export async function getAdminByUsername(username: string, shopId = 1): Promise<
   return (rows[0] as AdminUser) ?? null;
 }
 
+/** Global lookup — no shop filter. Used as fallback when shop can't be resolved from request (local dev, no subdomain). */
+export async function getAdminByUsernameGlobal(username: string): Promise<AdminUser | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM admin_users WHERE username = ? AND actif = 1 ORDER BY id ASC LIMIT 1",
+    [username]
+  );
+  return (rows[0] as AdminUser) ?? null;
+}
+
+export async function getAdminByEmailGlobal(email: string): Promise<AdminUser | null> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM admin_users WHERE email = ? AND actif = 1 ORDER BY id ASC LIMIT 1",
+    [email]
+  );
+  return (rows[0] as AdminUser) ?? null;
+}
+
 export async function getAdminById(id: number): Promise<AdminUser | null> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     "SELECT * FROM admin_users WHERE id = ? LIMIT 1",

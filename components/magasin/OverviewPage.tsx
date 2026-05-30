@@ -13,13 +13,7 @@ function stockColor(pct: number): string {
   return '#2D6A4F';
 }
 
-const ACTIVITY = [
-  { label: '+156 Karité Pure · stock importé',     time: 'il y a 2h',   color: '#2D6A4F' },
-  { label: 'Kente Royal passé en brouillon',        time: 'il y a 5h',   color: '#8A8278' },
-  { label: 'Savane Bio — nouvelle marque ajoutée',  time: 'hier, 16h34', color: '#3B6A8F' },
-  { label: 'Ajustement stock Bissap séché −10',     time: 'hier, 09h12', color: '#C9601E' },
-  { label: 'Export catalogue CSV · 248 produits',   time: 'il y a 2j',   color: '#5C4A88' },
-];
+const ACTIVITY: { label: string; time: string; color: string }[] = [];
 
 export interface OverviewPageProps {
   products?: Product[];

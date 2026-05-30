@@ -18,28 +18,24 @@ interface KpiDef {
   serif?: boolean;
 }
 
-const BRAND_KPIS: KpiDef[] = [
-  {
-    label: 'Marques actives', value: '11', delta: '+1', deltaColor: '#2D6A4F',
-    sub: 'sur 12 au total',
-    spark: [8, 8, 9, 9, 10, 10, 10, 10, 11, 11, 11], sparkColor: '#3B6A8F',
-  },
-  {
-    label: 'Marque principale', value: 'Maison Diallo', serif: true,
-    sub: '78 produits · 1 240 000 F',
-  },
-  {
-    label: 'Marge moy. / marque', value: '47', unit: '%', delta: '+2,1 pts', deltaColor: '#2D6A4F',
-    sub: 'vs 44,9% mois dernier',
-    spark: [40, 42, 43, 44, 43, 45, 45, 46, 46, 47, 47], sparkColor: '#2D6A4F',
-  },
-];
 
 export interface BrandsPageProps {
   brands?: Brand[];
 }
 
 export default function BrandsPage({ brands = SAMPLE_BRANDS }: BrandsPageProps) {
+  const actives  = brands.filter(b => b.status === 'Actif').length;
+  const mainBrand = [...brands].sort((a, b) => b.products - a.products)[0];
+  const avgMargin = brands.length > 0
+    ? Math.round(brands.reduce((s, b) => s + b.margin, 0) / brands.length)
+    : 0;
+
+  const BRAND_KPIS: KpiDef[] = [
+    { label: 'Marques actives',    value: String(actives),            sub: `sur ${brands.length} au total`, sparkColor: '#3B6A8F' },
+    { label: 'Marque principale',  value: mainBrand?.name ?? '—', serif: true, sub: mainBrand ? `${mainBrand.products} produits · ${mainBrand.revenue.toLocaleString('fr-FR')} F` : '—' },
+    { label: 'Marge moy. / marque', value: avgMargin > 0 ? String(avgMargin) : '—', unit: avgMargin > 0 ? '%' : undefined, sub: 'moyenne toutes marques', sparkColor: '#2D6A4F' },
+  ];
+
   return (
     <>
       <div className={styles.header}>

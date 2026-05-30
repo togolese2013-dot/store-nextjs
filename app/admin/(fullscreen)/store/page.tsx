@@ -1,11 +1,11 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import StoreShell from '@/components/store/StoreShell';
+import StoreDataLoader from '@/components/store/StoreDataLoader';
 
 export default function Page() {
   const router = useRouter();
   return (
-    <StoreShell
+    <StoreDataLoader
       onSwitchWorkspace={() => router.push('/admin')}
       onCreateOrder={() => router.push('/admin/orders/new')}
     />

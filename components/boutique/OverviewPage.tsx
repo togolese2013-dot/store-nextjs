@@ -19,6 +19,8 @@ interface OverviewPageProps {
 
 export default function OverviewPage({ sales = SAMPLE_SALES, onNewSale }: OverviewPageProps) {
   const lowStock = SAMPLE_STOCK.filter(p => p.boutique < p.seuil);
+  const totalCA = sales.reduce((s, i) => s + i.amount, 0);
+  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <>
@@ -26,7 +28,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, onNewSale }: Overvi
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Aperçu</div>
           <h1 className={styles.title}>Caisse du <span className={styles.serif}>jour</span></h1>
-          <p className={styles.subtitle}>28 mai 2026 · 7 ventes · 112 000 F encaissés · caisse ouverte depuis 08h30</p>
+          <p className={styles.subtitle}>{today} · {sales.length} vente{sales.length !== 1 ? 's' : ''} · {totalCA.toLocaleString('fr-FR')} F encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><PrinterIcon size={14} /> Rapport journée</button>

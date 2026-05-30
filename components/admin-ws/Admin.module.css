@@ -40,12 +40,64 @@
 .navItem .count.badge { color: white; background: var(--warn); }
 
 .sidebarFoot { margin-top: auto; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-.userRow { display: flex; align-items: center; gap: 10px; }
-.avatar { width: 30px; height: 30px; border-radius: 999px; background: var(--ink); color: white; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.userRowWrap { position: relative; }
+.userRow { display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 8px; padding: 4px; border: none; background: none; width: 100%; text-align: left; transition: background .12s; }
+.userRow:hover { background: var(--bg-2); }
+.avatar { width: 30px; height: 30px; border-radius: 999px; background: var(--ink); color: white; display: grid; place-items: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .userMeta { flex: 1; min-width: 0; }
 /* top-level aliases so Sidebar.tsx can use styles.n / styles.r */
 .n { font-size: 13px; font-weight: 500; line-height: 1.1; }
 .r { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ─── User dropdown menu ─────────────────────────────────────── */
+.userMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0; right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(20,17,14,.12);
+  overflow: hidden;
+  z-index: 200;
+}
+.userMenuHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.userMenuAvatar {
+  width: 34px; height: 34px; border-radius: 999px;
+  background: var(--ink); color: white;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.userMenuName { font-size: 13px; font-weight: 600; line-height: 1.1; }
+.userMenuRole { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.userMenuBody { padding: 4px 0; }
+.userMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: background .1s;
+}
+.userMenuItem:hover { background: var(--bg-2); }
+.userMenuDivider { height: 1px; background: var(--border); margin: 4px 0; }
+.userMenuItemDanger { color: #c9601e; }
+.userMenuItemDanger:hover { background: rgba(201,96,30,.08); }
 
 /* ─── Main ─────────────────────────────────────────────────────── */
 .main { display: flex; flex-direction: column; min-width: 0; }

@@ -83,6 +83,7 @@ export interface AdminWsShellProps {
   onInvite?: () => void;
   userName?: string;
   userRole?: string;
+  shopName?: string;
 }
 
 /* ─── Shell ─────────────────────────────────────────────────────── */
@@ -98,6 +99,7 @@ export default function AdminWsShell({
   onInvite,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
+  shopName = 'Ma boutique',
 }: AdminWsShellProps) {
   const [page, setPage] = useState<PageId>(defaultPage);
 
@@ -126,7 +128,7 @@ export default function AdminWsShell({
             <ChevLeftIcon size={16} />
           </button>
           <div className={styles.crumbs}>
-            <span>Maison Diallo</span>
+            <span>{shopName}</span>
             <span className={styles.sep}>/</span>
             <span>Admin</span>
             {page !== 'overview' && (

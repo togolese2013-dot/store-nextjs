@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from '@/components/magasin/Magasin.module.css';
 import { ChevLeftIcon } from '@/components/magasin/icons';
+import ImageUpload from '@/components/magasin/ImageUpload';
 
 interface Category { id: number; nom: string; }
 interface Brand    { id: number; nom: string; }
@@ -76,7 +77,7 @@ export default function NouveauProduitPage() {
       }).then(r => r.json());
 
       if (r.error) { setError(r.error); return; }
-      router.push('/admin/magasin');
+      router.push('/admin/magasin?page=products');
     } catch {
       setError('Erreur réseau. Réessayez.');
     } finally {
@@ -91,7 +92,7 @@ export default function NouveauProduitPage() {
         <button
           type="button"
           className={styles.iconBtn}
-          onClick={() => router.push('/admin/magasin')}
+          onClick={() => router.push('/admin/magasin?page=products')}
           aria-label="Retour"
         >
           <ChevLeftIcon size={16} />
@@ -101,7 +102,7 @@ export default function NouveauProduitPage() {
           <button
             type="button"
             className={styles.btn}
-            onClick={() => router.push('/admin/magasin')}
+            onClick={() => router.push('/admin/magasin?page=products')}
           >
             Annuler
           </button>
@@ -277,27 +278,10 @@ export default function NouveauProduitPage() {
             {/* Image */}
             <div className={styles.formCard}>
               <div className={styles.formCardTitle}>Image principale</div>
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>URL de l'image</label>
-                <input
-                  className={styles.formInput}
-                  value={form.image_url}
-                  onChange={e => set('image_url', e.target.value)}
-                  placeholder="https://res.cloudinary.com/…"
-                />
-                <div className={styles.formHint}>Cloudinary ou chemin relatif uniquement.</div>
-              </div>
-              {form.image_url && (
-                <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border)', marginTop: '4px' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={form.image_url}
-                    alt="Aperçu"
-                    style={{ width: '100%', height: '160px', objectFit: 'contain', background: 'var(--bg-2)' }}
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                </div>
-              )}
+              <ImageUpload
+                value={form.image_url}
+                onChange={url => set('image_url', url)}
+              />
             </div>
           </div>
         </div>

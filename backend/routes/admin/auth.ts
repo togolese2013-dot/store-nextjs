@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import {
   getAdminByUsername, getAdminByEmail,
+  getAdminByUsernameGlobal, getAdminByEmailGlobal,
   updateAdminLastLogin, createAdminUser,
   getUtilisateurByUsername,
   updateAdminPassword, updateUtilisateurPassword,
@@ -84,7 +85,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
       ?? (req.headers["x-shop-slug"] as string | undefined)
       ?? "default";
     const shop = await getShopBySlug(rawSlug);
-    const shopId = shop?.id ?? 1;
+    let shopId = shop?.id ?? 1;
 
     const slug = (username as string).trim().toLowerCase();
 
@@ -100,6 +101,14 @@ router.post("/api/admin/auth/login", async (req, res) => {
     // Try username first, then email fallback for existing accounts — scoped to shop
     let user = await getAdminByUsername(slug, shopId)
       ?? await getAdminByEmail(slug, shopId);
+
+    // Fallback: no shop resolved from request (local dev / no subdomain) — search globally
+    if (!user && rawSlug === "default") {
+      user = await getAdminByUsernameGlobal(slug)
+        ?? await getAdminByEmailGlobal(slug);
+      // Use the user's actual shop_id so the session is scoped correctly
+      if (user) shopId = user.shop_id;
+    }
 
     if (!user) {
       // Bootstrap: create the first super_admin if table is empty

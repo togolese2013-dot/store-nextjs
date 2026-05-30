@@ -13,11 +13,7 @@ import Sparkline from './Sparkline';
 import { PlusIcon, CogIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
 
-const KPIS = [
-  { label: 'Alertes actives',     value: '7', delta: '+1',        deltaColor: '#2D6A4F', sub: 'sur 8 règles configurées', spark: [4,4,5,5,6,6,6,7,7,7,7], color: '#3B6A8F' },
-  { label: 'Déclenchées ce mois', value: '3', delta: 'urgentes',  deltaColor: '#9C3A14', sub: 'requièrent une action',    spark: [1,1,2,2,2,2,2,3,3,3,3], color: '#C9601E' },
-  { label: 'Canaux configurés',   value: '4',                                             sub: 'Email · SMS · WhatsApp' },
-];
+type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 const CHANNEL_STYLE: Record<AlertChannel, React.CSSProperties> = {
   Email:    { background: 'var(--accent-bg)', color: 'var(--accent)' },
@@ -36,6 +32,20 @@ export default function AlertesPage({
 }: AlertesPageProps) {
   const [alerts, setAlerts] = useState<StockAlert[]>(initialAlerts);
 
+  const activeCount    = alerts.filter(a => a.active).length;
+  const triggeredCount = alerts.filter(a => a.triggered).length;
+  const channels       = [...new Set(alerts.flatMap(a => a.channels))];
+
+  const KPIS: LocalKpi[] = [
+    { label: 'Alertes actives',     value: String(activeCount),    sub: `sur ${alerts.length} règles configurées`, color: '#3B6A8F' },
+    { label: 'Déclenchées ce mois', value: String(triggeredCount), sub: 'requièrent une action',                    color: '#C9601E' },
+    { label: 'Canaux configurés',   value: String(channels.length || '—'), sub: channels.length ? channels.join(' · ') : 'Aucun canal' },
+  ];
+
+  const subtitle = alerts.length === 0
+    ? 'Aucune règle d\'alerte configurée'
+    : `${activeCount} règle${activeCount > 1 ? 's' : ''} active${activeCount > 1 ? 's' : ''} · ${triggeredCount} déclenchée${triggeredCount > 1 ? 's' : ''} ce mois${channels.length ? ` · ${channels.join(', ')}` : ''}`;
+
   const handleToggle = (i: number) => {
     const next = alerts.map((a, j) => j === i ? { ...a, active: !a.active } : a);
     setAlerts(next);
@@ -50,9 +60,7 @@ export default function AlertesPage({
           <h1 className={styles.title}>
             Alertes <span className={styles.serif}>stock</span>
           </h1>
-          <p className={styles.subtitle}>
-            7 règles actives · 3 déclenchées ce mois · Email, SMS, WhatsApp
-          </p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><CogIcon size={14} /> Paramètres</button>
@@ -156,7 +164,7 @@ export default function AlertesPage({
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>7 alertes · 3 déclenchées</span>
+          <span>{alerts.length} alerte{alerts.length !== 1 ? 's' : ''} · {triggeredCount} déclenchée{triggeredCount !== 1 ? 's' : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

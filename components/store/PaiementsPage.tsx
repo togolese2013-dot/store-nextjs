@@ -19,24 +19,42 @@ const METHOD_ICONS: Record<string, ComponentType<{ size?: number }>> = {
   Carte:          CardIcon,
 };
 
-const METHOD_SUMMARY = [
-  { name: 'Wave',         pct: 62, amount: 215000, color: '#1A73E8', bg: '#E8F0F7',          spark: [55,58,58,60,60,61,61,62,62,62,62] },
-  { name: 'Orange Money', pct: 28, amount:  97300, color: '#E07A2C', bg: 'var(--warn-bg)',   spark: [25,26,27,27,28,28,28,28,28,28,28] },
-  { name: 'Carte',        pct: 10, amount:  34600, color: 'var(--ink)', bg: 'var(--bg-2)',  spark: [8,9,9,10,10,10,10,10,10,10,10] },
-];
+const METHOD_META: Record<string, { color: string; bg: string }> = {
+  Wave:           { color: '#1A73E8', bg: '#E8F0F7' },
+  'Orange Money': { color: '#E07A2C', bg: 'var(--warn-bg)' },
+  Carte:          { color: 'var(--ink)', bg: 'var(--bg-2)' },
+};
 
 export interface PaiementsPageProps {
   payments?: Payment[];
 }
 
 export default function PaiementsPage({ payments = SAMPLE_PAYMENTS }: PaiementsPageProps) {
+  const totalCA = payments.reduce((s, p) => s + p.amount, 0);
+
+  const methodTotals = payments.reduce<Record<string, number>>((acc, p) => {
+    acc[p.method] = (acc[p.method] ?? 0) + p.amount;
+    return acc;
+  }, {});
+
+  const METHOD_SUMMARY = Object.entries(methodTotals).map(([name, amount]) => ({
+    name,
+    amount,
+    pct: totalCA > 0 ? Math.round((amount / totalCA) * 100) : 0,
+    ...(METHOD_META[name] ?? { color: 'var(--ink)', bg: 'var(--bg-2)' }),
+  }));
+
+  const subtitle = payments.length === 0
+    ? 'Aucun paiement ce mois'
+    : `${totalCA.toLocaleString('fr-FR')} F ce mois · ${METHOD_SUMMARY.map(m => `${m.name} ${m.pct}%`).join(' · ')}`;
+
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Store · Paiements</div>
           <h1 className={styles.title}>Historique des <span className={styles.serif}>paiements</span></h1>
-          <p className={styles.subtitle}>347 500 F ce mois · Wave 62% · Orange Money 28% · Carte 10%</p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -85,9 +103,7 @@ export default function PaiementsPage({ payments = SAMPLE_PAYMENTS }: PaiementsP
                   {m.amount.toLocaleString('fr-FR')} F
                 </div>
               </div>
-              <div>
-                <Sparkline data={m.spark} color={m.color} width={60} height={36} />
-              </div>
+              <div />
             </div>
           );
         })}
@@ -134,7 +150,7 @@ export default function PaiementsPage({ payments = SAMPLE_PAYMENTS }: PaiementsP
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>32 transactions ce mois</span>
+          <span>{payments.length} transaction{payments.length !== 1 ? 's' : ''} ce mois</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

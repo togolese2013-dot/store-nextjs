@@ -14,13 +14,14 @@ export interface LivraisonsPageProps {
 }
 
 export default function LivraisonsPage({ zones = SAMPLE_ZONES }: LivraisonsPageProps) {
+  const zonesActives = zones.filter(z => z.active).length;
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Store · Livraisons</div>
           <h1 className={styles.title}>Zones de <span className={styles.serif}>livraison</span></h1>
-          <p className={styles.subtitle}>5 zones configurées · 890 livraisons ce mois · délai moyen 1,8 j</p>
+          <p className={styles.subtitle}>{zones.length} zone{zones.length !== 1 ? 's' : ''} configurée{zones.length !== 1 ? 's' : ''} · {zonesActives} active{zonesActives !== 1 ? 's' : ''}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>

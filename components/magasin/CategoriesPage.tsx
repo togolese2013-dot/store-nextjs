@@ -18,21 +18,6 @@ interface KpiDef {
   serif?: boolean;
 }
 
-const CAT_KPIS: KpiDef[] = [
-  {
-    label: 'Total catégories', value: '18', delta: '+2', deltaColor: '#2D6A4F',
-    sub: 'dont 6 principales',
-    spark: [10, 11, 12, 12, 13, 14, 15, 16, 16, 17, 18], sparkColor: '#3B6A8F',
-  },
-  {
-    label: 'Catégorie principale', value: 'Textile', serif: true,
-    sub: '89 produits · 1 845 000 F',
-  },
-  {
-    label: 'Produits non classés', value: '5', delta: 'à assigner', deltaColor: '#C9601E',
-    sub: 'à affecter à une catégorie',
-  },
-];
 
 export interface CategoriesPageProps {
   categories?: Category[];
@@ -40,6 +25,13 @@ export interface CategoriesPageProps {
 
 export default function CategoriesPage({ categories = SAMPLE_CATEGORIES }: CategoriesPageProps) {
   const totalProducts = categories.reduce((s, c) => s + c.products, 0);
+  const mainCat       = [...categories].sort((a, b) => b.products - a.products)[0];
+
+  const CAT_KPIS: KpiDef[] = [
+    { label: 'Total catégories',    value: String(categories.length), sub: `${totalProducts} produits répartis`, sparkColor: '#3B6A8F' },
+    { label: 'Catégorie principale', value: mainCat?.name ?? '—', serif: true, sub: mainCat ? `${mainCat.products} produits · ${(mainCat.revenue / 1000).toFixed(0)}k F` : '—' },
+    { label: 'Sans produits',        value: String(categories.filter(c => c.products === 0).length), sub: 'catégories vides' },
+  ];
 
   return (
     <>

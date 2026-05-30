@@ -17,36 +17,19 @@ interface OverviewPageProps {
   onCreateOrder?: () => void;
 }
 
-const TOP_PRODUCTS = [
-  { name: 'Pagne wax — Indigo Royal',         sku: 'PWX-001', qty: 18, ca: 324000, avg: 18000, color: '#1F3D6E', init: 'P' },
-  { name: 'Beurre de karité brut · 250g',      sku: 'KAR-220', qty: 34, ca: 153000, avg:  4500, color: '#C8962A', init: 'K' },
-  { name: 'Collier perles wax · doré',          sku: 'BJL-307', qty: 12, ca: 102000, avg:  8500, color: '#B8501A', init: 'C' },
-  { name: 'Café Robusta torréfié · 450g',       sku: 'CFE-450', qty: 15, ca: 102000, avg:  6800, color: '#5A3520', init: 'C' },
-  { name: 'Bogolan brodé — Édition Mopti',      sku: 'BGL-014', qty:  7, ca:  84000, avg: 12000, color: '#3A2F25', init: 'B' },
-];
-
-const ACTIVITY = [
-  { label: 'CMD-2847 · Adjoa Mensah — nouvelle commande', time: 'il y a 5 min', dot: '#C9601E' },
-  { label: 'Coupon WAXFEST20 utilisé × 3',                 time: 'il y a 1h',   dot: '#5C4A88' },
-  { label: 'CMD-2846 expédiée · tracking envoyé',          time: 'il y a 2h',   dot: '#2D6A4F' },
-  { label: 'Paiement Wave remboursé · CMD-2842',           time: 'hier, 09h15', dot: '#8A8278' },
-  { label: 'Zone "Grand Lomé" mise à jour',                 time: 'il y a 2j',   dot: '#3B6A8F' },
-];
-
-const PAY_METHODS = [
-  { name: 'Wave',         color: '#1A73E8', pct: 62, amount: 215600 },
-  { name: 'Orange Money', color: '#E07A2C', pct: 28, amount:  97300 },
-  { name: 'Carte',        color: 'var(--ink)', pct: 10, amount: 34600 },
-];
+const TOP_PRODUCTS: { name: string; sku: string; qty: number; ca: number; avg: number; color: string; init: string }[] = [];
+const ACTIVITY: { label: string; time: string; dot: string }[] = [];
+const PAY_METHODS: { name: string; color: string; pct: number; amount: number }[] = [];
 
 export default function OverviewPage({ orders = SAMPLE_ORDERS, onCreateOrder }: OverviewPageProps) {
+  const totalCA = orders.reduce((s, o) => s + o.amount, 0);
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Store · Aperçu</div>
           <h1 className={styles.title}>Vue d&apos;<span className={styles.serif}>ensemble</span></h1>
-          <p className={styles.subtitle}>E-commerce Maison Diallo · 32 commandes ce mois · 347 500 F de CA</p>
+          <p className={styles.subtitle}>E-commerce · {orders.length} commande{orders.length !== 1 ? 's' : ''} · {totalCA.toLocaleString('fr-FR')} F de CA</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Rapport</button>

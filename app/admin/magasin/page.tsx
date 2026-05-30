@@ -1,13 +1,15 @@
-'use client';
-import MagasinDataLoader from '@/components/magasin/MagasinDataLoader';
-import { useRouter } from 'next/navigation';
+import { getAdminSession } from '@/lib/auth';
+import { getShopById } from '@/lib/shops';
+import MagasinPageClient from './MagasinPageClient';
 
-export default function Page() {
-  const router = useRouter();
+export default async function MagasinPage() {
+  const session = await getAdminSession();
+  const shop = session ? await getShopById(session.shop_id).catch(() => null) : null;
   return (
-    <MagasinDataLoader
-      onSwitchWorkspace={() => router.push('/admin')}
-      onCreateProduct={() => router.push('/admin/magasin/new')}
+    <MagasinPageClient
+      shopName={shop?.nom ?? ''}
+      userName={session?.nom ?? ''}
+      userRole={session?.role ?? ''}
     />
   );
 }

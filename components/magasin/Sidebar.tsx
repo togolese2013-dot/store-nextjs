@@ -4,7 +4,7 @@
  * Self-contained: takes a `groups` array (NavGroup[]) and renders sections.
  * Click handlers are local; lift state to the parent if you wire routing.
  */
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { NavGroup } from './types';
 import {
   HomeIcon, BoxIcon, FolderIcon, TagIcon, VariantsIcon, TruckIcon,
@@ -18,18 +18,18 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
     section: null,
     items: [
       { icon: HomeIcon,    label: 'Vue d\'ensemble', id: 'overview' },
-      { icon: BoxIcon,     label: 'Produits', count: 248, active: true, id: 'products' },
-      { icon: FolderIcon,  label: 'Catégories', count: 18, id: 'categories' },
-      { icon: TagIcon,     label: 'Marques', count: 12, id: 'brands' },
-      { icon: VariantsIcon,label: 'Variantes', count: 86, id: 'variants' },
+      { icon: BoxIcon,     label: 'Produits',    active: true, id: 'products' },
+      { icon: FolderIcon,  label: 'Catégories',              id: 'categories' },
+      { icon: TagIcon,     label: 'Marques',                  id: 'brands' },
+      { icon: VariantsIcon,label: 'Variantes',                id: 'variants' },
     ],
   },
   {
     section: 'Approvisionnement',
     items: [
-      { icon: TruckIcon,    label: 'Fournisseurs', count: 24, id: 'suppliers' },
-      { icon: ReceiptIcon,  label: 'Bons d\'achat', count: 6, id: 'purchase-orders' },
-      { icon: WarehouseIcon,label: 'Entrepôts', count: 3, id: 'warehouses' },
+      { icon: TruckIcon,    label: 'Fournisseurs',   id: 'suppliers' },
+      { icon: ReceiptIcon,  label: 'Bons d\'achat',  id: 'purchase-orders' },
+      { icon: WarehouseIcon,label: 'Entrepôts',       id: 'warehouses' },
     ],
   },
   {
@@ -37,7 +37,7 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
     items: [
       { icon: AdjustmentsIcon, label: 'Ajustements', id: 'adjustments' },
       { icon: HistoryIcon,     label: 'Mouvements', id: 'movements' },
-      { icon: BoxIcon,         label: 'Alertes stock', count: 7, badge: true, id: 'alerts' },
+      { icon: BoxIcon,         label: 'Alertes stock', id: 'alerts' },
     ],
   },
   {
@@ -66,10 +66,28 @@ export default function Sidebar({
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
 }: SidebarProps) {
-  // Use controlled activeId if provided, else track locally
   const initialActive = groups.flatMap(g => g.items).find(i => i.active)?.id ?? null;
   const [localActive, setLocalActive] = useState<string | null>(initialActive);
   const activeId = controlledActiveId !== undefined ? controlledActiveId : localActive;
+  const [menuOpen,  setMenuOpen]  = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
+  async function logout() {
+    setMenuOpen(false);
+    await fetch('/api/admin/auth/logout', { method: 'POST' });
+    window.location.href = '/admin/login';
+  }
+
+  const initial = userName.charAt(0).toUpperCase();
 
   return (
     <aside className={styles.sidebar}>
@@ -115,13 +133,52 @@ export default function Sidebar({
       </nav>
 
       <div className={styles.sidebarFoot}>
-        <div className={styles.userRow}>
-          <div className={styles.avatar}>{userName.charAt(0).toUpperCase()}</div>
-          <div className={styles.userMeta}>
-            <div className={styles.n}>{userName}</div>
-            <div className={styles.r}>{userRole}</div>
-          </div>
-          <CogIcon size={14} />
+        <div className={styles.userRowWrap} ref={menuRef}>
+          {/* Dropdown — opens upward */}
+          {menuOpen && (
+            <div className={styles.userMenu}>
+              <div className={styles.userMenuHeader}>
+                <div className={styles.userMenuAvatar}>{initial}</div>
+                <div>
+                  <div className={styles.userMenuName}>{userName}</div>
+                  <div className={styles.userMenuRole}>{userRole}</div>
+                </div>
+              </div>
+              <div className={styles.userMenuBody}>
+                <button type="button" className={styles.userMenuItem} onClick={() => { setMenuOpen(false); onNav?.('settings'); }}>
+                  <CogIcon size={14} /> Paramètres magasin
+                </button>
+                <a
+                  href="/" target="_blank" rel="noreferrer"
+                  className={styles.userMenuItem}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  Voir le site
+                </a>
+                {onSwitchWorkspace && (
+                  <button type="button" className={styles.userMenuItem} onClick={() => { setMenuOpen(false); onSwitchWorkspace(); }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                    Changer d'espace
+                  </button>
+                )}
+                <div className={styles.userMenuDivider} />
+                <button type="button" className={`${styles.userMenuItem} ${styles.userMenuItemDanger}`} onClick={logout}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  Déconnexion
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button type="button" className={styles.userRow} onClick={() => setMenuOpen(o => !o)}>
+            <div className={styles.avatar}>{initial}</div>
+            <div className={styles.userMeta}>
+              <div className={styles.n}>{userName}</div>
+              <div className={styles.r}>{userRole}</div>
+            </div>
+            <ChevDownIcon size={12} style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+          </button>
         </div>
       </div>
     </aside>

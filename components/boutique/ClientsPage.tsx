@@ -20,7 +20,7 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS }: ClientsPagePro
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Clients</div>
           <h1 className={styles.title}>Clients <span className={styles.serif}>physiques</span></h1>
-          <p className={styles.subtitle}>8 clients enregistrés · 56 800 F panier moyen · programme de fidélité actif</p>
+          <p className={styles.subtitle}>{clients.length} client{clients.length !== 1 ? 's' : ''} enregistré{clients.length !== 1 ? 's' : ''}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>

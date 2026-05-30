@@ -15,9 +15,9 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
     section: null,
     items: [
       { icon: HomeIcon,    label: "Vue d'ensemble", id: 'overview' },
-      { icon: CartIcon,    label: 'Commandes',       id: 'commandes', count: 3, badge: true },
-      { icon: PercentIcon, label: 'Coupons',          id: 'coupons',   count: 8 },
-      { icon: TruckIcon,   label: 'Livraisons',       id: 'livraisons',count: 5 },
+      { icon: CartIcon,    label: 'Commandes',  id: 'commandes' },
+      { icon: PercentIcon, label: 'Coupons',    id: 'coupons' },
+      { icon: TruckIcon,   label: 'Livraisons', id: 'livraisons' },
       { icon: CardIcon,    label: 'Paiements',         id: 'paiements' },
     ],
   },

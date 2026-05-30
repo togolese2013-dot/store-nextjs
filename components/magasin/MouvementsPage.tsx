@@ -9,12 +9,7 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, FilterIcon, MoreIcon, TrendIcon, ArrowRightIcon } from './icons';
 import styles from './Magasin.module.css';
 
-const KPIS = [
-  { label: 'Mouvements ce mois', value: '127', delta: '+18',  deltaColor: '#2D6A4F', sub: 'vs 109 mois dernier',    spark: [90,95,98,100,104,108,110,114,118,122,127],  color: '#3B6A8F' },
-  { label: 'Unités entrées',     value: '892', delta: '+12%', deltaColor: '#2D6A4F', sub: 'réceptions fournisseurs', spark: [700,720,740,760,780,800,820,840,860,875,892], color: '#2D6A4F' },
-  { label: 'Unités sorties',     value: '340', delta: '−5%',  deltaColor: '#5C4A88', sub: 'ventes et transferts',    spark: [280,290,300,310,315,320,325,330,335,338,340], color: '#C9601E' },
-  { label: 'Transferts',         value: '48',  delta: '+4',   deltaColor: '#2D6A4F', sub: 'entre entrepôts',         spark: [30,32,34,36,38,40,42,44,45,47,48],            color: '#5C4A88' },
-];
+type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 const TYPE_STYLE: Record<MovementType, React.CSSProperties> = {
   'Entrée':     { background: 'var(--ok-bg)',     color: 'var(--ok)' },
@@ -28,6 +23,21 @@ export interface MouvementsPageProps {
 }
 
 export default function MouvementsPage({ movements = SAMPLE_MOVEMENTS }: MouvementsPageProps) {
+  const entered   = movements.filter(m => m.qty > 0).reduce((s, m) => s + m.qty, 0);
+  const exited    = Math.abs(movements.filter(m => m.qty < 0).reduce((s, m) => s + m.qty, 0));
+  const transfers = movements.filter(m => m.type === 'Transfert').length;
+
+  const KPIS: LocalKpi[] = [
+    { label: 'Mouvements ce mois', value: String(movements.length), sub: 'total',                    color: '#3B6A8F' },
+    { label: 'Unités entrées',     value: String(entered),           sub: 'réceptions fournisseurs', color: '#2D6A4F' },
+    { label: 'Unités sorties',     value: String(exited),            sub: 'ventes et transferts',    color: '#C9601E' },
+    { label: 'Transferts',         value: String(transfers),          sub: 'entre entrepôts',          color: '#5C4A88' },
+  ];
+
+  const subtitle = movements.length === 0
+    ? 'Aucun mouvement ce mois'
+    : `${movements.length} mouvement${movements.length > 1 ? 's' : ''} · ${entered} unités entrées · ${exited} sorties · ${transfers} transfert${transfers > 1 ? 's' : ''}`;
+
   return (
     <>
       <div className={styles.header}>
@@ -36,9 +46,7 @@ export default function MouvementsPage({ movements = SAMPLE_MOVEMENTS }: Mouveme
           <h1 className={styles.title}>
             Mouvements <span className={styles.serif}>de stock</span>
           </h1>
-          <p className={styles.subtitle}>
-            127 mouvements ce mois · 892 unités entrées · 340 sorties · 48 transferts
-          </p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -113,7 +121,7 @@ export default function MouvementsPage({ movements = SAMPLE_MOVEMENTS }: Mouveme
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>127 mouvements ce mois</span>
+          <span>{movements.length} mouvement{movements.length !== 1 ? 's' : ''} ce mois</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

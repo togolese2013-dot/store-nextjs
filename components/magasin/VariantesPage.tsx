@@ -9,17 +9,27 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
 
-const KPIS = [
-  { label: 'Total variantes',       value: '86',     delta: '+4',  deltaColor: '#2D6A4F', sub: 'ce mois',            spark: [72,74,76,76,78,80,80,82,83,85,86], color: '#3B6A8F' },
-  { label: 'Groupe le plus utilisé', value: 'Taille', serif: true,                         sub: '45 produits associés' },
-  { label: 'Groupes configurés',     value: '7',      delta: '+1',  deltaColor: '#2D6A4F', sub: 'dont 5 actifs',      spark: [4,4,5,5,5,6,6,6,6,7,7],           color: '#5C4A88' },
-];
+type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 export interface VariantesPageProps {
   variants?: Variant[];
 }
 
 export default function VariantesPage({ variants = SAMPLE_VARIANTS }: VariantesPageProps) {
+  const totalCombinations = variants.reduce((s, v) => s + v.values.length, 0);
+  const totalProducts     = variants.reduce((s, v) => s + v.products, 0);
+  const mainGroup         = [...variants].sort((a, b) => b.products - a.products)[0];
+
+  const KPIS: LocalKpi[] = [
+    { label: 'Total variantes',        value: String(totalCombinations || '—'),     sub: 'combinaisons actives',    color: '#3B6A8F' },
+    { label: 'Groupe le plus utilisé', value: mainGroup?.name ?? '—', serif: true,  sub: mainGroup ? `${mainGroup.products} produits associés` : '—' },
+    { label: 'Groupes configurés',     value: String(variants.length),               sub: 'groupes de variantes',    color: '#5C4A88' },
+  ];
+
+  const subtitle = variants.length === 0
+    ? 'Aucune variante configurée'
+    : `${totalCombinations} combinaison${totalCombinations > 1 ? 's' : ''} · ${variants.length} groupe${variants.length > 1 ? 's' : ''} · ${totalProducts} produit${totalProducts > 1 ? 's' : ''} concerné${totalProducts > 1 ? 's' : ''}`;
+
   return (
     <>
       <div className={styles.header}>
@@ -28,9 +38,7 @@ export default function VariantesPage({ variants = SAMPLE_VARIANTS }: VariantesP
           <h1 className={styles.title}>
             Gestion des <span className={styles.serif}>variantes</span>
           </h1>
-          <p className={styles.subtitle}>
-            86 combinaisons actives · 7 groupes · 248 produits concernés
-          </p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -116,7 +124,7 @@ export default function VariantesPage({ variants = SAMPLE_VARIANTS }: VariantesP
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>7 groupes · 86 variantes</span>
+          <span>{variants.length} groupe{variants.length !== 1 ? 's' : ''} · {totalCombinations} variante{totalCombinations !== 1 ? 's' : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

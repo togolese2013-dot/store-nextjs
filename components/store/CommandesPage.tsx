@@ -10,15 +10,6 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, FilterIcon, ChevDownIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Store.module.css';
 
-const TABS = [
-  { id: 'all',       label: 'Toutes',     count: 32 },
-  { id: 'pending',   label: 'En attente', count:  3, warn: true },
-  { id: 'confirmed', label: 'Confirmées', count:  5 },
-  { id: 'shipped',   label: 'Expédiées',  count:  7 },
-  { id: 'delivered', label: 'Livrées',    count: 15 },
-  { id: 'cancelled', label: 'Annulées',   count:  2, warn: true },
-];
-
 export interface CommandesPageProps {
   orders?: Order[];
   onCreateOrder?: () => void;
@@ -26,6 +17,15 @@ export interface CommandesPageProps {
 
 export default function CommandesPage({ orders = SAMPLE_ORDERS, onCreateOrder }: CommandesPageProps) {
   const [activeTab, setActiveTab] = useState('all');
+  const totalCA = orders.reduce((s, o) => s + o.amount, 0);
+  const TABS = [
+    { id: 'all',       label: 'Toutes',     count: orders.length },
+    { id: 'pending',   label: 'En attente', count: orders.filter(o => o.status === 'En attente').length, warn: true },
+    { id: 'confirmed', label: 'Confirmées', count: orders.filter(o => o.status === 'Confirmée').length },
+    { id: 'shipped',   label: 'Expédiées',  count: orders.filter(o => o.status === 'Expédiée').length },
+    { id: 'delivered', label: 'Livrées',    count: orders.filter(o => o.status === 'Livrée').length },
+    { id: 'cancelled', label: 'Annulées',   count: orders.filter(o => o.status === 'Annulée').length, warn: true },
+  ];
 
   const visible = useMemo(() => {
     switch (activeTab) {
@@ -44,7 +44,7 @@ export default function CommandesPage({ orders = SAMPLE_ORDERS, onCreateOrder }:
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Store · Commandes</div>
           <h1 className={styles.title}>Gestion des <span className={styles.serif}>commandes</span></h1>
-          <p className={styles.subtitle}>32 commandes ce mois · 3 en attente · 347 500 F de CA</p>
+          <p className={styles.subtitle}>{orders.length} commande{orders.length !== 1 ? 's' : ''} · {orders.filter(o => o.status === 'En attente').length} en attente · {totalCA.toLocaleString('fr-FR')} F de CA</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>

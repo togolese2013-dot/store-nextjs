@@ -123,7 +123,8 @@ export function getAccessibleModules(
   role: string,
   permissions: AdminPermissions | null | undefined,
 ): ModuleKey[] {
-  if (role === "super_admin") return Object.keys(ADMIN_MODULES) as ModuleKey[];
+  // super_admin and admin (shop owner) without explicit restrictions get full access
+  if (role === "super_admin" || role === "admin") return Object.keys(ADMIN_MODULES) as ModuleKey[];
   if (!permissions) return [];
   return (Object.keys(permissions) as ModuleKey[]).filter(k => k in ADMIN_MODULES);
 }

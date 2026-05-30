@@ -110,16 +110,68 @@
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.userRow { display: flex; align-items: center; gap: 10px; }
+.userRowWrap { position: relative; }
+.userRow { display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 8px; padding: 4px; border: none; background: none; width: 100%; text-align: left; transition: background .12s; }
+.userRow:hover { background: var(--bg-2); }
 .avatar {
   width: 30px; height: 30px; border-radius: 999px;
   background: var(--ink); color: white;
   display: grid; place-items: center;
-  font-size: 12px; font-weight: 600;
+  font-size: 12px; font-weight: 600; flex-shrink: 0;
 }
 .userMeta { flex: 1; min-width: 0; }
 .userMeta .n { font-size: 13px; font-weight: 500; line-height: 1.1; }
 .userMeta .r { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ─── User dropdown menu ─────────────────────────────────────── */
+.userMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0; right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(20,17,14,.12);
+  overflow: hidden;
+  z-index: 200;
+}
+.userMenuHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.userMenuAvatar {
+  width: 34px; height: 34px; border-radius: 999px;
+  background: var(--ink); color: white;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.userMenuName { font-size: 13px; font-weight: 600; line-height: 1.1; }
+.userMenuRole { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.userMenuBody { padding: 4px 0; }
+.userMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: background .1s;
+}
+.userMenuItem:hover { background: var(--bg-2); }
+.userMenuDivider { height: 1px; background: var(--border); margin: 4px 0; }
+.userMenuItemDanger { color: #c9601e; }
+.userMenuItemDanger:hover { background: rgba(201,96,30,.08); }
 .n { font-size: 13px; font-weight: 500; line-height: 1.1; }
 .r { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
@@ -706,3 +758,35 @@
 .catStatLabel { font-size: 10px; color: var(--muted-2); letter-spacing: .06em; text-transform: uppercase; }
 .catCardFoot { display: flex; align-items: center; justify-content: space-between; }
 .catCardMeta { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
+
+/* ─── Image Upload ───────────────────────────────────────────────── */
+.imgUploadWrap { display: flex; flex-direction: column; gap: 10px; }
+.imgDropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; width: 100%; min-height: 140px;
+  border: 1.5px dashed var(--border-strong); border-radius: 12px;
+  background: var(--bg-2); cursor: pointer; transition: border-color .15s, background .15s;
+  padding: 24px 16px;
+}
+.imgDropzone:hover { border-color: var(--ink); background: var(--bg); }
+.imgDropzoneDrag { border-color: var(--accent); background: var(--accent-bg); }
+.imgDropzoneLoading { cursor: not-allowed; opacity: .7; }
+.imgDropzoneLabel { font-size: 13px; font-weight: 500; color: var(--ink); }
+.imgDropzoneHint  { font-size: 11px; color: var(--muted-2); }
+.imgPreview {
+  position: relative; border-radius: 12px;
+  overflow: hidden; border: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.imgPreview img { width: 100%; height: 200px; object-fit: contain; display: block; }
+.imgRemoveBtn {
+  position: absolute; top: 8px; right: 8px;
+  width: 26px; height: 26px; border-radius: 999px;
+  background: rgba(20,17,14,.65); color: white;
+  border: none; cursor: pointer; font-size: 11px;
+  display: grid; place-items: center;
+  transition: background .12s;
+}
+.imgRemoveBtn:hover { background: rgba(20,17,14,.9); }
+.imgUrlFallback { display: flex; flex-direction: column; gap: 6px; }
+.imgUrlFallback span { font-size: 11px; color: var(--muted-2); text-align: center; }

@@ -6,14 +6,7 @@ import {
 } from './icons';
 
 /* ─── Team members ──────────────────────────────── */
-export const SAMPLE_MEMBERS: Member[] = [
-  { name: 'Kent Diallo',      init: 'K',  color: '#14110E', email: 'kent@maisondiallo.tg',   role: 'Propriétaire', workspaces: 'Tous',             last: "À l'instant", status: 'Actif' },
-  { name: 'Akua Mensah',      init: 'AM', color: '#3B6A8F', email: 'akua@maisondiallo.tg',   role: 'Gérant',       workspaces: 'Magasin · Boutique', last: 'il y a 2h',   status: 'Actif' },
-  { name: 'Moussa Koné',      init: 'MK', color: '#2D6A4F', email: 'moussa@maisondiallo.tg', role: 'Vendeur',      workspaces: 'Boutique',          last: 'il y a 5h',   status: 'Actif' },
-  { name: 'Fatou Sow',        init: 'FS', color: '#5C4A88', email: 'fatou@maisondiallo.tg',  role: 'Comptable',    workspaces: 'Admin · Store',      last: 'hier',        status: 'Actif' },
-  { name: 'Yao Komlan',       init: 'YK', color: '#C9601E', email: 'yao@maisondiallo.tg',    role: 'Vendeur',      workspaces: 'Boutique',          last: 'il y a 3j',   status: 'Inactif' },
-  { name: 'invité@gmail.com', init: '?',  color: '#8A8278', email: 'invité@gmail.com',       role: 'Vendeur',      workspaces: 'Boutique',          last: '—',           status: 'Invitation' },
-];
+export const SAMPLE_MEMBERS: Member[] = [];
 
 export const ROLE_STYLE: Record<string, React.CSSProperties> = {
   'Propriétaire': { background: 'var(--accent-bg)', color: 'var(--accent)' },
@@ -32,10 +25,10 @@ export const SAMPLE_ROLES: Role[] = [
 
 /* ─── Workspaces health ─────────────────────────── */
 export const SAMPLE_WORKSPACES: WorkspaceHealth[] = [
-  { id: 'magasin',  name: 'Magasin',  tag: 'Gestion des stocks', icon: PackageIcon, tint: '#3B6A8F', bg: '#E8F0F7', count: '248 produits',  activity: 'il y a 2h',    active: true  },
-  { id: 'boutique', name: 'Boutique', tag: 'Ventes & caisse',    icon: ReceiptIcon, tint: '#C9601E', bg: '#FBE9D6', count: '12 ventes/j',   activity: "À l'instant",  active: true  },
-  { id: 'store',    name: 'Store',    tag: 'E-commerce',         icon: StoreIcon,   tint: '#2D6A4F', bg: '#DDEBE2', count: '32 commandes',  activity: 'il y a 5 min', active: true  },
-  { id: 'crm',      name: 'CRM',      tag: 'Relation client',    icon: HeartIcon,   tint: '#5C4A88', bg: '#E6E0F0', count: '1 421 clients', activity: 'il y a 1j',    active: false },
+  { id: 'magasin',  name: 'Magasin',  tag: 'Gestion des stocks', icon: PackageIcon, tint: '#3B6A8F', bg: '#E8F0F7', count: '—', activity: '—', active: true  },
+  { id: 'boutique', name: 'Boutique', tag: 'Ventes & caisse',    icon: ReceiptIcon, tint: '#C9601E', bg: '#FBE9D6', count: '—', activity: '—', active: true  },
+  { id: 'store',    name: 'Store',    tag: 'E-commerce',         icon: StoreIcon,   tint: '#2D6A4F', bg: '#DDEBE2', count: '—', activity: '—', active: true  },
+  { id: 'crm',      name: 'CRM',      tag: 'Relation client',    icon: HeartIcon,   tint: '#5C4A88', bg: '#E6E0F0', count: '—', activity: '—', active: false },
 ];
 
 /* ─── Integrations ──────────────────────────────── */
@@ -59,34 +52,28 @@ export const SAMPLE_REPORTS: Report[] = [
 ];
 
 /* ─── Activity log ──────────────────────────────── */
-export const SAMPLE_LOG: ActivityLog[] = [
-  { date: '28 mai, 14h32', who: 'Moussa Koné', init: 'MK', color: '#2D6A4F', action: 'a enregistré la vente V-0891',                  ws: 'Boutique', wsColor: '#C9601E' },
-  { date: '28 mai, 13h05', who: 'Kent Diallo', init: 'K',  color: '#14110E', action: 'a modifié le rôle de Fatou Sow → Comptable',   ws: 'Admin',    wsColor: '#2A2522' },
-  { date: '28 mai, 11h20', who: 'Akua Mensah', init: 'AM', color: '#3B6A8F', action: 'a importé 156 unités de stock',                ws: 'Magasin',  wsColor: '#3B6A8F' },
-  { date: '28 mai, 10h14', who: 'Système',     init: 'S',  color: '#8A8278', action: 'paiement Wave reçu · CMD-2847',                ws: 'Store',    wsColor: '#2D6A4F' },
-  { date: '28 mai, 09h00', who: 'Kent Diallo', init: 'K',  color: '#14110E', action: 'a ouvert la caisse (fonds 30 000 F)',          ws: 'Boutique', wsColor: '#C9601E' },
-  { date: '27 mai, 18h45', who: 'Fatou Sow',   init: 'FS', color: '#5C4A88', action: 'a exporté le rapport financier mensuel',       ws: 'Admin',    wsColor: '#2A2522' },
-  { date: '27 mai, 16h30', who: 'Kent Diallo', init: 'K',  color: '#14110E', action: 'a invité invité@gmail.com (Vendeur)',          ws: 'Admin',    wsColor: '#2A2522' },
-  { date: '27 mai, 14h12', who: 'Akua Mensah', init: 'AM', color: '#3B6A8F', action: 'a créé le coupon WAXFEST20',                   ws: 'Store',    wsColor: '#2D6A4F' },
-];
+export const SAMPLE_LOG: ActivityLog[] = [];
 
 /* ─── CA breakdown (overview) ───────────────────── */
 export const CA_BREAKDOWN = [
-  { name: 'Store',    ca: 2340000, pct: 45, tint: '#2D6A4F' },
-  { name: 'Boutique', ca: 1820000, pct: 35, tint: '#C9601E' },
-  { name: 'Magasin',  ca: 1040000, pct: 20, tint: '#3B6A8F' },
+  { name: 'Store',    ca: 0, pct: 0, tint: '#2D6A4F' },
+  { name: 'Boutique', ca: 0, pct: 0, tint: '#C9601E' },
+  { name: 'Magasin',  ca: 0, pct: 0, tint: '#3B6A8F' },
 ];
+
+const activeWorkspaces = SAMPLE_WORKSPACES.filter(w => w.active).length;
+const connectedIntegrations = SAMPLE_INTEGRATIONS.filter(i => i.connected).length;
 
 /* ─── KPI sets ──────────────────────────────────── */
 export const OVERVIEW_KPIS: KpiItem[] = [
-  { label: 'CA consolidé · mois', value: '5,2', unit: 'M F', delta: '+16%', deltaColor: '#2D6A4F', sub: 'tous workspaces',   spark: [3.2,3.5,3.8,4.0,4.2,4.5,4.7,4.9,5.0,5.1,5.2], sparkColor: '#2A2522' },
-  { label: 'Équipiers actifs',    value: '5',                 delta: '+1',   deltaColor: '#2D6A4F', sub: 'sur 6 membres',     spark: [3,3,4,4,4,5,5,5,5,5,5], sparkColor: '#3B6A8F' },
-  { label: 'Workspaces actifs',   value: '3', unit: '/ 4',                                          sub: 'CRM désactivé' },
-  { label: 'Abonnement',          value: 'Business', serif: true,                                   sub: 'renouvellement 15 juin' },
+  { label: 'CA consolidé · mois', value: '—',                                                        sub: 'tous workspaces' },
+  { label: 'Équipiers actifs',    value: '—',                                                        sub: 'membres actifs' },
+  { label: 'Workspaces actifs',   value: String(activeWorkspaces), unit: `/ ${SAMPLE_WORKSPACES.length}`, sub: 'espaces configurés' },
+  { label: 'Abonnement',          value: '—',        serif: true,                                    sub: '—' },
 ];
 
 export const INTEGRATIONS_KPIS: KpiItem[] = [
-  { label: 'Intégrations actives', value: '3',                                              sub: 'sur 6 disponibles',     spark: [1,1,2,2,2,3,3,3,3,3,3], sparkColor: '#2A2522' },
-  { label: 'Catégorie principale', value: 'Paiement', serif: true,                          sub: 'Wave · Orange Money' },
-  { label: 'Appels API · mois',    value: '48 200',   delta: '+12%', deltaColor: '#2D6A4F', sub: 'toutes intégrations',   spark: [30,33,36,38,40,42,44,45,46,47,48], sparkColor: '#3B6A8F' },
+  { label: 'Intégrations actives', value: String(connectedIntegrations),                              sub: `sur ${SAMPLE_INTEGRATIONS.length} disponibles` },
+  { label: 'Catégorie principale', value: '—',       serif: true,                                    sub: '—' },
+  { label: 'Appels API · mois',    value: '—',                                                       sub: 'toutes intégrations' },
 ];

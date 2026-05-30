@@ -6,7 +6,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import type { PageId } from './MagasinShell';
 import MagasinShell from './MagasinShell';
 import type { Product as MagasinProduct, KpiCard, TabSpec } from './types';
 import { SAMPLE_PRODUCTS, SAMPLE_KPIS, DEFAULT_TABS, ACCENT } from './sample-data';
@@ -125,6 +126,7 @@ interface Props {
   onCreateProduct?: () => void;
   userName?: string;
   userRole?: string;
+  shopName?: string;
 }
 
 export default function MagasinDataLoader({
@@ -132,8 +134,11 @@ export default function MagasinDataLoader({
   onCreateProduct,
   userName,
   userRole,
+  shopName,
 }: Props) {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const defaultPage  = (searchParams.get('page') as PageId | null) ?? 'overview';
 
   /* Data */
   const [allProducts, setAllProducts] = useState<MagasinProduct[]>(SAMPLE_PRODUCTS);
@@ -227,6 +232,7 @@ export default function MagasinDataLoader({
 
   return (
     <MagasinShell
+      defaultPage={defaultPage}
       products={allProducts}
       kpis={kpis}
       tabs={tabs}
@@ -244,6 +250,7 @@ export default function MagasinDataLoader({
       onPageChange={handlePageChange}
       userName={userName}
       userRole={userRole}
+      shopName={shopName}
     />
   );
 }

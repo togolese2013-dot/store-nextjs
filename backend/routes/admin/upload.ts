@@ -2,12 +2,6 @@ import express from "express";
 import { getSession } from "../../lib/auth";
 import { v2 as cloudinary } from "cloudinary";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 const MAX_SIZE = 10 * 1024 * 1024;
 
 /** Detect real MIME type from magic bytes — never trust client-supplied type. */
@@ -29,6 +23,13 @@ function detectMimeFromBuffer(buf: Buffer): string | null {
 const router = express.Router();
 
 async function uploadToCloudinary(buffer: Buffer, _clientType: string): Promise<string> {
+  // Configure lazily so dotenv has already populated env vars at call time
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key:    process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+
   if (buffer.length > MAX_SIZE) throw new Error("Fichier trop volumineux (max 10 Mo)");
 
   // Verify real type from magic bytes — ignore client-supplied type

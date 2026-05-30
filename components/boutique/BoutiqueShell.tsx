@@ -50,6 +50,7 @@ export interface BoutiqueShellProps {
   onNewSale?: () => void;
   userName?: string;
   userRole?: string;
+  shopName?: string;
 }
 
 export default function BoutiqueShell({
@@ -62,6 +63,7 @@ export default function BoutiqueShell({
   onNewSale,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
+  shopName = 'Ma boutique',
 }: BoutiqueShellProps) {
   const [page, setPage] = useState<PageId>(defaultPage);
 
@@ -90,7 +92,7 @@ export default function BoutiqueShell({
             <ChevLeftIcon size={16} />
           </button>
           <div className={styles.crumbs}>
-            <span>Maison Diallo</span>
+            <span>{shopName}</span>
             <span className={styles.sep}>/</span>
             <span>Boutique</span>
             {page !== 'overview' && (

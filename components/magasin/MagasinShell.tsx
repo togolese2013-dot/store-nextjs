@@ -131,6 +131,7 @@ export interface MagasinShellProps {
 
   userName?: string;
   userRole?: string;
+  shopName?: string;
 }
 
 /* ─── Shell ─────────────────────────────────────────────────────── */
@@ -162,6 +163,7 @@ export default function MagasinShell({
   onExport,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
+  shopName = 'Ma boutique',
 }: MagasinShellProps) {
   const [activePage, setActivePage] = useState<PageId>(defaultPage);
 
@@ -193,7 +195,7 @@ export default function MagasinShell({
             <ChevLeftIcon size={16} />
           </button>
           <div className={styles.crumbs}>
-            <span>Maison Diallo</span>
+            <span>{shopName}</span>
             <span className={styles.sep}>/</span>
             <span>Magasin</span>
             {activePage !== 'overview' && (
@@ -294,7 +296,10 @@ function ProductsContent({
             Catalogue <span className={styles.serif}>produits</span>
           </h1>
           <p className={styles.subtitle}>
-            {totalCount ?? products.length} produits actifs · dernier import il y a 2 h
+            {totalCount ?? products.length} produit{(totalCount ?? products.length) !== 1 ? 's' : ''}
+            {products.filter(p => p.stock === 0).length > 0
+              ? ` · ${products.filter(p => p.stock === 0).length} en rupture`
+              : ''}
           </p>
         </div>
         <div className={styles.headerActions}>

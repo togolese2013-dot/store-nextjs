@@ -21,13 +21,14 @@ export interface CouponsPageProps {
 }
 
 export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPageProps) {
+  const actifs = coupons.filter(c => c.status === 'Actif').length;
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Store · Coupons</div>
           <h1 className={styles.title}>Codes <span className={styles.serif}>promotionnels</span></h1>
-          <p className={styles.subtitle}>8 codes configurés · 5 actifs · 145 utilisations ce mois</p>
+          <p className={styles.subtitle}>{coupons.length} code{coupons.length !== 1 ? 's' : ''} configuré{coupons.length !== 1 ? 's' : ''} · {actifs} actif{actifs !== 1 ? 's' : ''}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>

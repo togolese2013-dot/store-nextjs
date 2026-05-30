@@ -9,17 +9,27 @@ import Sparkline from './Sparkline';
 import { PlusIcon, MoreIcon, TrendIcon, HistoryIcon } from './icons';
 import styles from './Magasin.module.css';
 
-const KPIS = [
-  { label: 'Ajustements ce mois', value: '14',   delta: '+3',      deltaColor: '#2D6A4F', sub: 'vs 11 mois dernier',      spark: [8,9,9,10,11,11,12,12,13,13,14], color: '#3B6A8F' },
-  { label: 'Unités ajoutées',     value: '+154',                    deltaColor: '#2D6A4F', sub: 'réceptions et corrections' },
-  { label: 'Unités retirées',     value: '−15',  delta: 'casses',  deltaColor: '#9C3A14', sub: 'casses et corrections',    spark: [2,3,3,4,4,5,5,6,6,5,5],        color: '#C9601E' },
-];
+type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 export interface AjustementsPageProps {
   adjustments?: StockAdjustment[];
 }
 
 export default function AjustementsPage({ adjustments = SAMPLE_ADJUSTMENTS }: AjustementsPageProps) {
+  const added   = adjustments.filter(a => a.delta > 0).reduce((s, a) => s + a.delta, 0);
+  const removed = Math.abs(adjustments.filter(a => a.delta < 0).reduce((s, a) => s + a.delta, 0));
+  const reasons = new Set(adjustments.map(a => a.reason)).size;
+
+  const KPIS: LocalKpi[] = [
+    { label: 'Ajustements ce mois', value: String(adjustments.length), sub: 'total',                    color: '#3B6A8F' },
+    { label: 'Unités ajoutées',     value: added   > 0 ? `+${added}`   : '—', sub: 'réceptions et corrections' },
+    { label: 'Unités retirées',     value: removed > 0 ? `−${removed}` : '—', sub: 'casses et corrections',    color: '#C9601E' },
+  ];
+
+  const subtitle = adjustments.length === 0
+    ? 'Aucun ajustement ce mois'
+    : `${adjustments.length} ajustement${adjustments.length > 1 ? 's' : ''} · ${added > 0 ? `+${added}` : '0'} unités nettes · ${reasons} raison${reasons > 1 ? 's' : ''}`;
+
   return (
     <>
       <div className={styles.header}>
@@ -28,9 +38,7 @@ export default function AjustementsPage({ adjustments = SAMPLE_ADJUSTMENTS }: Aj
           <h1 className={styles.title}>
             Ajustements <span className={styles.serif}>de stock</span>
           </h1>
-          <p className={styles.subtitle}>
-            14 ajustements ce mois · +154 unités nettes · 2 raisons fréquentes
-          </p>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}>
@@ -114,7 +122,7 @@ export default function AjustementsPage({ adjustments = SAMPLE_ADJUSTMENTS }: Aj
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>14 ajustements ce mois</span>
+          <span>{adjustments.length} ajustement{adjustments.length !== 1 ? 's' : ''} ce mois</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>
