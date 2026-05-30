@@ -1,5 +1,5 @@
 # HANDOFF — Togolese Shop Admin
-> Dernière mise à jour : 2026-04-21 (session 5)
+> Dernière mise à jour : 2026-05-30 (session 8)
 > Commit actuel : voir `git log --oneline -1`
 
 ---
@@ -98,6 +98,26 @@
 
 ---
 
+## 🌐 Déploiement — Deux branches, deux serveurs
+
+| Branche | Serveur | Domaine | Déclenchement |
+|---|---|---|---|
+| `main` | Vercel | togolese.tg | Push `main` → Vercel auto |
+| `saas` | Hetzner (Ubuntu, `/opt/afrisika`) | afrisika.com | `npm run deploy` (script SSH) |
+
+### Déployer sur Hetzner
+```bash
+npm run deploy          # git push + SSH + docker compose rebuild
+# ou manuellement :
+./deploy-hetzner.sh
+```
+Script : `deploy-hetzner.sh` — push origin saas → SSH `root@178.105.157.67` → `cd /opt/afrisika` → `git pull origin saas` → `docker compose -f docker-compose.prod.yml down && up --build`
+
+### Vercel — ignore branche saas
+Configuré via API Vercel (`commandForIgnoringBuildStep`) : exit 0 si branche = `saas`, exit 1 sinon. Vercel ne déploie que `main`.
+
+---
+
 ## 🚀 Lancer le projet
 
 ```bash
@@ -106,7 +126,7 @@ npx next dev --turbopack --port 3003
 # http://localhost:3003/admin
 ```
 
-> ⚠️ **Règle absolue** : toujours éditer dans `/Volumes/LOCAL/CLAUDE CODE/store-nextjs` (main). Jamais dans un worktree.
+> ⚠️ **Règle absolue** : toujours éditer dans `/Volumes/LOCAL/CLAUDE CODE/store-nextjs` (branche `saas`). Jamais dans un worktree.
 
 ---
 
@@ -329,6 +349,35 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3003
 
 ---
 
+## 🏗️ Architecture SaaS — Workspaces CSS Modules
+
+5 workspaces fullscreen, chacun = Shell + Sidebar + Pages + CSS Module. Montés via `app/admin/(fullscreen)/`.
+
+| Workspace | Dossier | Route | Accent |
+|---|---|---|---|
+| Magasin | `components/magasin/` | `/admin/magasin` | `#3B6A8F` bleu |
+| Boutique | `components/boutique/` | `/admin/boutique-ws` | `#C9601E` orange |
+| Store | `components/store/` | `/admin/store` | `#2D6A4F` vert |
+| CRM | `components/crm/` | `/admin/crm-ws` | `#5C4A88` violet |
+| Admin WS | `components/admin-ws/` | `/admin/admin-ws` | `#2A2522` graphite |
+
+Entrée : `WorkspaceSelector` (`/admin`) → cartes → `AdminWorkspaceClient.tsx` → route correspondante.
+
+### Règles CSS Modules workspaces (CRITIQUE)
+- **`color-mix()` INTERDIT** — Turbopack crash MIME type. Utiliser `rgba(0,0,0,0.08)` à la place.
+- **Classes dans Sidebar** : toujours `styles.l1`, `styles.l2`, `styles.n`, `styles.r` — jamais `"l1"` raw string.
+- **Classes top-level** : définir `.l1`, `.l2`, `.n`, `.r` au top du CSS Module (pas seulement en nested `.workspaceMeta .l1`).
+- **Composant de shell Admin WS** : nommé `AdminWsShell` (pas `AdminShell`) pour éviter conflit avec `components/admin/AdminShell.tsx`.
+
+### Store — Page Réglages boutique
+- Fichier : `components/store/ReglagesPage.tsx`
+- Sections : URL & Domaine, Apparence (logo + couleur), Infos boutique, Paiements, Notifications, Zone danger
+- Persistance : `localStorage` clé `"store_reglages"` — load sur mount, save au clic "Enregistrer"
+- Zone danger (désactiver boutique) → sauvegarde immédiate sans bouton
+- Slug : lecture seule (`slug.afrisika.com`) — domaine perso éditable
+
+---
+
 ## 🚫 Règles importantes
 
 1. **Jamais de worktree** — éditer uniquement dans `/Volumes/LOCAL/CLAUDE CODE/store-nextjs`
@@ -343,10 +392,29 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3003
 10. **SSE** : utiliser `emitAdminEvent()` dans toutes les API routes de mutation
 11. **Auto-init DB** : `ensureBoutiqueStockPopulated()`, `ensureBoutiqueClientsTable()`, `ensureMarquesTable()` — pas besoin d'exécuter des scripts SQL manuellement
 12. **Table `achats`** : pas de `created_at`, colonne `notes` (pas `note`), statut sans `annule`
+13. **CSS Modules workspaces** : `color-mix()` interdit (Turbopack crash). Sidebar classes = `styles.xxx` jamais `"xxx"`.
+14. **Déployer Hetzner** : `npm run deploy` depuis le Mac local — ne pas relancer depuis le serveur SSH
+15. **MySQL Hetzner** : port 3307, base `togolese`, partagée entre afrisika.com et togolese.tg
+16. **Jamais subquery `reviews` dans `getProducts()`** — casse toute la liste produits. Avis via `RatingBadge` lazy client uniquement.
 
 ---
 
 ## 📝 Historique des sessions
+
+### Session 8 (2026-05-30)
+- **Store — Réglages boutique** : `ReglagesPage.tsx` créé — 6 sections (URL/domaine, apparence, infos, paiements, notifications, zone danger). localStorage persistance (`store_reglages`). Slug readonly, domaine perso éditable. Color picker + presets. Logo URL avec aperçu live.
+- **Deploy script** : `deploy-hetzner.sh` + `npm run deploy` — SSH + git pull + docker compose rebuild automatique
+- **Réglages persistés** : `useEffect` load depuis localStorage au mount, `handleSave` écrit au clic, zone danger sauvegarde immédiate
+
+### Session 7 (2026-05-30)
+- **Admin workspace** : `components/admin-ws/` (13 fichiers) — AdminWsShell, Sidebar, OverviewPage, UsersPage, WorkspacesPage, IntegrationsPage, ReportsPage, LogsPage, types, icons, Sparkline, sample-data, Admin.module.css
+- **Route** : `app/admin/admin-ws/page.tsx` → `AdminWsShell`
+- **AdminWorkspaceClient** : `admin: '/admin/admin-ws'` (était `/admin/config`)
+- **AdminShell** : `ADMIN_ZONE` enrichi avec `"/admin/admin-ws"`
+- **CSS Modules fix Magasin + Store sidebars** : `className="l1"` → `className={styles.l1}` (idem l2/n/r) + classes top-level ajoutées dans les 2 CSS modules
+- **Magasin sample-data** : tous les tableaux vidés (`[]`), KPIs à `value: '0'`, `spark: []`
+- **Vercel ignore saas** : API `commandForIgnoringBuildStep` configurée — `main` → Vercel (togolese.tg), `saas` → Hetzner (afrisika.com)
+- **WorkspaceSelector** : accent orange, 5 cartes (Magasin/Boutique/Store/CRM/Admin), ⌘K palette, raccourcis 1–5
 
 ### Session 5 (2026-04-21)
 - **SSE temps réel** : remplacement du polling 30s par Server-Sent Events — `lib/admin-events.ts` (EventEmitter singleton), `app/api/admin/events/route.ts` (heartbeat 25s), `AdminShell.tsx` (EventSource avec reconnexion auto)
