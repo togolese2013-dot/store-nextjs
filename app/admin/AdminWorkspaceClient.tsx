@@ -8,11 +8,19 @@ export default function AdminWorkspaceClient({
   shopName,
   shopLocation,
   userName,
+  shopPlan,
+  shopStatus,
+  shopTrialEndsAt,
+  shopPeriodEnd,
 }: {
   workspaceIds: WorkspaceId[];
   shopName: string;
   shopLocation: string;
   userName: string;
+  shopPlan?: string;
+  shopStatus?: string;
+  shopTrialEndsAt?: string | null;
+  shopPeriodEnd?: string | null;
 }) {
   const router = useRouter();
   const workspaces = DEFAULT_WORKSPACES.filter(w => workspaceIds.includes(w.id));
@@ -23,6 +31,10 @@ export default function AdminWorkspaceClient({
       shopName={shopName}
       shopLocation={shopLocation}
       userName={userName}
+      shopPlan={shopPlan}
+      shopStatus={shopStatus}
+      shopTrialEndsAt={shopTrialEndsAt}
+      shopPeriodEnd={shopPeriodEnd}
       onEnter={(ws: Workspace) => {
         const routes: Record<string, string> = {
           magasin:  '/admin/magasin',

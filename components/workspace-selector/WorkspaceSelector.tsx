@@ -35,6 +35,220 @@ export const DEFAULT_WORKSPACES: WorkspaceWithIcon[] = [
   { id: 'admin',    name: 'Admin',    tag: 'Config & rapports',  desc: 'Utilisateurs, rôles, paramètres, rapports avancés, intégrations', tint: '#2A2522', tintBg: '#EBE4D6', count: '4 équipiers',    icon: GaugeIcon },
 ];
 
+/* ─── Subscription helpers ───────────────────────────────────────── */
+function daysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000);
+}
+
+function fmtDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
+}
+
+function planColors(plan: string): { text: string; bg: string } {
+  if (plan === 'pro')   return { text: '#5C4A88', bg: '#E6E0F0' };
+  if (plan === 'basic') return { text: '#3B6A8F', bg: '#E8F0F7' };
+  return { text: '#6B635B', bg: '#EBE4D6' };
+}
+
+function planLabel(plan: string): string {
+  if (plan === 'pro')   return 'Pro';
+  if (plan === 'basic') return 'Basic';
+  return 'Gratuit';
+}
+
+/* ─── Plan badge (topbar) ────────────────────────────────────────── */
+function PlanBadge({
+  plan, status, trialEndsAt, periodEnd,
+}: {
+  plan: string; status: string;
+  trialEndsAt?: string | null; periodEnd?: string | null;
+}) {
+  const isTrial   = status === 'trial';
+  const isExpired = status === 'expired' || status === 'suspended';
+  const days      = isTrial ? daysUntil(trialEndsAt) : daysUntil(periodEnd);
+  const isWarn    = !isExpired && days !== null && days <= 14;
+
+  let text: string;
+  let textColor: string;
+  let bgColor: string;
+  let border: string;
+
+  if (isExpired) {
+    text = 'Expiré'; textColor = '#9C3A14'; bgColor = '#F7DCCB'; border = 'rgba(156,58,20,.2)';
+  } else if (isTrial) {
+    const d = days ?? 0;
+    text = `Essai · ${d > 0 ? d + 'j' : 'terminé'}`;
+    textColor = d <= 7 ? '#9C3A14' : '#C9601E';
+    bgColor   = d <= 7 ? '#F7DCCB'  : '#FBE9D6';
+    border    = d <= 7 ? 'rgba(156,58,20,.2)' : 'rgba(201,96,30,.2)';
+  } else if (isWarn) {
+    text = `${planLabel(plan)} · ${days}j`;
+    textColor = '#C9601E'; bgColor = '#FBE9D6'; border = 'rgba(201,96,30,.2)';
+  } else {
+    const c = planColors(plan);
+    text = planLabel(plan); textColor = c.text; bgColor = c.bg;
+    border = `rgba(${plan === 'pro' ? '92,74,136' : plan === 'basic' ? '59,106,143' : '107,99,91'},.2)`;
+  }
+
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '2px 8px', borderRadius: 99,
+      fontSize: 11, fontWeight: 600, letterSpacing: '.03em',
+      color: textColor, background: bgColor,
+      border: `1px solid ${border}`,
+      fontFamily: '"Geist Mono", monospace',
+      flexShrink: 0,
+    }}>
+      {text}
+    </span>
+  );
+}
+
+/* ─── Subscription card (grid) ───────────────────────────────────── */
+function SubscriptionCard({
+  plan, status, trialEndsAt, periodEnd,
+}: {
+  plan: string; status: string;
+  trialEndsAt?: string | null; periodEnd?: string | null;
+}) {
+  const isTrial   = status === 'trial';
+  const isExpired = status === 'expired' || status === 'suspended';
+  const days      = isTrial ? daysUntil(trialEndsAt) : daysUntil(periodEnd);
+  const isWarn    = !isExpired && days !== null && days <= 14;
+  const colors    = planColors(plan);
+
+  let accentText: string;
+  let accentBg: string;
+  let statusLine: React.ReactNode;
+
+  if (isExpired) {
+    accentText = '#9C3A14'; accentBg = '#F7DCCB';
+    statusLine = <span style={{ color: '#9C3A14', fontWeight: 600 }}>Expiré — accès restreint</span>;
+  } else if (isTrial) {
+    accentText = '#C9601E'; accentBg = '#FBE9D6';
+    const d = days ?? 0;
+    statusLine = (
+      <span>
+        <span style={{ color: d <= 7 ? '#9C3A14' : '#C9601E', fontWeight: 600 }}>
+          {d > 0 ? `${d} jour${d > 1 ? 's' : ''} d'essai restant${d > 1 ? 's' : ''}` : "Essai terminé"}
+        </span>
+        {trialEndsAt && d > 0 && (
+          <span style={{ color: '#8A8278', fontSize: 12, display: 'block', marginTop: 2 }}>
+            Jusqu'au {fmtDate(trialEndsAt)}
+          </span>
+        )}
+      </span>
+    );
+  } else if (isWarn && periodEnd) {
+    accentText = '#C9601E'; accentBg = '#FBE9D6';
+    statusLine = (
+      <span>
+        <span style={{ color: '#C9601E', fontWeight: 600 }}>Expire dans {days} jour{(days ?? 0) > 1 ? 's' : ''}</span>
+        <span style={{ color: '#8A8278', fontSize: 12, display: 'block', marginTop: 2 }}>
+          Le {fmtDate(periodEnd)}
+        </span>
+      </span>
+    );
+  } else {
+    accentText = colors.text; accentBg = colors.bg;
+    statusLine = periodEnd ? (
+      <span style={{ color: '#6B635B' }}>Expire le {fmtDate(periodEnd)}</span>
+    ) : (
+      <span style={{ color: '#6B635B' }}>Actif</span>
+    );
+  }
+
+  const ctaLabel = isExpired ? 'Renouveler' : isTrial ? 'Choisir un plan' : isWarn ? 'Renouveler' : 'Gérer';
+
+  return (
+    <a
+      href="/admin/billing"
+      style={{
+        position: 'relative',
+        background: 'white',
+        border: `1px solid ${isExpired || isWarn ? 'rgba(201,96,30,.35)' : '#E8E1D4'}`,
+        borderRadius: 18,
+        padding: '22px 22px 18px',
+        display: 'flex', flexDirection: 'column',
+        minHeight: 220,
+        textDecoration: 'none', color: 'inherit',
+        transition: 'transform .18s ease, border-color .18s ease, box-shadow .25s ease',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-2px)';
+        (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 18px 40px -22px rgba(20,17,14,0.25)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLAnchorElement).style.transform = '';
+        (e.currentTarget as HTMLAnchorElement).style.boxShadow = '';
+      }}
+    >
+      {/* Top row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 12,
+          background: accentBg, color: accentText,
+          display: 'grid', placeItems: 'center',
+        }}>
+          {/* Credit card icon */}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+            <line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+        </div>
+        <span style={{
+          fontFamily: '"Geist Mono", monospace',
+          fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase',
+          color: '#6B635B', fontWeight: 500,
+          padding: '4px 9px', border: '1px solid #E8E1D4',
+          background: '#FBF7F1', borderRadius: 999,
+        }}>
+          Abonnement
+        </span>
+      </div>
+
+      {/* Plan name */}
+      <h3 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.022em', lineHeight: 1.1, margin: '0 0 6px' }}>
+        Plan&nbsp;
+        <span style={{ color: accentText }}>{planLabel(plan)}</span>
+      </h3>
+
+      {/* Status line */}
+      <p style={{ fontSize: 13.5, lineHeight: 1.5, color: '#6B635B', margin: '0 0 18px' }}>
+        {statusLine}
+      </p>
+
+      {/* Footer */}
+      <div style={{
+        marginTop: 'auto', paddingTop: 14,
+        borderTop: '1px dashed #E8E1D4',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{
+          fontFamily: '"Geist Mono", monospace', fontSize: 12, color: '#14110E',
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: 99, background: accentText, display: 'inline-block', flexShrink: 0 }} />
+          {ctaLabel}
+        </span>
+        <div style={{
+          width: 34, height: 34, borderRadius: 999,
+          background: '#FBF7F1', color: '#14110E',
+          border: '1px solid #E8E1D4',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <ArrowRightIcon size={15} />
+        </div>
+      </div>
+    </a>
+  );
+}
+
 /* ─── Component props ────────────────────────────────────────────── */
 export interface WorkspaceSelectorProps {
   workspaces?: WorkspaceWithIcon[];
@@ -44,6 +258,11 @@ export interface WorkspaceSelectorProps {
   /** User name + initial for the avatar pill */
   userName?: string;
   userRole?: string;
+  /** Subscription info */
+  shopPlan?: string;
+  shopStatus?: string;
+  shopTrialEndsAt?: string | null;
+  shopPeriodEnd?: string | null;
   /** Called when a card / palette row is selected. Wire to your router. */
   onEnter: (workspace: Workspace) => void;
 }
@@ -87,6 +306,10 @@ export default function WorkspaceSelector({
   shopLocation = '',
   userName = 'Kent',
   userRole = 'Propriétaire',
+  shopPlan,
+  shopStatus,
+  shopTrialEndsAt,
+  shopPeriodEnd,
   onEnter,
 }: WorkspaceSelectorProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -153,6 +376,14 @@ export default function WorkspaceSelector({
           <span className={styles.brandName}>Afrisika</span>
           <span className={styles.brandDivider} />
           <span className={styles.brandShop}><b>{shopName}</b>{shopLocation ? ` · ${shopLocation}` : ''}</span>
+          {shopPlan && shopStatus && (
+            <PlanBadge
+              plan={shopPlan}
+              status={shopStatus}
+              trialEndsAt={shopTrialEndsAt}
+              periodEnd={shopPeriodEnd}
+            />
+          )}
         </div>
 
         <div className={styles.topActions}>
@@ -217,6 +448,14 @@ export default function WorkspaceSelector({
           {workspaces.map((ws, i) => (
             <WorkspaceCard key={ws.id} ws={ws} index={i} onEnter={enter} />
           ))}
+          {shopPlan && shopStatus && (
+            <SubscriptionCard
+              plan={shopPlan}
+              status={shopStatus}
+              trialEndsAt={shopTrialEndsAt}
+              periodEnd={shopPeriodEnd}
+            />
+          )}
         </div>
       </div>
 
