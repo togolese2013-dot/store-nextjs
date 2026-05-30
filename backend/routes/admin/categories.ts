@@ -44,7 +44,7 @@ router.delete("/api/admin/categories/:id", async (req, res) => {
 router.get("/api/admin/marques", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  const marques = await listAdminMarques();
+  const marques = await listAdminMarques(session.shop_id ?? 1);
   res.json({ success: true, data: marques });
 });
 
@@ -53,21 +53,21 @@ router.post("/api/admin/marques", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   const { nom, description = "" } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createMarque({ nom: nom.trim(), description: description.trim() });
+  const id = await createMarque({ nom: nom.trim(), description: description.trim() }, session.shop_id ?? 1);
   res.json({ success: true, id });
 });
 
 router.patch("/api/admin/marques/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await updateMarque(Number(req.params.id), req.body);
+  await updateMarque(Number(req.params.id), req.body, session.shop_id ?? 1);
   res.json({ success: true });
 });
 
 router.delete("/api/admin/marques/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  await deleteMarque(Number(req.params.id));
+  await deleteMarque(Number(req.params.id), session.shop_id ?? 1);
   res.json({ success: true });
 });
 

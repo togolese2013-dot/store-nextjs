@@ -907,10 +907,11 @@ export async function ensureEntrepotsTable(): Promise<void> {
   });
 }
 
-export async function listEntrepots(): Promise<Entrepot[]> {
+export async function listEntrepots(shopId = 1): Promise<Entrepot[]> {
   await ensureEntrepotsTable();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots ORDER BY nom"
+    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots WHERE shop_id = ? ORDER BY nom",
+    [shopId]
   );
   return (rows as mysql.RowDataPacket[]).map(r => ({
     id:        Number(r.id),
@@ -922,24 +923,24 @@ export async function listEntrepots(): Promise<Entrepot[]> {
   }));
 }
 
-export async function upsertEntrepot(data: Partial<Entrepot> & { nom: string }): Promise<number> {
+export async function upsertEntrepot(data: Partial<Entrepot> & { nom: string }, shopId = 1): Promise<number> {
   await ensureEntrepotsTable();
   if (data.id) {
     await db.execute(
-      `UPDATE entrepots SET nom = ?, telephone = ?, adresse = ?, notes = ?, actif = ? WHERE id = ?`,
-      [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, data.id]
+      `UPDATE entrepots SET nom = ?, telephone = ?, adresse = ?, notes = ?, actif = ? WHERE id = ? AND shop_id = ?`,
+      [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, data.id, shopId]
     );
     return data.id;
   }
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO entrepots (nom, telephone, adresse, notes, actif) VALUES (?, ?, ?, ?, ?)`,
-    [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0]
+    `INSERT INTO entrepots (nom, telephone, adresse, notes, actif, shop_id) VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, shopId]
   );
   return result.insertId;
 }
 
-export async function deleteEntrepot(id: number): Promise<void> {
-  await db.execute("DELETE FROM entrepots WHERE id = ?", [id]);
+export async function deleteEntrepot(id: number, shopId = 1): Promise<void> {
+  await db.execute("DELETE FROM entrepots WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
 export async function getProductEntrepotsForRefs(
@@ -3117,30 +3118,31 @@ export interface Fournisseur {
   created_at: string;
 }
 
-export async function listFournisseurs(): Promise<Fournisseur[]> {
+export async function listFournisseurs(shopId = 1): Promise<Fournisseur[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs ORDER BY nom LIMIT 500"
+    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs WHERE shop_id = ? ORDER BY nom LIMIT 500",
+    [shopId]
   );
   return rows as Fournisseur[];
 }
 
-export async function createFournisseur(data: Omit<Fournisseur, "id" | "created_at">): Promise<number> {
+export async function createFournisseur(data: Omit<Fournisseur, "id" | "created_at">, shopId = 1): Promise<number> {
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note) VALUES (?,?,?,?,?,?)`,
-    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null]
+    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, shop_id) VALUES (?,?,?,?,?,?,?)`,
+    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, shopId]
   );
   return result.insertId;
 }
 
-export async function updateFournisseur(id: number, data: Partial<Omit<Fournisseur, "id" | "created_at">>) {
+export async function updateFournisseur(id: number, data: Partial<Omit<Fournisseur, "id" | "created_at">>, shopId = 1) {
   await db.execute(
-    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=?`,
-    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id]
+    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=? AND shop_id=?`,
+    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id, shopId]
   );
 }
 
-export async function deleteFournisseur(id: number) {
-  await db.execute("DELETE FROM fournisseurs WHERE id = ?", [id]);
+export async function deleteFournisseur(id: number, shopId = 1) {
+  await db.execute("DELETE FROM fournisseurs WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
 // ─── Achats ───────────────────────────────────────────────────────────────────
@@ -3168,30 +3170,36 @@ export interface AchatItem {
   prix_unitaire: number;
 }
 
-export async function listAchats(limit = 50, offset = 0): Promise<Achat[]> {
+export async function listAchats(shopId = 1, limit = 50, offset = 0): Promise<Achat[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT a.*, f.nom AS fournisseur_nom
      FROM achats a
      LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id
+     WHERE a.shop_id = ?
      ORDER BY a.date_achat DESC, a.id DESC
-     LIMIT ${limit} OFFSET ${offset}`
+     LIMIT ${limit} OFFSET ${offset}`,
+    [shopId]
   );
   return rows as Achat[];
 }
 
-export async function countAchats(): Promise<number> {
-  const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) as cnt FROM achats");
+export async function countAchats(shopId = 1): Promise<number> {
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT COUNT(*) as cnt FROM achats WHERE shop_id = ?",
+    [shopId]
+  );
   return Number(rows[0]?.cnt ?? 0);
 }
 
-export async function getAchatStats(): Promise<{ total: number; en_attente: number; recu: number; montant_total: number }> {
+export async function getAchatStats(shopId = 1): Promise<{ total: number; en_attente: number; recu: number; montant_total: number }> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total,
        SUM(statut = 'en_attente') AS en_attente,
        SUM(statut = 'recu') AS recu,
        COALESCE(SUM(montant_total), 0) AS montant_total
-     FROM achats`
+     FROM achats WHERE shop_id = ?`,
+    [shopId]
   );
   const r = rows[0] as mysql.RowDataPacket;
   return {
@@ -3202,9 +3210,9 @@ export async function getAchatStats(): Promise<{ total: number; en_attente: numb
   };
 }
 
-export async function getAchatById(id: number): Promise<{ achat: Achat; items: AchatItem[] } | null> {
+export async function getAchatById(id: number, shopId = 1): Promise<{ achat: Achat; items: AchatItem[] } | null> {
   const [aRows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT a.*, f.nom AS fournisseur_nom FROM achats a LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id WHERE a.id = ?`, [id]
+    `SELECT a.*, f.nom AS fournisseur_nom FROM achats a LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id WHERE a.id = ? AND a.shop_id = ?`, [id, shopId]
   );
   if (!aRows[0]) return null;
   const [iRows] = await db.execute<mysql.RowDataPacket[]>(
@@ -3221,7 +3229,7 @@ export async function createAchat(data: {
   note:           string | null;
   transport?:     string | null;
   items: Array<{ produit_id: number | null; designation: string; quantite: number; prix_unitaire: number }>;
-}): Promise<number> {
+}, shopId = 1): Promise<number> {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -3230,7 +3238,7 @@ export async function createAchat(data: {
     if (!reference) {
       const year = new Date().getFullYear();
       const [cntRows] = await conn.execute<mysql.RowDataPacket[]>(
-        `SELECT COUNT(*) AS cnt FROM achats WHERE YEAR(date_achat) = ?`, [year]
+        `SELECT COUNT(*) AS cnt FROM achats WHERE YEAR(date_achat) = ? AND shop_id = ?`, [year, shopId]
       );
       const num = (Number((cntRows[0] as mysql.RowDataPacket).cnt) + 1).toString().padStart(3, "0");
       reference = `ACH-${year}-${num}`;
@@ -3247,9 +3255,9 @@ export async function createAchat(data: {
         hasTransport = true;
       }
     }
-    const achatCols  = ["fournisseur_id","reference","date_achat","statut","montant_total","notes"];
+    const achatCols  = ["shop_id","fournisseur_id","reference","date_achat","statut","montant_total","notes"];
     const achatVals: (string | number | null)[] = [
-      data.fournisseur_id ?? null, reference, data.date_achat, data.statut, montant_total, data.note ?? null,
+      shopId, data.fournisseur_id ?? null, reference, data.date_achat, data.statut, montant_total, data.note ?? null,
     ];
     if (hasTransport) { achatCols.push("transport"); achatVals.push(data.transport ?? null); }
     const [res] = await conn.execute<mysql.ResultSetHeader>(
@@ -3279,12 +3287,15 @@ export async function updateAchatStatut(id: number, statut: string) {
   await db.execute("UPDATE achats SET statut = ? WHERE id = ?", [statut, id]);
 }
 
-export async function deleteAchat(id: number) {
+export async function deleteAchat(id: number, shopId = 1) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+    // Verify ownership before deleting items
+    const [check] = await conn.execute<mysql.RowDataPacket[]>("SELECT id FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
+    if (!(check as mysql.RowDataPacket[])[0]) throw new Error("Achat introuvable.");
     await conn.execute("DELETE FROM achat_items WHERE achat_id = ?", [id]);
-    await conn.execute("DELETE FROM achats WHERE id = ?", [id]);
+    await conn.execute("DELETE FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -3300,7 +3311,7 @@ export async function updateAchat(id: number, data: {
   transport?:      string | null;
   note?:           string | null;
   items?: Array<{ produit_id: number | null; designation: string; quantite: number; prix_unitaire: number }>;
-}) {
+}, shopId = 1) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -3326,7 +3337,8 @@ export async function updateAchat(id: number, data: {
     }
     if (sets.length) {
       vals.push(id);
-      await conn.execute(`UPDATE achats SET ${sets.join(", ")} WHERE id = ?`, vals);
+      vals.push(shopId);
+      await conn.execute(`UPDATE achats SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, vals);
     }
     await conn.commit();
   } catch (err) {
@@ -3337,14 +3349,14 @@ export async function updateAchat(id: number, data: {
   }
 }
 
-export async function recevoirAchat(id: number) {
+export async function recevoirAchat(id: number, shopId = 1) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.execute<mysql.RowDataPacket[]>("SELECT statut FROM achats WHERE id = ?", [id]);
+    const [rows] = await conn.execute<mysql.RowDataPacket[]>("SELECT statut FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
     if (!rows[0]) throw new Error("Achat introuvable.");
     if (rows[0].statut !== "en_attente") throw new Error("Cet achat n'est pas en attente.");
-    await conn.execute("UPDATE achats SET statut = 'recu' WHERE id = ?", [id]);
+    await conn.execute("UPDATE achats SET statut = 'recu' WHERE id = ? AND shop_id = ?", [id, shopId]);
     const [items] = await conn.execute<mysql.RowDataPacket[]>(
       "SELECT produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL", [id]
     );
@@ -4065,16 +4077,17 @@ async function ensureMarquesTable() {
   });
 }
 
-export async function listAdminMarques(): Promise<AdminMarque[]> {
+export async function listAdminMarques(shopId = 1): Promise<AdminMarque[]> {
   await ensureMarquesTable();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT m.id, m.nom, COALESCE(m.description, '') AS description,
            COUNT(p.id) AS nb_produits
     FROM marques m
-    LEFT JOIN produits p ON p.marque_id = m.id
+    LEFT JOIN produits p ON p.marque_id = m.id AND p.shop_id = ?
+    WHERE m.shop_id = ?
     GROUP BY m.id
     ORDER BY m.nom
-  `);
+  `, [shopId, shopId]);
   return (rows as mysql.RowDataPacket[]).map(r => ({
     id:          Number(r.id),
     nom:         String(r.nom),
@@ -4083,24 +4096,24 @@ export async function listAdminMarques(): Promise<AdminMarque[]> {
   }));
 }
 
-export async function createMarque(data: { nom: string; description: string }) {
+export async function createMarque(data: { nom: string; description: string }, shopId = 1) {
   await ensureMarquesTable();
   const [res] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO marques (nom, description) VALUES (?, ?)`,
-    [data.nom, data.description || null]
+    `INSERT INTO marques (nom, description, shop_id) VALUES (?, ?, ?)`,
+    [data.nom, data.description || null, shopId]
   );
   return res.insertId;
 }
 
-export async function updateMarque(id: number, data: { nom: string; description: string }) {
+export async function updateMarque(id: number, data: { nom: string; description: string }, shopId = 1) {
   await db.execute(
-    `UPDATE marques SET nom = ?, description = ? WHERE id = ?`,
-    [data.nom, data.description || null, id]
+    `UPDATE marques SET nom = ?, description = ? WHERE id = ? AND shop_id = ?`,
+    [data.nom, data.description || null, id, shopId]
   );
 }
 
-export async function deleteMarque(id: number) {
-  await db.execute(`DELETE FROM marques WHERE id = ?`, [id]);
+export async function deleteMarque(id: number, shopId = 1) {
+  await db.execute(`DELETE FROM marques WHERE id = ? AND shop_id = ?`, [id, shopId]);
 }
 
 /* ─── Token version — JWT revocation ─── */

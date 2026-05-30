@@ -144,8 +144,12 @@ function PlanDistribution({ stats }: { stats: Stats }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export default function SuperAdminDashboard() {
-  const [tab,       setTab]       = useState<'shops' | 'payments'>('shops');
+interface DashboardProps {
+  view:             'overview' | 'shops' | 'payments';
+  onPendingCount?:  (n: number) => void;
+}
+
+export default function SuperAdminDashboard({ view, onPendingCount }: DashboardProps) {
   const [shops,     setShops]     = useState<ShopRow[]>([]);
   const [stats,     setStats]     = useState<Stats | null>(null);
   const [pending,   setPending]   = useState<PendingPayment[]>([]);
@@ -172,7 +176,9 @@ export default function SuperAdminDashboard() {
       const shopList = shopsData.shops ?? [];
       setShops(shopList);
       setStats(statsData);
-      setPending(paymentsData.payments ?? []);
+      const payments = paymentsData.payments ?? [];
+      setPending(payments);
+      onPendingCount?.(payments.length);
       const planMap: Record<number, string> = {};
       shopList.forEach((sh: ShopRow) => { planMap[sh.id] = sh.plan; });
       setEditPlan(planMap);
@@ -181,7 +187,7 @@ export default function SuperAdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onPendingCount]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -270,8 +276,16 @@ export default function SuperAdminDashboard() {
       <div className={s.header}>
         <div className={s.headerLeft}>
           <span className={s.eyebrow}>Plateforme SaaS</span>
-          <h1 className={s.title}>Super-Admin</h1>
-          <p className={s.subtitle}>Contrôle global — boutiques, plans, paiements</p>
+          <h1 className={s.title}>
+            {view === 'overview' ? 'Tableau de bord'
+              : view === 'shops' ? 'Boutiques'
+              : 'Paiements en attente'}
+          </h1>
+          <p className={s.subtitle}>
+            {view === 'overview' ? 'KPIs globaux et distribution des plans'
+              : view === 'shops' ? 'Gestion des boutiques, plans et suspension'
+              : 'Validation manuelle des paiements Mobile Money'}
+          </p>
         </div>
         <div className={s.headerActions}>
           <button className={s.btn} onClick={fetchAll} disabled={loading}>
@@ -315,41 +329,17 @@ export default function SuperAdminDashboard() {
         </div>
       )}
 
-      {/* ── Plan distribution ───────────────────────────────────────── */}
-      {stats && (
+      {/* ── Overview: plan distribution ─────────────────────────────── */}
+      {view === 'overview' && stats && (
         <div className={s.planSection}>
           <PlanDistribution stats={stats} />
         </div>
       )}
 
-      {/* ── Tabs ───────────────────────────────────────────────────── */}
-      <div className={s.toolbar}>
-        <button
-          className={`${s.tabBtn} ${tab === 'shops' ? s.tabActive : ''}`}
-          onClick={() => setTab('shops')}
-        >
-          <Store size={13} />
-          Boutiques
-          {shops.length > 0 && (
-            <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: 'var(--muted-2)' }}>
-              {shops.length}
-            </span>
-          )}
-        </button>
-        <button
-          className={`${s.tabBtn} ${tab === 'payments' ? s.tabActive : ''}`}
-          onClick={() => setTab('payments')}
-        >
-          <CreditCard size={13} />
-          Paiements en attente
-          {pending.length > 0 && <span className={s.tabBadge}>{pending.length}</span>}
-        </button>
-      </div>
-
       {/* ══════════════════════════════════════════════════════════════
-          TAB: BOUTIQUES
+          VIEW: BOUTIQUES
          ══════════════════════════════════════════════════════════════ */}
-      {tab === 'shops' && (
+      {view === 'shops' && (
         <>
           {/* Sub-toolbar */}
           <div className={s.subToolbar}>
@@ -512,9 +502,9 @@ export default function SuperAdminDashboard() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          TAB: PAIEMENTS EN ATTENTE
+          VIEW: PAIEMENTS EN ATTENTE
          ══════════════════════════════════════════════════════════════ */}
-      {tab === 'payments' && (
+      {view === 'payments' && (
         <div className={s.tableWrap} style={{ marginTop: 20 }}>
           {pending.length === 0 ? (
             <div className={s.empty}>

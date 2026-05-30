@@ -207,9 +207,10 @@ export async function listShopsWithStats(): Promise<
 /** true = shop can access admin (not suspended) */
 export function isShopAccessAllowed(shop: Shop): boolean {
   if (shop.id === 1) return true;
-  if (shop.plan === "free") return true;
+  // Check suspension first — overrides plan
   if (!shop.actif) return false;
   if (shop.subscription_status === "suspended") return false;
+  if (shop.plan === "free") return true;
   if (shop.subscription_status === "trial") {
     if (!shop.trial_ends_at) return true;
     return new Date(shop.trial_ends_at) > new Date();
