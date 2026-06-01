@@ -36,6 +36,11 @@ export default function AdminWorkspaceClient({
       shopTrialEndsAt={shopTrialEndsAt}
       shopPeriodEnd={shopPeriodEnd}
       onEnter={(ws: Workspace) => {
+        const trialExpired = shopStatus === 'trial' && shopTrialEndsAt != null && new Date(shopTrialEndsAt) < new Date();
+        if (shopStatus === 'suspended' || trialExpired) {
+          router.push('/admin/billing');
+          return;
+        }
         const routes: Record<string, string> = {
           magasin:  '/admin/magasin',
           boutique: '/admin/boutique',

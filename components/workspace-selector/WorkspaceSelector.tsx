@@ -48,15 +48,17 @@ function fmtDate(dateStr: string): string {
 }
 
 function planColors(plan: string): { text: string; bg: string } {
-  if (plan === 'pro')   return { text: '#5C4A88', bg: '#E6E0F0' };
-  if (plan === 'basic') return { text: '#3B6A8F', bg: '#E8F0F7' };
+  if (plan === 'business') return { text: '#5C4A88', bg: '#E6E0F0' };
+  if (plan === 'pro')      return { text: '#3B6A8F', bg: '#E8F0F7' };
+  if (plan === 'basic')    return { text: '#6B635B', bg: '#EBE4D6' };
   return { text: '#6B635B', bg: '#EBE4D6' };
 }
 
 function planLabel(plan: string): string {
-  if (plan === 'pro')   return 'Pro';
-  if (plan === 'basic') return 'Basic';
-  return 'Gratuit';
+  if (plan === 'business') return 'Business';
+  if (plan === 'pro')      return 'Pro';
+  if (plan === 'basic')    return 'Basic';
+  return 'Basic';
 }
 
 /* ─── Plan badge (topbar) ────────────────────────────────────────── */
@@ -90,7 +92,7 @@ function PlanBadge({
   } else {
     const c = planColors(plan);
     text = planLabel(plan); textColor = c.text; bgColor = c.bg;
-    border = `rgba(${plan === 'pro' ? '92,74,136' : plan === 'basic' ? '59,106,143' : '107,99,91'},.2)`;
+    border = `rgba(${plan === 'business' ? '92,74,136' : plan === 'pro' ? '59,106,143' : '107,99,91'},.2)`;
   }
 
   return (
@@ -211,12 +213,14 @@ function SubscriptionCard({
   } else if (isTrial) {
     accentText = '#C9601E'; accentBg = '#FBE9D6';
     const d = days ?? 0;
-    statusLine = (
+    statusLine = trialEndsAt == null ? (
+      <span style={{ color: '#6B635B' }}>Essai en cours</span>
+    ) : (
       <span>
         <span style={{ color: d <= 7 ? '#9C3A14' : '#C9601E', fontWeight: 600 }}>
           {d > 0 ? `${d} jour${d > 1 ? 's' : ''} d'essai restant${d > 1 ? 's' : ''}` : "Essai terminé"}
         </span>
-        {trialEndsAt && d > 0 && (
+        {d > 0 && (
           <span style={{ color: '#8A8278', fontSize: 12, display: 'block', marginTop: 2 }}>
             Jusqu'au {fmtDate(trialEndsAt)}
           </span>

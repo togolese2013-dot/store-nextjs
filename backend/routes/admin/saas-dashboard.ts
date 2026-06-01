@@ -45,10 +45,13 @@ router.patch("/api/admin/saas/shops/:id", async (req, res) => {
     const update: Parameters<typeof updateShop>[1] = {};
     if (nom   !== undefined) update.nom   = String(nom);
     if (email !== undefined) update.email = String(email);
-    if (plan  !== undefined && ["free","basic","pro"].includes(String(plan))) {
-      update.plan = plan as "free" | "basic" | "pro";
+    if (plan  !== undefined && ["basic","pro","business"].includes(String(plan))) {
+      update.plan = plan as "basic" | "pro" | "business";
     }
-    if (actif !== undefined) update.actif = Boolean(actif);
+    if (actif !== undefined) {
+      update.actif = Boolean(actif);
+      update.subscription_status = Boolean(actif) ? 'active' : 'suspended';
+    }
     await updateShop(id, update);
     res.json({ ok: true });
   } catch (err) {
@@ -65,9 +68,9 @@ router.get("/api/admin/saas/stats", async (req, res) => {
       SELECT
         (SELECT COUNT(*) FROM shops)                                   AS total_shops,
         (SELECT COUNT(*) FROM shops WHERE actif = 1)                  AS active_shops,
-        (SELECT COUNT(*) FROM shops WHERE plan = 'free')              AS plan_free,
         (SELECT COUNT(*) FROM shops WHERE plan = 'basic')             AS plan_basic,
         (SELECT COUNT(*) FROM shops WHERE plan = 'pro')               AS plan_pro,
+        (SELECT COUNT(*) FROM shops WHERE plan = 'business')          AS plan_business,
         (SELECT COUNT(*) FROM produits)                               AS total_products,
         (SELECT COUNT(*) FROM admin_users WHERE role != 'super_admin') AS total_admins
     `);

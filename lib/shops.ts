@@ -6,7 +6,7 @@ export interface Shop {
   nom:                 string;
   slug:                string;
   email:               string;
-  plan:                "free" | "basic" | "pro";
+  plan:                "basic" | "pro" | "business";
   actif:               boolean;
   custom_domain:       string | null;
   subscription_status: "trial" | "active" | "expired" | "suspended";
@@ -20,7 +20,7 @@ export interface ShopPayment {
   id:              number;
   shop_id:         number;
   transaction_id:  string;
-  plan:            "basic" | "pro";
+  plan:            "pro" | "business";
   amount:          number;
   duration_months: number;
   status:          "pending" | "paid" | "failed" | "cancelled";
@@ -40,7 +40,7 @@ export async function ensureShopsTable(): Promise<void> {
       nom                 VARCHAR(150)                                          NOT NULL,
       slug                VARCHAR(100)                                          NOT NULL UNIQUE,
       email               VARCHAR(150)                                          NOT NULL,
-      plan                ENUM('free','basic','pro')                            NOT NULL DEFAULT 'basic',
+      plan                ENUM('basic','pro','business')                        NOT NULL DEFAULT 'basic',
       actif               TINYINT(1)                                            NOT NULL DEFAULT 1,
       custom_domain       VARCHAR(255)                                          NULL UNIQUE,
       subscription_status ENUM('trial','active','expired','suspended')         NOT NULL DEFAULT 'trial',
@@ -67,7 +67,7 @@ export async function ensureShopsTable(): Promise<void> {
       id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       shop_id         INT UNSIGNED       NOT NULL,
       transaction_id  VARCHAR(100)       NOT NULL UNIQUE,
-      plan            ENUM('basic','pro') NOT NULL,
+      plan            ENUM('pro','business') NOT NULL,
       amount          INT UNSIGNED        NOT NULL,
       duration_months TINYINT UNSIGNED   NOT NULL DEFAULT 1,
       status          ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',
@@ -145,7 +145,7 @@ export async function createShop(data: {
   nom:   string;
   slug:  string;
   email: string;
-  plan?: "free" | "basic" | "pro";
+  plan?: "basic" | "pro" | "business";
 }): Promise<number> {
   await ensureShopsTable();
   const [result] = await db.execute<mysql.ResultSetHeader>(
@@ -165,15 +165,16 @@ export async function listShops(): Promise<Shop[]> {
 
 export async function updateShop(
   id: number,
-  data: Partial<{ nom: string; email: string; plan: "free" | "basic" | "pro"; actif: boolean }>
+  data: Partial<{ nom: string; email: string; plan: "basic" | "pro" | "business"; actif: boolean; subscription_status: "trial" | "active" | "expired" | "suspended" }>
 ): Promise<void> {
   await ensureShopsTable();
   const sets: string[] = [];
   const vals: (string | number)[] = [];
-  if (data.nom   !== undefined) { sets.push("nom = ?");   vals.push(data.nom); }
-  if (data.email !== undefined) { sets.push("email = ?"); vals.push(data.email); }
-  if (data.plan  !== undefined) { sets.push("plan = ?");  vals.push(data.plan); }
-  if (data.actif !== undefined) { sets.push("actif = ?"); vals.push(data.actif ? 1 : 0); }
+  if (data.nom                 !== undefined) { sets.push("nom = ?");                  vals.push(data.nom); }
+  if (data.email               !== undefined) { sets.push("email = ?");                vals.push(data.email); }
+  if (data.plan                !== undefined) { sets.push("plan = ?");                 vals.push(data.plan); }
+  if (data.actif               !== undefined) { sets.push("actif = ?");                vals.push(data.actif ? 1 : 0); }
+  if (data.subscription_status !== undefined) { sets.push("subscription_status = ?"); vals.push(data.subscription_status); }
   if (!sets.length) return;
   vals.push(id);
   await db.execute(`UPDATE shops SET ${sets.join(", ")} WHERE id = ?`, vals);
@@ -210,7 +211,7 @@ export function isShopAccessAllowed(shop: Shop): boolean {
   // Check suspension first — overrides plan
   if (!shop.actif) return false;
   if (shop.subscription_status === "suspended") return false;
-  if (shop.plan === "free") return true;
+  if (shop.plan === "basic") return true;
   if (shop.subscription_status === "trial") {
     if (!shop.trial_ends_at) return true;
     return new Date(shop.trial_ends_at) > new Date();
@@ -225,7 +226,7 @@ export function isShopAccessAllowed(shop: Shop): boolean {
 
 export async function activateShopSubscription(
   shopId: number,
-  plan: "basic" | "pro",
+  plan: "pro" | "business",
   durationMonths: number
 ): Promise<void> {
   await ensureShopsTable();
@@ -251,7 +252,7 @@ export async function activateShopSubscription(
 export async function recordShopPayment(data: {
   shopId:         number;
   transactionId:  string;
-  plan:           "basic" | "pro";
+  plan:           "pro" | "business";
   amount:         number;
   durationMonths: number;
   status:         "pending" | "paid" | "failed" | "cancelled";

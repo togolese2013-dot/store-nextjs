@@ -55,7 +55,7 @@ export default async function AdminHomePage() {
       shopName={shopName}
       shopLocation={shop?.pays ?? ''}
       userName={session.nom}
-      shopPlan={shop?.plan ?? 'free'}
+      shopPlan={shop?.plan ?? 'basic'}
       shopStatus={shop?.subscription_status ?? 'active'}
       shopTrialEndsAt={shop?.trial_ends_at ?? null}
       shopPeriodEnd={shop?.current_period_end ?? null}

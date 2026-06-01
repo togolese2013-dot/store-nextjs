@@ -1,5 +1,5 @@
 # HANDOFF — Togolese Shop Admin
-> Dernière mise à jour : 2026-05-30 (session 8)
+> Dernière mise à jour : 2026-05-30 (session 10)
 > Commit actuel : voir `git log --oneline -1`
 
 ---
@@ -393,13 +393,46 @@ Entrée : `WorkspaceSelector` (`/admin`) → cartes → `AdminWorkspaceClient.ts
 11. **Auto-init DB** : `ensureBoutiqueStockPopulated()`, `ensureBoutiqueClientsTable()`, `ensureMarquesTable()` — pas besoin d'exécuter des scripts SQL manuellement
 12. **Table `achats`** : pas de `created_at`, colonne `notes` (pas `note`), statut sans `annule`
 13. **CSS Modules workspaces** : `color-mix()` interdit (Turbopack crash). Sidebar classes = `styles.xxx` jamais `"xxx"`.
-14. **Déployer Hetzner** : `npm run deploy` depuis le Mac local — ne pas relancer depuis le serveur SSH
+14. **Déployer Hetzner** : `npm run deploy` depuis le Mac local — ne pas relancer depuis le serveur SSH. **Ne jamais commiter/pusher/déployer automatiquement** — attendre demande explicite de l'utilisateur.
 15. **MySQL Hetzner** : port 3307, base `togolese`, partagée entre afrisika.com et togolese.tg
 16. **Jamais subquery `reviews` dans `getProducts()`** — casse toute la liste produits. Avis via `RatingBadge` lazy client uniquement.
+17. **Isolation données multi-tenant** : toutes les fonctions DB `admin-db.ts` pour entrepots/fournisseurs/achats/marques acceptent `shopId = 1`. Les routes backend doivent passer `session.shop_id ?? 1`. Ne jamais laisser une route lire/écrire sans scoping shop_id.
+18. **`isShopAccessAllowed()`** : vérifier `!actif` et `suspended` AVANT `plan === 'free'`. Sinon boutiques gratuites ne peuvent pas être suspendues.
 
 ---
 
 ## 📝 Historique des sessions
+
+### Sessions 9-10 (2026-05-30)
+
+#### SaaS — Isolation données multi-tenant (CRITIQUE)
+- **`lib/admin-db.ts`** : `getAchatStats`, `createAchat`, `getAchatById`, `updateAchat`, `deleteAchat`, `recevoirAchat` — tous acceptent `shopId = 1` en paramètre, filtrent par `WHERE shop_id = ?` ou `AND shop_id = ?`
+- **`routes/entrepots.ts`** : POST (upsertEntrepot) + DELETE (deleteEntrepot) passent `session.shop_id ?? 1`
+- **`routes/fournisseurs.ts`** : tous CRUD fournisseurs + toutes routes achats passent `session.shop_id`
+- **`routes/categories.ts`** : toutes routes marques (GET/POST/PATCH/DELETE) passent `session.shop_id`
+- **DB migrations Hetzner** (déjà appliquées en prod) :
+  ```sql
+  ALTER TABLE fournisseurs ADD COLUMN shop_id INT UNSIGNED NOT NULL DEFAULT 1;
+  ALTER TABLE achats ADD COLUMN shop_id INT UNSIGNED NOT NULL DEFAULT 1;
+  ```
+- **`lib/shops.ts` — `isShopAccessAllowed()`** : vérification `!actif` et `suspended` déplacée AVANT le check `plan === 'free'`. Avant ce fix, les boutiques gratuites ne pouvaient pas être suspendues.
+
+#### SaaS — Sidebar Super-Admin redesign
+- **`components/saas/SaasShell.module.css`** : CSS vars warm beige, layout flex 100vh
+- **`components/saas/SaasSidebar.tsx`** : sidebar nav (3 items : Tableau de bord, Boutiques, Paiements) + badge pending count + footer user avec logout. Exporte le type `SaasView`.
+- **`components/saas/SaasShell.tsx`** : shell fullscreen, gère état `view` + `pendingCount`
+- **`components/saas/SuperAdminDashboard.tsx`** : accepte `view: 'overview'|'shops'|'payments'` + `onPendingCount` props. Tabs internes supprimés. Header titre dynamique selon view.
+- **`components/admin/AdminShell.tsx`** : `/admin/saas` ajouté à `ADMIN_ZONE` (bypass generic sidebar)
+- **`app/admin/saas/page.tsx`** : server component, passe `session.nom` à SaasShell
+
+#### WorkspaceSelector — Info abonnement (A+B+C)
+- **A — Badge plan topbar** : pill colorée à côté du nom boutique. Couleurs : free=gris, basic=bleu, pro=violet. Trial countdown orange. Expiry < 14j = orange. Expiré/suspendu = rouge.
+- **B — Bandeau expiration** : s'affiche entre le titre et la grille UNIQUEMENT si action requise (expiry ≤ 14j, trial ≤ 7j, expiré, suspendu). Silencieux sinon.
+- **C — Carte Abonnement** : 6ème carte dans la grille, lien vers `/admin/billing`. Affiche plan, status, countdown ou date expiry, CTA contextuel (Renouveler / Choisir un plan / Gérer).
+- **`app/admin/page.tsx`** + **`AdminWorkspaceClient.tsx`** : passent `shopPlan`, `shopStatus`, `shopTrialEndsAt`, `shopPeriodEnd` depuis le server component.
+
+#### Landing page — Plans
+- **`LandingContent.tsx`** : plan "Gratuit" renommé "Basic", prix `0 toujours` → `2 000 / mois (FCFA)` (FR + EN)
 
 ### Session 8 (2026-05-30)
 - **Store — Réglages boutique** : `ReglagesPage.tsx` créé — 6 sections (URL/domaine, apparence, infos, paiements, notifications, zone danger). localStorage persistance (`store_reglages`). Slug readonly, domaine perso éditable. Color picker + presets. Logo URL avec aperçu live.

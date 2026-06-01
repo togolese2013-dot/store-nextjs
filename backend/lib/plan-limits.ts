@@ -1,12 +1,12 @@
 // Plan-based product limits for SaaS multi-tenant
 export const PLAN_LIMITS: Record<string, number> = {
-  free:  50,
-  basic: 500,
-  pro:   Infinity,
+  basic:    20,
+  pro:      Infinity,
+  business: Infinity,
 };
 
 export function planLimit(plan: string): number {
-  return PLAN_LIMITS[plan] ?? 50; // unknown plan defaults to free
+  return PLAN_LIMITS[plan] ?? 20; // unknown plan defaults to basic
 }
 
 export function planLimitLabel(plan: string): string {

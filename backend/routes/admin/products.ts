@@ -65,7 +65,7 @@ router.get("/api/admin/products", async (req, res) => {
   ]);
 
   // Enrich products with variant stock sums (sum of product_variants.stock per product)
-  const ids = products.map((p: mysql.RowDataPacket) => p.id).filter(Boolean) as number[];
+  const ids = products.map((p) => p.id).filter(Boolean) as number[];
   const variantStockMap: Record<number, number> = {};
   if (ids.length > 0) {
     try {
@@ -80,7 +80,7 @@ router.get("/api/admin/products", async (req, res) => {
     } catch { /* table may not exist yet — ignore */ }
   }
 
-  const enriched = products.map((p: mysql.RowDataPacket) => ({
+  const enriched = products.map((p) => ({
     ...p,
     variants_stock: Object.prototype.hasOwnProperty.call(variantStockMap, p.id) ? variantStockMap[p.id] : null,
   }));
@@ -298,7 +298,7 @@ router.get("/api/admin/products/export", async (req, res) => {
       "Stock magasin","Stock boutique","Stock minimum",
       "Statut","Actif","Créé le",
     ];
-    const rows = products.map((p: mysql.RowDataPacket) => {
+    const rows = products.map((p: any) => {
       const prix     = Number(p.prix_unitaire ?? 0);
       const remise   = Number(p.remise ?? 0);
       const promo    = remise > 0 ? Math.round(prix * (1 - remise / 100)) : "";

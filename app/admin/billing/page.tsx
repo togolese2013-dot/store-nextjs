@@ -6,7 +6,7 @@ import { CreditCard, CheckCircle, Clock, AlertTriangle, XCircle, Zap, Star, Smar
 interface BillingInfo {
   shop_id:             number;
   nom:                 string;
-  plan:                "free" | "basic" | "pro";
+  plan:                "basic" | "pro" | "business";
   subscription_status: "trial" | "active" | "expired" | "suspended";
   trial_ends_at:       string | null;
   current_period_end:  string | null;
@@ -19,7 +19,7 @@ interface BillingInfo {
 interface Payment {
   id:              number;
   transaction_id:  string;
-  plan:            "basic" | "pro";
+  plan:            "pro" | "business";
   amount:          number;
   duration_months: number;
   status:          "pending" | "paid" | "failed" | "cancelled";
@@ -29,8 +29,8 @@ interface Payment {
   paid_at:         string | null;
 }
 
-const PLAN_PRICES = { basic: 9900, pro: 24900 };
-const PLAN_LABELS = { free: "Gratuit", basic: "Basic", pro: "Pro" };
+const PLAN_PRICES = { pro: 9900, business: 24900 };
+const PLAN_LABELS = { basic: "Basic", pro: "Pro", business: "Business" };
 
 function formatDate(d: string | null) {
   if (!d) return "—";
@@ -40,14 +40,16 @@ function formatPrice(n: number) {
   return n.toLocaleString("fr-FR") + " FCFA";
 }
 
-function StatusBadge({ status }: { status: BillingInfo["subscription_status"] }) {
+function StatusBadge({ status, trialEndsAt }: { status: BillingInfo["subscription_status"]; trialEndsAt?: string | null }) {
+  const trialExpired = status === "trial" && trialEndsAt && new Date(trialEndsAt) < new Date();
+  const effectiveStatus = trialExpired ? "expired" : status;
   const map = {
-    trial:     { label: "Essai gratuit",  cls: "bg-blue-100 text-blue-700",   icon: Clock },
-    active:    { label: "Actif",          cls: "bg-green-100 text-green-700", icon: CheckCircle },
-    expired:   { label: "Expiré",         cls: "bg-amber-100 text-amber-700", icon: AlertTriangle },
-    suspended: { label: "Suspendu",       cls: "bg-red-100 text-red-700",     icon: XCircle },
+    trial:     { label: "Essai gratuit",       cls: "bg-blue-100 text-blue-700",   icon: Clock },
+    active:    { label: "Actif",               cls: "bg-green-100 text-green-700", icon: CheckCircle },
+    expired:   { label: "Essai terminé",       cls: "bg-amber-100 text-amber-700", icon: AlertTriangle },
+    suspended: { label: "Suspendu",            cls: "bg-red-100 text-red-700",     icon: XCircle },
   };
-  const { label, cls, icon: Icon } = map[status];
+  const { label, cls, icon: Icon } = map[effectiveStatus];
   return (
     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${cls}`}>
       <Icon size={14} />{label}
@@ -60,7 +62,7 @@ function PaymentModal({
   plan, months, info,
   onClose, onSuccess,
 }: {
-  plan:      "basic" | "pro";
+  plan:      "pro" | "business";
   months:    number;
   info:      BillingInfo;
   onClose:   () => void;
@@ -187,17 +189,17 @@ function PaymentModal({
 function PlanCard({
   plan, current, onPay,
 }: {
-  plan:    "basic" | "pro";
+  plan:    "pro" | "business";
   current: boolean;
-  onPay:   (plan: "basic" | "pro", months: number) => void;
+  onPay:   (plan: "pro" | "business", months: number) => void;
 }) {
   const [months, setMonths] = useState(1);
   const price = PLAN_PRICES[plan];
-  const isPro = plan === "pro";
+  const isPro = plan === "business";
 
-  const features: Record<"basic" | "pro", string[]> = {
-    basic: ["Jusqu'à 500 produits", "Boutique en ligne", "Gestion des commandes", "Facturation & devis", "Support email"],
-    pro:   ["Produits illimités", "Domaine personnalisé", "Analytics avancés", "Campagnes WhatsApp", "Support prioritaire"],
+  const features: Record<"pro" | "business", string[]> = {
+    pro:      ["Produits illimités", "Commandes illimitées", "5 utilisateurs admin", "WhatsApp CRM inclus", "Finance & rapports", "Coupons & fidélité", "Support prioritaire WhatsApp"],
+    business: ["Tout du plan Pro", "Utilisateurs illimités", "Multi-entrepôts", "API & webhooks", "Marque blanche", "Gestionnaire dédié", "SLA 99,9%"],
   };
 
   return (
@@ -254,7 +256,7 @@ function PlanCard({
 export default function BillingPage() {
   const [info, setInfo]         = useState<BillingInfo | null>(null);
   const [loading, setLoading]   = useState(true);
-  const [modal, setModal]       = useState<{ plan: "basic" | "pro"; months: number } | null>(null);
+  const [modal, setModal]       = useState<{ plan: "pro" | "business"; months: number } | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   function loadBilling() {
@@ -318,11 +320,13 @@ export default function BillingPage() {
             <div className="space-y-1">
               <p className="text-sm text-gray-500">Plan actuel</p>
               <p className="text-xl font-bold text-gray-900">{PLAN_LABELS[info.plan]}</p>
-              <StatusBadge status={info.subscription_status} />
+              <StatusBadge status={info.subscription_status} trialEndsAt={info.trial_ends_at} />
             </div>
             <div className="text-right space-y-1">
               {info.subscription_status === "trial" && info.trial_ends_at && (
-                <><p className="text-xs text-gray-400">Fin d&apos;essai</p><p className="font-semibold text-gray-800">{formatDate(info.trial_ends_at)}</p></>
+                new Date(info.trial_ends_at) < new Date()
+                  ? <p className="text-sm text-amber-600 font-medium">Période d&apos;essai terminée le {formatDate(info.trial_ends_at)}.</p>
+                  : <><p className="text-xs text-gray-400">Fin d&apos;essai</p><p className="font-semibold text-gray-800">{formatDate(info.trial_ends_at)}</p></>
               )}
               {info.subscription_status === "active" && info.current_period_end && (
                 <><p className="text-xs text-gray-400">Expire le</p><p className="font-semibold text-gray-800">{formatDate(info.current_period_end)}</p></>
@@ -343,8 +347,8 @@ export default function BillingPage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Choisir un plan</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <PlanCard plan="basic" current={info?.plan === "basic"} onPay={(p, m) => setModal({ plan: p, months: m })} />
-                <PlanCard plan="pro"   current={info?.plan === "pro"}   onPay={(p, m) => setModal({ plan: p, months: m })} />
+                <PlanCard plan="pro"       current={info?.plan === "pro"}       onPay={(p, m) => setModal({ plan: p, months: m })} />
+                <PlanCard plan="business"  current={info?.plan === "business"}  onPay={(p, m) => setModal({ plan: p, months: m })} />
               </div>
             </div>
 

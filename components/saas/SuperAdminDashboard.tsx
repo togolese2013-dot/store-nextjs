@@ -11,24 +11,27 @@ const API = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4001';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface ShopRow {
-  id:            number;
-  nom:           string;
-  slug:          string;
-  email:         string;
-  plan:          'free' | 'basic' | 'pro';
-  plan_limit:    string;
-  actif:         boolean;
-  product_count: number;
-  admin_count:   number;
-  created_at:    string;
+  id:                  number;
+  nom:                 string;
+  slug:                string;
+  email:               string;
+  plan:                'basic' | 'pro' | 'business';
+  plan_limit:          string;
+  actif:               boolean;
+  subscription_status: 'trial' | 'active' | 'expired' | 'suspended';
+  trial_ends_at:       string | null;
+  current_period_end:  string | null;
+  product_count:       number;
+  admin_count:         number;
+  created_at:          string;
 }
 
 interface Stats {
   total_shops:    number;
   active_shops:   number;
-  plan_free:      number;
   plan_basic:     number;
   plan_pro:       number;
+  plan_business:  number;
   total_products: number;
   total_admins:   number;
 }
@@ -39,7 +42,7 @@ interface PendingPayment {
   shop_nom:        string;
   shop_slug:       string;
   shop_email:      string;
-  plan:            'basic' | 'pro';
+  plan:            'pro' | 'business';
   amount:          number;
   duration_months: number;
   operator:        'moov' | 'yas' | null;
@@ -68,15 +71,48 @@ function initials(nom: string) {
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 function PlanBadge({ plan }: { plan: string }) {
-  const cls = plan === 'pro' ? s.planPro : plan === 'basic' ? s.planBasic : s.planFree;
-  return <span className={`${s.planBadge} ${cls}`}>{plan}</span>;
+  const cls = plan === 'business' ? s.planPro : plan === 'pro' ? s.planBasic : s.planFree;
+  const label = plan === 'business' ? 'Business' : plan === 'pro' ? 'Pro' : 'Basic';
+  return <span className={`${s.planBadge} ${cls}`}>{label}</span>;
 }
 
-function StatusBadge({ actif }: { actif: boolean }) {
+function StatusBadge({ actif, subscriptionStatus, trialEndsAt }: {
+  actif:              boolean;
+  subscriptionStatus: ShopRow['subscription_status'];
+  trialEndsAt:        string | null;
+}) {
+  if (!actif) {
+    return (
+      <span className={`${s.statusBadge} ${s.statusOff}`}>
+        <span className={s.statusDot} />Suspendu
+      </span>
+    );
+  }
+  const trialExpired = subscriptionStatus === 'trial' && trialEndsAt && new Date(trialEndsAt) < new Date();
+  if (trialExpired) {
+    return (
+      <span className={s.statusBadge} style={{ background: '#FEF3C7', color: '#92400E' }}>
+        <span className={s.statusDot} style={{ background: '#F59E0B' }} />Essai terminé
+      </span>
+    );
+  }
+  if (subscriptionStatus === 'trial') {
+    return (
+      <span className={s.statusBadge} style={{ background: '#EFF6FF', color: '#1D4ED8' }}>
+        <span className={s.statusDot} style={{ background: '#3B82F6' }} />Essai
+      </span>
+    );
+  }
+  if (subscriptionStatus === 'expired') {
+    return (
+      <span className={s.statusBadge} style={{ background: '#FEF3C7', color: '#92400E' }}>
+        <span className={s.statusDot} style={{ background: '#F59E0B' }} />Expiré
+      </span>
+    );
+  }
   return (
-    <span className={`${s.statusBadge} ${actif ? s.statusOk : s.statusOff}`}>
-      <span className={s.statusDot} />
-      {actif ? 'Actif' : 'Suspendu'}
+    <span className={`${s.statusBadge} ${s.statusOk}`}>
+      <span className={s.statusDot} />Actif
     </span>
   );
 }
@@ -104,9 +140,9 @@ function KpiCard({
 
 function PlanDistribution({ stats }: { stats: Stats }) {
   const total = Math.max(stats.total_shops, 1);
-  const freePct  = Math.round((stats.plan_free  / total) * 100);
-  const basicPct = Math.round((stats.plan_basic / total) * 100);
-  const proPct   = Math.round((stats.plan_pro   / total) * 100);
+  const basicPct    = Math.round((stats.plan_basic    / total) * 100);
+  const proPct      = Math.round((stats.plan_pro      / total) * 100);
+  const businessPct = Math.round((stats.plan_business / total) * 100);
   return (
     <div className={s.planCard}>
       <span className={s.planCardLabel}>Distribution des plans</span>
@@ -114,29 +150,29 @@ function PlanDistribution({ stats }: { stats: Stats }) {
         <div className={s.planItem}>
           <div className={s.planBar}>
             <div className={s.planBarTrack}>
-              <div className={`${s.planBarFill} ${s.planBarFree}`} style={{ width: `${freePct}%` }} />
+              <div className={`${s.planBarFill} ${s.planBarFree}`} style={{ width: `${basicPct}%` }} />
             </div>
           </div>
-          <span className={s.planItemCount} style={{ color: 'var(--muted)' }}>{stats.plan_free}</span>
-          <span className={s.planItemLabel}>Gratuit</span>
-        </div>
-        <div className={s.planItem}>
-          <div className={s.planBar}>
-            <div className={s.planBarTrack}>
-              <div className={`${s.planBarFill} ${s.planBarBasic}`} style={{ width: `${basicPct}%` }} />
-            </div>
-          </div>
-          <span className={s.planItemCount} style={{ color: 'var(--blue)' }}>{stats.plan_basic}</span>
+          <span className={s.planItemCount} style={{ color: 'var(--muted)' }}>{stats.plan_basic}</span>
           <span className={s.planItemLabel}>Basic</span>
         </div>
         <div className={s.planItem}>
           <div className={s.planBar}>
             <div className={s.planBarTrack}>
-              <div className={`${s.planBarFill} ${s.planBarPro}`} style={{ width: `${proPct}%` }} />
+              <div className={`${s.planBarFill} ${s.planBarBasic}`} style={{ width: `${proPct}%` }} />
             </div>
           </div>
-          <span className={s.planItemCount} style={{ color: 'var(--purple)' }}>{stats.plan_pro}</span>
+          <span className={s.planItemCount} style={{ color: 'var(--blue)' }}>{stats.plan_pro}</span>
           <span className={s.planItemLabel}>Pro</span>
+        </div>
+        <div className={s.planItem}>
+          <div className={s.planBar}>
+            <div className={s.planBarTrack}>
+              <div className={`${s.planBarFill} ${s.planBarPro}`} style={{ width: `${businessPct}%` }} />
+            </div>
+          </div>
+          <span className={s.planItemCount} style={{ color: 'var(--purple)' }}>{stats.plan_business}</span>
+          <span className={s.planItemLabel}>Business</span>
         </div>
       </div>
     </div>
@@ -321,8 +357,8 @@ export default function SuperAdminDashboard({ view, onPendingCount }: DashboardP
           />
           <KpiCard
             label="Plans payants"
-            value={stats.plan_basic + stats.plan_pro}
-            sub={`${stats.plan_free} gratuits`}
+            value={stats.plan_pro + stats.plan_business}
+            sub={`${stats.plan_basic} Basic`}
             dotColor="var(--warn)"
             icon={TrendingUp}
           />
@@ -351,13 +387,13 @@ export default function SuperAdminDashboard({ view, onPendingCount }: DashboardP
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            {['', 'free', 'basic', 'pro'].map(p => (
+            {['', 'basic', 'pro', 'business'].map(p => (
               <button
                 key={p}
                 className={`${s.chip} ${planFilter === p ? s.chipActive : ''}`}
                 onClick={() => setPlanFilter(p)}
               >
-                {p === '' ? 'Tous les plans' : p === 'free' ? 'Gratuit' : p === 'basic' ? 'Basic' : 'Pro'}
+                {p === '' ? 'Tous les plans' : p === 'basic' ? 'Basic' : p === 'pro' ? 'Pro' : 'Business'}
               </button>
             ))}
           </div>
@@ -428,9 +464,9 @@ export default function SuperAdminDashboard({ view, onPendingCount }: DashboardP
                                   onChange={e => setEditPlan(prev => ({ ...prev, [shop.id]: e.target.value }))}
                                   disabled={saving === shop.id}
                                 >
-                                  <option value="free">Gratuit</option>
                                   <option value="basic">Basic</option>
                                   <option value="pro">Pro</option>
+                                  <option value="business">Business</option>
                                 </select>
                                 {planChanged && (
                                   <button
@@ -462,7 +498,13 @@ export default function SuperAdminDashboard({ view, onPendingCount }: DashboardP
                             </td>
 
                             {/* Statut */}
-                            <td><StatusBadge actif={shop.actif} /></td>
+                            <td>
+                              <StatusBadge
+                                actif={shop.actif}
+                                subscriptionStatus={shop.subscription_status}
+                                trialEndsAt={shop.trial_ends_at}
+                              />
+                            </td>
 
                             {/* Créée le */}
                             <td>

@@ -1,10 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   ShoppingBag, BarChart3, MessageCircle, Package, Truck, Tag, Users,
   CreditCard, Zap, CheckCircle, Star, ArrowRight, Globe, Shield,
-  Smartphone, TrendingUp, Play,
+  Smartphone, TrendingUp, Play, ChevronDown,
 } from 'lucide-react';
 import { useLang } from './useLang';
 
@@ -74,35 +75,53 @@ const T = {
       { title: 'Commencez à vendre',   desc: "Partagez votre lien boutique sur WhatsApp, Facebook ou Instagram. Les commandes arrivent automatiquement." },
     ],
     pricingSection: {
-      eyebrow:   'Tarifs simples · FCFA',
-      h2a:       "Choisissez l'offre qui",
-      h2b:       'grandit avec vous.',
-      p:         "Pas de frais cachés. Pas de carte bancaire pour démarrer. Annulez quand vous voulez.",
-      note:      "Paiement par mobile money (Flooz, T-Money, Wave, Orange Money) ou virement bancaire. Pas de carte requise.",
-      mostPop:   'Le plus choisi',
+      eyebrow:         'Tarifs simples · FCFA',
+      h2a:             "Choisissez l'offre qui",
+      h2b:             'grandit avec vous.',
+      p:               "Pas de frais cachés. Pas de carte bancaire pour démarrer. Annulez quand vous voulez.",
+      note:            "Paiement par mobile money (Flooz, T-Money, Wave, Orange Money) ou virement bancaire. Pas de carte requise.",
+      mostPop:         'Le plus choisi',
+      toggleMonthly:   'Mensuel',
+      toggleYearly:    'Annuel',
+      toggleDiscount:  '-20%',
+      socialProof:     "+20 commerçants actifs — Togo, Bénin, Côte d'Ivoire, Sénégal",
+      payments:        'Wave · Orange Money · MTN MoMo',
+      basicUpsell:     'Passez à Pro quand vous êtes prêt',
+      proUrgency:      '⏱ Offre de lancement — prix bloqué à vie si vous souscrivez ce mois-ci',
+      businessSubline: 'Un conseiller vous répond en moins de 2h',
+      faqTitle:        'Questions fréquentes',
+      faqItems: [
+        { q: 'Puis-je annuler ?', a: 'Oui, à tout moment depuis votre tableau de bord. Aucun engagement, aucune pénalité.' },
+        { q: 'Que se passe-t-il après 14 jours ?', a: "Si vous n'avez pas souscrit, votre boutique reste sur le plan Basic gratuit. Aucune donnée perdue." },
+        { q: 'Quels paiements acceptez-vous ?', a: 'Wave, Orange Money, MTN MoMo, Flooz, T-Money et virement bancaire. Pas de carte bancaire requise.' },
+        { q: 'Puis-je changer de plan ?', a: 'Oui, à tout moment depuis les réglages de votre compte. La différence est calculée au prorata.' },
+      ],
     },
     plans: [
       {
-        name: 'Gratuit', price: '0', period: 'toujours',
+        name: 'Basic', price: '2 000', priceYearly: '1 600', period: '/ mois (FCFA)',
         desc: 'Pour tester et démarrer.',
-        cta: 'Démarrer gratuitement', highlighted: false,
+        cta: 'Commencer gratuitement — toujours', highlighted: false,
         href: '/saas/onboarding', external: false,
-        features: ["Jusqu'à 20 produits", '50 commandes / mois', '1 utilisateur admin', 'Gestion de stock basique', 'Support par email'],
+        features: ['5 produits max', '10 commandes / mois', '1 utilisateur admin', 'Gestion de stock basique', 'Support par email'],
+        upsell: true, urgency: false, subline: false,
       },
       {
-        name: 'Pro', price: '9 900', period: '/ mois (FCFA)',
+        name: 'Pro', price: '9 900', priceYearly: '7 920', period: '/ mois (FCFA)',
         desc: 'La plupart de nos commerçants commencent ici.',
         cta: 'Essayer 14 jours gratuit', highlighted: true, tag: true,
-        href: '/saas/onboarding?plan=basic', external: false,
+        href: '/saas/onboarding?plan=pro', external: false,
         features: ['Produits illimités', 'Commandes illimitées', '5 utilisateurs admin', 'WhatsApp CRM inclus', 'Finance & rapports', 'Coupons & fidélité', 'Support prioritaire WhatsApp'],
+        upsell: false, urgency: true, subline: false,
       },
       {
-        name: 'Business', price: '24 900', period: '/ mois (FCFA)',
+        name: 'Business', price: '24 900', priceYearly: '19 920', period: '/ mois (FCFA)',
         desc: 'Pour chaînes, grossistes & revendeurs.',
-        cta: 'Nous contacter', highlighted: false,
+        cta: 'Demander une démo WhatsApp →', highlighted: false,
         href: `https://wa.me/22890527912?text=${encodeURIComponent('Bonjour, je suis intéressé par le plan Business de Afrisika')}`,
         external: true,
         features: ['Tout du plan Pro', 'Utilisateurs illimités', 'Multi-entrepôts', 'API & webhooks', 'Marque blanche', 'Gestionnaire dédié', 'SLA 99,9%'],
+        upsell: false, urgency: false, subline: true,
       },
     ],
     previewSection: {
@@ -207,35 +226,53 @@ const T = {
       { title: 'Start selling',        desc: "Share your store link on WhatsApp, Facebook, or Instagram. Orders come in automatically." },
     ],
     pricingSection: {
-      eyebrow:   'Simple pricing · FCFA',
-      h2a:       'Choose the plan that',
-      h2b:       'grows with you.',
-      p:         "No hidden fees. No credit card to get started. Cancel anytime.",
-      note:      "Pay by mobile money (Flooz, T-Money, Wave, Orange Money) or wire transfer. No card required.",
-      mostPop:   'Most popular',
+      eyebrow:         'Simple pricing · FCFA',
+      h2a:             'Choose the plan that',
+      h2b:             'grows with you.',
+      p:               "No hidden fees. No credit card to get started. Cancel anytime.",
+      note:            "Pay by mobile money (Flooz, T-Money, Wave, Orange Money) or wire transfer. No card required.",
+      mostPop:         'Most popular',
+      toggleMonthly:   'Monthly',
+      toggleYearly:    'Yearly',
+      toggleDiscount:  '-20%',
+      socialProof:     '+20 active merchants — Togo, Benin, Ivory Coast, Senegal',
+      payments:        'Wave · Orange Money · MTN MoMo',
+      basicUpsell:     'Upgrade to Pro when you are ready',
+      proUrgency:      '⏱ Launch offer — price locked for life if you subscribe this month',
+      businessSubline: 'An advisor replies in under 2 hours',
+      faqTitle:        'Frequently asked questions',
+      faqItems: [
+        { q: 'Can I cancel?', a: 'Yes, anytime from your dashboard. No commitment, no penalty.' },
+        { q: 'What happens after 14 days?', a: "If you haven't subscribed, your store stays on the free Basic plan. No data lost." },
+        { q: 'What payments do you accept?', a: 'Wave, Orange Money, MTN MoMo, Flooz, T-Money, and wire transfer. No credit card required.' },
+        { q: 'Can I change my plan?', a: 'Yes, anytime from your account settings. The difference is calculated on a pro-rata basis.' },
+      ],
     },
     plans: [
       {
-        name: 'Free', price: '0', period: 'forever',
+        name: 'Basic', price: '2 000', priceYearly: '1 600', period: '/ month (FCFA)',
         desc: 'To test and get started.',
-        cta: 'Get started free', highlighted: false,
+        cta: 'Get started free — forever', highlighted: false,
         href: '/saas/onboarding', external: false,
-        features: ['Up to 20 products', '50 orders / month', '1 admin user', 'Basic inventory management', 'Email support'],
+        features: ['5 products max', '10 orders / month', '1 admin user', 'Basic inventory management', 'Email support'],
+        upsell: true, urgency: false, subline: false,
       },
       {
-        name: 'Pro', price: '9 900', period: '/ month (FCFA)',
+        name: 'Pro', price: '9 900', priceYearly: '7 920', period: '/ month (FCFA)',
         desc: 'Most of our merchants start here.',
         cta: 'Try free for 14 days', highlighted: true, tag: true,
-        href: '/saas/onboarding?plan=basic', external: false,
+        href: '/saas/onboarding?plan=pro', external: false,
         features: ['Unlimited products', 'Unlimited orders', '5 admin users', 'WhatsApp CRM included', 'Finance & reports', 'Coupons & loyalty', 'Priority WhatsApp support'],
+        upsell: false, urgency: true, subline: false,
       },
       {
-        name: 'Business', price: '24 900', period: '/ month (FCFA)',
+        name: 'Business', price: '24 900', priceYearly: '19 920', period: '/ month (FCFA)',
         desc: 'For chains, wholesalers & resellers.',
-        cta: 'Contact us', highlighted: false,
+        cta: 'Request a WhatsApp demo →', highlighted: false,
         href: `https://wa.me/22890527912?text=${encodeURIComponent('Hello, I am interested in the Afrisika Business plan')}`,
         external: true,
         features: ['Everything in Pro', 'Unlimited users', 'Multi-warehouse', 'API & webhooks', 'White label', 'Dedicated manager', '99.9% SLA'],
+        upsell: false, urgency: false, subline: true,
       },
     ],
     previewSection: {
@@ -422,6 +459,7 @@ function HeroMock({ lang }: { lang: 'fr' | 'en' }) {
 /* ─── Main ───────────────────────────────────────────────────────────────── */
 export default function LandingContent() {
   const [lang] = useLang();
+  const [yearly, setYearly] = useState(false);
   const t = T[lang];
 
   return (
@@ -663,17 +701,40 @@ export default function LandingContent() {
                 </span>
               </h2>
             </div>
-            <p className="text-[17px] lg:text-[19px] text-[#6B635B] leading-[1.5] max-w-[54ch]">
-              {t.pricingSection.p}
-            </p>
           </div>
+
+          {/* Billing toggle */}
+          <div className="flex items-center justify-center gap-3 mb-12">
+            <span className={`text-[14px] transition-colors ${!yearly ? 'text-[#14110E] font-medium' : 'text-[#8A8278]'}`}>
+              {t.pricingSection.toggleMonthly}
+            </span>
+            <button
+              onClick={() => setYearly(y => !y)}
+              className="relative w-11 h-6 rounded-full transition-colors focus:outline-none"
+              style={{ background: yearly ? '#14110E' : '#E8E1D4' }}
+              aria-label="toggle billing period"
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                style={{ transform: yearly ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
+            <span className={`text-[14px] flex items-center gap-1.5 transition-colors ${yearly ? 'text-[#14110E] font-medium' : 'text-[#8A8278]'}`}>
+              {t.pricingSection.toggleYearly}
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#E4F1EA] text-[#1E5C3E]">
+                {t.pricingSection.toggleDiscount}
+              </span>
+            </span>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-[1080px] mx-auto">
             {t.plans.map((plan) => {
               const dark = plan.highlighted;
+              const displayPrice = yearly ? plan.priceYearly : plan.price;
               return (
                 <div
                   key={plan.name}
-                  className={`relative rounded-[28px] p-8 flex flex-col gap-6 border ${dark ? 'bg-[#14110E] border-[#14110E] text-white' : 'bg-white border-[#E8E1D4]'}`}
+                  className={`relative rounded-[28px] p-8 flex flex-col gap-5 border ${dark ? 'bg-[#14110E] border-[#14110E] text-white' : 'bg-white border-[#E8E1D4]'}`}
                   style={{ boxShadow: dark ? '0 24px 60px -20px rgba(20,17,14,0.4)' : '0 1px 0 rgba(20,17,14,0.03)' }}
                 >
                   {'tag' in plan && plan.tag && (
@@ -691,29 +752,48 @@ export default function LandingContent() {
                     <h3 className={`text-[18px] font-medium tracking-tight ${dark ? 'text-white' : 'text-[#14110E]'}`}>{plan.name}</h3>
                     <p className={`text-[14px] mt-1.5 ${dark ? 'text-white/70' : 'text-[#6B635B]'}`}>{plan.desc}</p>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-[48px] font-medium tracking-[-0.04em] leading-none ${dark ? 'text-white' : 'text-[#14110E]'}`}>{plan.price}</span>
-                    <span className={`text-[14px] ml-1 ${dark ? 'text-white/70' : 'text-[#6B635B]'}`}>{plan.period}</span>
+                  <div>
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-[48px] font-medium tracking-[-0.04em] leading-none ${dark ? 'text-white' : 'text-[#14110E]'}`}>{displayPrice}</span>
+                      <span className={`text-[14px] ml-1 ${dark ? 'text-white/70' : 'text-[#6B635B]'}`}>{plan.period}</span>
+                    </div>
+                    {yearly && (
+                      <div className={`text-[12px] mt-1 ${dark ? 'text-white/50' : 'text-[#8A8278]'}`}>
+                        {lang === 'fr' ? 'facturé annuellement' : 'billed annually'}
+                      </div>
+                    )}
+                    <div className={`text-[12px] mt-1.5 ${dark ? 'text-white/40' : 'text-[#A09890]'}`}>
+                      {t.pricingSection.payments}
+                    </div>
                   </div>
                   {plan.external ? (
                     <a
                       href={plan.href}
                       target="_blank" rel="noopener noreferrer"
-                      className={`inline-flex items-center justify-center gap-2 w-full h-11 rounded-full text-[14.5px] font-medium transition-all hover:-translate-y-px ${dark ? 'text-white' : 'bg-transparent border border-[#E8E1D4] text-[#14110E] hover:bg-[#FBF7F1]'}`}
+                      className={`inline-flex items-center justify-center gap-2 w-full h-11 rounded-full text-[14px] font-medium transition-all hover:-translate-y-px ${dark ? 'text-white' : 'bg-transparent border border-[#E8E1D4] text-[#14110E] hover:bg-[#FBF7F1]'}`}
                       style={dark ? { background: 'linear-gradient(180deg,#ED8A38,#C9601E)', boxShadow: '0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 20px -8px rgba(184,80,26,0.55)' } : undefined}
                     >
                       {plan.cta}
-                      {dark && <ArrowRight className="w-3.5 h-3.5" />}
                     </a>
                   ) : (
                     <Link
                       href={plan.href}
-                      className={`inline-flex items-center justify-center gap-2 w-full h-11 rounded-full text-[14.5px] font-medium transition-all hover:-translate-y-px ${dark ? 'text-white' : 'bg-transparent border border-[#E8E1D4] text-[#14110E] hover:bg-[#FBF7F1]'}`}
+                      className={`inline-flex items-center justify-center gap-2 w-full h-11 rounded-full text-[14px] font-medium transition-all hover:-translate-y-px ${dark ? 'text-white' : 'bg-transparent border border-[#E8E1D4] text-[#14110E] hover:bg-[#FBF7F1]'}`}
                       style={dark ? { background: 'linear-gradient(180deg,#ED8A38,#C9601E)', boxShadow: '0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 20px -8px rgba(184,80,26,0.55)' } : undefined}
                     >
                       {plan.cta}
                       {dark && <ArrowRight className="w-3.5 h-3.5" />}
                     </Link>
+                  )}
+                  {plan.urgency && (
+                    <div className={`text-[12px] text-center px-3 py-2.5 rounded-xl leading-[1.4] ${dark ? 'bg-white/10 text-[#F2A765]' : 'bg-[#FCEBD6] text-[#B8501A]'}`}>
+                      {t.pricingSection.proUrgency}
+                    </div>
+                  )}
+                  {plan.subline && (
+                    <div className={`text-[12.5px] text-center ${dark ? 'text-white/60' : 'text-[#6B635B]'}`}>
+                      {t.pricingSection.businessSubline}
+                    </div>
                   )}
                   <ul className="flex flex-col gap-2.5">
                     {plan.features.map((feat) => (
@@ -723,11 +803,34 @@ export default function LandingContent() {
                       </li>
                     ))}
                   </ul>
+                  {plan.upsell && (
+                    <p className={`text-[12px] text-center pt-1 ${dark ? 'text-white/40' : 'text-[#A09890]'}`}>
+                      {t.pricingSection.basicUpsell}
+                    </p>
+                  )}
                 </div>
               );
             })}
           </div>
           <p className="text-center text-[#8A8278] text-[13px] mt-10">{t.pricingSection.note}</p>
+
+          {/* FAQ */}
+          <div className="max-w-[720px] mx-auto mt-16">
+            <h3 className="text-[24px] sm:text-[28px] font-medium tracking-[-0.02em] text-center mb-8 text-[#14110E]">
+              {t.pricingSection.faqTitle}
+            </h3>
+            <div className="space-y-3">
+              {t.pricingSection.faqItems.map((item) => (
+                <details key={item.q} className="bg-white border border-[#E8E1D4] rounded-2xl overflow-hidden group">
+                  <summary className="px-6 py-4 text-[15px] font-medium text-[#14110E] cursor-pointer list-none flex items-center justify-between gap-4 select-none">
+                    {item.q}
+                    <ChevronDown className="w-4 h-4 text-[#6B635B] shrink-0 transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+                  <div className="px-6 pb-5 text-[14px] text-[#6B635B] leading-[1.65]">{item.a}</div>
+                </details>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

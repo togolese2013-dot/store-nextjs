@@ -343,6 +343,7 @@ export interface AdminUser {
   created_at:           string;
   last_login:           string | null;
   must_change_password: number;
+  shop_id:              number;
 }
 
 export async function ensureAdminUsersCols() {
