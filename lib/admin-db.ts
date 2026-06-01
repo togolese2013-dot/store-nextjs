@@ -44,7 +44,8 @@ export async function getProduitsWithStock(): Promise<ProduitStock[]> {
        SELECT p.id AS produit_id, p.nom,
               p.reference,
               COALESCE(p.stock_magasin, 0) AS stock,
-              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+              0 AS variants_count, NULL AS variant_id,
+              CAST(NULL AS CHAR) AS variant_nom
        FROM produits p
        WHERE p.actif = 1
          AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
