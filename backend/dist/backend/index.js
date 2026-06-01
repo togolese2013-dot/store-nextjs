@@ -402,7 +402,8 @@ async function getProducts(opts) {
        ${cols.entrepot_id ? "e.nom" : "NULL"} AS entrepot_nom,
        ${cols.entrepot_id ? "e.telephone" : "NULL"} AS entrepot_telephone,
        ${orderCol}                                                                          AS sort_col,
-       c.nom AS categorie_nom
+       c.nom AS categorie_nom,
+       p.actif
      FROM produits p
      LEFT JOIN categories c ON p.categorie_id = c.id
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}
@@ -758,8 +759,10 @@ __export(admin_db_exports, {
   getAchatById: () => getAchatById,
   getAchatStats: () => getAchatStats,
   getAdminByEmail: () => getAdminByEmail,
+  getAdminByEmailGlobal: () => getAdminByEmailGlobal,
   getAdminById: () => getAdminById,
   getAdminByUsername: () => getAdminByUsername,
+  getAdminByUsernameGlobal: () => getAdminByUsernameGlobal,
   getBoutiqueClientById: () => getBoutiqueClientById,
   getBoutiqueClientsStats: () => getBoutiqueClientsStats,
   getCRMStats: () => getCRMStats,
@@ -1217,6 +1220,20 @@ async function getAdminByUsername(username, shopId = 1) {
   );
   return rows[0] ?? null;
 }
+async function getAdminByUsernameGlobal(username) {
+  const [rows] = await db.execute(
+    "SELECT * FROM admin_users WHERE username = ? AND actif = 1 ORDER BY id ASC LIMIT 1",
+    [username]
+  );
+  return rows[0] ?? null;
+}
+async function getAdminByEmailGlobal(email) {
+  const [rows] = await db.execute(
+    "SELECT * FROM admin_users WHERE email = ? AND actif = 1 ORDER BY id ASC LIMIT 1",
+    [email]
+  );
+  return rows[0] ?? null;
+}
 async function getAdminById(id) {
   const [rows] = await db.execute(
     "SELECT * FROM admin_users WHERE id = ? LIMIT 1",
@@ -1600,10 +1617,11 @@ async function ensureEntrepotsTable() {
     }
   });
 }
-async function listEntrepots() {
+async function listEntrepots(shopId = 1) {
   await ensureEntrepotsTable();
   const [rows] = await db.execute(
-    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots ORDER BY nom"
+    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots WHERE shop_id = ? ORDER BY nom",
+    [shopId]
   );
   return rows.map((r) => ({
     id: Number(r.id),
@@ -1614,23 +1632,23 @@ async function listEntrepots() {
     actif: Boolean(r.actif)
   }));
 }
-async function upsertEntrepot(data) {
+async function upsertEntrepot(data, shopId = 1) {
   await ensureEntrepotsTable();
   if (data.id) {
     await db.execute(
-      `UPDATE entrepots SET nom = ?, telephone = ?, adresse = ?, notes = ?, actif = ? WHERE id = ?`,
-      [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, data.id]
+      `UPDATE entrepots SET nom = ?, telephone = ?, adresse = ?, notes = ?, actif = ? WHERE id = ? AND shop_id = ?`,
+      [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, data.id, shopId]
     );
     return data.id;
   }
   const [result] = await db.execute(
-    `INSERT INTO entrepots (nom, telephone, adresse, notes, actif) VALUES (?, ?, ?, ?, ?)`,
-    [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0]
+    `INSERT INTO entrepots (nom, telephone, adresse, notes, actif, shop_id) VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.nom, data.telephone ?? null, data.adresse ?? null, data.notes ?? null, data.actif !== false ? 1 : 0, shopId]
   );
   return result.insertId;
 }
-async function deleteEntrepot(id) {
-  await db.execute("DELETE FROM entrepots WHERE id = ?", [id]);
+async function deleteEntrepot(id, shopId = 1) {
+  await db.execute("DELETE FROM entrepots WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 async function getProductEntrepotsForRefs(refs) {
   if (!refs.length) return {};
@@ -3465,50 +3483,57 @@ async function getLivraisonsStats() {
     livre: Number(r.livre ?? 0)
   };
 }
-async function listFournisseurs() {
+async function listFournisseurs(shopId = 1) {
   const [rows] = await db.query(
-    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs ORDER BY nom LIMIT 500"
+    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs WHERE shop_id = ? ORDER BY nom LIMIT 500",
+    [shopId]
   );
   return rows;
 }
-async function createFournisseur(data) {
+async function createFournisseur(data, shopId = 1) {
   const [result] = await db.execute(
-    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note) VALUES (?,?,?,?,?,?)`,
-    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null]
+    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, shop_id) VALUES (?,?,?,?,?,?,?)`,
+    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, shopId]
   );
   return result.insertId;
 }
-async function updateFournisseur(id, data) {
+async function updateFournisseur(id, data, shopId = 1) {
   await db.execute(
-    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=?`,
-    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id]
+    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=? AND shop_id=?`,
+    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id, shopId]
   );
 }
-async function deleteFournisseur(id) {
-  await db.execute("DELETE FROM fournisseurs WHERE id = ?", [id]);
+async function deleteFournisseur(id, shopId = 1) {
+  await db.execute("DELETE FROM fournisseurs WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
-async function listAchats(limit = 50, offset = 0) {
+async function listAchats(shopId = 1, limit = 50, offset = 0) {
   const [rows] = await db.query(
     `SELECT a.*, f.nom AS fournisseur_nom
      FROM achats a
      LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id
+     WHERE a.shop_id = ?
      ORDER BY a.date_achat DESC, a.id DESC
-     LIMIT ${limit} OFFSET ${offset}`
+     LIMIT ${limit} OFFSET ${offset}`,
+    [shopId]
   );
   return rows;
 }
-async function countAchats() {
-  const [rows] = await db.execute("SELECT COUNT(*) as cnt FROM achats");
+async function countAchats(shopId = 1) {
+  const [rows] = await db.execute(
+    "SELECT COUNT(*) as cnt FROM achats WHERE shop_id = ?",
+    [shopId]
+  );
   return Number(rows[0]?.cnt ?? 0);
 }
-async function getAchatStats() {
+async function getAchatStats(shopId = 1) {
   const [rows] = await db.execute(
     `SELECT
        COUNT(*) AS total,
        SUM(statut = 'en_attente') AS en_attente,
        SUM(statut = 'recu') AS recu,
        COALESCE(SUM(montant_total), 0) AS montant_total
-     FROM achats`
+     FROM achats WHERE shop_id = ?`,
+    [shopId]
   );
   const r = rows[0];
   return {
@@ -3518,10 +3543,10 @@ async function getAchatStats() {
     montant_total: Number(r.montant_total ?? 0)
   };
 }
-async function getAchatById(id) {
+async function getAchatById(id, shopId = 1) {
   const [aRows] = await db.execute(
-    `SELECT a.*, f.nom AS fournisseur_nom FROM achats a LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id WHERE a.id = ?`,
-    [id]
+    `SELECT a.*, f.nom AS fournisseur_nom FROM achats a LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id WHERE a.id = ? AND a.shop_id = ?`,
+    [id, shopId]
   );
   if (!aRows[0]) return null;
   const [iRows] = await db.execute(
@@ -3530,7 +3555,7 @@ async function getAchatById(id) {
   );
   return { achat: aRows[0], items: iRows };
 }
-async function createAchat(data) {
+async function createAchat(data, shopId = 1) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -3538,8 +3563,8 @@ async function createAchat(data) {
     if (!reference) {
       const year = (/* @__PURE__ */ new Date()).getFullYear();
       const [cntRows] = await conn.execute(
-        `SELECT COUNT(*) AS cnt FROM achats WHERE YEAR(date_achat) = ?`,
-        [year]
+        `SELECT COUNT(*) AS cnt FROM achats WHERE YEAR(date_achat) = ? AND shop_id = ?`,
+        [year, shopId]
       );
       const num = (Number(cntRows[0].cnt) + 1).toString().padStart(3, "0");
       reference = `ACH-${year}-${num}`;
@@ -3555,8 +3580,9 @@ async function createAchat(data) {
         hasTransport = true;
       }
     }
-    const achatCols = ["fournisseur_id", "reference", "date_achat", "statut", "montant_total", "notes"];
+    const achatCols = ["shop_id", "fournisseur_id", "reference", "date_achat", "statut", "montant_total", "notes"];
     const achatVals = [
+      shopId,
       data.fournisseur_id ?? null,
       reference,
       data.date_achat,
@@ -3593,12 +3619,14 @@ async function createAchat(data) {
 async function updateAchatStatut(id, statut) {
   await db.execute("UPDATE achats SET statut = ? WHERE id = ?", [statut, id]);
 }
-async function deleteAchat(id) {
+async function deleteAchat(id, shopId = 1) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+    const [check] = await conn.execute("SELECT id FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
+    if (!check[0]) throw new Error("Achat introuvable.");
     await conn.execute("DELETE FROM achat_items WHERE achat_id = ?", [id]);
-    await conn.execute("DELETE FROM achats WHERE id = ?", [id]);
+    await conn.execute("DELETE FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -3607,7 +3635,7 @@ async function deleteAchat(id) {
     conn.release();
   }
 }
-async function updateAchat(id, data) {
+async function updateAchat(id, data, shopId = 1) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -3645,7 +3673,8 @@ async function updateAchat(id, data) {
     }
     if (sets.length) {
       vals.push(id);
-      await conn.execute(`UPDATE achats SET ${sets.join(", ")} WHERE id = ?`, vals);
+      vals.push(shopId);
+      await conn.execute(`UPDATE achats SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, vals);
     }
     await conn.commit();
   } catch (err) {
@@ -3655,14 +3684,14 @@ async function updateAchat(id, data) {
     conn.release();
   }
 }
-async function recevoirAchat(id) {
+async function recevoirAchat(id, shopId = 1) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.execute("SELECT statut FROM achats WHERE id = ?", [id]);
+    const [rows] = await conn.execute("SELECT statut FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
     if (!rows[0]) throw new Error("Achat introuvable.");
     if (rows[0].statut !== "en_attente") throw new Error("Cet achat n'est pas en attente.");
-    await conn.execute("UPDATE achats SET statut = 'recu' WHERE id = ?", [id]);
+    await conn.execute("UPDATE achats SET statut = 'recu' WHERE id = ? AND shop_id = ?", [id, shopId]);
     const [items] = await conn.execute(
       "SELECT produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL",
       [id]
@@ -4275,16 +4304,17 @@ async function ensureMarquesTable() {
     }
   });
 }
-async function listAdminMarques() {
+async function listAdminMarques(shopId = 1) {
   await ensureMarquesTable();
   const [rows] = await db.execute(`
     SELECT m.id, m.nom, COALESCE(m.description, '') AS description,
            COUNT(p.id) AS nb_produits
     FROM marques m
-    LEFT JOIN produits p ON p.marque_id = m.id
+    LEFT JOIN produits p ON p.marque_id = m.id AND p.shop_id = ?
+    WHERE m.shop_id = ?
     GROUP BY m.id
     ORDER BY m.nom
-  `);
+  `, [shopId, shopId]);
   return rows.map((r) => ({
     id: Number(r.id),
     nom: String(r.nom),
@@ -4292,22 +4322,22 @@ async function listAdminMarques() {
     nb_produits: Number(r.nb_produits ?? 0)
   }));
 }
-async function createMarque(data) {
+async function createMarque(data, shopId = 1) {
   await ensureMarquesTable();
   const [res] = await db.execute(
-    `INSERT INTO marques (nom, description) VALUES (?, ?)`,
-    [data.nom, data.description || null]
+    `INSERT INTO marques (nom, description, shop_id) VALUES (?, ?, ?)`,
+    [data.nom, data.description || null, shopId]
   );
   return res.insertId;
 }
-async function updateMarque(id, data) {
+async function updateMarque(id, data, shopId = 1) {
   await db.execute(
-    `UPDATE marques SET nom = ?, description = ? WHERE id = ?`,
-    [data.nom, data.description || null, id]
+    `UPDATE marques SET nom = ?, description = ? WHERE id = ? AND shop_id = ?`,
+    [data.nom, data.description || null, id, shopId]
   );
 }
-async function deleteMarque(id) {
-  await db.execute(`DELETE FROM marques WHERE id = ?`, [id]);
+async function deleteMarque(id, shopId = 1) {
+  await db.execute(`DELETE FROM marques WHERE id = ? AND shop_id = ?`, [id, shopId]);
 }
 async function ensureTokenVersionCols() {
   const alters = [
@@ -4550,7 +4580,7 @@ async function ensureShopsTable() {
       nom                 VARCHAR(150)                                          NOT NULL,
       slug                VARCHAR(100)                                          NOT NULL UNIQUE,
       email               VARCHAR(150)                                          NOT NULL,
-      plan                ENUM('free','basic','pro')                            NOT NULL DEFAULT 'basic',
+      plan                ENUM('basic','pro','business')                        NOT NULL DEFAULT 'basic',
       actif               TINYINT(1)                                            NOT NULL DEFAULT 1,
       custom_domain       VARCHAR(255)                                          NULL UNIQUE,
       subscription_status ENUM('trial','active','expired','suspended')         NOT NULL DEFAULT 'trial',
@@ -4577,7 +4607,7 @@ async function ensureShopsTable() {
       id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       shop_id         INT UNSIGNED       NOT NULL,
       transaction_id  VARCHAR(100)       NOT NULL UNIQUE,
-      plan            ENUM('basic','pro') NOT NULL,
+      plan            ENUM('pro','business') NOT NULL,
       amount          INT UNSIGNED        NOT NULL,
       duration_months TINYINT UNSIGNED   NOT NULL DEFAULT 1,
       status          ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',
@@ -4669,6 +4699,10 @@ async function updateShop(id, data) {
   if (data.actif !== void 0) {
     sets.push("actif = ?");
     vals.push(data.actif ? 1 : 0);
+  }
+  if (data.subscription_status !== void 0) {
+    sets.push("subscription_status = ?");
+    vals.push(data.subscription_status);
   }
   if (!sets.length) return;
   vals.push(id);
@@ -4903,7 +4937,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
     await ensureShopsTable();
     const rawSlug = shop_slug ?? req.headers["x-shop-slug"] ?? "default";
     const shop = await getShopBySlug(rawSlug);
-    const shopId = shop?.id ?? 1;
+    let shopId = shop?.id ?? 1;
     const slug = username.trim().toLowerCase();
     const lock = isLocked(slug);
     if (lock.locked) {
@@ -4913,6 +4947,10 @@ router.post("/api/admin/auth/login", async (req, res) => {
       });
     }
     let user = await getAdminByUsername(slug, shopId) ?? await getAdminByEmail(slug, shopId);
+    if (!user && rawSlug === "default") {
+      user = await getAdminByUsernameGlobal(slug) ?? await getAdminByEmailGlobal(slug);
+      if (user) shopId = user.shop_id;
+    }
     if (!user) {
       const [rows] = await db.execute(
         "SELECT COUNT(*) as cnt FROM admin_users"
@@ -5146,12 +5184,12 @@ init_admin_db();
 
 // lib/plan-limits.ts
 var PLAN_LIMITS = {
-  free: 50,
-  basic: 500,
-  pro: Infinity
+  basic: 20,
+  pro: Infinity,
+  business: Infinity
 };
 function planLimit(plan) {
-  return PLAN_LIMITS[plan] ?? 50;
+  return PLAN_LIMITS[plan] ?? 20;
 }
 function planLimitLabel(plan) {
   const limit = planLimit(plan);
@@ -6970,11 +7008,6 @@ var orders_default = router10;
 // routes/admin/upload.ts
 var import_express11 = __toESM(require("express"));
 var import_cloudinary = require("cloudinary");
-import_cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
 var MAX_SIZE = 10 * 1024 * 1024;
 function detectMimeFromBuffer(buf) {
   if (buf.length < 4) return null;
@@ -6986,6 +7019,11 @@ function detectMimeFromBuffer(buf) {
 }
 var router11 = import_express11.default.Router();
 async function uploadToCloudinary(buffer, _clientType) {
+  import_cloudinary.v2.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
   if (buffer.length > MAX_SIZE) throw new Error("Fichier trop volumineux (max 10 Mo)");
   const realMime = detectMimeFromBuffer(buffer);
   if (!realMime) throw new Error("Format de fichier non reconnu. Utilisez JPEG, PNG, WebP ou GIF.");
@@ -7195,7 +7233,7 @@ var router13 = import_express13.default.Router();
 router13.get("/api/admin/fournisseurs", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  const fournisseurs = await listFournisseurs();
+  const fournisseurs = await listFournisseurs(session.shop_id ?? 1);
   res.json({ fournisseurs });
 });
 router13.post("/api/admin/fournisseurs", async (req, res) => {
@@ -7204,7 +7242,7 @@ router13.post("/api/admin/fournisseurs", async (req, res) => {
   try {
     const { nom, contact, telephone, email, adresse, note } = req.body;
     if (!nom?.trim()) return res.status(400).json({ error: "Le nom est obligatoire." });
-    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note });
+    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note }, session.shop_id ?? 1);
     res.status(201).json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -7214,7 +7252,7 @@ router13.patch("/api/admin/fournisseurs/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    await updateFournisseur(Number(req.params.id), req.body);
+    await updateFournisseur(Number(req.params.id), req.body, session.shop_id ?? 1);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -7223,16 +7261,17 @@ router13.patch("/api/admin/fournisseurs/:id", async (req, res) => {
 router13.delete("/api/admin/fournisseurs/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await deleteFournisseur(Number(req.params.id));
+  await deleteFournisseur(Number(req.params.id), session.shop_id ?? 1);
   res.json({ ok: true });
 });
 router13.get("/api/admin/achats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = 20;
   const offset = (page - 1) * limit;
-  const [achats, total, stats] = await Promise.all([listAchats(limit, offset), countAchats(), getAchatStats()]);
+  const [achats, total, stats] = await Promise.all([listAchats(shopId, limit, offset), countAchats(shopId), getAchatStats(shopId)]);
   res.json({ achats, total, stats, page, limit });
 });
 router13.post("/api/admin/achats", async (req, res) => {
@@ -7242,7 +7281,7 @@ router13.post("/api/admin/achats", async (req, res) => {
     const { fournisseur_id, reference, date_achat, statut, note, transport, items } = req.body;
     if (!date_achat) return res.status(400).json({ error: "La date est obligatoire." });
     if (!items?.length) return res.status(400).json({ error: "Au moins un article est requis." });
-    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference: reference || void 0, date_achat, statut: statut ?? "en_attente", note: note ?? null, transport: transport ?? null, items });
+    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference: reference || void 0, date_achat, statut: statut ?? "en_attente", note: note ?? null, transport: transport ?? null, items }, session.shop_id ?? 1);
     emitAdminEvent("achat");
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -7252,7 +7291,7 @@ router13.post("/api/admin/achats", async (req, res) => {
 router13.get("/api/admin/achats/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  const achat = await getAchatById(Number(req.params.id));
+  const achat = await getAchatById(Number(req.params.id), session.shop_id ?? 1);
   if (!achat) return res.status(404).json({ error: "Achat introuvable." });
   res.json({ achat });
 });
@@ -7261,10 +7300,11 @@ router13.patch("/api/admin/achats/:id", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
     const id = Number(req.params.id);
+    const shopId = session.shop_id ?? 1;
     if (req.body.action === "recevoir") {
-      await recevoirAchat(id);
+      await recevoirAchat(id, shopId);
     } else {
-      await updateAchat(id, req.body);
+      await updateAchat(id, req.body, shopId);
     }
     res.json({ ok: true });
   } catch (err) {
@@ -7275,7 +7315,7 @@ router13.delete("/api/admin/achats/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    await deleteAchat(Number(req.params.id));
+    await deleteAchat(Number(req.params.id), session.shop_id ?? 1);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -7318,7 +7358,7 @@ router14.delete("/api/admin/categories/:id", async (req, res) => {
 router14.get("/api/admin/marques", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  const marques = await listAdminMarques();
+  const marques = await listAdminMarques(session.shop_id ?? 1);
   res.json({ success: true, data: marques });
 });
 router14.post("/api/admin/marques", async (req, res) => {
@@ -7326,19 +7366,19 @@ router14.post("/api/admin/marques", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { nom, description = "" } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createMarque({ nom: nom.trim(), description: description.trim() });
+  const id = await createMarque({ nom: nom.trim(), description: description.trim() }, session.shop_id ?? 1);
   res.json({ success: true, id });
 });
 router14.patch("/api/admin/marques/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await updateMarque(Number(req.params.id), req.body);
+  await updateMarque(Number(req.params.id), req.body, session.shop_id ?? 1);
   res.json({ success: true });
 });
 router14.delete("/api/admin/marques/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  await deleteMarque(Number(req.params.id));
+  await deleteMarque(Number(req.params.id), session.shop_id ?? 1);
   res.json({ success: true });
 });
 var categories_default = router14;
@@ -11679,7 +11719,7 @@ router42.get("/api/admin/entrepots", async (req, res) => {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
   try {
-    const entrepots = await listEntrepots();
+    const entrepots = await listEntrepots(session.shop_id ?? 1);
     res.json({ entrepots });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -11694,7 +11734,7 @@ router42.post("/api/admin/entrepots", async (req, res) => {
   const { id, nom, telephone, adresse, notes, actif } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
   try {
-    const newId = await upsertEntrepot({ id: id ? Number(id) : void 0, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false });
+    const newId = await upsertEntrepot({ id: id ? Number(id) : void 0, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false }, session.shop_id ?? 1);
     res.json({ ok: true, id: newId });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -11707,7 +11747,7 @@ router42.delete("/api/admin/entrepots/:id", async (req, res) => {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
   try {
-    await deleteEntrepot(Number(req.params.id));
+    await deleteEntrepot(Number(req.params.id), session.shop_id ?? 1);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -12067,10 +12107,13 @@ router45.patch("/api/admin/saas/shops/:id", async (req, res) => {
     const update = {};
     if (nom !== void 0) update.nom = String(nom);
     if (email !== void 0) update.email = String(email);
-    if (plan !== void 0 && ["free", "basic", "pro"].includes(String(plan))) {
+    if (plan !== void 0 && ["basic", "pro", "business"].includes(String(plan))) {
       update.plan = plan;
     }
-    if (actif !== void 0) update.actif = Boolean(actif);
+    if (actif !== void 0) {
+      update.actif = Boolean(actif);
+      update.subscription_status = Boolean(actif) ? "active" : "suspended";
+    }
     await updateShop(id, update);
     res.json({ ok: true });
   } catch (err) {
@@ -12085,9 +12128,9 @@ router45.get("/api/admin/saas/stats", async (req, res) => {
       SELECT
         (SELECT COUNT(*) FROM shops)                                   AS total_shops,
         (SELECT COUNT(*) FROM shops WHERE actif = 1)                  AS active_shops,
-        (SELECT COUNT(*) FROM shops WHERE plan = 'free')              AS plan_free,
         (SELECT COUNT(*) FROM shops WHERE plan = 'basic')             AS plan_basic,
         (SELECT COUNT(*) FROM shops WHERE plan = 'pro')               AS plan_pro,
+        (SELECT COUNT(*) FROM shops WHERE plan = 'business')          AS plan_business,
         (SELECT COUNT(*) FROM produits)                               AS total_products,
         (SELECT COUNT(*) FROM admin_users WHERE role != 'super_admin') AS total_admins
     `);
