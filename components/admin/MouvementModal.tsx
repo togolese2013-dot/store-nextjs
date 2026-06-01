@@ -159,11 +159,11 @@ export default function MouvementModal() {
 
   function filteredFor(index: number): ProduitStock[] {
     const search = items[index]?.search ?? "";
-    if (!search.trim()) return [];
+    if (!search.trim()) return produits.slice(0, 20);
     const q = search.toLowerCase();
     return produits.filter(p =>
       p.nom.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q)
-    );
+    ).slice(0, 30);
   }
 
   const selectedType = TYPES.find(t => t.value === type)!;
