@@ -43,7 +43,7 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
     });
   }, [subscribe, router]);
 
-  const ADMIN_ZONE = ["/admin/admin-ws", "/admin/config", "/admin/settings", "/admin/users", "/admin/rapports", "/admin/tendances", "/admin/magasin", "/admin/store", "/admin/boutique", "/admin/saas"];
+  const ADMIN_ZONE = ["/admin/admin-ws", "/admin/config", "/admin/settings", "/admin/users", "/admin/rapports", "/admin/tendances", "/admin/magasin", "/admin/store", "/admin/boutique", "/admin/saas", "/admin/crm"];
   const STORE_EXCEPTIONS = ["/admin/settings/delivery", "/admin/settings/payment"];
   const isAdminZone = pathname === "/admin" || ADMIN_ZONE.some(p =>
     (pathname === p || pathname.startsWith(p + "/")) &&

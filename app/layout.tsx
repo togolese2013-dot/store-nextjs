@@ -5,6 +5,8 @@ import ThemeVars from "@/components/ThemeVars";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import PwaRegister from "@/components/PwaRegister";
 import { getSettings } from "@/lib/admin-db";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 const FALLBACK_NAME    = "Togolese Shop";
@@ -41,13 +43,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const nonce = (await headers()).get("x-nonce") ?? "";
 
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
         <ThemeVars />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&display=swap" />
-        <link rel="manifest" href="/manifest.json" />
+<link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#14532d" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

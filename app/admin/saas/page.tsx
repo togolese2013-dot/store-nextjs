@@ -1,9 +1,12 @@
 import { getAdminSession } from '@/lib/auth';
-import SaasShell from '@/components/saas/SaasShell';
-
-export const metadata = { title: 'Super-Admin — SaaS' };
+import SuperAdmin from '@/components/super-admin/SuperAdmin';
 
 export default async function SaasPage() {
   const session = await getAdminSession();
-  return <SaasShell userName={session?.nom ?? 'Admin'} />;
+  return (
+    <SuperAdmin
+      userName={session?.nom ?? 'Admin'}
+      userRole={session?.role ?? 'Super Admin'}
+    />
+  );
 }
