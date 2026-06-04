@@ -62,8 +62,8 @@ export default function Crm({
   const page = controlledPage ?? internalPage;
 
   const go = (p: CrmPageId) => {
-    if (onPageChange) onPageChange(p);
-    else setInternalPage(p);
+    setInternalPage(p);
+    onPageChange?.(p);
   };
 
   const Page = PAGES[page];

@@ -1,16 +1,16 @@
-'use client';
+import { getAdminSession } from '@/lib/auth';
+import { getShopById } from '@/lib/shops';
+import CrmClient from './CrmClient';
 
-import { useRouter } from 'next/navigation';
-import Crm from '@/components/crm/Crm';
-import type { CrmPageId } from '@/components/crm/types';
-
-export default function CrmPage() {
-  const router = useRouter();
+export default async function CrmPage() {
+  const session = await getAdminSession();
+  const shop = session ? await getShopById(session.shop_id) : null;
 
   return (
-    <Crm
-      onBack={() => router.push('/admin')}
-      onPageChange={(p: CrmPageId) => router.push(`/admin/crm#${p}`)}
+    <CrmClient
+      shopName={shop?.nom ?? 'Mon Shop'}
+      userName={session?.nom ?? 'Admin'}
+      userRole={session?.role ?? 'Administrateur'}
     />
   );
 }
