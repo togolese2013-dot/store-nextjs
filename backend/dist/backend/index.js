@@ -205,14 +205,14 @@ async function produitCols() {
       }
     }
   }
-  if (!names.has("condition")) {
+  if (!names.has("prod_condition")) {
     try {
-      await db.execute(`ALTER TABLE produits ADD COLUMN \`condition\` ENUM('neuf','occasion','reconditionne') NOT NULL DEFAULT 'neuf'`);
-      names.add("condition");
+      await db.execute(`ALTER TABLE produits ADD COLUMN prod_condition ENUM('neuf','occasion','reconditionne') NOT NULL DEFAULT 'neuf'`);
+      names.add("prod_condition");
     } catch (e) {
       const err = e;
       if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
-        names.add("condition");
+        names.add("prod_condition");
       }
     }
   }
@@ -257,7 +257,7 @@ async function produitCols() {
     slug: names.has("slug"),
     entrepot_id: names.has("entrepot_id"),
     prix_entrepot: names.has("prix_entrepot"),
-    condition: names.has("condition")
+    prod_condition: names.has("prod_condition")
   };
   return _cols;
 }
@@ -360,8 +360,8 @@ async function getProducts(opts) {
     conditions.push("p.entrepot_id = ?");
     params.push(entrepotId);
   }
-  if (conditionFilter && cols.condition) {
-    conditions.push("p.`condition` = ?");
+  if (conditionFilter && cols.prod_condition) {
+    conditions.push("p.prod_condition = ?");
     params.push(conditionFilter);
   }
   const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
@@ -388,7 +388,7 @@ async function getProducts(opts) {
        ${cols.prix_entrepot ? "p.prix_entrepot" : "NULL"} AS prix_entrepot,
        ${cols.entrepot_id ? "e.nom" : "NULL"} AS entrepot_nom,
        ${cols.entrepot_id ? "e.telephone" : "NULL"} AS entrepot_telephone,
-       ${cols.condition ? "p.`condition`" : "NULL"} AS \`condition\`,
+       ${cols.prod_condition ? "p.prod_condition" : "NULL"} AS prod_condition,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
@@ -425,7 +425,7 @@ async function getProducts(opts) {
     prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
     entrepot_nom: r.entrepot_nom ?? null,
     entrepot_telephone: r.entrepot_telephone ?? null,
-    condition: r.condition ?? null
+    prod_condition: r.prod_condition ?? null
   }));
 }
 async function getProductsByIds(ids) {
@@ -5146,9 +5146,9 @@ router2.post("/api/admin/products", async (req, res) => {
       columns.push("prix_entrepot");
       values.push(Number(body.prix_entrepot) || null);
     }
-    if (cols.condition && body.condition) {
-      columns.push("`condition`");
-      values.push(body.condition);
+    if (cols.prod_condition && body.prod_condition) {
+      columns.push("prod_condition");
+      values.push(body.prod_condition);
     }
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await db.execute(
@@ -5371,7 +5371,7 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       "slug",
       "entrepot_id",
       "prix_entrepot",
-      "condition"
+      "prod_condition"
     ];
     for (const key of alwaysAllowed) {
       if (key in body) {
@@ -8137,7 +8137,7 @@ function seededShuffle(arr, seed) {
   return result;
 }
 var _bsCache = null;
-var BS_TTL = 6e4;
+var BS_TTL = 6e5;
 async function loadBestsellerProducts(limit) {
   if (_bsCache && Date.now() - _bsCache.ts < BS_TTL) return _bsCache.data;
   const pool2 = db;
@@ -8259,7 +8259,7 @@ router25.get("/api/products", async (req, res) => {
     if (occasionOnly) {
       const { produitCols: produitCols2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const cols = await produitCols2();
-      if (!cols.condition) return res.json({ success: true, data: [], total: 0 });
+      if (!cols.prod_condition) return res.json({ success: true, data: [], total: 0 });
     }
     if (slugExact) {
       const { getProductBySlug: getProductBySlug2 } = await Promise.resolve().then(() => (init_db(), db_exports));

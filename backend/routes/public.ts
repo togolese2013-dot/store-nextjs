@@ -20,7 +20,7 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 
 // ── Bestsellers cache — 60s TTL ──────────────────────────────────────────────
 let _bsCache: { data: unknown[]; ts: number } | null = null;
-const BS_TTL = 60_000;
+const BS_TTL = 600_000;
 
 async function loadBestsellerProducts(limit: number) {
   if (_bsCache && Date.now() - _bsCache.ts < BS_TTL) return _bsCache.data;
@@ -157,7 +157,7 @@ router.get("/api/products", async (req, res) => {
     if (occasionOnly) {
       const { produitCols } = await import("@/lib/db");
       const cols = await produitCols();
-      if (!cols.condition) return res.json({ success: true, data: [], total: 0 });
+      if (!cols.prod_condition) return res.json({ success: true, data: [], total: 0 });
     }
 
     // Lookup by slug — search slug column then fallback to reference

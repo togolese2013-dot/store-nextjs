@@ -128,12 +128,12 @@ export default function ProductCard({ product, className, floatingCart = false }
                 Nouveau
               </span>
             )}
-            {product.condition === 'occasion' && (
+            {product.prod_condition === 'occasion' && (
               <span className="px-2 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold">
                 Occasion
               </span>
             )}
-            {product.condition === 'reconditionne' && (
+            {product.prod_condition === 'reconditionne' && (
               <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-bold">
                 Reconditionné
               </span>

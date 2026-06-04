@@ -185,15 +185,15 @@ export async function produitCols() {
     }
   }
 
-  // Auto-migrate: add condition column if missing
-  if (!names.has("condition")) {
+  // Auto-migrate: add prod_condition column if missing
+  if (!names.has("prod_condition")) {
     try {
-      await db.execute(`ALTER TABLE produits ADD COLUMN \`condition\` ENUM('neuf','occasion','reconditionne') NOT NULL DEFAULT 'neuf'`);
-      names.add("condition");
+      await db.execute(`ALTER TABLE produits ADD COLUMN prod_condition ENUM('neuf','occasion','reconditionne') NOT NULL DEFAULT 'neuf'`);
+      names.add("prod_condition");
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
       if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
-        names.add("condition");
+        names.add("prod_condition");
       }
     }
   }
@@ -240,7 +240,7 @@ export async function produitCols() {
     slug:            names.has("slug"),
     entrepot_id:     names.has("entrepot_id"),
     prix_entrepot:   names.has("prix_entrepot"),
-    condition:       names.has("condition"),
+    prod_condition:  names.has("prod_condition"),
   };
   return _cols;
 }
@@ -324,7 +324,7 @@ export async function getProducts(opts?: {
   if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
   if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
-  if (conditionFilter && cols.condition) { conditions.push("p.`condition` = ?"); params.push(conditionFilter); }
+  if (conditionFilter && cols.prod_condition) { conditions.push("p.prod_condition = ?"); params.push(conditionFilter); }
 
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -355,7 +355,7 @@ export async function getProducts(opts?: {
        ${cols.prix_entrepot   ? "p.prix_entrepot"                              : "NULL" } AS prix_entrepot,
        ${cols.entrepot_id     ? "e.nom"                                        : "NULL" } AS entrepot_nom,
        ${cols.entrepot_id     ? "e.telephone"                                  : "NULL" } AS entrepot_telephone,
-       ${cols.condition       ? "p.`condition`"                                : "NULL" } AS \`condition\`,
+       ${cols.prod_condition   ? "p.prod_condition"                             : "NULL" } AS prod_condition,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
@@ -393,7 +393,7 @@ export async function getProducts(opts?: {
     prix_entrepot:       r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
     entrepot_nom:        (r.entrepot_nom ?? null) as string | null,
     entrepot_telephone:  (r.entrepot_telephone ?? null) as string | null,
-    condition:           (r.condition ?? null) as 'neuf' | 'occasion' | 'reconditionne' | null,
+    prod_condition:      (r.prod_condition ?? null) as 'neuf' | 'occasion' | 'reconditionne' | null,
   })) as Product[];
 }
 

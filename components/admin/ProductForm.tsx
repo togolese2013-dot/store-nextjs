@@ -39,7 +39,7 @@ interface ProductData {
   images:             string[];
   entrepot_id:        number | null;
   prix_entrepot:      number | "";
-  condition:          'neuf' | 'occasion' | 'reconditionne';
+  prod_condition:     'neuf' | 'occasion' | 'reconditionne';
 }
 
 interface EntrepotItem {
@@ -102,7 +102,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     image_url:          initial?.image_url          ?? "",
     entrepot_id:        (initial as Record<string, unknown>)?.entrepot_id as number | null ?? null,
     prix_entrepot:      (initial as Record<string, unknown>)?.prix_entrepot as number | "" ?? "",
-    condition:          ((initial as Record<string, unknown>)?.condition as 'neuf' | 'occasion' | 'reconditionne') ?? 'neuf',
+    prod_condition:     ((initial as Record<string, unknown>)?.prod_condition as 'neuf' | 'occasion' | 'reconditionne') ?? 'neuf',
     ...initial,
     images:             secondaryImages,
   });
@@ -292,7 +292,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       if (form.images.length > 0) payload.images = form.images;
       payload.entrepot_id   = form.entrepot_id ?? null;
       payload.prix_entrepot = form.entrepot_id && form.prix_entrepot !== "" ? Number(form.prix_entrepot) : null;
-      payload.condition     = form.condition;
+      payload.prod_condition = form.prod_condition;
       const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur"); return; }
@@ -548,9 +548,9 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => set('condition', opt.value)}
+                      onClick={() => set('prod_condition', opt.value)}
                       className={`px-4 py-1.5 rounded-full border text-xs font-semibold transition-all ${
-                        form.condition === opt.value
+                        form.prod_condition === opt.value
                           ? opt.color + ' ring-2 ring-offset-1 ring-current'
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
                       }`}
