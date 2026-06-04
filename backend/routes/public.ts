@@ -153,11 +153,23 @@ router.get("/api/products", async (req, res) => {
       return res.json({ success: true, data: products, total: products.length });
     }
 
-    // Guard: if condition column doesn't exist yet, return empty rather than all products
+    // Occasions & reconditionnés — direct SQL query (bypasses getProducts conditionFilter issue)
     if (occasionOnly) {
-      const { produitCols } = await import("@/lib/db");
-      const cols = await produitCols();
-      if (!cols.prod_condition) return res.json({ success: true, data: [], total: 0 });
+      try {
+        const pool = db as import("mysql2/promise").Pool;
+        const safeLimit = Math.max(1, Math.min(200, Number(limit)));
+        const [rows] = await pool.query<import("mysql2/promise").RowDataPacket[]>(
+          `SELECT p.*, c.nom AS categorie_nom
+           FROM produits p
+           LEFT JOIN categories c ON c.id = p.categorie_id
+           WHERE p.actif = 1 AND p.prod_condition IN ('occasion','reconditionne')
+           ORDER BY p.id DESC
+           LIMIT ${safeLimit}`
+        );
+        return res.json({ success: true, data: rows, total: rows.length });
+      } catch {
+        return res.json({ success: true, data: [], total: 0 });
+      }
     }
 
     // Lookup by slug — search slug column then fallback to reference

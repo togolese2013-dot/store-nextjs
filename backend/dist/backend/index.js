@@ -8257,9 +8257,21 @@ router25.get("/api/products", async (req, res) => {
       return res.json({ success: true, data: products2, total: products2.length });
     }
     if (occasionOnly) {
-      const { produitCols: produitCols2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const cols = await produitCols2();
-      if (!cols.prod_condition) return res.json({ success: true, data: [], total: 0 });
+      try {
+        const pool2 = db;
+        const safeLimit = Math.max(1, Math.min(200, Number(limit)));
+        const [rows] = await pool2.query(
+          `SELECT p.*, c.nom AS categorie_nom
+           FROM produits p
+           LEFT JOIN categories c ON c.id = p.categorie_id
+           WHERE p.actif = 1 AND p.prod_condition IN ('occasion','reconditionne')
+           ORDER BY p.id DESC
+           LIMIT ${safeLimit}`
+        );
+        return res.json({ success: true, data: rows, total: rows.length });
+      } catch {
+        return res.json({ success: true, data: [], total: 0 });
+      }
     }
     if (slugExact) {
       const { getProductBySlug: getProductBySlug2 } = await Promise.resolve().then(() => (init_db(), db_exports));
