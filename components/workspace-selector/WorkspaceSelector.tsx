@@ -28,11 +28,11 @@ import styles from './WorkspaceSelector.module.css';
 
 /* ─── Default workspaces ─────────────────────────────────────────── */
 export const DEFAULT_WORKSPACES: WorkspaceWithIcon[] = [
-  { id: 'magasin',  name: 'Magasin',  tag: 'Gestion des stocks', desc: 'Produits, catégories, marques, fournisseurs et achats',          tint: '#3B6A8F', tintBg: '#E8F0F7', count: '248 produits',  icon: PackageIcon },
-  { id: 'boutique', name: 'Boutique', tag: 'Ventes & caisse',    desc: 'Ventes du jour, stock boutique, finance, clients physiques',     tint: '#C9601E', tintBg: '#FBE9D6', count: '12 ventes auj.', icon: BagIcon },
-  { id: 'store',    name: 'Store',    tag: 'E-commerce',         desc: 'Commandes en ligne, coupons, zones de livraison, paiements',     tint: '#2D6A4F', tintBg: '#DDEBE2', count: '3 commandes',    icon: StorefrontIcon },
-  { id: 'crm',      name: 'CRM',      tag: 'Relation client',    desc: 'Comptes clients, fidélité, parrainage, newsletter, WhatsApp',    tint: '#5C4A88', tintBg: '#E6E0F0', count: '1 421 clients',  icon: UsersIcon },
-  { id: 'admin',    name: 'Admin',    tag: 'Config & rapports',  desc: 'Utilisateurs, rôles, paramètres, rapports avancés, intégrations', tint: '#2A2522', tintBg: '#EBE4D6', count: '4 équipiers',    icon: GaugeIcon },
+  { id: 'magasin',  name: 'Magasin',  tag: 'Gestion des stocks', desc: 'Produits, catégories, marques, fournisseurs et achats',          tint: '#3B6A8F', tintBg: '#E8F0F7', count: '—',  icon: PackageIcon },
+  { id: 'boutique', name: 'Boutique', tag: 'Ventes & caisse',    desc: 'Ventes du jour, stock boutique, finance, clients physiques',     tint: '#C9601E', tintBg: '#FBE9D6', count: '—', icon: BagIcon },
+  { id: 'store',    name: 'Store',    tag: 'E-commerce',         desc: 'Commandes en ligne, coupons, zones de livraison, paiements',     tint: '#2D6A4F', tintBg: '#DDEBE2', count: '—',    icon: StorefrontIcon },
+  { id: 'crm',      name: 'CRM',      tag: 'Relation client',    desc: 'Comptes clients, fidélité, parrainage, newsletter, WhatsApp',    tint: '#5C4A88', tintBg: '#E6E0F0', count: '—',  icon: UsersIcon },
+  { id: 'admin',    name: 'Admin',    tag: 'Config & rapports',  desc: 'Utilisateurs, rôles, paramètres, rapports avancés, intégrations', tint: '#2A2522', tintBg: '#EBE4D6', count: '—',    icon: GaugeIcon },
 ];
 
 /* ─── Subscription helpers ───────────────────────────────────────── */
