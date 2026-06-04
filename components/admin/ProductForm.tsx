@@ -107,14 +107,21 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     images:             secondaryImages,
   });
 
-  // Always fetch the latest slug from API on mount (bypasses all Next.js/Vercel caching)
+  // Always fetch latest product data from API on mount (bypasses all Next.js/Vercel caching)
   useEffect(() => {
     if (!isEdit || !initial?.id) return;
     fetch(`/api/admin/products/${initial.id}`)
       .then(r => r.json())
       .then(d => {
-        const slug = ((d.product?.slug ?? "") as string);
-        if (slug) { setForm(f => ({ ...f, slug })); setSlugEdited(true); }
+        const p = d.product ?? {};
+        const slug = ((p.slug ?? "") as string);
+        if (slug) { setSlugEdited(true); }
+        const condition = (p.prod_condition as 'neuf' | 'occasion' | 'reconditionne') || 'neuf';
+        setForm(f => ({
+          ...f,
+          ...(slug ? { slug } : {}),
+          prod_condition: condition,
+        }));
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
