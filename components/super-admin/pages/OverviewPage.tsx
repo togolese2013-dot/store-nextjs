@@ -25,7 +25,7 @@ export default function OverviewPage() {
   }, []);
 
   const billableTenants = ui.tenants.filter((t) => t.id !== 1);
-  const mrr = billableTenants.reduce((s, t) => s + t.mrr, 0);
+  const mrr = billableTenants.filter((t) => t.status === 'Actif').reduce((s, t) => s + t.mrr, 0);
   const active = billableTenants.filter((t) => t.status === 'Actif').length;
   const total = billableTenants.length;
 
