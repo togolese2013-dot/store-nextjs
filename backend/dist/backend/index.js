@@ -8185,13 +8185,7 @@ async function loadBestsellerProducts(limit) {
       ids
     );
     prodRows.sort((a, b) => (salesMap.get(b.id) ?? 0) - (salesMap.get(a.id) ?? 0));
-    const poolSize = Math.min(prodRows.length, Math.max(limit + 8, 16));
-    const topPool = prodRows.slice(0, poolSize);
-    for (let i = topPool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [topPool[i], topPool[j]] = [topPool[j], topPool[i]];
-    }
-    products = topPool.slice(0, limit);
+    products = prodRows.slice(0, limit);
   }
   _bsCache = { data: products, ts: Date.now() };
   return products;
