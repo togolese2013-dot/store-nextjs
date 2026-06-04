@@ -37,6 +37,7 @@ export default async function EditProductPage({ params }: PageProps) {
     slug:           (product.slug as string) ?? "",
     entrepot_id:    product.entrepot_id ? Number(product.entrepot_id) : null,
     prix_entrepot:  product.prix_entrepot != null ? Number(product.prix_entrepot) : ("" as const),
+    prod_condition: ((product.prod_condition as string) || 'neuf') as 'neuf' | 'occasion' | 'reconditionne',
   };
 
   return (
