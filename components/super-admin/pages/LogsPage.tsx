@@ -17,7 +17,7 @@ export default function LogsPage() {
           <td style={{ color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{l.date}</td>
           <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar init={l.init} color={l.color} size={28} fs={10} /><span style={{ fontWeight: 500, fontSize: 13 }}>{l.who}</span></div></td>
           <td style={{ fontSize: 13 }}>{l.action}</td><td><span className="tag" style={{ background: `${l.catColor}1A`, color: l.catColor }}>{l.cat}</span></td></tr>)}</tbody></table></div>
-        <div className="tfoot"><span>{ui.audit.length} affichés · 312 événements ce mois</span><div className="pgr"><button>‹</button><button className="on">1</button><button>2</button><button>3</button><button>›</button></div></div>
+        <div className="tfoot"><span>{ui.audit.length} affichés · 0 événements ce mois</span><div className="pgr"><button>‹</button><button className="on">1</button><button>2</button><button>3</button><button>›</button></div></div>
       </div>
     </>
   );

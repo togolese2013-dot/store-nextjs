@@ -7,7 +7,9 @@ export type PlanName = 'Starter' | 'Business' | 'Enterprise' | string;
 export type TenantStatus = 'Actif' | 'Essai' | 'Suspendu' | 'Impayé' | 'Inactif';
 
 export interface Tenant {
+  id: number;
   name: string;
+  email: string;
   init: string;
   color: string;
   plan: PlanName;

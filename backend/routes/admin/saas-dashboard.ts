@@ -137,4 +137,39 @@ router.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
   }
 });
 
+// ── POST /api/admin/saas/shops — créer/inviter une boutique ──────────────────
+router.post("/api/admin/saas/shops", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  const { nom, email, plan = "basic", pays } = req.body as Record<string, string>;
+  if (!nom || !email) return res.status(400).json({ error: "nom et email requis." });
+  const slug = nom.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  try {
+    const [result] = await (db as mysql.Pool).execute<mysql.OkPacket>(
+      `INSERT INTO shops (nom, slug, email, plan, actif, subscription_status, pays)
+       VALUES (?, ?, ?, ?, 1, 'trial', ?)`,
+      [nom, slug, email, plan, pays ?? null]
+    );
+    res.json({ ok: true, id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── DELETE /api/admin/saas/shops/:id — supprimer une boutique ────────────────
+router.delete("/api/admin/saas/shops/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID invalide." });
+  if (id === 1) return res.status(400).json({ error: "La boutique par défaut ne peut pas être supprimée." });
+  try {
+    await (db as mysql.Pool).execute("DELETE FROM shop_payments WHERE shop_id = ?", [id]);
+    await (db as mysql.Pool).execute("DELETE FROM shops WHERE id = ?", [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 export default router;

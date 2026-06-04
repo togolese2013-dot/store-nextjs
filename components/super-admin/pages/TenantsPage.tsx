@@ -18,14 +18,14 @@ export default function TenantsPage() {
   const vis = useMemo(() => (tab === 'all' ? ui.tenants : ui.tenants.filter((t) => t.status === tab)), [tab, ui.tenants]);
   const allSel = vis.length > 0 && vis.every((t) => selH.has(t.name));
   const kpis: Kpi[] = [
-    { l: 'Boutiques totales', v: String(ui.tenants.length), d: '+6', dc: '#2D6A4F', sub: 'ce mois', spark: [42,43,44,45,46,47,48,49,50,50,51], c: '#34396B' },
-    { l: 'Actives & payantes', v: String(counts['Actif'] || 0), sub: 'du parc', spark: [38,40,41,42,43,44,45,45,46,47,47], c: '#2D6A4F' },
-    { l: "En période d'essai", v: String(counts['Essai'] || 0), sub: '14 j restants en moy.' },
-    { l: 'À risque', v: String((counts['Impayé'] || 0) + (counts['Suspendu'] || 0)), d: 'impayé / suspendu', dc: '#9C3A14', di: <span />, sub: 'relance en cours' },
+    { l: 'Boutiques totales', v: String(ui.tenants.length), sub: 'inscrites', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#34396B' },
+    { l: 'Actives & payantes', v: String(counts['Actif'] || 0), sub: 'du parc', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#2D6A4F' },
+    { l: "En période d'essai", v: String(counts['Essai'] || 0), sub: 'en cours' },
+    { l: 'À risque', v: String((counts['Impayé'] || 0) + (counts['Suspendu'] || 0)), sub: 'impayé / suspendu' },
   ];
   return (
     <>
-      <PageHead eyb="Super Admin · Parc" title="Boutiques" serif="abonnées" sub="51 boutiques sur ShopSaaS · gérez les abonnements, l'accès et le statut de chaque commerce">
+      <PageHead eyb="Super Admin · Parc" title="Boutiques" serif="abonnées" sub="Afrisika · gérez les abonnements, l'accès et le statut de chaque commerce">
         <button className="btn" onClick={() => ui.notify('Export CSV des boutiques…')}><I.download /> Exporter</button>
         <button className="btn pri" onClick={() => ui.openModal('invite')}><I.plus /> Inviter une boutique</button>
       </PageHead>

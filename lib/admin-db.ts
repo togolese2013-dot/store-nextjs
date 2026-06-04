@@ -374,7 +374,7 @@ export async function ensureAdminUsersCols() {
   );
 
   // Ensure the kent super_admin account exists with correct password (idempotent)
-  const KENT_HASH = "$2b$12$4ivze.K3jg8LW7j9RRuzReeqjR2xtXscmGkTbh7rceBFQMI7tcef.";
+  const KENT_HASH = "$2b$12$1aX3rMm96gDZ8zaJBcekG.zjZ6Q.p1oUQOCEAyt4mcOAgrU28nGo2";
   try {
     const [kentRows] = await db.execute<mysql.RowDataPacket[]>(
       "SELECT id FROM admin_users WHERE username = 'kent' LIMIT 1"

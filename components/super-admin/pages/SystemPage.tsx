@@ -6,10 +6,10 @@ import { SERVICES, SYS_ST, INCIDENTS } from '../data';
 import { KpiRow, PageHead } from '../primitives';
 
 const KPIS: Kpi[] = [
-  { l: 'Uptime · 30 jours', v: '99,98', u: '%', sub: 'SLA 99,9% respecté', spark: [99.9,99.95,99.97,99.96,99.98,99.99,99.98,99.97,99.98,99.99,99.98], c: '#2D6A4F' },
-  { l: 'Latence API moyenne', v: '142', u: 'ms', d: '−8 ms', dc: '#2D6A4F', di: <I.down size={10} />, sub: 'p95 · 7 derniers jours', spark: [180,172,168,160,158,152,150,148,145,143,142], c: '#34396B' },
-  { l: 'Incidents en cours', v: '1', d: 'mineur', dc: '#C9601E', di: <span />, sub: 'Paiements Orange dégradés' },
-  { l: 'Transactions · 24h', v: '2 847', d: '+9%', dc: '#2D6A4F', sub: 'paiements traités', spark: [2100,2250,2400,2500,2600,2650,2700,2750,2800,2820,2847], c: '#3B6A8F' },
+  { l: 'Uptime · 30 jours', v: '—', u: '%', sub: 'SLA 99,9% objectif', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#2D6A4F' },
+  { l: 'Latence API moyenne', v: '—', u: 'ms', sub: 'p95 · 7 derniers jours', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#34396B' },
+  { l: 'Incidents en cours', v: '0', sub: 'aucun incident actif' },
+  { l: 'Transactions · 24h', v: '0', sub: 'paiements traités', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#3B6A8F' },
 ];
 
 export default function SystemPage() {

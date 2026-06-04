@@ -11,10 +11,10 @@ export default function BillingPage() {
   const selH = useSel();
   const allSel = ui.invoices.length > 0 && ui.invoices.every((i) => selH.has(i.id));
   const kpis: Kpi[] = [
-    { l: 'Encaissé · ce mois', v: '1 042 000', u: 'F', d: '+12%', dc: '#2D6A4F', sub: 'paiements reçus', spark: [720,760,800,840,870,910,945,975,1000,1025,1042], c: '#34396B' },
-    { l: 'En attente', v: '86 000', u: 'F', sub: '3 factures à échéance', spark: [60,70,65,80,75,90,85,88,84,86,86], c: '#C9601E' },
-    { l: 'Impayés', v: '54 000', u: 'F', d: '2 factures', dc: '#9C3A14', di: <span />, sub: 'relance automatique active' },
-    { l: 'Taux de recouvrement', v: '94', u: '%', d: '+2 pts', dc: '#2D6A4F', sub: 'sur 90 jours', spark: [88,89,90,90,91,92,92,93,93,94,94], c: '#2D6A4F' },
+    { l: 'Encaissé · ce mois', v: '0', u: 'F', sub: 'paiements reçus', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#34396B' },
+    { l: 'En attente', v: '0', u: 'F', sub: '0 facture à échéance', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#C9601E' },
+    { l: 'Impayés', v: '0', u: 'F', sub: 'relance automatique active' },
+    { l: 'Taux de recouvrement', v: '0', u: '%', sub: 'sur 90 jours', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#2D6A4F' },
   ];
   return (
     <>
@@ -45,7 +45,7 @@ export default function BillingPage() {
                 inv.status === 'Payée' ? { ic: <I.refresh size={15} />, label: 'Rembourser', danger: true, onClick: () => ui.openModal('refund', inv) } : { sep: false, label: '' },
               ].filter((x) => x.label)} />}
             </td></tr>)}</tbody></table></div>
-        <div className="tfoot"><span>{ui.invoices.length} factures récentes · 291 émises au total</span><div className="pgr"><button>‹</button><button className="on">1</button><button>2</button><button>…</button><button>33</button><button>›</button></div></div>
+        <div className="tfoot"><span>{ui.invoices.length} factures récentes</span><div className="pgr"><button>‹</button><button className="on">1</button><button>2</button><button>…</button><button>33</button><button>›</button></div></div>
       </div>
     </>
   );

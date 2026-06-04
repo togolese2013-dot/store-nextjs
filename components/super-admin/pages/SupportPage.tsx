@@ -9,9 +9,9 @@ export default function SupportPage() {
   const ui = useUI();
   const open = ui.tickets.filter((t) => t.status !== 'Résolu').length;
   const kpis: Kpi[] = [
-    { l: 'Tickets ouverts', v: String(open), d: '2 prioritaires', dc: '#9C3A14', di: <span />, sub: 'sur 8 ce mois' },
-    { l: 'Temps de réponse moyen', v: '2h 14m', sub: 'objectif : < 4h', spark: [4,3.8,3.5,3.2,3,2.8,2.6,2.5,2.4,2.3,2.2], c: '#34396B' },
-    { l: 'Satisfaction', v: '4,6', u: '/ 5', d: '+0,2', dc: '#2D6A4F', sub: '126 réponses', spark: [4.1,4.2,4.2,4.3,4.4,4.4,4.5,4.5,4.6,4.6,4.6], c: '#2D6A4F' },
+    { l: 'Tickets ouverts', v: String(open), sub: 'ce mois' },
+    { l: 'Temps de réponse moyen', v: '—', sub: 'objectif : < 4h' },
+    { l: 'Satisfaction', v: '—', u: '/ 5', sub: '0 réponse' },
   ];
   return (
     <>

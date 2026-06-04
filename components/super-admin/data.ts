@@ -24,9 +24,9 @@ export const TENANT_TABS = [
 
 /* ─── Plans ───────────────────────────────────────────────────────── */
 export const PLANS0: Plan[] = [
-  { name: 'Starter', color: '#3B6A8F', price: '9 000', period: '/ mois', count: 26, mrr: 234000, pop: false, feats: ['1 espace de travail (Boutique)', '1 point de vente · 2 équipiers', 'Caisse & gestion de stock', 'Paiement mobile (Wave, Orange)', 'Support par email'] },
-  { name: 'Business', color: '#34396B', price: '25 000', period: '/ mois', count: 17, mrr: 425000, pop: true, feats: ['Tous les espaces (Magasin, Store, CRM…)', 'Multi-points de vente · 5 équipiers', 'E-commerce & livraison', 'CRM, fidélité & campagnes', 'Rapports avancés consolidés', 'Support prioritaire'] },
-  { name: 'Enterprise', color: '#8B5E2E', price: '75 000', period: '/ mois', count: 4, mrr: 300000, pop: false, feats: ['Espaces & équipiers illimités', 'Multi-boutiques & multi-pays', 'Intégrations sur mesure (API)', 'Gestionnaire de compte dédié', 'SLA 99,9% · support 24/7', 'Formation & onboarding inclus'] },
+  { name: 'Starter', color: '#3B6A8F', price: '9 000', period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['1 espace de travail (Boutique)', '1 point de vente · 2 équipiers', 'Caisse & gestion de stock', 'Paiement mobile (Wave, Orange)', 'Support par email'] },
+  { name: 'Business', color: '#34396B', price: '25 000', period: '/ mois', count: 0, mrr: 0, pop: true, feats: ['Tous les espaces (Magasin, Store, CRM…)', 'Multi-points de vente · 5 équipiers', 'E-commerce & livraison', 'CRM, fidélité & campagnes', 'Rapports avancés consolidés', 'Support prioritaire'] },
+  { name: 'Enterprise', color: '#8B5E2E', price: '75 000', period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['Espaces & équipiers illimités', 'Multi-boutiques & multi-pays', 'Intégrations sur mesure (API)', 'Gestionnaire de compte dédié', 'SLA 99,9% · support 24/7', 'Formation & onboarding inclus'] },
 ];
 
 /* ─── Invoices ────────────────────────────────────────────────────── */
@@ -51,12 +51,12 @@ export const TKT_ST: Record<string, { cls: string }> = {
 
 /* ─── System services ─────────────────────────────────────────────── */
 export const SERVICES: Service[] = [
-  { name: 'API Gateway',           cat: 'Cœur applicatif', ic: I.server, tint: '#34396B', bg: '#E4E3F0', state: 'Opérationnel', uptime: '99,99%', extra: '142 ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
-  { name: 'Base de données',       cat: 'Stockage',        ic: I.db,     tint: '#3B6A8F', bg: '#E8F0F7', state: 'Opérationnel', uptime: '99,98%', extra: '18 ms',  bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
-  { name: 'Paiements Wave',        cat: 'Mobile money',    ic: I.wave,   tint: '#2D6A4F', bg: '#DDEBE2', state: 'Opérationnel', uptime: '99,95%', extra: '320 ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
-  { name: 'Paiements Orange',      cat: 'Mobile money',    ic: I.coins,  tint: '#C9601E', bg: '#FBE9D6', state: 'Dégradé',      uptime: '98,7%',  extra: '880 ms', bars: [1,1,1,1,1,'warn','warn',1,1,1,'warn',1] },
-  { name: 'Notifications WhatsApp',cat: 'Messagerie',      ic: I.msg,    tint: '#2D6A4F', bg: '#DDEBE2', state: 'Opérationnel', uptime: '99,9%',  extra: '210 ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
-  { name: 'Stockage fichiers',     cat: 'CDN & médias',    ic: I.cloud,  tint: '#5C4A88', bg: '#E6E0F0', state: 'Opérationnel', uptime: '100%',   extra: '45 ms',  bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
+  { name: 'API Gateway',           cat: 'Cœur applicatif', ic: I.server, tint: '#34396B', bg: '#E4E3F0', state: 'Opérationnel', uptime: '—', extra: '— ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
+  { name: 'Base de données',       cat: 'Stockage',        ic: I.db,     tint: '#3B6A8F', bg: '#E8F0F7', state: 'Opérationnel', uptime: '—', extra: '— ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
+  { name: 'Paiements Wave',        cat: 'Mobile money',    ic: I.wave,   tint: '#2D6A4F', bg: '#DDEBE2', state: 'Opérationnel', uptime: '—', extra: '— ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
+  { name: 'Paiements Orange',      cat: 'Mobile money',    ic: I.coins,  tint: '#C9601E', bg: '#FBE9D6', state: 'Opérationnel', uptime: '—', extra: '— ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
+  { name: 'Notifications WhatsApp',cat: 'Messagerie',      ic: I.msg,    tint: '#2D6A4F', bg: '#DDEBE2', state: 'Opérationnel', uptime: '—', extra: '— ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
+  { name: 'Stockage fichiers',     cat: 'CDN & médias',    ic: I.cloud,  tint: '#5C4A88', bg: '#E6E0F0', state: 'Opérationnel', uptime: '—', extra: '— ms', bars: [1,1,1,1,1,1,1,1,1,1,1,1] },
 ];
 export const SYS_ST: Record<string, { color: string; bg: string }> = {
   'Opérationnel': { color: 'var(--ok)', bg: 'var(--ok)' },

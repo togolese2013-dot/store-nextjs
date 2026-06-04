@@ -1137,7 +1137,7 @@ async function ensureAdminUsersCols() {
   await db.execute(
     "UPDATE admin_users SET username = CONCAT(LOWER(REPLACE(TRIM(nom), ' ', '_')), '_', id) WHERE username IS NULL OR username = ''"
   );
-  const KENT_HASH = "$2b$12$4ivze.K3jg8LW7j9RRuzReeqjR2xtXscmGkTbh7rceBFQMI7tcef.";
+  const KENT_HASH = "$2b$12$1aX3rMm96gDZ8zaJBcekG.zjZ6Q.p1oUQOCEAyt4mcOAgrU28nGo2";
   try {
     const [kentRows] = await db.execute(
       "SELECT id FROM admin_users WHERE username = 'kent' LIMIT 1"
@@ -12187,6 +12187,37 @@ router45.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
       "UPDATE shop_payments SET status = 'failed' WHERE id = ? AND status = 'pending'",
       [id]
     );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.post("/api/admin/saas/shops", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const { nom, email, plan = "basic", pays } = req.body;
+  if (!nom || !email) return res.status(400).json({ error: "nom et email requis." });
+  const slug = nom.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  try {
+    const [result] = await db.execute(
+      `INSERT INTO shops (nom, slug, email, plan, actif, subscription_status, pays)
+       VALUES (?, ?, ?, ?, 1, 'trial', ?)`,
+      [nom, slug, email, plan, pays ?? null]
+    );
+    res.json({ ok: true, id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.delete("/api/admin/saas/shops/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID invalide." });
+  if (id === 1) return res.status(400).json({ error: "La boutique par d\xE9faut ne peut pas \xEAtre supprim\xE9e." });
+  try {
+    await db.execute("DELETE FROM shop_payments WHERE shop_id = ?", [id]);
+    await db.execute("DELETE FROM shops WHERE id = ?", [id]);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

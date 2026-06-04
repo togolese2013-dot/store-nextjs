@@ -28,7 +28,7 @@ export const SAMPLE_WORKSPACES: WorkspaceHealth[] = [
   { id: 'magasin',  name: 'Magasin',  tag: 'Gestion des stocks', icon: PackageIcon, tint: '#3B6A8F', bg: '#E8F0F7', count: '—', activity: '—', active: true  },
   { id: 'boutique', name: 'Boutique', tag: 'Ventes & caisse',    icon: ReceiptIcon, tint: '#C9601E', bg: '#FBE9D6', count: '—', activity: '—', active: true  },
   { id: 'store',    name: 'Store',    tag: 'E-commerce',         icon: StoreIcon,   tint: '#2D6A4F', bg: '#DDEBE2', count: '—', activity: '—', active: true  },
-  { id: 'crm',      name: 'CRM',      tag: 'Relation client',    icon: HeartIcon,   tint: '#5C4A88', bg: '#E6E0F0', count: '—', activity: '—', active: false },
+  { id: 'crm',      name: 'CRM',      tag: 'Relation client',    icon: HeartIcon,   tint: '#5C4A88', bg: '#E6E0F0', count: '—', activity: '—', active: true  },
 ];
 
 /* ─── Integrations ──────────────────────────────── */
