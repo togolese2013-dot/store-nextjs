@@ -205,6 +205,17 @@ async function produitCols() {
       }
     }
   }
+  if (!names.has("condition")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN \`condition\` ENUM('neuf','occasion','reconditionne') NOT NULL DEFAULT 'neuf'`);
+      names.add("condition");
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("condition");
+      }
+    }
+  }
   if (!names.has("stock_magasin")) {
     try {
       await db.execute(`ALTER TABLE produits ADD COLUMN stock_magasin INT NOT NULL DEFAULT 0`);
@@ -245,7 +256,8 @@ async function produitCols() {
     marque_id: names.has("marque_id"),
     slug: names.has("slug"),
     entrepot_id: names.has("entrepot_id"),
-    prix_entrepot: names.has("prix_entrepot")
+    prix_entrepot: names.has("prix_entrepot"),
+    condition: names.has("condition")
   };
   return _cols;
 }
@@ -296,7 +308,8 @@ async function getProducts(opts) {
     offset = 0,
     statut,
     includeInactive = false,
-    entrepotId
+    entrepotId,
+    conditionFilter
   } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
@@ -347,6 +360,10 @@ async function getProducts(opts) {
     conditions.push("p.entrepot_id = ?");
     params.push(entrepotId);
   }
+  if (conditionFilter && cols.condition) {
+    conditions.push("p.`condition` = ?");
+    params.push(conditionFilter);
+  }
   const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
@@ -371,6 +388,7 @@ async function getProducts(opts) {
        ${cols.prix_entrepot ? "p.prix_entrepot" : "NULL"} AS prix_entrepot,
        ${cols.entrepot_id ? "e.nom" : "NULL"} AS entrepot_nom,
        ${cols.entrepot_id ? "e.telephone" : "NULL"} AS entrepot_telephone,
+       ${cols.condition ? "p.`condition`" : "NULL"} AS \`condition\`,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
@@ -406,7 +424,8 @@ async function getProducts(opts) {
     entrepot_id: r.entrepot_id ? Number(r.entrepot_id) : null,
     prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
     entrepot_nom: r.entrepot_nom ?? null,
-    entrepot_telephone: r.entrepot_telephone ?? null
+    entrepot_telephone: r.entrepot_telephone ?? null,
+    condition: r.condition ?? null
   }));
 }
 async function getProductsByIds(ids) {
@@ -5127,6 +5146,10 @@ router2.post("/api/admin/products", async (req, res) => {
       columns.push("prix_entrepot");
       values.push(Number(body.prix_entrepot) || null);
     }
+    if (cols.condition && body.condition) {
+      columns.push("`condition`");
+      values.push(body.condition);
+    }
     const placeholders = columns.map(() => "?").join(",");
     const [result] = await db.execute(
       `INSERT INTO produits (${columns.join(", ")}) VALUES (${placeholders})`,
@@ -5347,11 +5370,12 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       "reference",
       "slug",
       "entrepot_id",
-      "prix_entrepot"
+      "prix_entrepot",
+      "condition"
     ];
     for (const key of alwaysAllowed) {
       if (key in body) {
-        sets.push(`${key} = ?`);
+        sets.push(`\`${key}\` = ?`);
         vals.push(body[key]);
       }
     }
@@ -8220,6 +8244,8 @@ router25.get("/api/products", async (req, res) => {
     const promoOnly = req.query.promo === "true";
     const newOnly = req.query.new === "true";
     const bestOnly = req.query.best === "true";
+    const occasionOnly = req.query.occasion === "true";
+    const conditionFilter = occasionOnly ? "occasion" : void 0;
     const inStock = req.query.inStock === "true";
     const minPrice = req.query.minPrice ? Number(req.query.minPrice) : void 0;
     const maxPrice = req.query.maxPrice ? Number(req.query.maxPrice) : void 0;
@@ -8235,10 +8261,10 @@ router25.get("/api/products", async (req, res) => {
       return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset }),
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, conditionFilter }),
       referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice })
     ]);
-    const isFiltered = search || categoryId || promoOnly || newOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
+    const isFiltered = search || categoryId || promoOnly || newOnly || occasionOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
     const data = isFiltered ? products : seededShuffle(products, Math.floor(Date.now() / (1e3 * 60 * 60)));
     res.json({ success: true, data, total });
   } catch (err) {

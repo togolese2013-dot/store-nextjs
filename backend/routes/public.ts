@@ -139,6 +139,8 @@ router.get("/api/products", async (req, res) => {
     const promoOnly      = req.query.promo   === "true";
     const newOnly        = req.query.new     === "true";
     const bestOnly       = req.query.best    === "true";
+    const occasionOnly   = req.query.occasion === "true";
+    const conditionFilter = occasionOnly ? ("occasion" as const) : undefined;
     const inStock        = req.query.inStock === "true";
     const minPrice       = req.query.minPrice ? Number(req.query.minPrice) : undefined;
     const maxPrice       = req.query.maxPrice ? Number(req.query.maxPrice) : undefined;
@@ -158,14 +160,14 @@ router.get("/api/products", async (req, res) => {
     }
 
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset }),
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, conditionFilter }),
       referenceExact
         ? Promise.resolve(1)
         : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice }),
     ]);
 
     // Shuffle when no active filter — order changes every hour
-    const isFiltered = search || categoryId || promoOnly || newOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
+    const isFiltered = search || categoryId || promoOnly || newOnly || occasionOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
     const data = isFiltered
       ? products
       : seededShuffle(products, Math.floor(Date.now() / (1000 * 60 * 60)));

@@ -10,7 +10,7 @@ import HeroSection from "@/components/HeroSection";
 import TestimonialsSlider from "@/components/TestimonialsSlider";
 import Link from "next/link";
 import {
-  ArrowRight, Star, TrendingUp, Sparkles, Tag,
+  ArrowRight, Star, TrendingUp, Sparkles, Tag, RefreshCw as Reconditioned,
   MessageCircle, Truck, CreditCard, RefreshCw, ShieldCheck,
 } from "lucide-react";
 
@@ -270,20 +270,23 @@ export default async function HomePage() {
   let bestsellers: Product[] = [];
   let promos:      Product[] = [];
   let newItems:    Product[] = [];
+  let occasions:   Product[] = [];
 
-  const [bsRes, promoRes, newRes, siteUrl, siteName] = await Promise.allSettled([
+  const [bsRes, promoRes, newRes, occasionRes, siteUrl, siteName] = await Promise.allSettled([
     apiGet<{ data: Product[] }>("/api/products/bestsellers?limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
+    apiGet<{ data: Product[] }>("/api/products?occasion=true&limit=8").then(r => r.data),
     getSiteUrl(),
     getSiteName(),
   ]);
-  if (bsRes.status    === "fulfilled") bestsellers = bsRes.value;
-  if (promoRes.status === "fulfilled") promos      = promoRes.value;
-  if (newRes.status   === "fulfilled") newItems    = newRes.value;
-  if (bsRes.status    === "rejected")  console.error("[HomePage] bestsellers:", bsRes.reason);
-  if (promoRes.status === "rejected")  console.error("[HomePage] promos:",      promoRes.reason);
-  if (newRes.status   === "rejected")  console.error("[HomePage] new:",         newRes.reason);
+  if (bsRes.status       === "fulfilled") bestsellers = bsRes.value;
+  if (promoRes.status    === "fulfilled") promos      = promoRes.value;
+  if (newRes.status      === "fulfilled") newItems    = newRes.value;
+  if (occasionRes.status === "fulfilled") occasions   = occasionRes.value;
+  if (bsRes.status       === "rejected")  console.error("[HomePage] bestsellers:", bsRes.reason);
+  if (promoRes.status    === "rejected")  console.error("[HomePage] promos:",      promoRes.reason);
+  if (newRes.status      === "rejected")  console.error("[HomePage] new:",         newRes.reason);
 
   const base = siteUrl.status === "fulfilled" ? siteUrl.value : "https://togolese.tg";
   const name = siteName.status === "fulfilled" ? siteName.value : "Togolese Shop";
@@ -366,6 +369,18 @@ export default async function HomePage() {
           bg="bg-[#f8fafb]"
         >
           <ProductGrid products={newItems} />
+        </Section>
+      )}
+
+      {occasions.length > 0 && (
+        <Section
+          title="Occasions & Reconditionnés"
+          subtitle="Bons plans"
+          icon={Reconditioned}
+          viewAll={{ label: "Voir tout", href: "/products?occasion=true" }}
+          bg="bg-amber-50"
+        >
+          <ProductGrid products={occasions} />
         </Section>
       )}
 

@@ -39,6 +39,7 @@ interface ProductData {
   images:             string[];
   entrepot_id:        number | null;
   prix_entrepot:      number | "";
+  condition:          'neuf' | 'occasion' | 'reconditionne';
 }
 
 interface EntrepotItem {
@@ -101,6 +102,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     image_url:          initial?.image_url          ?? "",
     entrepot_id:        (initial as Record<string, unknown>)?.entrepot_id as number | null ?? null,
     prix_entrepot:      (initial as Record<string, unknown>)?.prix_entrepot as number | "" ?? "",
+    condition:          ((initial as Record<string, unknown>)?.condition as 'neuf' | 'occasion' | 'reconditionne') ?? 'neuf',
     ...initial,
     images:             secondaryImages,
   });
@@ -290,6 +292,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       if (form.images.length > 0) payload.images = form.images;
       payload.entrepot_id   = form.entrepot_id ?? null;
       payload.prix_entrepot = form.entrepot_id && form.prix_entrepot !== "" ? Number(form.prix_entrepot) : null;
+      payload.condition     = form.condition;
       const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur"); return; }
@@ -531,6 +534,31 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                   <Toggle checked={form.neuf} onChange={v => set("neuf", v)} label='Marquer comme "Nouveau"' color="brand" />
                 )}
                 <Toggle checked={form.actif} onChange={v => set("actif", v)} label="Produit actif (visible)" color="green" />
+              </div>
+
+              {/* Condition produit */}
+              <div className="pt-1">
+                <label className="block text-xs font-semibold text-slate-600 mb-2">État du produit</label>
+                <div className="flex gap-3 flex-wrap">
+                  {([
+                    { value: 'neuf',          label: 'Neuf',          color: 'bg-emerald-50 border-emerald-300 text-emerald-700' },
+                    { value: 'occasion',      label: 'Occasion',      color: 'bg-amber-50 border-amber-300 text-amber-700' },
+                    { value: 'reconditionne', label: 'Reconditionné', color: 'bg-blue-50 border-blue-300 text-blue-700' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => set('condition', opt.value)}
+                      className={`px-4 py-1.5 rounded-full border text-xs font-semibold transition-all ${
+                        form.condition === opt.value
+                          ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
 

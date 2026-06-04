@@ -26,6 +26,7 @@ export interface Product {
   entrepot_nom?: string | null;
   entrepot_telephone?: string | null;
   variants_stock?: number | null; // sum of variant.stock when product has variants
+  condition?: 'neuf' | 'occasion' | 'reconditionne' | null;
 }
 
 export interface Category {
