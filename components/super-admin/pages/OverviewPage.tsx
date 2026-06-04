@@ -24,9 +24,10 @@ export default function OverviewPage() {
       .catch(() => {});
   }, []);
 
-  const mrr = ui.tenants.reduce((s, t) => s + t.mrr, 0);
-  const active = stats?.active_shops ?? ui.tenants.filter((t) => t.status === 'Actif').length;
-  const total = stats?.total_shops ?? ui.tenants.length;
+  const billableTenants = ui.tenants.filter((t) => t.id !== 1);
+  const mrr = billableTenants.reduce((s, t) => s + t.mrr, 0);
+  const active = billableTenants.filter((t) => t.status === 'Actif').length;
+  const total = billableTenants.length;
 
   const kpis: Kpi[] = [
     { l: 'MRR · revenu mensuel', v: fmt(mrr), u: 'F', sub: 'récurrent · ce mois', spark: [0,0,0,0,0,0,0,0,0,0,mrr], c: '#34396B' },
@@ -36,16 +37,16 @@ export default function OverviewPage() {
   ];
 
   const planColors: Record<string, string> = { Starter: '#3B6A8F', Business: '#34396B', Enterprise: '#8B5E2E' };
-  const segs = ui.tenants.length > 0
+  const segs = billableTenants.length > 0
     ? (['Starter', 'Business', 'Enterprise'] as const).map((name) => {
-        const count = ui.tenants.filter((t) => t.plan === name).length;
-        const segMrr = ui.tenants.filter((t) => t.plan === name).reduce((s, t) => s + t.mrr, 0);
+        const count = billableTenants.filter((t) => t.plan === name).length;
+        const segMrr = billableTenants.filter((t) => t.plan === name).reduce((s, t) => s + t.mrr, 0);
         const pct = mrr > 0 ? Math.round(segMrr / mrr * 100) : 0;
         return { name, color: planColors[name], ca: `${fmt(segMrr)} F`, pct, count };
       }).filter((s) => s.count > 0)
     : [];
 
-  const recents = [...ui.tenants].sort((a, b) => b.id - a.id).slice(0, 5);
+  const recents = [...billableTenants].sort((a, b) => b.id - a.id).slice(0, 5);
 
   return (
     <>
@@ -76,12 +77,12 @@ export default function OverviewPage() {
       <div className="ov-bot"><div className="ov-card">
         <div className="ov-card-h">Top boutiques · revenu mensuel <button className="btn sm" onClick={() => ui.goto('tenants')}>Voir toutes</button></div>
         <table className="mini-t"><thead><tr><th>Boutique</th><th>Plan</th><th>Localisation</th><th style={{ textAlign: 'right' }}>MRR</th><th style={{ textAlign: 'right' }}>Statut</th></tr></thead>
-          <tbody>{ui.tenants.filter((t) => t.status === 'Actif').sort((a, b) => b.mrr - a.mrr).slice(0, 5).map((t) => <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => ui.openModal('tenantDetail', t)}>
+          <tbody>{billableTenants.filter((t) => t.status === 'Actif').sort((a, b) => b.mrr - a.mrr).slice(0, 5).map((t) => <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => ui.openModal('tenantDetail', t)}>
             <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar init={t.init} color={t.color} size={28} fs={10} /><span style={{ fontWeight: 500 }}>{t.name}</span></div></td>
             <td><span className="tag" style={PLAN_ST[t.plan]}>{t.plan}</span></td><td style={{ color: 'var(--muted)' }}>{t.city}</td>
             <td style={{ textAlign: 'right', fontFamily: 'var(--font-geist-mono),monospace', fontWeight: 500 }}>{fmt(t.mrr)} F</td>
             <td style={{ textAlign: 'right' }}><span className="st actif"><span className="d" />Actif</span></td></tr>)}
-            {ui.tenants.filter((t) => t.status === 'Actif').length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>Aucune boutique active</td></tr>}
+            {billableTenants.filter((t) => t.status === 'Actif').length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>Aucune boutique active</td></tr>}
           </tbody></table>
       </div></div>
     </>

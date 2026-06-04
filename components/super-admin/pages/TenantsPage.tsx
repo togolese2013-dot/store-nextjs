@@ -10,12 +10,13 @@ export default function TenantsPage() {
   const [tab, setTab] = useState<string>('all');
   const [menu, setMenu] = useState<string | null>(null);
   const selH = useSel();
+  const billable = useMemo(() => ui.tenants.filter((t) => t.id !== 1), [ui.tenants]);
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: ui.tenants.length };
-    ui.tenants.forEach((t) => { c[t.status] = (c[t.status] || 0) + 1; });
+    const c: Record<string, number> = { all: billable.length };
+    billable.forEach((t) => { c[t.status] = (c[t.status] || 0) + 1; });
     return c;
-  }, [ui.tenants]);
-  const vis = useMemo(() => (tab === 'all' ? ui.tenants : ui.tenants.filter((t) => t.status === tab)), [tab, ui.tenants]);
+  }, [billable]);
+  const vis = useMemo(() => (tab === 'all' ? billable : billable.filter((t) => t.status === tab)), [tab, billable]);
   const allSel = vis.length > 0 && vis.every((t) => selH.has(t.name));
   const kpis: Kpi[] = [
     { l: 'Boutiques totales', v: String(ui.tenants.length), sub: 'inscrites', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#34396B' },
