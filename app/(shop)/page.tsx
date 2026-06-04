@@ -378,7 +378,7 @@ export default async function HomePage() {
           subtitle="Bons plans"
           icon={Reconditioned}
           viewAll={{ label: "Voir tout", href: "/products?occasion=true" }}
-          bg="bg-amber-50"
+          bg="bg-white"
         >
           <ProductGrid products={occasions} />
         </Section>

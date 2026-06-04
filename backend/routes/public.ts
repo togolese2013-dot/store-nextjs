@@ -93,7 +93,8 @@ async function loadBestsellerProducts(limit: number) {
        FROM produits p
        LEFT JOIN categories c ON c.id = p.categorie_id
        WHERE p.id IN (${placeholders})
-         AND p.actif = 1`,
+         AND p.actif = 1
+       ORDER BY p.id ASC`,
       ids
     );
 
@@ -150,6 +151,13 @@ router.get("/api/products", async (req, res) => {
     if (bestOnly) {
       const products = await loadBestsellerProducts(limit);
       return res.json({ success: true, data: products, total: products.length });
+    }
+
+    // Guard: if condition column doesn't exist yet, return empty rather than all products
+    if (occasionOnly) {
+      const { produitCols } = await import("@/lib/db");
+      const cols = await produitCols();
+      if (!cols.condition) return res.json({ success: true, data: [], total: 0 });
     }
 
     // Lookup by slug — search slug column then fallback to reference

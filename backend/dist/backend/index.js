@@ -8205,7 +8205,8 @@ async function loadBestsellerProducts(limit) {
        FROM produits p
        LEFT JOIN categories c ON c.id = p.categorie_id
        WHERE p.id IN (${placeholders})
-         AND p.actif = 1`,
+         AND p.actif = 1
+       ORDER BY p.id ASC`,
       ids
     );
     prodRows.sort((a, b) => (salesMap.get(b.id) ?? 0) - (salesMap.get(a.id) ?? 0));
@@ -8254,6 +8255,11 @@ router25.get("/api/products", async (req, res) => {
     if (bestOnly) {
       const products2 = await loadBestsellerProducts(limit);
       return res.json({ success: true, data: products2, total: products2.length });
+    }
+    if (occasionOnly) {
+      const { produitCols: produitCols2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const cols = await produitCols2();
+      if (!cols.condition) return res.json({ success: true, data: [], total: 0 });
     }
     if (slugExact) {
       const { getProductBySlug: getProductBySlug2 } = await Promise.resolve().then(() => (init_db(), db_exports));
