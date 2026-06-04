@@ -137,6 +137,25 @@ router.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
   }
 });
 
+// ── GET /api/admin/workspace-stats — compteurs live workspace selector ────────
+router.get("/api/admin/workspace-stats", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(`
+      SELECT
+        (SELECT COUNT(*) FROM produits WHERE actif = 1)                                                     AS produits,
+        (SELECT COUNT(*) FROM factures WHERE DATE(created_at) = CURDATE())                                  AS ventes_today,
+        (SELECT COUNT(*) FROM orders WHERE status NOT IN ('cancelled','delivered'))                         AS commandes,
+        (SELECT COUNT(*) FROM boutique_clients)                                                             AS clients,
+        (SELECT COUNT(*) FROM utilisateurs WHERE actif = 1)                                                 AS equipiers
+    `);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 // ── POST /api/admin/saas/shops — créer/inviter une boutique ──────────────────
 router.post("/api/admin/saas/shops", async (req, res) => {
   const session = await getSession(req);

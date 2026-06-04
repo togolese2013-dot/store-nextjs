@@ -1,7 +1,16 @@
 'use client';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import WorkspaceSelector, { DEFAULT_WORKSPACES } from '@/components/workspace-selector/WorkspaceSelector';
 import type { Workspace, WorkspaceId } from '@/components/workspace-selector/types';
+
+interface WsStats {
+  produits: number;
+  ventes_today: number;
+  commandes: number;
+  clients: number;
+  equipiers: number;
+}
 
 export default function AdminWorkspaceClient({
   workspaceIds,
@@ -23,7 +32,30 @@ export default function AdminWorkspaceClient({
   shopPeriodEnd?: string | null;
 }) {
   const router = useRouter();
-  const workspaces = DEFAULT_WORKSPACES.filter(w => workspaceIds.includes(w.id));
+  const [stats, setStats] = useState<WsStats | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/workspace-stats', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setStats(d))
+      .catch(() => {});
+  }, []);
+
+  const fmt = (n: number) => n.toLocaleString('fr-FR');
+
+  const workspaces = DEFAULT_WORKSPACES
+    .filter(w => workspaceIds.includes(w.id))
+    .map(w => {
+      if (!stats) return w;
+      const counts: Record<WorkspaceId, string> = {
+        magasin:  `${fmt(stats.produits)} produit${stats.produits !== 1 ? 's' : ''}`,
+        boutique: `${fmt(stats.ventes_today)} vente${stats.ventes_today !== 1 ? 's' : ''} auj.`,
+        store:    `${fmt(stats.commandes)} commande${stats.commandes !== 1 ? 's' : ''}`,
+        crm:      `${fmt(stats.clients)} client${stats.clients !== 1 ? 's' : ''}`,
+        admin:    `${fmt(stats.equipiers)} équipier${stats.equipiers !== 1 ? 's' : ''}`,
+      };
+      return { ...w, count: counts[w.id as WorkspaceId] ?? w.count };
+    });
 
   return (
     <WorkspaceSelector
