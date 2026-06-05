@@ -7,17 +7,25 @@ import type { Tenant, Invoice, Ticket, Plan, Incident, PlanName } from './types'
 
 function InviteModal({ close }: { close: () => void }) {
   const ui = useUI();
-  const [name, setName] = useState(''); const [email, setEmail] = useState('');
-  const [city, setCity] = useState('Lomé'); const [plan, setPlan] = useState<PlanName>('Starter');
-  const ok = name.trim() && email.trim();
+  const [name, setName]       = useState('');
+  const [email, setEmail]     = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [city, setCity]       = useState('Lomé');
+  const [plan, setPlan]       = useState<PlanName>('Starter');
+  const ok = name.trim() && email.trim() && username.trim() && password.length >= 6;
   return (
-    <Modal title="Inviter une boutique" sub="La boutique recevra un email pour créer son espace · essai de 14 jours" onClose={close}
-      footer={<><button className="btn ghost" onClick={close}>Annuler</button><button className="btn pri" disabled={!ok} onClick={() => { ui.inviteTenant({ name, email, city, plan }); close(); }}><I.send size={13} /> Envoyer l'invitation</button></>}>
+    <Modal title="Créer une boutique" sub="Un compte admin sera créé automatiquement · essai de 14 jours" onClose={close}
+      footer={<><button className="btn ghost" onClick={close}>Annuler</button><button className="btn pri" disabled={!ok} onClick={() => { ui.inviteTenant({ name, email, city, plan, username, password }); close(); }}><I.send size={13} /> Créer la boutique</button></>}>
       <div className="field-row">
         <Field label="Nom de la boutique"><input className="inp" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Boutique Améyo" /></Field>
         <Field label="Ville"><select className="inp" value={city} onChange={(e) => setCity(e.target.value)}>{CITIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
       </div>
       <Field label="Email du propriétaire"><input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="proprietaire@email.com" /></Field>
+      <div className="field-row">
+        <Field label="Identifiant de connexion"><input className="inp" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ex. boutique_ameyo" /></Field>
+        <Field label="Mot de passe (min. 6 car.)"><input className="inp" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" /></Field>
+      </div>
       <Field label="Plan proposé"><PlanPick value={plan} onChange={setPlan} /></Field>
     </Modal>
   );
