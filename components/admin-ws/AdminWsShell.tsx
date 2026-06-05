@@ -32,7 +32,8 @@ import {
 } from './sample-data';
 import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import OverviewPage from './OverviewPage';
-import UsersPage from './UsersPage';
+import UsersRolesPage from './UsersRolesPage';
+import type { Member as UsersRolesMember } from './users-types';
 import WorkspacesPage from './WorkspacesPage';
 import IntegrationsPage from './IntegrationsPage';
 import ReportsPage from './ReportsPage';
@@ -150,7 +151,11 @@ export default function AdminWsShell({
 
         {/* Page routing */}
         {page === 'overview'     && <OverviewPage onInvite={onInvite} shopName={shopName} members={members} workspaces={workspaces} log={log} />}
-        {page === 'users'        && <UsersPage members={members} roles={roles} onInvite={onInvite} />}
+        {page === 'users'        && <UsersRolesPage initialMembers={members.map((m): UsersRolesMember => ({
+          name: m.name, init: m.init, color: m.color, email: m.email,
+          phone: undefined, role: (m.role as UsersRolesMember['role']) || 'Vendeur',
+          workspaces: m.workspaces, last: m.last, status: m.status as UsersRolesMember['status'],
+        }))} />}
         {page === 'workspaces'   && <WorkspacesPage workspaces={workspaces} onToggle={onToggleWorkspace} />}
         {page === 'integrations' && <IntegrationsPage integrations={integrations} />}
         {page === 'reports'      && <ReportsPage reports={reports} />}
