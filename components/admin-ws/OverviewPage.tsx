@@ -3,35 +3,54 @@
  * Mount via AdminWsShell (page id: 'overview') or standalone.
  */
 import React from 'react';
-import { SAMPLE_WORKSPACES, SAMPLE_LOG, CA_BREAKDOWN, OVERVIEW_KPIS } from './sample-data';
+import type { Member, WorkspaceHealth, ActivityLog } from './types';
+import { SAMPLE_WORKSPACES, SAMPLE_LOG, CA_BREAKDOWN } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, TrendIcon } from './icons';
 import styles from './Admin.module.css';
 
 interface OverviewPageProps {
   onInvite?: () => void;
+  shopName?: string;
+  members?: Member[];
+  workspaces?: WorkspaceHealth[];
+  log?: ActivityLog[];
 }
 
-export default function OverviewPage({ onInvite }: OverviewPageProps) {
+export default function OverviewPage({
+  onInvite,
+  shopName = 'Ma boutique',
+  members = [],
+  workspaces = SAMPLE_WORKSPACES,
+  log = SAMPLE_LOG,
+}: OverviewPageProps) {
+  const activeWs = workspaces.filter(w => w.active).length;
+  const activeMembers = members.filter(m => m.status === 'Actif').length;
+  const kpis = [
+    { label: 'CA consolidé · mois', value: '—', sub: 'tous workspaces' },
+    { label: 'Équipiers actifs',    value: String(activeMembers), sub: 'membres actifs' },
+    { label: 'Workspaces actifs',   value: String(activeWs), unit: `/ ${workspaces.length}`, sub: 'espaces configurés' },
+    { label: 'Abonnement',          value: '—', serif: true, sub: '—' },
+  ];
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Admin · Aperçu</div>
           <h1 className={styles.title}>Tableau de bord <span className={styles.serif}>administrateur</span></h1>
-          <p className={styles.subtitle}>Maison Diallo · vue consolidée de tous les espaces de travail</p>
+          <p className={styles.subtitle}>{shopName} · vue consolidée de tous les espaces de travail</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Rapport global</button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onInvite}>
-            <PlusIcon size={14} /> Inviter un membre
+            <PlusIcon size={14} /> Ajouter un membre
           </button>
         </div>
       </div>
 
       {/* KPIs */}
       <div className={styles.kpis}>
-        {OVERVIEW_KPIS.map(k => (
+        {kpis.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
               <div className={styles.kpiLabel}>{k.label}</div>
@@ -57,7 +76,7 @@ export default function OverviewPage({ onInvite }: OverviewPageProps) {
             <button type="button" className={`${styles.btn} ${styles.sm}`}>Gérer</button>
           </div>
           <div className={styles.wsGrid}>
-            {SAMPLE_WORKSPACES.map(w => {
+            {workspaces.map(w => {
               const Icon = w.icon;
               return (
                 <div key={w.id} className={styles.wsCard} style={{ opacity: w.active ? 1 : 0.6 }}>
@@ -85,7 +104,7 @@ export default function OverviewPage({ onInvite }: OverviewPageProps) {
         <div className={styles.ovSide}>
           <div className={styles.ovCard}>
             <div className={styles.ovCardHead}>Activité récente</div>
-            {SAMPLE_LOG.slice(0, 5).map((l, i) => (
+            {log.slice(0, 5).map((l, i) => (
               <div key={i} className={styles.eventItem}>
                 <div style={{ width: 24, height: 24, borderRadius: 99, background: l.color, color: 'white', display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{l.init}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>

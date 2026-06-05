@@ -147,7 +147,7 @@ export default function AdminWsShell({
         </header>
 
         {/* Page routing */}
-        {page === 'overview'     && <OverviewPage onInvite={onInvite} />}
+        {page === 'overview'     && <OverviewPage onInvite={onInvite} shopName={shopName} members={members} workspaces={workspaces} log={log} />}
         {page === 'users'        && <UsersPage members={members} roles={roles} onInvite={onInvite} />}
         {page === 'workspaces'   && <WorkspacesPage workspaces={workspaces} />}
         {page === 'integrations' && <IntegrationsPage integrations={integrations} />}
