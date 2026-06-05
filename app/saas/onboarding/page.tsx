@@ -120,6 +120,7 @@ export default function OnboardingPage() {
   const [slugTouched, setSlugTouched] = useState(false);
 
   // Step 3
+  const [plan,     setPlan]     = useState<"basic"|"pro">("basic");
   const [payments, setPayments] = useState<Set<PaymentId>>(new Set(["wave","om","momo","cash"]));
 
   // Step 4 — Account
@@ -177,7 +178,7 @@ export default function OnboardingPage() {
           shop_nom:       name.trim() || displayName,
           shop_slug:      displaySlug,
           shop_email:     email.trim(),
-          shop_plan:      "free",
+          shop_plan:      plan,
           shop_currency:  currency,
           admin_nom:      name.trim() || username,
           admin_username: username.toLowerCase(),
@@ -425,12 +426,35 @@ export default function OnboardingPage() {
               </>
             )}
 
-            {/* STEP 3 — PAYMENTS */}
+            {/* STEP 3 — PLAN + PAYMENTS */}
             {step === 3 && (
               <>
                 <Eyebrow>Étape 3 sur 5</Eyebrow>
-                <H1>Acceptez les <Em>paiements locaux.</Em></H1>
-                <Lede>Cochez les modes de paiement que vous utilisez. La connexion réelle se fera après l'inscription.</Lede>
+                <H1>Choisissez votre <Em>plan d'essai.</Em></H1>
+                <Lede>14 jours gratuits · Changez à tout moment · Aucune carte requise.</Lede>
+
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {([
+                    { id: "basic", label: "Starter", price: "9 000 F", period: "/ mois", feats: ["Boutique & caisse", "Gestion des stocks", "2 équipiers"] },
+                    { id: "pro",   label: "Business", price: "25 000 F", period: "/ mois", feats: ["Tous les espaces", "E-commerce & CRM", "5 équipiers"] },
+                  ] as const).map(p => (
+                    <button key={p.id} type="button" onClick={() => setPlan(p.id)}
+                      className={`flex flex-col gap-1 p-4 rounded-[14px] border-2 text-left transition-all ${
+                        plan === p.id ? "border-[#E07A2C] bg-[#FFF8EF]" : "border-[#E8E1D4] bg-white hover:border-[#14110E]/20"
+                      }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[13px] font-700 ${plan === p.id ? "text-[#C9601E]" : "text-[#14110E]"}`} style={{fontWeight:700}}>{p.label}</span>
+                        {plan === p.id && <span className="text-[10px] font-600 text-[#C9601E] bg-[#FDDCBA] px-2 py-0.5 rounded-full" style={{fontWeight:600}}>Sélectionné</span>}
+                      </div>
+                      <div className="text-[15px] font-700 text-[#14110E]" style={{fontWeight:700}}>{p.price} <span className="text-[12px] font-400 text-[#8A8278]">{p.period}</span></div>
+                      <ul className="mt-2 flex flex-col gap-1">
+                        {p.feats.map(f => <li key={f} className="text-[12px] text-[#6B635B] flex items-center gap-1.5"><Check size={11} className="text-[#2D6A4F] shrink-0" />{f}</li>)}
+                      </ul>
+                    </button>
+                  ))}
+                </div>
+
+                <p className="text-[12px] text-[#8A8278] mb-4">Modes de paiement acceptés · configurable après l'inscription.</p>
 
                 <div className="flex flex-col gap-2.5">
                   {PAYMENTS.map((p) => {
