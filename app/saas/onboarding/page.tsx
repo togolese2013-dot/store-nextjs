@@ -124,6 +124,8 @@ export default function OnboardingPage() {
   const [payments, setPayments] = useState<Set<PaymentId>>(new Set(["wave","om","momo","cash"]));
 
   // Step 4 — Account
+  const [ownerNom,       setOwnerNom]       = useState("");
+  const [ownerPhone,     setOwnerPhone]     = useState("");
   const [email,          setEmail]          = useState("");
   const [username,       setUsername]       = useState("");
   const [usernameTouched,setUsernameTouched]= useState(false);
@@ -180,7 +182,7 @@ export default function OnboardingPage() {
           shop_email:     email.trim(),
           shop_plan:      plan,
           shop_currency:  currency,
-          admin_nom:      name.trim() || username,
+          admin_nom:      ownerNom.trim() || name.trim() || username,
           admin_username: username.toLowerCase(),
           admin_email:    email.trim(),
           admin_password: password,
@@ -502,7 +504,25 @@ export default function OnboardingPage() {
               <>
                 <Eyebrow>Étape 4 sur 5</Eyebrow>
                 <H1>Créez votre <Em>compte administrateur.</Em></H1>
-                <Lede>Ces identifiants vous permettront de gérer votre boutique.</Lede>
+                <Lede>Informations du propriétaire et identifiants de connexion.</Lede>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Votre nom *">
+                    <Input
+                      value={ownerNom}
+                      onChange={v => setOwnerNom(v)}
+                      placeholder="Kofi Mensah"
+                    />
+                  </Field>
+                  <Field label="Téléphone">
+                    <Input
+                      type="tel"
+                      value={ownerPhone}
+                      onChange={v => setOwnerPhone(v)}
+                      placeholder="+228 90 00 00 00"
+                    />
+                  </Field>
+                </div>
 
                 <Field label="Email *" hint="Votre email de connexion.">
                   <Input
