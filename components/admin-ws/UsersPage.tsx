@@ -26,7 +26,7 @@ export default function UsersPage({ members = SAMPLE_MEMBERS, roles = SAMPLE_ROL
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><ShieldIcon size={14} /> Gérer les rôles</button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onInvite}>
-            <PlusIcon size={14} /> Inviter un membre
+            <PlusIcon size={14} /> Ajouter un membre
           </button>
         </div>
       </div>

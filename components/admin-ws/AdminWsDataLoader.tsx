@@ -151,7 +151,13 @@ export default function AdminWsDataLoader({
       const team: Member[] = Array.isArray(teamRes.utilisateurs)
         ? (teamRes.utilisateurs as ApiUtilisateur[]).map(mapUtilisateur)
         : [];
-      setMembers([...admins, ...team]);
+      const all = [...admins, ...team];
+      // Inject current user as Propriétaire if not already in list
+      if (userName && !all.some(m => m.name === userName)) {
+        const init = userName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+        all.unshift({ name: userName, email: '', init, color: SWATCHES[0], role: 'Propriétaire', workspaces: 'Tous', last: "Maintenant", status: 'Actif' });
+      }
+      setMembers(all);
     });
   }, []);
 
