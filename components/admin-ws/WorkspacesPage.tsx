@@ -3,7 +3,7 @@
  * Mount via AdminWsShell (page id: 'workspaces') or standalone.
  */
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { WorkspaceHealth } from './types';
 import { SAMPLE_WORKSPACES } from './sample-data';
 import { PlusIcon } from './icons';
@@ -16,6 +16,9 @@ export interface WorkspacesPageProps {
 
 export default function WorkspacesPage({ workspaces = SAMPLE_WORKSPACES, onToggle }: WorkspacesPageProps) {
   const [ws, setWs] = useState(workspaces);
+
+  // Sync when parent updates (e.g. after fetch)
+  useEffect(() => { setWs(workspaces); }, [workspaces]);
 
   const toggle = (id: string) => {
     const next = ws.map(w => w.id === id ? { ...w, active: !w.active } : w);

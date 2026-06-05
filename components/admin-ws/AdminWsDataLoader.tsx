@@ -137,8 +137,9 @@ export default function AdminWsDataLoader({
   userRole,
   shopName,
 }: Props) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [log,     setLog]     = useState<ActivityLog[]>([]);
+  const [members,  setMembers]  = useState<Member[]>([]);
+  const [log,      setLog]      = useState<ActivityLog[]>([]);
+  const [disabled, setDisabled] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -162,6 +163,13 @@ export default function AdminWsDataLoader({
   }, []);
 
   useEffect(() => {
+    fetch('/api/admin/workspace-settings', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.disabled)) setDisabled(d.disabled); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     fetch('/api/admin/security-logs?limit=20')
       .then(r => r.json())
       .then(d => {
@@ -177,7 +185,16 @@ export default function AdminWsDataLoader({
         ...r,
         count: members.filter(m => m.role === r.name).length,
       }))}
-      workspaces={SAMPLE_WORKSPACES}
+      workspaces={SAMPLE_WORKSPACES.map(w => ({ ...w, active: !disabled.includes(w.id) }))}
+      onToggleWorkspace={async (id: string, active: boolean) => {
+        setDisabled(prev => active ? prev.filter(x => x !== id) : [...prev, id]);
+        await fetch('/api/admin/workspace-settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ id, active }),
+        });
+      }}
       integrations={SAMPLE_INTEGRATIONS}
       reports={SAMPLE_REPORTS}
       log={log}

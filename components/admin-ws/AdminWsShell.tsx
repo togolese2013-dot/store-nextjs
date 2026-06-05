@@ -81,6 +81,7 @@ export interface AdminWsShellProps {
   log?: ActivityLog[];
   onSwitchWorkspace?: () => void;
   onInvite?: () => void;
+  onToggleWorkspace?: (id: string, active: boolean) => void;
   userName?: string;
   userRole?: string;
   shopName?: string;
@@ -97,6 +98,7 @@ export default function AdminWsShell({
   log          = SAMPLE_LOG,
   onSwitchWorkspace,
   onInvite,
+  onToggleWorkspace,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
@@ -149,7 +151,7 @@ export default function AdminWsShell({
         {/* Page routing */}
         {page === 'overview'     && <OverviewPage onInvite={onInvite} shopName={shopName} members={members} workspaces={workspaces} log={log} />}
         {page === 'users'        && <UsersPage members={members} roles={roles} onInvite={onInvite} />}
-        {page === 'workspaces'   && <WorkspacesPage workspaces={workspaces} />}
+        {page === 'workspaces'   && <WorkspacesPage workspaces={workspaces} onToggle={onToggleWorkspace} />}
         {page === 'integrations' && <IntegrationsPage integrations={integrations} />}
         {page === 'reports'      && <ReportsPage reports={reports} />}
         {page === 'logs'         && <LogsPage log={log} />}

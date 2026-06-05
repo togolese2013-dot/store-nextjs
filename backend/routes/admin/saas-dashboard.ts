@@ -175,6 +175,54 @@ router.post("/api/admin/saas/shops", async (req, res) => {
   }
 });
 
+// ── GET /api/admin/workspace-settings — liste workspaces désactivés ──────────
+router.get("/api/admin/workspace-settings", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    // Ensure column exists
+    await (db as mysql.Pool).execute(
+      `ALTER TABLE shops ADD COLUMN IF NOT EXISTS disabled_workspaces TEXT NULL`
+    ).catch(() => {});
+    const [[row]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+      `SELECT disabled_workspaces FROM shops WHERE id = ? LIMIT 1`,
+      [session.shop_id ?? 1]
+    );
+    const disabled: string[] = JSON.parse(row?.disabled_workspaces || '[]');
+    res.json({ disabled });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── PATCH /api/admin/workspace-settings — toggle workspace ───────────────────
+router.patch("/api/admin/workspace-settings", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Accès refusé." });
+  const { id, active } = req.body as { id: string; active: boolean };
+  if (!id) return res.status(400).json({ error: "id requis." });
+  try {
+    const [[row]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
+      `SELECT disabled_workspaces FROM shops WHERE id = ? LIMIT 1`,
+      [session.shop_id ?? 1]
+    );
+    let disabled: string[] = JSON.parse(row?.disabled_workspaces || '[]');
+    if (active) {
+      disabled = disabled.filter(w => w !== id);
+    } else {
+      if (!disabled.includes(id)) disabled.push(id);
+    }
+    await (db as mysql.Pool).execute(
+      `UPDATE shops SET disabled_workspaces = ? WHERE id = ?`,
+      [JSON.stringify(disabled), session.shop_id ?? 1]
+    );
+    res.json({ ok: true, disabled });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 // ── DELETE /api/admin/saas/shops/:id — supprimer une boutique ────────────────
 router.delete("/api/admin/saas/shops/:id", async (req, res) => {
   const session = await getSession(req);

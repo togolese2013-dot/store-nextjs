@@ -12243,6 +12243,50 @@ router45.post("/api/admin/saas/shops", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
+router45.get("/api/admin/workspace-settings", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    await db.execute(
+      `ALTER TABLE shops ADD COLUMN IF NOT EXISTS disabled_workspaces TEXT NULL`
+    ).catch(() => {
+    });
+    const [[row]] = await db.execute(
+      `SELECT disabled_workspaces FROM shops WHERE id = ? LIMIT 1`,
+      [session.shop_id ?? 1]
+    );
+    const disabled = JSON.parse(row?.disabled_workspaces || "[]");
+    res.json({ disabled });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.patch("/api/admin/workspace-settings", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  const { id, active } = req.body;
+  if (!id) return res.status(400).json({ error: "id requis." });
+  try {
+    const [[row]] = await db.execute(
+      `SELECT disabled_workspaces FROM shops WHERE id = ? LIMIT 1`,
+      [session.shop_id ?? 1]
+    );
+    let disabled = JSON.parse(row?.disabled_workspaces || "[]");
+    if (active) {
+      disabled = disabled.filter((w) => w !== id);
+    } else {
+      if (!disabled.includes(id)) disabled.push(id);
+    }
+    await db.execute(
+      `UPDATE shops SET disabled_workspaces = ? WHERE id = ?`,
+      [JSON.stringify(disabled), session.shop_id ?? 1]
+    );
+    res.json({ ok: true, disabled });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 router45.delete("/api/admin/saas/shops/:id", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
