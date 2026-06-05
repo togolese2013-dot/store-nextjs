@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminWsShell from './AdminWsShell';
 import type { Member, ActivityLog } from './types';
 import { SAMPLE_WORKSPACES, SAMPLE_INTEGRATIONS, SAMPLE_REPORTS, SAMPLE_ROLES } from './sample-data';
@@ -137,6 +138,7 @@ export default function AdminWsDataLoader({
   userRole,
   shopName,
 }: Props) {
+  const router = useRouter();
   const [members,  setMembers]  = useState<Member[]>([]);
   const [log,      setLog]      = useState<ActivityLog[]>([]);
   const [disabled, setDisabled] = useState<string[]>([]);
@@ -194,6 +196,7 @@ export default function AdminWsDataLoader({
           credentials: 'include',
           body: JSON.stringify({ id, active }),
         });
+        router.refresh();
       }}
       integrations={SAMPLE_INTEGRATIONS}
       reports={SAMPLE_REPORTS}
