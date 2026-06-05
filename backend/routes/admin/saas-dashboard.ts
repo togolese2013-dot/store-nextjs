@@ -165,8 +165,8 @@ router.post("/api/admin/saas/shops", async (req, res) => {
   const slug = nom.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   try {
     const [result] = await (db as mysql.Pool).execute<mysql.OkPacket>(
-      `INSERT INTO shops (nom, slug, email, plan, actif, subscription_status, pays)
-       VALUES (?, ?, ?, ?, 1, 'trial', ?)`,
+      `INSERT INTO shops (nom, slug, email, plan, actif, subscription_status, trial_ends_at, pays)
+       VALUES (?, ?, ?, ?, 1, 'trial', DATE_ADD(NOW(), INTERVAL 14 DAY), ?)`,
       [nom, slug, email, plan, pays ?? null]
     );
     res.json({ ok: true, id: result.insertId });
