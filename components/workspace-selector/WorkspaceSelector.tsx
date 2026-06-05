@@ -81,11 +81,11 @@ function PlanBadge({
   if (isExpired) {
     text = 'Expiré'; textColor = '#9C3A14'; bgColor = '#F7DCCB'; border = 'rgba(156,58,20,.2)';
   } else if (isTrial) {
-    const d = days ?? 0;
-    text = `Essai · ${d > 0 ? d + 'j' : 'terminé'}`;
-    textColor = d <= 7 ? '#9C3A14' : '#C9601E';
-    bgColor   = d <= 7 ? '#F7DCCB'  : '#FBE9D6';
-    border    = d <= 7 ? 'rgba(156,58,20,.2)' : 'rgba(201,96,30,.2)';
+    const d = days;
+    text = d === null ? 'Essai · en cours' : d > 0 ? `Essai · ${d}j` : 'Essai · terminé';
+    textColor = (d !== null && d <= 7) ? '#9C3A14' : '#C9601E';
+    bgColor   = (d !== null && d <= 7) ? '#F7DCCB'  : '#FBE9D6';
+    border    = (d !== null && d <= 7) ? 'rgba(156,58,20,.2)' : 'rgba(201,96,30,.2)';
   } else if (isWarn) {
     text = `${planLabel(plan)} · ${days}j`;
     textColor = '#C9601E'; bgColor = '#FBE9D6'; border = 'rgba(201,96,30,.2)';
