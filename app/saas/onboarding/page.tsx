@@ -437,8 +437,8 @@ export default function OnboardingPage() {
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   {([
-                    { id: "basic", label: "Starter", price: "9 000 F", period: "/ mois", feats: ["Boutique & caisse", "Gestion des stocks", "2 équipiers"] },
-                    { id: "pro",   label: "Business", price: "25 000 F", period: "/ mois", feats: ["Tous les espaces", "E-commerce & CRM", "5 équipiers"] },
+                    { id: "basic", label: "Basic",  price: "9 000 F", period: "/ mois", feats: ["Boutique & caisse", "Gestion des stocks", "2 équipiers"] },
+                    { id: "pro",   label: "Pro",    price: "25 000 F", period: "/ mois", feats: ["Tous les espaces", "E-commerce & CRM", "5 équipiers"] },
                   ] as const).map(p => (
                     <button key={p.id} type="button" onClick={() => setPlan(p.id)}
                       className={`flex flex-col gap-1 p-4 rounded-[14px] border-2 text-left transition-all ${
