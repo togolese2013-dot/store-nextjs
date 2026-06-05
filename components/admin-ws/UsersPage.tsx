@@ -21,7 +21,7 @@ export default function UsersPage({ members = SAMPLE_MEMBERS, roles = SAMPLE_ROL
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Admin · Équipe</div>
           <h1 className={styles.title}>Utilisateurs &amp; <span className={styles.serif}>rôles</span></h1>
-          <p className={styles.subtitle}>6 membres · 4 rôles · 1 invitation en attente</p>
+          <p className={styles.subtitle}>{members.length} membre{members.length !== 1 ? 's' : ''} · {roles.filter(r => r.count > 0).length} rôle{roles.filter(r => r.count > 0).length !== 1 ? 's' : ''}{members.filter(m => m.status === 'Invitation').length > 0 ? ` · ${members.filter(m => m.status === 'Invitation').length} invitation en attente` : ''}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><ShieldIcon size={14} /> Gérer les rôles</button>
@@ -82,7 +82,7 @@ export default function UsersPage({ members = SAMPLE_MEMBERS, roles = SAMPLE_ROL
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>6 membres · 1 invitation en attente</span>
+          <span>{members.length} membre{members.length !== 1 ? 's' : ''}{members.filter(m => m.status === 'Invitation').length > 0 ? ` · ${members.filter(m => m.status === 'Invitation').length} invitation en attente` : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

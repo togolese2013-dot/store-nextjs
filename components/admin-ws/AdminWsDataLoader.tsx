@@ -167,7 +167,10 @@ export default function AdminWsDataLoader({
   return (
     <AdminWsShell
       members={members}
-      roles={SAMPLE_ROLES}
+      roles={SAMPLE_ROLES.map(r => ({
+        ...r,
+        count: members.filter(m => m.role === r.name).length,
+      }))}
       workspaces={SAMPLE_WORKSPACES}
       integrations={SAMPLE_INTEGRATIONS}
       reports={SAMPLE_REPORTS}
