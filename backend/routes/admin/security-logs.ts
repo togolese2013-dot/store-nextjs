@@ -12,7 +12,8 @@ router.get("/api/admin/security-logs", async (req, res) => {
   }
 
   const limit = Math.min(Number(req.query.limit) || 100, 500);
-  const logs = await getSecurityLogs(limit);
+  const shopId = session.role === 'super_admin' ? undefined : session.shop_id;
+  const logs = await getSecurityLogs(limit, shopId);
   res.json({ logs });
 });
 

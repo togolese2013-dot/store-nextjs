@@ -206,7 +206,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
     });
     await updateAdminLastLogin(user.id);
     setAuthCookie(res, token);
-    logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], `role=${user.role}`);
+    logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], `role=${user.role}`, shopId);
     return res.json({ ok: true, nom: user.nom, role: user.role, must_change_password: mustChange });
   } catch (err) {
     console.error("[admin login]", err);

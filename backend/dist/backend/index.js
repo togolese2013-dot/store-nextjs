@@ -4862,30 +4862,46 @@ async function ensureSecurityLogsTable() {
       ip          VARCHAR(45)  NOT NULL DEFAULT '',
       user_agent  VARCHAR(255) NULL,
       details     TEXT         NULL,
+      shop_id     INT UNSIGNED NULL,
       created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_username (username),
       INDEX idx_action   (action),
-      INDEX idx_created  (created_at)
+      INDEX idx_created  (created_at),
+      INDEX idx_shop     (shop_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  try {
+    await db.execute(`ALTER TABLE security_logs ADD COLUMN shop_id INT UNSIGNED NULL`);
+    await db.execute(`ALTER TABLE security_logs ADD INDEX idx_shop (shop_id)`);
+  } catch {
+  }
 }
-async function logSecurityEvent(action, username, ip, userAgent, details) {
+async function logSecurityEvent(action, username, ip, userAgent, details, shopId) {
   try {
     await db.execute(
-      "INSERT INTO security_logs (action, username, ip, user_agent, details) VALUES (?, ?, ?, ?, ?)",
-      [action, username, ip, userAgent ?? null, details ?? null]
+      "INSERT INTO security_logs (action, username, ip, user_agent, details, shop_id) VALUES (?, ?, ?, ?, ?, ?)",
+      [action, username, ip, userAgent ?? null, details ?? null, shopId ?? null]
     );
   } catch {
   }
 }
-async function getSecurityLogs(limit = 100) {
-  const [rows] = await db.execute(
-    `SELECT id, action, username, ip, details, created_at
-     FROM security_logs
-     ORDER BY created_at DESC
-     LIMIT ${Number(limit)}`
-  );
-  return rows;
+async function getSecurityLogs(limit = 100, shopId) {
+  let query = `SELECT id, action, username, ip, details, created_at FROM security_logs`;
+  const params = [];
+  if (shopId) {
+    query += ` WHERE shop_id = ?`;
+    params.push(shopId);
+  }
+  query += ` ORDER BY created_at DESC LIMIT ${Number(limit)}`;
+  try {
+    const [rows] = await db.execute(query, params);
+    return rows;
+  } catch {
+    const [rows] = await db.execute(
+      `SELECT id, action, username, ip, details, created_at FROM security_logs ORDER BY created_at DESC LIMIT ${Number(limit)}`
+    );
+    return rows;
+  }
 }
 
 // routes/admin/auth.ts
@@ -5040,7 +5056,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
     });
     await updateAdminLastLogin(user.id);
     setAuthCookie(res, token);
-    logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], `role=${user.role}`);
+    logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], `role=${user.role}`, shopId);
     return res.json({ ok: true, nom: user.nom, role: user.role, must_change_password: mustChange });
   } catch (err) {
     console.error("[admin login]", err);
@@ -9794,7 +9810,8 @@ router29.get("/api/admin/security-logs", async (req, res) => {
     return res.status(403).json({ error: "Acc\xE8s r\xE9serv\xE9 aux administrateurs." });
   }
   const limit = Math.min(Number(req.query.limit) || 100, 500);
-  const logs = await getSecurityLogs(limit);
+  const shopId = session.role === "super_admin" ? void 0 : session.shop_id;
+  const logs = await getSecurityLogs(limit, shopId);
   res.json({ logs });
 });
 var security_logs_default = router29;
