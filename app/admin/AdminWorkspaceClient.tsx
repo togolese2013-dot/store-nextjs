@@ -34,17 +34,23 @@ export default function AdminWorkspaceClient({
   const router = useRouter();
   const [stats, setStats] = useState<WsStats | null>(null);
 
+  const [disabled, setDisabled] = useState<string[]>([]);
+
   useEffect(() => {
     fetch('/api/admin/workspace-stats', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => d && setStats(d))
+      .catch(() => {});
+    fetch('/api/admin/workspace-settings', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d?.disabled && setDisabled(d.disabled))
       .catch(() => {});
   }, []);
 
   const fmt = (n: number) => n.toLocaleString('fr-FR');
 
   const workspaces = DEFAULT_WORKSPACES
-    .filter(w => workspaceIds.includes(w.id))
+    .filter(w => workspaceIds.includes(w.id) && !disabled.includes(w.id))
     .map(w => {
       if (!stats) return w;
       const counts: Record<WorkspaceId, string> = {
