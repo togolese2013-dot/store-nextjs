@@ -3,7 +3,7 @@
  * Mount via AdminWsShell (page id: 'overview') or standalone.
  */
 import React from 'react';
-import type { Member, WorkspaceHealth, ActivityLog } from './types';
+import type { Member, WorkspaceHealth, ActivityLog, KpiItem } from './types';
 import { SAMPLE_WORKSPACES, SAMPLE_LOG, CA_BREAKDOWN } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, TrendIcon } from './icons';
@@ -26,7 +26,7 @@ export default function OverviewPage({
 }: OverviewPageProps) {
   const activeWs = workspaces.filter(w => w.active).length;
   const activeMembers = members.filter(m => m.status === 'Actif').length;
-  const kpis = [
+  const kpis: KpiItem[] = [
     { label: 'CA consolidé · mois', value: '—', sub: 'tous workspaces' },
     { label: 'Équipiers actifs',    value: String(activeMembers), sub: 'membres actifs' },
     { label: 'Workspaces actifs',   value: String(activeWs), unit: `/ ${workspaces.length}`, sub: 'espaces configurés' },
