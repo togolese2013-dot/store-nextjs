@@ -44,13 +44,15 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
   }, [subscribe, router]);
 
   const ADMIN_ZONE = ["/admin/config", "/admin/settings", "/admin/users", "/admin/rapports", "/admin/tendances"];
+  const FULLSCREEN_ZONE = ["/admin/store", "/admin/magasin", "/admin/crm"];
   const STORE_EXCEPTIONS = ["/admin/settings/delivery", "/admin/settings/payment", "/admin/store"];
   const isAdminZone = pathname === "/admin" || ADMIN_ZONE.some(p =>
     (pathname === p || pathname.startsWith(p + "/")) &&
     !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
   );
+  const isFullscreenZone = FULLSCREEN_ZONE.some(p => pathname === p || pathname.startsWith(p + "/"));
 
-  if (isAdminZone) return <>{children}</>;
+  if (isAdminZone || isFullscreenZone) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-slate-50 overflow-x-hidden">
