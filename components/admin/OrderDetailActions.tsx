@@ -142,7 +142,7 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
   const [note,              setNote]              = useState(order.note ?? "");
   const [lienLocalisation,  setLienLocalisation]  = useState(order.lien_localisation ?? "");
   const [deliveryFee,       setDeliveryFee]       = useState(Number(order.delivery_fee));
-  const [items,             setItems]             = useState<OrderItem[]>(order.items.map(i => ({ ...i })));
+  const [items,             setItems]             = useState<OrderItem[]>(order.items.map(i => ({ ...i, qty: Number(i.qty), prix_unitaire: Number(i.prix_unitaire), total: Number(i.total) })));
   const [saving,            setSaving]            = useState(false);
   const [error,             setError]             = useState("");
 
