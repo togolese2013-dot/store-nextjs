@@ -80,7 +80,7 @@ async function ensureOrderCols() {
 const PRICE_TOLERANCE = 100; // FCFA — rounding tolerance
 
 async function validateOrderPricing(
-  items: Array<{ id?: number; produit_id?: number; qty?: number; quantite?: number }>,
+  items: Array<{ id?: number; produit_id?: number; qty?: number; quantite?: number; variantId?: number }>,
   zone_livraison: string | undefined,
   delivery_fee_claimed: number,
   coupon_code: string | undefined,
@@ -108,16 +108,31 @@ async function validateOrderPricing(
       priceMap.set(Number(p.id), { prix: Number(p.prix_unitaire), remise: Number(p.remise) });
     }
 
+    // Fetch variant prices for items that have a variantId
+    const variantIds = items.map(i => Number(i.variantId)).filter(v => v > 0);
+    const variantPriceMap = new Map<number, number>();
+    if (variantIds.length > 0) {
+      try {
+        const vph = variantIds.map(() => "?").join(",");
+        const [vrows] = await pool.execute<mysql.RowDataPacket[]>(
+          `SELECT id, prix FROM product_variants WHERE id IN (${vph})`, variantIds
+        );
+        for (const v of vrows) variantPriceMap.set(Number(v.id), Number(v.prix));
+      } catch { /* table may not exist — fall back to product price */ }
+    }
+
     let serverSubtotal = 0;
     for (const item of items) {
       const pid = Number(item.id ?? item.produit_id);
       const qty = Math.max(1, Number(item.qty ?? item.quantite ?? 1));
       const prod = priceMap.get(pid);
       if (!prod) return { ok: false, error: `Produit introuvable ou inactif : ID ${pid}` };
-      // remise is stored in FCFA (not %), matching frontend calcPrice logic
-      const unitPrice = prod.remise > 0
-        ? Math.max(0, prod.prix - prod.remise)
-        : prod.prix;
+      // Use variant price if present, otherwise product price minus remise
+      const unitPrice = item.variantId && variantPriceMap.has(Number(item.variantId))
+        ? variantPriceMap.get(Number(item.variantId))!
+        : prod.remise > 0
+          ? Math.max(0, prod.prix - prod.remise)
+          : prod.prix;
       serverSubtotal += unitPrice * qty;
     }
 

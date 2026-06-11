@@ -335,12 +335,13 @@ export default function CheckoutPage() {
     try {
       const telephone = `${phonePrefix} ${normalizeLocalPhone(phoneNumber)}`;
       const orderItems = selectedItems.map(i => ({
-        id:           i.id,
-        nom:          i.nom,
-        reference:    i.reference,
+        id:            i.id,
+        nom:           i.nom,
+        reference:     i.reference,
         prix_unitaire: calcPrice(i),
-        qty:          i.qty,
-        total:        calcPrice(i) * i.qty,
+        qty:           i.qty,
+        total:         calcPrice(i) * i.qty,
+        ...(i.variantId ? { variantId: i.variantId } : {}),
       }));
       // Screenshot already compressed at file-selection time
       const mmScreenshotPayload = (payMode === "flooz" || payMode === "yas") ? mmScreenshotB64 || null : null;

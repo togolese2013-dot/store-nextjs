@@ -9050,13 +9050,26 @@ async function validateOrderPricing(items, zone_livraison, delivery_fee_claimed,
     for (const p of products) {
       priceMap.set(Number(p.id), { prix: Number(p.prix_unitaire), remise: Number(p.remise) });
     }
+    const variantIds = items.map((i) => Number(i.variantId)).filter((v) => v > 0);
+    const variantPriceMap = /* @__PURE__ */ new Map();
+    if (variantIds.length > 0) {
+      try {
+        const vph = variantIds.map(() => "?").join(",");
+        const [vrows] = await pool2.execute(
+          `SELECT id, prix FROM product_variants WHERE id IN (${vph})`,
+          variantIds
+        );
+        for (const v of vrows) variantPriceMap.set(Number(v.id), Number(v.prix));
+      } catch {
+      }
+    }
     let serverSubtotal = 0;
     for (const item of items) {
       const pid = Number(item.id ?? item.produit_id);
       const qty = Math.max(1, Number(item.qty ?? item.quantite ?? 1));
       const prod = priceMap.get(pid);
       if (!prod) return { ok: false, error: `Produit introuvable ou inactif : ID ${pid}` };
-      const unitPrice = prod.remise > 0 ? Math.max(0, prod.prix - prod.remise) : prod.prix;
+      const unitPrice = item.variantId && variantPriceMap.has(Number(item.variantId)) ? variantPriceMap.get(Number(item.variantId)) : prod.remise > 0 ? Math.max(0, prod.prix - prod.remise) : prod.prix;
       serverSubtotal += unitPrice * qty;
     }
     let serverFee = 0;
