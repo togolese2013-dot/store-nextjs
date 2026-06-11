@@ -9036,7 +9036,7 @@ async function ensureOrderCols() {
   _orderColsReady = true;
 }
 var PRICE_TOLERANCE = 100;
-async function validateOrderPricing(items, zone_livraison, delivery_fee_claimed, coupon_code, coupon_remise_claimed, total_claimed) {
+async function validateOrderPricing(items, zone_livraison, delivery_fee_claimed, coupon_code, coupon_remise_claimed, total_claimed, ref_code) {
   try {
     const pool2 = db;
     const productIds = items.map((i) => Number(i.id ?? i.produit_id)).filter((id) => id > 0);
@@ -9083,6 +9083,7 @@ async function validateOrderPricing(items, zone_livraison, delivery_fee_claimed,
         serverFee = Number(delivery_fee_claimed ?? 0);
       }
     }
+    const referralDiscount = ref_code ? Math.round(serverSubtotal * 0.1) : 0;
     let serverRemise = 0;
     if (coupon_code) {
       try {
@@ -9107,7 +9108,7 @@ async function validateOrderPricing(items, zone_livraison, delivery_fee_claimed,
         serverRemise = Number(coupon_remise_claimed ?? 0);
       }
     }
-    const expectedTotal = serverSubtotal - serverRemise + serverFee;
+    const expectedTotal = serverSubtotal - referralDiscount - serverRemise + serverFee;
     if (Math.abs(total_claimed - expectedTotal) > PRICE_TOLERANCE) {
       console.warn(
         `[orders] Price mismatch: claimed=${total_claimed}, expected=${expectedTotal}`,
@@ -9168,7 +9169,8 @@ router27.post("/api/orders", async (req, res) => {
       Number(delivery_fee ?? 0),
       coupon_code,
       Number(coupon_remise ?? 0),
-      Number(total ?? 0)
+      Number(total ?? 0),
+      ref_code
     );
     if (!priceCheck.ok) {
       return res.status(400).json({ error: priceCheck.error });

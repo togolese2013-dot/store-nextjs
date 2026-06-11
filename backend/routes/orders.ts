@@ -86,6 +86,7 @@ async function validateOrderPricing(
   coupon_code: string | undefined,
   coupon_remise_claimed: number,
   total_claimed: number,
+  ref_code?: string | undefined,
 ): Promise<{ ok: true; subtotal: number; fee: number; remise: number } | { ok: false; error: string }> {
   try {
     const pool = db as mysql.Pool;
@@ -149,7 +150,10 @@ async function validateOrderPricing(
       }
     }
 
-    // 3. Validate coupon discount
+    // 3a. Referral discount (10% of subtotal if valid ref_code cookie)
+    const referralDiscount = ref_code ? Math.round(serverSubtotal * 0.10) : 0;
+
+    // 3b. Validate coupon discount
     let serverRemise = 0;
     if (coupon_code) {
       try {
@@ -181,7 +185,7 @@ async function validateOrderPricing(
     }
 
     // 4. Compare totals
-    const expectedTotal = serverSubtotal - serverRemise + serverFee;
+    const expectedTotal = serverSubtotal - referralDiscount - serverRemise + serverFee;
     if (Math.abs(total_claimed - expectedTotal) > PRICE_TOLERANCE) {
       console.warn(
         `[orders] Price mismatch: claimed=${total_claimed}, expected=${expectedTotal}`,
@@ -242,6 +246,7 @@ router.post("/api/orders", async (req, res) => {
       coupon_code,
       Number(coupon_remise ?? 0),
       Number(total ?? 0),
+      ref_code,
     );
     if (!priceCheck.ok) {
       return res.status(400).json({ error: priceCheck.error });
