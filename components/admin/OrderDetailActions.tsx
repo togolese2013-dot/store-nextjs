@@ -17,7 +17,9 @@ interface OrderItem {
 }
 
 interface Product {
-  id: number; nom: string; reference: string; prix: number; stock: number;
+  id: number; nom: string; reference: string;
+  prix?: number; prix_unitaire?: number;
+  stock?: number; stock_boutique?: number; stock_magasin?: number;
 }
 
 interface Order {
@@ -174,7 +176,8 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
         next[idx] = { ...next[idx], qty: next[idx].qty + 1, total: (next[idx].qty + 1) * next[idx].prix_unitaire };
         return next;
       }
-      return [...prev, { nom: p.nom, reference: p.reference, qty: 1, prix_unitaire: p.prix, total: p.prix } as OrderItem];
+      const pu = Number(p.prix_unitaire ?? p.prix ?? 0);
+      return [...prev, { nom: p.nom, reference: p.reference, qty: 1, prix_unitaire: pu, total: pu } as OrderItem];
     });
     setQuery(""); setResults([]);
   }
@@ -302,9 +305,9 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
                       className="w-full flex items-center justify-between px-4 py-3 hover:bg-emerald-50 text-left transition-colors">
                       <div>
                         <p className="font-semibold text-sm text-slate-800">{p.nom}</p>
-                        <p className="text-xs text-slate-400">{p.reference} · stock: {p.stock}</p>
+                        <p className="text-xs text-slate-400">{p.reference} · stock: {p.stock_boutique ?? p.stock_magasin ?? p.stock ?? 0}</p>
                       </div>
-                      <span className="text-sm font-bold text-emerald-700">{formatPrice(p.prix)}</span>
+                      <span className="text-sm font-bold text-emerald-700">{formatPrice(Number(p.prix_unitaire ?? p.prix ?? 0))}</span>
                     </button>
                   ))}
                 </div>
