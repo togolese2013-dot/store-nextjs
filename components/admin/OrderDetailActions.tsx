@@ -141,7 +141,7 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
   const [zone,              setZone]              = useState(order.zone_livraison);
   const [note,              setNote]              = useState(order.note ?? "");
   const [lienLocalisation,  setLienLocalisation]  = useState(order.lien_localisation ?? "");
-  const [deliveryFee,       setDeliveryFee]       = useState(order.delivery_fee);
+  const [deliveryFee,       setDeliveryFee]       = useState(Number(order.delivery_fee));
   const [items,             setItems]             = useState<OrderItem[]>(order.items.map(i => ({ ...i })));
   const [saving,            setSaving]            = useState(false);
   const [error,             setError]             = useState("");
@@ -161,7 +161,7 @@ function EditModal({ order, onClose }: { order: Order; onClose: () => void }) {
       try {
         const r = await fetch(`/api/admin/products/search?q=${encodeURIComponent(q)}`);
         const j = await r.json();
-        setResults(j.data ?? []);
+        setResults(j.products ?? j.data ?? []);
       } finally { setSearching(false); }
     }, 300);
   }, []);
