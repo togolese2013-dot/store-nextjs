@@ -7,7 +7,6 @@ export default function Page() {
   return (
     <StoreDataLoader
       onSwitchWorkspace={() => router.push('/admin')}
-      onCreateOrder={() => router.push('/admin/orders/new')}
     />
   );
 }

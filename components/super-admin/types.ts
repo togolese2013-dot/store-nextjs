@@ -124,7 +124,7 @@ export interface UIStore {
   tickets: Ticket[];
   plans: Plan[];
   audit: AuditEntry[];
-  inviteTenant: (t: { name: string; email: string; city: string; plan: PlanName }) => void;
+  inviteTenant: (t: { name: string; email: string; city: string; plan: PlanName; username?: string; password?: string }) => void;
   changePlan: (name: string, plan: PlanName) => void;
   setStatus: (name: string, status: TenantStatus, verb: string) => void;
   bulkStatus: (names: string[], status: TenantStatus) => void;

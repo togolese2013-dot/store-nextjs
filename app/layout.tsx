@@ -8,6 +8,7 @@ import { getSettings } from "@/lib/admin-db";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import "@/components/interaction-layer/ui-core.css";
 
 const FALLBACK_NAME    = "Togolese Shop";
 const FALLBACK_TAGLINE = "Boutique Premium au Togo";

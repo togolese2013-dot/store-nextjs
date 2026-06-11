@@ -41,6 +41,7 @@ import LivraisonsPage from './LivraisonsPage';
 import PaiementsPage from './PaiementsPage';
 import ReglagesPage from './ReglagesPage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
+import { useUI } from '@/components/interaction-layer';
 import styles from './Store.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
@@ -98,6 +99,7 @@ export default function StoreShell({
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
 }: StoreShellProps) {
+  const ui = useUI();
   const [page, setPage] = useState<PageId>(defaultPage);
 
   const groups = useMemo(() =>
@@ -132,12 +134,12 @@ export default function StoreShell({
               <><span className={styles.sep}>/</span><span className={styles.here}>{PAGE_LABELS[page]}</span></>
             )}
           </div>
-          <div className={styles.search}>
+          <div className={styles.search} onClick={() => ui.openPalette()} style={{ cursor: 'pointer' }}>
             <SearchIcon size={14} />
             <input placeholder={SEARCH_PLACEHOLDERS[page]} />
             <span className={styles.kbd}>⌘K</span>
           </div>
-          <button type="button" className={styles.iconBtn} aria-label="Notifications">
+          <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={(e) => ui.notifications(e)}>
             <BellIcon size={16} />
             <span className={styles.pip} />
           </button>

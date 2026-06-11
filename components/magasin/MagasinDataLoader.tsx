@@ -5,12 +5,14 @@
  * Handles: section routing, product fetch/search/pagination, row actions.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { PageId } from './MagasinShell';
 import MagasinShell from './MagasinShell';
 import type { Product as MagasinProduct, KpiCard, TabSpec } from './types';
 import { SAMPLE_PRODUCTS, SAMPLE_KPIS, DEFAULT_TABS, ACCENT } from './sample-data';
+import { UIProvider, useUI } from '@/components/interaction-layer';
+import { createMagasinConfig, setMagasinData } from './magasin.config';
 
 /* ── Constants ── */
 const PAGE_SIZE = 20;
@@ -41,6 +43,7 @@ interface ApiProduct {
   categorie_nom?: string | null;
   marque_nom?: string | null;
   prix_unitaire: number;
+  stock_magasin?: number | null;
   stock_boutique?: number | null;
   actif?: number | boolean | null;
   image_url?: string | null;
@@ -63,7 +66,7 @@ interface StatsResponse {
 
 /* ── Mapping helpers ── */
 function mapProduct(p: ApiProduct, idx: number): MagasinProduct {
-  const stock    = Number(p.stock_boutique ?? 0);
+  const stock    = Number(p.stock_magasin ?? 0);
   const isActive = p.actif === 1 || p.actif === true;
 
   let status: MagasinProduct['status'];
@@ -197,57 +200,96 @@ export default function MagasinDataLoader({
     fetchProducts(searchQuery, p);
   }
 
-  /* ── Export ── */
+  /* ── Sync live data into interaction-layer config store ── */
+  useEffect(() => {
+    setMagasinData({ PRODUCTS: allProducts });
+  }, [allProducts]);
+
+  /* ── Build config (stable ref — onRefresh triggers re-fetch) ── */
+  const config = useMemo(() => createMagasinConfig({
+    onRefresh: () => fetchProducts(searchQuery, page),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []); // intentionally stable — fetchProducts/searchQuery/page accessed via closure at call time
+
+  return (
+    <UIProvider config={config} onNavigate={(pg) => {/* MagasinShell handles nav internally */}}>
+      <MagasinShellWithUI
+        defaultPage={defaultPage}
+        products={allProducts}
+        kpis={kpis}
+        tabs={tabs}
+        searchQuery={searchQuery}
+        onSearch={handleSearch}
+        onSwitchWorkspace={onSwitchWorkspace}
+        onCreateProduct={onCreateProduct}
+        totalCount={totalCount}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={handlePageChange}
+        userName={userName}
+        userRole={userRole}
+        shopName={shopName}
+        fetchProducts={fetchProducts}
+        currentSearchQuery={searchQuery}
+        currentPage={page}
+      />
+    </UIProvider>
+  );
+}
+
+/* ── Inner shell: consumes useUI() ── */
+interface ShellWithUIProps extends Props {
+  defaultPage: PageId;
+  products: MagasinProduct[];
+  kpis: KpiCard[];
+  tabs: TabSpec[];
+  searchQuery: string;
+  onSearch: (q: string) => void;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (p: number) => void;
+  fetchProducts: (q: string, p: number) => void;
+  currentSearchQuery: string;
+  currentPage: number;
+}
+
+function MagasinShellWithUI({
+  products, kpis, tabs, searchQuery, onSearch,
+  onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
+  userName, userRole, shopName, defaultPage,
+  fetchProducts, currentSearchQuery, currentPage,
+}: ShellWithUIProps) {
+  const ui = useUI();
+
   function handleExport() {
     const qs = new URLSearchParams();
-    if (searchQuery.trim()) qs.set('q', searchQuery.trim());
+    if (currentSearchQuery.trim()) qs.set('q', currentSearchQuery.trim());
     window.location.href = `/api/admin/products/export${qs.toString() ? `?${qs}` : ''}`;
-  }
-
-  /* ── Row actions ── */
-  function handleEdit(p: MagasinProduct) {
-    if (p.id) router.push(`/admin/magasin/${p.id}`);
-  }
-
-  async function handleDelete(p: MagasinProduct) {
-    if (!p.id) return;
-    try {
-      const r = await fetch(`/api/admin/products/${p.id}`, { method: 'DELETE' }).then(r => r.json());
-      if (r.ok) fetchProducts(searchQuery, page);
-    } catch { /* ignore */ }
-  }
-
-  async function handleArchive(p: MagasinProduct) {
-    if (!p.id) return;
-    const newActif = p.status === 'Archivé' ? 1 : 0;
-    try {
-      await fetch(`/api/admin/products/${p.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actif: newActif }),
-      });
-      fetchProducts(searchQuery, page);
-    } catch { /* ignore */ }
   }
 
   return (
     <MagasinShell
       defaultPage={defaultPage}
-      products={allProducts}
+      products={products}
       kpis={kpis}
       tabs={tabs}
       searchQuery={searchQuery}
-      onSearch={handleSearch}
+      onSearch={onSearch}
       onExport={handleExport}
       onSwitchWorkspace={onSwitchWorkspace}
-      onCreateProduct={onCreateProduct ?? (() => router.push('/admin/magasin/nouveau'))}
-      onEdit={handleEdit}
-      onDelete={handleDelete}
-      onArchive={handleArchive}
+      onCreateProduct={onCreateProduct ?? (() => ui.openForm('product'))}
+      onEdit={(p) => ui.openDetail('product', p)}
+      onDelete={(p) => ui.confirmDelete('le produit', p.name, {
+        onConfirm: () => ui.config.onDeleteRow?.('product', p),
+      })}
+      onArchive={(p) => ui.confirmArchive('le produit', p.name, {
+        onConfirm: () => ui.config.onArchiveRow?.('product', p),
+      })}
       totalCount={totalCount}
       page={page}
-      pageSize={PAGE_SIZE}
-      onPageChange={handlePageChange}
+      pageSize={pageSize}
+      onPageChange={onPageChange}
       userName={userName}
       userRole={userRole}
       shopName={shopName}

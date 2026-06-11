@@ -147,10 +147,10 @@ function ExpiryBanner({
     border = isDanger ? 'rgba(156,58,20,.25)' : 'rgba(201,96,30,.25)';
     textColor = isDanger ? '#7D2D0E' : '#7D3B0E';
     icon = isDanger ? '⏳' : '⏱';
-    ctaLabel = 'Choisir un plan';
+    ctaLabel = 'Activer Basic';
     text = d > 0
-      ? <><strong>Essai gratuit — {d} jour{d > 1 ? 's' : ''} restant{d > 1 ? 's' : ''}.</strong> Choisissez un plan avant expiration.</>
-      : <><strong>Essai terminé.</strong> Choisissez un plan pour continuer.</>;
+      ? <><strong>Essai {planLabel(plan)} — {d} jour{d > 1 ? 's' : ''} restant{d > 1 ? 's' : ''}.</strong> Activez votre abonnement {planLabel(plan)} ou passez au Pro / Business.</>
+      : <><strong>Essai terminé.</strong> Activez votre abonnement {planLabel(plan)} ou choisissez un plan supérieur.</>;
   } else {
     const d = days ?? 0;
     bg = '#FBE9D6'; border = 'rgba(201,96,30,.25)'; textColor = '#7D3B0E';
@@ -171,20 +171,39 @@ function ExpiryBanner({
       }}>
         <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
         <span style={{ flex: 1, lineHeight: 1.4 }}>{text}</span>
-        <a
-          href="/admin/billing"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '6px 12px', borderRadius: 8,
-            background: 'rgba(0,0,0,.08)', color: textColor,
-            fontSize: 12.5, fontWeight: 600, textDecoration: 'none',
-            flexShrink: 0, whiteSpace: 'nowrap',
-            border: `1px solid ${border}`,
-            transition: 'background .15s',
-          }}
-        >
-          {ctaLabel} →
-        </a>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <a
+            href="/admin/billing"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 8,
+              background: 'rgba(0,0,0,.08)', color: textColor,
+              fontSize: 12.5, fontWeight: 600, textDecoration: 'none',
+              whiteSpace: 'nowrap',
+              border: `1px solid ${border}`,
+              transition: 'background .15s',
+            }}
+          >
+            {ctaLabel} →
+          </a>
+          {isTrial && (
+            <a
+              href="/admin/billing#plans"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '6px 12px', borderRadius: 8,
+                background: 'transparent', color: textColor,
+                fontSize: 12.5, fontWeight: 500, textDecoration: 'none',
+                whiteSpace: 'nowrap',
+                border: `1px solid ${border}`,
+                transition: 'background .15s',
+                opacity: 0.75,
+              }}
+            >
+              Voir les plans
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

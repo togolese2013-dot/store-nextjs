@@ -30,6 +30,7 @@ import {
   DownloadIcon, UploadIcon, SparklesIcon, PlusIcon,
   FilterIcon, ChevDownIcon,
 } from './icons';
+import { useUI } from '@/components/interaction-layer';
 import styles from './Magasin.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
@@ -165,6 +166,7 @@ export default function MagasinShell({
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
 }: MagasinShellProps) {
+  const ui = useUI();
   const [activePage, setActivePage] = useState<PageId>(defaultPage);
 
   const navId = PAGE_TO_NAV[activePage];
@@ -205,7 +207,7 @@ export default function MagasinShell({
               </>
             )}
           </div>
-          <div className={styles.search}>
+          <div className={styles.search} onClick={() => ui.openPalette()} style={{ cursor: 'pointer' }}>
             <SearchIcon size={14} />
             <input
               placeholder={SEARCH_PLACEHOLDERS[activePage]}
@@ -214,7 +216,7 @@ export default function MagasinShell({
             />
             <span className={styles.kbd}>⌘K</span>
           </div>
-          <button type="button" className={styles.iconBtn} aria-label="Notifications">
+          <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={(e) => ui.notifications(e)}>
             <BellIcon size={16} />
             <span className={styles.pip} />
           </button>
@@ -268,6 +270,7 @@ function ProductsContent({
   onCreateProduct, onEdit, onDelete, onArchive,
   totalCount, page, pageSize, onPageChange, onExport,
 }: ProductsContentProps) {
+  const ui = useUI();
   const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? 'all');
   const [view, setView]           = useState<'table' | 'grid'>('table');
   const [selected, setSelected]   = useState<Set<string>>(new Set());
@@ -304,8 +307,8 @@ function ProductsContent({
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn} onClick={onExport}><DownloadIcon size={14} /> Exporter</button>
-          <button type="button" className={styles.btn}><UploadIcon size={14} /> Importer</button>
-          <button type="button" className={styles.btn}><SparklesIcon size={14} /> Suggestions IA</button>
+          <button type="button" className={styles.btn} onClick={() => ui.openImport('Produits')}><UploadIcon size={14} /> Importer</button>
+          <button type="button" className={styles.btn} onClick={() => ui.openAI()}><SparklesIcon size={14} /> Suggestions IA</button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onCreateProduct}>
             <PlusIcon size={14} /> Nouveau produit
           </button>

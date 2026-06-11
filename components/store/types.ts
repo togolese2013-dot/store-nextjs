@@ -5,6 +5,13 @@ import type { ComponentType } from 'react';
 
 export type OrderStatus = 'En attente' | 'Confirmée' | 'Expédiée' | 'Livrée' | 'Annulée';
 
+export interface OrderItem {
+  id: string;
+  nom: string;
+  qty: number;
+  prix: number;
+}
+
 export interface Order {
   ref: string;
   client: string;
@@ -17,6 +24,15 @@ export interface Order {
   amount: number;
   status: OrderStatus;
   zone: string;
+  items?: OrderItem[];
+  /** Applied coupon code */
+  couponCode?: string;
+  /** Discount amount in base currency */
+  couponRemise?: number;
+  /** Delivery fee */
+  fraisLivraison?: number;
+  telephone?: string;
+  adresse?: string;
 }
 
 export type CouponStatus = 'Actif' | 'Expiré' | 'Inactif';

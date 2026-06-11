@@ -2,7 +2,60 @@ import type { CSSProperties } from 'react';
 import type { Order, Coupon, DeliveryZone, Payment, KpiItem } from './types';
 
 /* ─── Orders ────────────────────────────────────── */
-export const SAMPLE_ORDERS: Order[] = [];
+export const SAMPLE_ORDERS: Order[] = [
+  {
+    ref: 'CMD-2026-001', client: 'Amara Diallo', init: 'AD', color: '#2D6A4F',
+    date: '11 juin 2026', products: 3, amount: 87500, status: 'En attente', zone: 'Lomé centre',
+    telephone: '+228 90 12 34 56', adresse: '12 Rue du Commerce, Lomé',
+    items: [
+      { id: 'p1', nom: 'Casque Bluetooth JBL', qty: 1, prix: 45000 },
+      { id: 'p2', nom: 'Chargeur USB-C 65W',   qty: 2, prix: 12500 },
+      { id: 'p3', nom: 'Câble HDMI 2m',         qty: 2, prix: 8750  },
+    ],
+    fraisLivraison: 500,
+  },
+  {
+    ref: 'CMD-2026-002', client: 'Kofi Mensah', init: 'KM', color: '#5C4A88',
+    date: '10 juin 2026', products: 1, amount: 125000, status: 'Confirmée', zone: 'Agoè',
+    telephone: '+228 91 23 45 67', adresse: 'Quartier Agoè-Nyivé',
+    items: [
+      { id: 'p4', nom: 'Téléviseur 43" Samsung', qty: 1, prix: 124500 },
+    ],
+    fraisLivraison: 500,
+  },
+  {
+    ref: 'CMD-2026-003', client: 'Fatou Traoré', init: 'FT', color: '#C9601E',
+    date: '9 juin 2026', products: 4, amount: 34200, status: 'Expédiée', zone: 'Bè',
+    telephone: '+228 92 34 56 78', adresse: 'Bè Kpota',
+    items: [
+      { id: 'p5', nom: 'Ventilateur de table',  qty: 1, prix: 14500 },
+      { id: 'p6', nom: 'Ampoule LED 12W (×10)', qty: 2, prix: 5500  },
+      { id: 'p7', nom: 'Multiprise 5 prises',   qty: 1, prix: 8700  },
+    ],
+    fraisLivraison: 0,
+    couponCode: 'PROMO10',
+    couponRemise: 2800,
+  },
+  {
+    ref: 'CMD-2026-004', client: 'Yves Agbodjan', init: 'YA', color: '#3B6A8F',
+    date: '8 juin 2026', products: 2, amount: 56000, status: 'Livrée', zone: 'Tokoin',
+    telephone: '+228 93 45 67 89', adresse: 'Tokoin Forever',
+    items: [
+      { id: 'p8', nom: 'Tondeuse Philips',  qty: 1, prix: 32000 },
+      { id: 'p9', nom: 'Brosse à dents élec.', qty: 2, prix: 12000 },
+    ],
+    fraisLivraison: 0,
+  },
+  {
+    ref: 'CMD-2026-005', client: 'Séna Kpodo', init: 'SK', color: '#A0522D',
+    date: '7 juin 2026', products: 1, amount: 0, status: 'Annulée', zone: 'Adidogomé',
+    telephone: '+228 94 56 78 90', adresse: 'Adidogomé Carrefour',
+    items: [
+      { id: 'p10', nom: 'Aspirateur sans fil', qty: 1, prix: 89000 },
+    ],
+    fraisLivraison: 500,
+  },
+];
 
 export const ORDER_STATUS_STYLE: Record<string, CSSProperties> = {
   'En attente': { background: 'var(--warn-bg)',          color: 'var(--warn)' },

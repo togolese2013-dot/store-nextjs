@@ -180,10 +180,10 @@ router.get("/api/admin/workspace-settings", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    // Ensure column exists
+    // Ensure column exists (MySQL 8 doesn't support IF NOT EXISTS on ALTER)
     await (db as mysql.Pool).execute(
-      `ALTER TABLE shops ADD COLUMN IF NOT EXISTS disabled_workspaces TEXT NULL`
-    ).catch(() => {});
+      `ALTER TABLE shops ADD COLUMN disabled_workspaces TEXT NULL`
+    ).catch(() => {}); // silently ignore ER_DUP_FIELDNAME
     const [[row]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
       `SELECT disabled_workspaces FROM shops WHERE id = ? LIMIT 1`,
       [session.shop_id ?? 1]

@@ -12248,7 +12248,7 @@ router45.get("/api/admin/workspace-settings", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
     await db.execute(
-      `ALTER TABLE shops ADD COLUMN IF NOT EXISTS disabled_workspaces TEXT NULL`
+      `ALTER TABLE shops ADD COLUMN disabled_workspaces TEXT NULL`
     ).catch(() => {
     });
     const [[row]] = await db.execute(
