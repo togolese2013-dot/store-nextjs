@@ -10,7 +10,7 @@ export default function TenantsPage() {
   const [tab, setTab] = useState<string>('all');
   const [menu, setMenu] = useState<string | null>(null);
   const selH = useSel();
-  const billable = useMemo(() => ui.tenants.filter((t) => t.id !== 1), [ui.tenants]);
+  const billable = useMemo(() => ui.tenants, [ui.tenants]);
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: billable.length };
     billable.forEach((t) => { c[t.status] = (c[t.status] || 0) + 1; });

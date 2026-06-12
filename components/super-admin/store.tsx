@@ -29,7 +29,7 @@ function statusFromDB(s: string): TenantStatus {
 
 function shopToTenant(s: Record<string, unknown>): Tenant {
   const name = String(s.nom ?? '');
-  const plan = PLAN_MAP[String(s.plan)] ?? 'Starter';
+  const plan = PLAN_MAP[String(s.plan)] ?? 'Basic';
   return {
     id: Number(s.id),
     name,
@@ -49,7 +49,7 @@ function paymentToInvoice(p: Record<string, unknown>): Invoice {
   return {
     id: `PAY-${p.id}`,
     tenant: String(p.shop_nom ?? ''),
-    plan: PLAN_MAP[String(p.plan)] ?? 'Starter',
+    plan: PLAN_MAP[String(p.plan)] ?? 'Basic',
     amount: Number(p.amount ?? 0),
     date: p.created_at ? new Date(String(p.created_at)).toLocaleDateString('fr-FR') : '—',
     method: String(p.operator ?? 'Mobile Money'),
