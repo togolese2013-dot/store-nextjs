@@ -1,0 +1,345 @@
+/* ============================================
+   subscription-page.module.css
+   Full-page subscription management
+   ============================================ */
+
+.page {
+  min-height: 100vh;
+  background: #FBF7F1;
+  font-family: "Geist", system-ui, -apple-system, sans-serif;
+  color: #14110E;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Top bar ── */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px;
+  height: 72px;
+  background: rgba(251,247,241,0.88);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  border-bottom: 1px solid #E8E1D4;
+}
+.topbarLeft { display: flex; align-items: center; gap: 16px; }
+.backBtn {
+  width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid #E8E1D4; background: white;
+  display: grid; place-items: center; cursor: pointer;
+  color: #6B635B;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.backBtn:hover { background: #14110E; color: white; border-color: #14110E; }
+.topbarEyebrow {
+  font-size: 11px; color: #8A8278; letter-spacing: 0.06em;
+  text-transform: uppercase; font-weight: 500;
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+.topbarTitle {
+  font-size: 20px; font-weight: 600; letter-spacing: -0.02em;
+  margin: 0; line-height: 1.2;
+}
+
+/* Toast */
+.toast {
+  display: flex; align-items: center; gap: 8px;
+  background: #14110E; color: white;
+  padding: 10px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 500;
+  box-shadow: 0 8px 24px -8px rgba(20,17,14,0.4);
+  animation: toastIn .25s ease;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Body layout ── */
+.body {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 28px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 40px 80px;
+}
+@media (max-width: 900px) {
+  .body { grid-template-columns: 1fr; }
+  .sidebar { order: -1; }
+}
+
+/* ── Current plan banner ── */
+.currentBanner {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #14110E; color: white;
+  border-radius: 20px; padding: 24px 28px;
+  gap: 20px; margin-bottom: 32px;
+}
+.bannerLeft { display: flex; align-items: center; gap: 16px; }
+.bannerIcon {
+  width: 48px; height: 48px; border-radius: 13px;
+  background: rgba(255,255,255,0.08);
+  display: grid; place-items: center; color: #F2A765;
+  flex-shrink: 0;
+}
+.bannerLabel {
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.45); font-weight: 500;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  margin-bottom: 4px;
+}
+.bannerPlan { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+.bannerPlan span { color: #F2A765; }
+.bannerMeta { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+
+.statusPill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 18px; border-radius: 99px;
+  background: rgba(45,138,95,0.2); color: #5DCFA0;
+  font-size: 13px; font-weight: 500; flex-shrink: 0;
+}
+.statusDot {
+  width: 8px; height: 8px; border-radius: 99px; background: #5DCFA0; position: relative;
+}
+.statusDot::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 99px;
+  background: #5DCFA0; opacity: 0.3;
+  animation: pulseDot 1.6s infinite;
+}
+@keyframes pulseDot {
+  0%, 100% { transform: scale(0.6); opacity: 0.5; }
+  50%       { transform: scale(1.6); opacity: 0; }
+}
+
+/* ── Section ── */
+.section { margin-bottom: 36px; }
+.sectionHead {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 20px; margin-bottom: 20px;
+}
+.sectionTitle {
+  font-size: 18px; font-weight: 600; letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+.sectionDesc { font-size: 13.5px; color: #6B635B; margin: 0; }
+
+/* Billing toggle */
+.billingToggle {
+  display: inline-flex; align-items: center;
+  background: white; border: 1px solid #E8E1D4;
+  border-radius: 99px; padding: 3px; gap: 2px; flex-shrink: 0;
+}
+.billingBtn {
+  padding: 6px 14px; border-radius: 99px; border: 0;
+  font-size: 13px; font-weight: 500;
+  background: transparent; color: #6B635B;
+  transition: all .15s ease; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit;
+}
+.billingBtnOn { background: #14110E; color: white; }
+.billingBadge {
+  font-size: 10px; padding: 1px 7px; border-radius: 99px;
+  background: #FBE9D6; color: #B8501A; font-weight: 600;
+}
+.billingBadgeOn { background: rgba(242,167,101,0.2); color: #F2A765; }
+
+/* Plan cards */
+.plansGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 720px) { .plansGrid { grid-template-columns: 1fr; } }
+
+.planCard {
+  background: white; border: 1.5px solid #E8E1D4;
+  border-radius: 18px; padding: 22px 20px;
+  cursor: pointer; position: relative;
+  transition: border-color .18s ease, transform .18s ease, box-shadow .2s ease;
+  display: flex; flex-direction: column;
+}
+.planCard:hover {
+  border-color: #B8501A;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -10px rgba(184,80,26,0.15);
+}
+.planCardCurrent {
+  background: #FBE9D6; border-color: #B8501A;
+}
+.planCardCurrent:hover { transform: none; }
+.planCardConfirming {
+  border-color: #14110E;
+  box-shadow: 0 0 0 3px rgba(20,17,14,0.08);
+}
+.planCurrentBadge {
+  position: absolute; top: 12px; right: 12px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #B8501A; background: rgba(184,80,26,0.12);
+  padding: 3px 9px; border-radius: 99px;
+}
+.planName { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 6px; }
+.planPrice {
+  font-size: 28px; font-weight: 500; letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.planPrice small { font-size: 12px; color: #6B635B; font-weight: 400; letter-spacing: 0; }
+.planAnnual { font-size: 11px; color: #B8501A; margin-top: 3px; font-weight: 500; }
+.planFeats {
+  list-style: none; padding: 0; margin: 16px 0 0;
+  display: flex; flex-direction: column; gap: 7px; flex: 1;
+}
+.planFeat {
+  font-size: 12.5px; color: #6B635B;
+  display: flex; align-items: center; gap: 7px;
+}
+.planFeat::before {
+  content: ""; flex-shrink: 0;
+  width: 4px; height: 4px; border-radius: 99px; background: #B8501A;
+}
+.planCta {
+  margin-top: 18px; padding: 9px 14px; border-radius: 10px;
+  font-size: 13px; font-weight: 500; text-align: center;
+  border: 1.5px solid #E8E1D4; background: white; color: #14110E;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.planCard:not(.planCardCurrent):hover .planCta {
+  background: #14110E; color: white; border-color: #14110E;
+}
+.planCtaActive {
+  background: #B8501A !important; color: white !important;
+  border-color: #B8501A !important; cursor: default;
+}
+.planCardCurrent .planCta {
+  background: #B8501A; color: white; border-color: #B8501A; cursor: default;
+}
+
+/* Confirmation block */
+.confirmBlock { margin-top: 18px; display: flex; flex-direction: column; gap: 7px; }
+.confirmLabel { font-size: 12px; color: #6B635B; text-align: center; }
+.confirmBtn {
+  width: 100%; padding: 9px; border-radius: 9px; border: 0;
+  background: #14110E; color: white; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.cancelBtn {
+  width: 100%; padding: 8px; border-radius: 9px;
+  border: 1px solid #E8E1D4; background: white; color: #6B635B;
+  font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+}
+
+/* Billing history table */
+.historyTable {
+  background: white; border: 1px solid #E8E1D4;
+  border-radius: 16px; overflow: hidden;
+}
+.historyHeader {
+  display: grid; grid-template-columns: 130px 1fr 140px 80px 140px;
+  padding: 12px 20px;
+  background: #FBF7F1; border-bottom: 1px solid #E8E1D4;
+  font-size: 11px; color: #8A8278; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+.historyRow {
+  display: grid; grid-template-columns: 130px 1fr 140px 80px 140px;
+  padding: 14px 20px; align-items: center;
+  border-bottom: 1px solid #F0EBE0;
+}
+.historyRow:last-child { border-bottom: 0; }
+.historyDate {
+  font-size: 12.5px; color: #6B635B;
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+.historyPlan { font-size: 13.5px; font-weight: 500; }
+.historyAmount {
+  font-size: 13px; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+.historyStatus {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  padding: 3px 10px; border-radius: 99px;
+  background: #E4ECE6; color: #2D6A4F;
+  display: inline-flex; width: fit-content;
+}
+.downloadBtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 8px;
+  border: 1px solid #E8E1D4; background: white; color: #6B635B;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: all .18s ease; font-family: inherit;
+  justify-self: end;
+}
+.downloadBtn:hover { border-color: #B8501A; color: #B8501A; }
+.downloadBtnDone { background: #14110E; color: white; border-color: #14110E; }
+.downloadBtnDone:hover { border-color: #14110E; color: white; }
+
+/* ── Sidebar ── */
+.sidebar { display: flex; flex-direction: column; gap: 16px; }
+.sideCard {
+  background: white; border: 1px solid #E8E1D4;
+  border-radius: 16px; padding: 22px;
+}
+.sideCardTitle {
+  font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+  margin-bottom: 16px;
+}
+
+/* Payment */
+.payRow {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.payIcon {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.payInfo { flex: 1; min-width: 0; }
+.payName { font-size: 14px; font-weight: 500; }
+.payDetail { font-size: 12px; color: #6B635B; margin-top: 1px; }
+.payDefault {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 99px;
+  background: #E4ECE6; color: #2D6A4F;
+}
+.editPayBtn {
+  width: 100%; padding: 9px; border-radius: 10px;
+  border: 1px solid #E8E1D4; background: #FBF7F1; color: #14110E;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+  font-family: inherit;
+}
+.editPayBtn:hover { background: #14110E; color: white; border-color: #14110E; }
+.payList { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.payOption {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 11px;
+  border: 1px solid #E8E1D4; background: white;
+  cursor: pointer; font-family: inherit; width: 100%;
+  transition: border-color .15s ease;
+}
+.payOption:hover { border-color: #B8501A; }
+.payOptionIcon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: grid; place-items: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+
+/* Summary */
+.summaryRow {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid #F0EBE0;
+  font-size: 13.5px; color: #6B635B;
+}
+.summaryRow:last-child { border-bottom: 0; }
+.summaryTotal { font-weight: 600; color: #14110E; }
+.summaryVal { font-weight: 500; color: #14110E; text-align: right; }
+
+/* Cancel */
+.cancelLink {
+  font-size: 12.5px; color: #8A8278;
+  background: none; border: 0; cursor: pointer;
+  text-align: center; padding: 8px;
+  text-decoration: underline; text-decoration-color: transparent;
+  transition: color .15s ease, text-decoration-color .15s ease;
+  font-family: inherit;
+}
+.cancelLink:hover { color: #C84B3A; text-decoration-color: #C84B3A; }
