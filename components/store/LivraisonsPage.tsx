@@ -3,6 +3,7 @@
  * Mount via StoreShell (page id: 'livraisons') or standalone.
  */
 import React from 'react';
+import { useUI } from '@/components/interaction-layer';
 import type { DeliveryZone } from './types';
 import { SAMPLE_ZONES, LIVRAISONS_KPIS } from './sample-data';
 import Sparkline from './Sparkline';
@@ -14,6 +15,7 @@ export interface LivraisonsPageProps {
 }
 
 export default function LivraisonsPage({ zones = SAMPLE_ZONES }: LivraisonsPageProps) {
+  const ui = useUI();
   const zonesActives = zones.filter(z => z.active).length;
   return (
     <>
@@ -24,8 +26,8 @@ export default function LivraisonsPage({ zones = SAMPLE_ZONES }: LivraisonsPageP
           <p className={styles.subtitle}>{zones.length} zone{zones.length !== 1 ? 's' : ''} configurée{zones.length !== 1 ? 's' : ''} · {zonesActives} active{zonesActives !== 1 ? 's' : ''}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Livraisons')}><DownloadIcon size={14} /> Exporter</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('zone')}>
             <PlusIcon size={14} /> Nouvelle zone
           </button>
         </div>
@@ -69,7 +71,9 @@ export default function LivraisonsPage({ zones = SAMPLE_ZONES }: LivraisonsPageP
                   >
                     {z.active ? 'Active' : 'Inactive'}
                   </span>
-                  <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                  <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [
+                      { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('la zone', z.name) },
+                    ], 'right'); }}><MoreIcon size={16} /></button>
                 </div>
               </div>
               <div className={styles.zoneCoverage}>

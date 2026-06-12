@@ -3,6 +3,7 @@
  * Mount via StoreShell (page id: 'overview') or standalone.
  */
 import React from 'react';
+import { useUI } from '@/components/interaction-layer';
 import type { Order } from './types';
 import {
   SAMPLE_ORDERS,
@@ -22,6 +23,7 @@ const ACTIVITY: { label: string; time: string; dot: string }[] = [];
 const PAY_METHODS: { name: string; color: string; pct: number; amount: number }[] = [];
 
 export default function OverviewPage({ orders = SAMPLE_ORDERS, onCreateOrder }: OverviewPageProps) {
+  const ui = useUI();
   const totalCA = orders.reduce((s, o) => s + o.amount, 0);
   return (
     <>
@@ -32,8 +34,8 @@ export default function OverviewPage({ orders = SAMPLE_ORDERS, onCreateOrder }: 
           <p className={styles.subtitle}>E-commerce · {orders.length} commande{orders.length !== 1 ? 's' : ''} · {totalCA.toLocaleString('fr-FR')} F de CA</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Rapport</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onCreateOrder}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Commandes')}><DownloadIcon size={14} /> Rapport</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('order')}>
             <PlusIcon size={14} /> Nouvelle commande
           </button>
         </div>

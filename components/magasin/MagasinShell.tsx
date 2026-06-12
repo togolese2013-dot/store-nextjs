@@ -119,7 +119,6 @@ export interface MagasinShellProps {
   onSwitchWorkspace?: () => void;
   onCreateProduct?:   () => void;
 
-  onEdit?:    (p: Product) => void;
   onDelete?:  (p: Product) => void;
   onArchive?: (p: Product) => void;
 
@@ -154,7 +153,6 @@ export default function MagasinShell({
   onSearch,
   onSwitchWorkspace,
   onCreateProduct,
-  onEdit,
   onDelete,
   onArchive,
   totalCount,
@@ -230,7 +228,7 @@ export default function MagasinShell({
           <ProductsContent
             products={products} kpis={kpis} tabs={tabs}
             onCreateProduct={onCreateProduct}
-            onEdit={onEdit} onDelete={onDelete} onArchive={onArchive}
+            onDelete={onDelete} onArchive={onArchive}
             totalCount={totalCount} page={page} pageSize={pageSize}
             onPageChange={onPageChange} onExport={onExport}
           />
@@ -255,7 +253,6 @@ interface ProductsContentProps {
   kpis:           KpiCard[];
   tabs:           TabSpec[];
   onCreateProduct?: () => void;
-  onEdit?:        (p: Product) => void;
   onDelete?:      (p: Product) => void;
   onArchive?:     (p: Product) => void;
   totalCount?:    number;

@@ -27,7 +27,6 @@ export interface MagasinPageProps {
   onExport?: () => void;
   onCreateProduct?: () => void;
   onSwitchWorkspace?: () => void;
-  onEdit?: (p: Product) => void;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
   totalCount?: number;
@@ -50,7 +49,6 @@ export default function MagasinPage({
   onExport,
   onCreateProduct,
   onSwitchWorkspace,
-  onEdit,
   onDelete,
   onArchive,
   totalCount,

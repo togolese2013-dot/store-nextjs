@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import type { ComponentType } from 'react';
+import { useUI } from '@/components/interaction-layer';
 import type { Payment } from './types';
 import {
   SAMPLE_PAYMENTS, PAIEMENTS_KPIS,
@@ -30,6 +31,7 @@ export interface PaiementsPageProps {
 }
 
 export default function PaiementsPage({ payments = SAMPLE_PAYMENTS }: PaiementsPageProps) {
+  const ui = useUI();
   const totalCA = payments.reduce((s, p) => s + p.amount, 0);
 
   const methodTotals = payments.reduce<Record<string, number>>((acc, p) => {
@@ -57,7 +59,7 @@ export default function PaiementsPage({ payments = SAMPLE_PAYMENTS }: PaiementsP
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Paiements')}><DownloadIcon size={14} /> Exporter</button>
           <button type="button" className={styles.btn}><FilterIcon size={14} /> Filtres</button>
         </div>
       </div>

@@ -2,17 +2,17 @@
  * Products table — selectable rows, status pills, stock bars, row actions.
  */
 'use client';
-import React, { useRef, useEffect, useState } from 'react';
+import React from 'react';
 import type { Product } from './types';
 import { MoreIcon, ChevDownIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 interface ProductTableProps {
   products: Product[];
   selected: Set<string>;
   onToggle: (sku: string) => void;
   onToggleAll: () => void;
-  onEdit?: (p: Product) => void;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
   totalCount?: number;
@@ -39,102 +39,37 @@ function stockColor(pct: number): string {
   return '#2D6A4F';
 }
 
-/* ── Row menu ── */
-function RowMenu({ product, onEdit, onDelete, onArchive }: {
+/* ── Row menu (interaction-layer) ── */
+function RowMenuUI({ product, onDelete, onArchive }: {
   product: Product;
-  onEdit?: (p: Product) => void;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function close(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  const isArchived = product.status === 'Archivé';
-
+  const ui = useUI();
   return (
-    <div className={styles.menuWrap} ref={ref}>
-      <button
-        type="button"
-        className={styles.rowMenu}
-        onClick={() => setOpen(v => !v)}
-        aria-label="Actions"
-      >
-        <MoreIcon size={16} />
-      </button>
-      {open && (
-        <div className={styles.dropdown} onClick={() => setOpen(false)}>
-          {onEdit && (
-            <button
-              type="button"
-              className={styles.dropdownItem}
-              onClick={() => onEdit(product)}
-            >
-              <EditIcon /> Modifier
-            </button>
-          )}
-          {onArchive && (
-            <button
-              type="button"
-              className={styles.dropdownItem}
-              onClick={() => onArchive(product)}
-            >
-              <ArchiveIcon /> {isArchived ? 'Réactiver' : 'Archiver'}
-            </button>
-          )}
-          {(onEdit || onArchive) && onDelete && (
-            <div className={styles.dropdownSep} />
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              className={`${styles.dropdownItem} ${styles.danger}`}
-              onClick={() => onDelete(product)}
-            >
-              <TrashIcon /> Supprimer
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Confirm delete overlay ── */
-function ConfirmDelete({ product, onConfirm, onCancel }: {
-  product: Product;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.confirmCard} onClick={e => e.stopPropagation()}>
-        <h3>Supprimer ce produit ?</h3>
-        <p>
-          <strong>{product.name}</strong> ({product.sku}) sera définitivement supprimé.
-          Cette action est irréversible.
-        </p>
-        <div className={styles.confirmActions}>
-          <button type="button" className={styles.btn} onClick={onCancel}>Annuler</button>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.primary}`}
-            style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
-            onClick={onConfirm}
-          >
-            Supprimer
-          </button>
-        </div>
-      </div>
-    </div>
+    <button
+      type="button"
+      className={styles.rowMenu}
+      aria-label="Actions"
+      onClick={(e) => {
+        e.stopPropagation();
+        ui.menu(e, [
+          { label: 'Voir les détails', icon: 'eye',     onClick: () => ui.openDetail('product', product) },
+          { label: 'Modifier',         icon: 'edit',    onClick: () => ui.openForm('product', 'edit', product) },
+          { sep: true },
+          { label: product.status === 'Archivé' ? 'Réactiver' : 'Archiver', icon: 'archive',
+            onClick: () => ui.confirmArchive('le produit', product.name, {
+              onConfirm: () => onArchive?.(product),
+            }) },
+          { label: 'Supprimer', icon: 'trash', danger: true,
+            onClick: () => ui.confirmDelete('le produit', product.name, {
+              onConfirm: () => onDelete?.(product),
+            }) },
+        ], 'right');
+      }}
+    >
+      <MoreIcon size={16} />
+    </button>
   );
 }
 
@@ -183,7 +118,6 @@ export default function ProductTable({
   selected,
   onToggle,
   onToggleAll,
-  onEdit,
   onDelete,
   onArchive,
   totalCount,
@@ -196,25 +130,8 @@ export default function ProductTable({
   const realTotal = totalCount ?? products.length;
   const totalPages = Math.ceil(realTotal / pageSize);
 
-  const [pendingDelete, setPendingDelete] = useState<Product | null>(null);
-
-  function handleDeleteRequest(p: Product) {
-    setPendingDelete(p);
-  }
-  function handleDeleteConfirm() {
-    if (pendingDelete) { onDelete?.(pendingDelete); setPendingDelete(null); }
-  }
-
   return (
     <>
-      {pendingDelete && (
-        <ConfirmDelete
-          product={pendingDelete}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setPendingDelete(null)}
-        />
-      )}
-
       <div className={styles.tableWrap}>
         <div className={styles.tableScroll}>
           <table className={styles.table}>
@@ -293,12 +210,7 @@ export default function ProductTable({
                     <td className={styles.priceCell}>{formatPrice(p.price)}</td>
                     <td className={styles.marginCell}>{p.margin > 0 ? `${p.margin}%` : '—'}</td>
                     <td className={styles.actionsCell}>
-                      <RowMenu
-                        product={p}
-                        onEdit={onEdit}
-                        onDelete={onDelete ? handleDeleteRequest : undefined}
-                        onArchive={onArchive}
-                      />
+                      <RowMenuUI product={p} onDelete={onDelete} onArchive={onArchive} />
                     </td>
                   </tr>
                 );
@@ -337,32 +249,3 @@ function CheckMark() {
   );
 }
 
-function EditIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>
-    </svg>
-  );
-}
-
-function ArchiveIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="4" width="20" height="5" rx="2"/>
-      <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/>
-      <path d="M10 13h4"/>
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-    </svg>
-  );
-}

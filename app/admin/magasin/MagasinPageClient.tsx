@@ -16,7 +16,6 @@ export default function MagasinPageClient({ shopName, userName, userRole }: Prop
       userName={userName}
       userRole={userRole}
       onSwitchWorkspace={() => router.push('/admin')}
-      onCreateProduct={() => router.push('/admin/magasin/nouveau')}
     />
   );
 }

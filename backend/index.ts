@@ -87,6 +87,8 @@ const allowedOrigins = new Set(
     "https://togolese.tg",
     "https://www.togolese.tg",
     "https://store.togolese.fr",
+    "https://afrisika.com",
+    "https://www.afrisika.com",
     "http://localhost:3000",
     "http://localhost:3003",
   ]

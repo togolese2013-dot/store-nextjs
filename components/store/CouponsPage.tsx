@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import type { CSSProperties } from 'react';
+import { useUI } from '@/components/interaction-layer';
 import type { Coupon } from './types';
 import { SAMPLE_COUPONS, COUPONS_KPIS } from './sample-data';
 import Sparkline from './Sparkline';
@@ -21,6 +22,7 @@ export interface CouponsPageProps {
 }
 
 export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPageProps) {
+  const ui = useUI();
   const actifs = coupons.filter(c => c.status === 'Actif').length;
   return (
     <>
@@ -31,8 +33,8 @@ export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPagePro
           <p className={styles.subtitle}>{coupons.length} code{coupons.length !== 1 ? 's' : ''} configuré{coupons.length !== 1 ? 's' : ''} · {actifs} actif{actifs !== 1 ? 's' : ''}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Coupons')}><DownloadIcon size={14} /> Exporter</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('coupon')}>
             <PlusIcon size={14} /> Nouveau coupon
           </button>
         </div>
@@ -98,7 +100,11 @@ export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPagePro
                   <td style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{c.expiry}</td>
                   <td><span className={styles.tag} style={COUPON_STATUS_STYLE[c.status]}>{c.status}</span></td>
                   <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                    <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [
+                      { label: 'Copier le code', icon: 'copy', onClick: () => ui.toast('Code copié') },
+                      { sep: true },
+                      { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le coupon', c.code) },
+                    ], 'right'); }}><MoreIcon size={16} /></button>
                   </td>
                 </tr>
               ))}
