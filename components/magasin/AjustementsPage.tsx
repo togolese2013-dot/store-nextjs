@@ -2,12 +2,14 @@
  * AjustementsPage — stock adjustment log
  * Route: page id 'ajustements' in MagasinShell
  */
+'use client';
 import React from 'react';
 import type { StockAdjustment } from './types';
 import { SAMPLE_ADJUSTMENTS } from './sample-data';
 import Sparkline from './Sparkline';
 import { PlusIcon, MoreIcon, TrendIcon, HistoryIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
@@ -16,6 +18,7 @@ export interface AjustementsPageProps {
 }
 
 export default function AjustementsPage({ adjustments = SAMPLE_ADJUSTMENTS }: AjustementsPageProps) {
+  const ui = useUI();
   const added   = adjustments.filter(a => a.delta > 0).reduce((s, a) => s + a.delta, 0);
   const removed = Math.abs(adjustments.filter(a => a.delta < 0).reduce((s, a) => s + a.delta, 0));
   const reasons = new Set(adjustments.map(a => a.reason)).size;
@@ -41,10 +44,10 @@ export default function AjustementsPage({ adjustments = SAMPLE_ADJUSTMENTS }: Aj
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}>
+          <button type="button" className={styles.btn} onClick={() => ui.openHistory('Ajustements')}>
             <HistoryIcon size={14} /> Historique complet
           </button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('adjustment')}>
             <PlusIcon size={14} /> Nouvel ajustement
           </button>
         </div>
@@ -114,7 +117,7 @@ export default function AjustementsPage({ adjustments = SAMPLE_ADJUSTMENTS }: Aj
                   <td style={{ color: 'var(--muted)', fontSize: 13 }}>{a.reason}</td>
                   <td style={{ fontSize: 13 }}>{a.author}</td>
                   <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                    <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Détails', icon: 'eye', onClick: () => ui.openDetail('adjustment', a) }], 'right'); }}><MoreIcon size={16} /></button>
                   </td>
                 </tr>
               ))}

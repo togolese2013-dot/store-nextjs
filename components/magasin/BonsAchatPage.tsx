@@ -2,12 +2,14 @@
  * BonsAchatPage — purchase order management
  * Route: page id 'bons-achat' in MagasinShell
  */
+'use client';
 import React from 'react';
 import type { PurchaseOrder, PurchaseOrderStatus } from './types';
 import { SAMPLE_PURCHASE_ORDERS } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
@@ -24,6 +26,7 @@ export interface BonsAchatPageProps {
 }
 
 export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsAchatPageProps) {
+  const ui = useUI();
   const enCours    = orders.filter(o => o.status !== 'Reçu' && o.status !== 'Annulé').length;
   const enAttente  = orders.filter(o => o.status === 'En attente').length;
   const recus      = orders.filter(o => o.status === 'Reçu').length;
@@ -50,8 +53,8 @@ export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsA
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Bons d\'achat')}><DownloadIcon size={14} /> Exporter</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('po')}>
             <PlusIcon size={14} /> Nouveau bon d&apos;achat
           </button>
         </div>
@@ -112,7 +115,7 @@ export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsA
                     <span className={styles.tag} style={STATUS_STYLE[o.status]}>{o.status}</span>
                   </td>
                   <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                    <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('po', 'edit', o) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le bon d\'achat', o.ref) }], 'right'); }}><MoreIcon size={16} /></button>
                   </td>
                 </tr>
               ))}

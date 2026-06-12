@@ -2,12 +2,14 @@
  * EntrepotsPage — warehouse management
  * Route: page id 'entrepots' in MagasinShell
  */
+'use client';
 import React from 'react';
 import type { Warehouse } from './types';
 import { SAMPLE_WAREHOUSES } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon, MapPinIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
@@ -22,6 +24,7 @@ export interface EntrepotsPageProps {
 }
 
 export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: EntrepotsPageProps) {
+  const ui = useUI();
   const totalCap      = warehouses.reduce((s, w) => s + w.capacity, 0);
   const totalOccupied = warehouses.reduce((s, w) => s + w.occupied, 0);
   const totalProducts = warehouses.reduce((s, w) => s + w.products, 0);
@@ -48,8 +51,8 @@ export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: Entrep
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Rapport capacité</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Capacité entrepôts')}><DownloadIcon size={14} /> Rapport capacité</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('warehouse')}>
             <PlusIcon size={14} /> Nouvel entrepôt
           </button>
         </div>
@@ -88,7 +91,7 @@ export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: Entrep
               <div className={styles.catCardBody}>
                 <div className={styles.catCardTop}>
                   <div className={styles.catCardName}>{w.name}</div>
-                  <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                  <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('warehouse', 'edit', w) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('l\'entrepôt', w.name) }], 'right'); }}><MoreIcon size={16} /></button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--muted)' }}>
                   <MapPinIcon size={12} />{w.location}

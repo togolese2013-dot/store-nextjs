@@ -2,12 +2,14 @@
  * VariantesPage — variant group management
  * Route: page id 'variantes' in MagasinShell
  */
+'use client';
 import React from 'react';
 import type { Variant } from './types';
 import { SAMPLE_VARIANTS } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
@@ -16,6 +18,7 @@ export interface VariantesPageProps {
 }
 
 export default function VariantesPage({ variants = SAMPLE_VARIANTS }: VariantesPageProps) {
+  const ui = useUI();
   const totalCombinations = variants.reduce((s, v) => s + v.values.length, 0);
   const totalProducts     = variants.reduce((s, v) => s + v.products, 0);
   const mainGroup         = [...variants].sort((a, b) => b.products - a.products)[0];
@@ -41,8 +44,8 @@ export default function VariantesPage({ variants = SAMPLE_VARIANTS }: VariantesP
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Variantes')}><DownloadIcon size={14} /> Exporter</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('variant')}>
             <PlusIcon size={14} /> Nouveau groupe
           </button>
         </div>
@@ -116,7 +119,7 @@ export default function VariantesPage({ variants = SAMPLE_VARIANTS }: VariantesP
                     </span>
                   </td>
                   <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                    <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('variant', 'edit', v) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le groupe', v.name) }], 'right'); }}><MoreIcon size={16} /></button>
                   </td>
                 </tr>
               ))}

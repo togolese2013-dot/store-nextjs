@@ -5,6 +5,7 @@ import { SAMPLE_CATEGORIES } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, FolderIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 interface KpiDef {
   label: string;
@@ -24,6 +25,7 @@ export interface CategoriesPageProps {
 }
 
 export default function CategoriesPage({ categories = SAMPLE_CATEGORIES }: CategoriesPageProps) {
+  const ui = useUI();
   const totalProducts = categories.reduce((s, c) => s + c.products, 0);
   const mainCat       = [...categories].sort((a, b) => b.products - a.products)[0];
 
@@ -46,10 +48,10 @@ export default function CategoriesPage({ categories = SAMPLE_CATEGORIES }: Categ
           </p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Catégories')}>
             <DownloadIcon size={14} /> Exporter
           </button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('category')}>
             <PlusIcon size={14} /> Nouvelle catégorie
           </button>
         </div>
@@ -111,7 +113,7 @@ export default function CategoriesPage({ categories = SAMPLE_CATEGORIES }: Categ
                   <FolderIcon size={12} />
                   {cat.subcats} sous-catégorie{cat.subcats > 1 ? 's' : ''}
                 </div>
-                <button type="button" className={styles.rowMenu}>
+                <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('category', 'edit', cat) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('la catégorie', cat.name) }], 'right'); }}>
                   <MoreIcon size={16} />
                 </button>
               </div>

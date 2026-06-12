@@ -5,6 +5,7 @@ import { SAMPLE_BRANDS } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon, GlobeIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 interface KpiDef {
   label: string;
@@ -24,6 +25,7 @@ export interface BrandsPageProps {
 }
 
 export default function BrandsPage({ brands = SAMPLE_BRANDS }: BrandsPageProps) {
+  const ui = useUI();
   const actives  = brands.filter(b => b.status === 'Actif').length;
   const mainBrand = [...brands].sort((a, b) => b.products - a.products)[0];
   const avgMargin = brands.length > 0
@@ -49,10 +51,10 @@ export default function BrandsPage({ brands = SAMPLE_BRANDS }: BrandsPageProps) 
           </p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Marques')}>
             <DownloadIcon size={14} /> Exporter
           </button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('brand')}>
             <PlusIcon size={14} /> Nouvelle marque
           </button>
         </div>
@@ -132,7 +134,7 @@ export default function BrandsPage({ brands = SAMPLE_BRANDS }: BrandsPageProps) 
                       </span>
                     </td>
                     <td className={styles.actionsCell}>
-                      <button type="button" className={styles.rowMenu}>
+                      <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('brand', 'edit', b) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('la marque', b.name) }], 'right'); }}>
                         <MoreIcon size={16} />
                       </button>
                     </td>

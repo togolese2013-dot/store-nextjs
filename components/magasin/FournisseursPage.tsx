@@ -2,12 +2,14 @@
  * FournisseursPage — supplier management
  * Route: page id 'fournisseurs' in MagasinShell
  */
+'use client';
 import React from 'react';
 import type { Supplier } from './types';
 import { SAMPLE_SUPPLIERS } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
@@ -16,6 +18,7 @@ export interface FournisseursPageProps {
 }
 
 export default function FournisseursPage({ suppliers = SAMPLE_SUPPLIERS }: FournisseursPageProps) {
+  const ui = useUI();
   const actifs      = suppliers.filter(s => s.status === 'Actif').length;
   const totalCA     = suppliers.reduce((s, sup) => s + sup.total, 0);
   const countries   = new Set(suppliers.map(s => s.country)).size;
@@ -45,8 +48,8 @@ export default function FournisseursPage({ suppliers = SAMPLE_SUPPLIERS }: Fourn
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Fournisseurs')}><DownloadIcon size={14} /> Exporter</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('supplier')}>
             <PlusIcon size={14} /> Nouveau fournisseur
           </button>
         </div>
@@ -118,7 +121,7 @@ export default function FournisseursPage({ suppliers = SAMPLE_SUPPLIERS }: Fourn
                       </span>
                     </td>
                     <td className={styles.actionsCell}>
-                      <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                      <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('supplier', 'edit', s) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le fournisseur', s.name) }], 'right'); }}><MoreIcon size={16} /></button>
                     </td>
                   </tr>
                 );

@@ -12,6 +12,7 @@ import { SAMPLE_ALERTS } from './sample-data';
 import Sparkline from './Sparkline';
 import { PlusIcon, CogIcon, MoreIcon, TrendIcon } from './icons';
 import styles from './Magasin.module.css';
+import { useUI } from '@/components/interaction-layer';
 
 type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
@@ -30,6 +31,7 @@ export default function AlertesPage({
   alerts: initialAlerts = SAMPLE_ALERTS,
   onToggle,
 }: AlertesPageProps) {
+  const ui = useUI();
   const [alerts, setAlerts] = useState<StockAlert[]>(initialAlerts);
 
   const activeCount    = alerts.filter(a => a.active).length;
@@ -63,8 +65,8 @@ export default function AlertesPage({
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><CogIcon size={14} /> Paramètres</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => ui.toast('Paramètres globaux des alertes')}><CogIcon size={14} /> Paramètres</button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('alert')}>
             <PlusIcon size={14} /> Nouvelle alerte
           </button>
         </div>
@@ -156,7 +158,7 @@ export default function AlertesPage({
                     </div>
                   </td>
                   <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu}><MoreIcon size={16} /></button>
+                    <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('alert', 'edit', alert) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('l\'alerte', alert.name) }], 'right'); }}><MoreIcon size={16} /></button>
                   </td>
                 </tr>
               ))}
