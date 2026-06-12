@@ -264,7 +264,7 @@ interface ProductsContentProps {
 
 function ProductsContent({
   products, kpis, tabs,
-  onCreateProduct, onEdit, onDelete, onArchive,
+  onCreateProduct, onDelete, onArchive,
   totalCount, page, pageSize, onPageChange, onExport,
 }: ProductsContentProps) {
   const ui = useUI();
@@ -344,7 +344,6 @@ function ProductsContent({
         selected={selected}
         onToggle={toggle}
         onToggleAll={toggleAll}
-        onEdit={onEdit}
         onDelete={onDelete}
         onArchive={onArchive}
         totalCount={totalCount}
