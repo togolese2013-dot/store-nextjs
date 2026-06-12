@@ -25,6 +25,7 @@ import {
   ArrowRightIcon, SearchIcon,
 } from './icons';
 import styles from './WorkspaceSelector.module.css';
+import { SubscriptionCard, SubscriptionModal } from '@/components/subscription';
 
 /* ─── Default workspaces ─────────────────────────────────────────── */
 export const DEFAULT_WORKSPACES: WorkspaceWithIcon[] = [
@@ -209,149 +210,6 @@ function ExpiryBanner({
   );
 }
 
-/* ─── Subscription card (grid) ───────────────────────────────────── */
-function SubscriptionCard({
-  plan, status, trialEndsAt, periodEnd,
-}: {
-  plan: string; status: string;
-  trialEndsAt?: string | null; periodEnd?: string | null;
-}) {
-  const isTrial   = status === 'trial';
-  const isExpired = status === 'expired' || status === 'suspended';
-  const days      = isTrial ? daysUntil(trialEndsAt) : daysUntil(periodEnd);
-  const isWarn    = !isExpired && days !== null && days <= 14;
-  const colors    = planColors(plan);
-
-  let accentText: string;
-  let accentBg: string;
-  let statusLine: React.ReactNode;
-
-  if (isExpired) {
-    accentText = '#9C3A14'; accentBg = '#F7DCCB';
-    statusLine = <span style={{ color: '#9C3A14', fontWeight: 600 }}>Expiré — accès restreint</span>;
-  } else if (isTrial) {
-    accentText = '#C9601E'; accentBg = '#FBE9D6';
-    const d = days ?? 0;
-    statusLine = trialEndsAt == null ? (
-      <span style={{ color: '#6B635B' }}>Essai en cours</span>
-    ) : (
-      <span>
-        <span style={{ color: d <= 7 ? '#9C3A14' : '#C9601E', fontWeight: 600 }}>
-          {d > 0 ? `${d} jour${d > 1 ? 's' : ''} d'essai restant${d > 1 ? 's' : ''}` : "Essai terminé"}
-        </span>
-        {d > 0 && (
-          <span style={{ color: '#8A8278', fontSize: 12, display: 'block', marginTop: 2 }}>
-            Jusqu'au {fmtDate(trialEndsAt)}
-          </span>
-        )}
-      </span>
-    );
-  } else if (isWarn && periodEnd) {
-    accentText = '#C9601E'; accentBg = '#FBE9D6';
-    statusLine = (
-      <span>
-        <span style={{ color: '#C9601E', fontWeight: 600 }}>Expire dans {days} jour{(days ?? 0) > 1 ? 's' : ''}</span>
-        <span style={{ color: '#8A8278', fontSize: 12, display: 'block', marginTop: 2 }}>
-          Le {fmtDate(periodEnd)}
-        </span>
-      </span>
-    );
-  } else {
-    accentText = colors.text; accentBg = colors.bg;
-    statusLine = periodEnd ? (
-      <span style={{ color: '#6B635B' }}>Expire le {fmtDate(periodEnd)}</span>
-    ) : (
-      <span style={{ color: '#6B635B' }}>Actif</span>
-    );
-  }
-
-  const ctaLabel = isExpired ? 'Renouveler' : isTrial ? 'Choisir un plan' : isWarn ? 'Renouveler' : 'Gérer';
-
-  return (
-    <a
-      href="/admin/billing"
-      style={{
-        position: 'relative',
-        background: 'white',
-        border: `1px solid ${isExpired || isWarn ? 'rgba(201,96,30,.35)' : '#E8E1D4'}`,
-        borderRadius: 18,
-        padding: '22px 22px 18px',
-        display: 'flex', flexDirection: 'column',
-        minHeight: 220,
-        textDecoration: 'none', color: 'inherit',
-        transition: 'transform .18s ease, border-color .18s ease, box-shadow .25s ease',
-      }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-2px)';
-        (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 18px 40px -22px rgba(20,17,14,0.25)';
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLAnchorElement).style.transform = '';
-        (e.currentTarget as HTMLAnchorElement).style.boxShadow = '';
-      }}
-    >
-      {/* Top row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: 12,
-          background: accentBg, color: accentText,
-          display: 'grid', placeItems: 'center',
-        }}>
-          {/* Credit card icon */}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-            <line x1="1" y1="10" x2="23" y2="10"/>
-          </svg>
-        </div>
-        <span style={{
-          fontFamily: '"Geist Mono", monospace',
-          fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase',
-          color: '#6B635B', fontWeight: 500,
-          padding: '4px 9px', border: '1px solid #E8E1D4',
-          background: '#FBF7F1', borderRadius: 999,
-        }}>
-          Abonnement
-        </span>
-      </div>
-
-      {/* Plan name */}
-      <h3 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.022em', lineHeight: 1.1, margin: '0 0 6px' }}>
-        Plan&nbsp;
-        <span style={{ color: accentText }}>{planLabel(plan)}</span>
-      </h3>
-
-      {/* Status line */}
-      <p style={{ fontSize: 13.5, lineHeight: 1.5, color: '#6B635B', margin: '0 0 18px' }}>
-        {statusLine}
-      </p>
-
-      {/* Footer */}
-      <div style={{
-        marginTop: 'auto', paddingTop: 14,
-        borderTop: '1px dashed #E8E1D4',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <span style={{
-          fontFamily: '"Geist Mono", monospace', fontSize: 12, color: '#14110E',
-          display: 'inline-flex', alignItems: 'center', gap: 7,
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: 99, background: accentText, display: 'inline-block', flexShrink: 0 }} />
-          {ctaLabel}
-        </span>
-        <div style={{
-          width: 34, height: 34, borderRadius: 999,
-          background: '#FBF7F1', color: '#14110E',
-          border: '1px solid #E8E1D4',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <ArrowRightIcon size={15} />
-        </div>
-      </div>
-    </a>
-  );
-}
-
 /* ─── Component props ────────────────────────────────────────────── */
 export interface WorkspaceSelectorProps {
   workspaces?: WorkspaceWithIcon[];
@@ -415,9 +273,10 @@ export default function WorkspaceSelector({
   shopPeriodEnd,
   onEnter,
 }: WorkspaceSelectorProps) {
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [entering,    setEntering]    = useState<Workspace | null>(null);
-  const [menuOpen,    setMenuOpen]    = useState(false);
+  const [paletteOpen,  setPaletteOpen]  = useState(false);
+  const [entering,     setEntering]     = useState<Workspace | null>(null);
+  const [menuOpen,     setMenuOpen]     = useState(false);
+  const [subModalOpen, setSubModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -567,6 +426,7 @@ export default function WorkspaceSelector({
               status={shopStatus}
               trialEndsAt={shopTrialEndsAt}
               periodEnd={shopPeriodEnd}
+              onClick={() => setSubModalOpen(true)}
             />
           )}
         </div>
@@ -591,6 +451,16 @@ export default function WorkspaceSelector({
 
       {/* Entry overlay */}
       <EnterOverlay workspace={entering} />
+
+      {/* Subscription modal */}
+      <SubscriptionModal
+        open={subModalOpen}
+        onClose={() => setSubModalOpen(false)}
+        shopPlan={shopPlan}
+        shopStatus={shopStatus}
+        shopTrialEndsAt={shopTrialEndsAt}
+        shopPeriodEnd={shopPeriodEnd}
+      />
     </div>
   );
 }

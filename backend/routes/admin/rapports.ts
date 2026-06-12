@@ -24,18 +24,20 @@ router.get("/api/admin/rapports", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
-  const type       = (req.query.type       as string) || "ventes";
-  const periode    = (req.query.periode    as string) || "ce_mois";
-  const statut     = (req.query.statut     as string) || "all";
+  const shopId      = session.shop_id ?? 1;
+  const type        = (req.query.type       as string) || "ventes";
+  const periode     = (req.query.periode    as string) || "ce_mois";
+  const statut      = (req.query.statut     as string) || "all";
   const utilisateur = (req.query.utilisateur as string) || "all";
 
   try {
     let rows: mysql.RowDataPacket[] = [];
     let utilisateurs: { id: number; nom: string }[] = [];
 
-    // Fetch utilisateurs list (for filter dropdown)
+    // Fetch utilisateurs list (for filter dropdown) — scoped to shop
     const [uRows] = await pool.execute<mysql.RowDataPacket[]>(
-      `SELECT id, nom FROM admin_users WHERE actif = 1 ORDER BY nom`
+      `SELECT id, nom FROM admin_users WHERE actif = 1 AND shop_id = ? ORDER BY nom`,
+      [shopId]
     );
     utilisateurs = uRows as { id: number; nom: string }[];
 
@@ -44,6 +46,7 @@ router.get("/api/admin/rapports", async (req, res) => {
     // ── VENTES ───────────────────────────────────────────────────────────────
     if (type === "ventes") {
       const conditions: string[] = [
+        `f.shop_id = ${Number(shopId)}`,
         pc("f.created_at", periode),
         "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)",
       ];
@@ -83,7 +86,7 @@ router.get("/api/admin/rapports", async (req, res) => {
 
     // ── ACHATS ───────────────────────────────────────────────────────────────
     else if (type === "achats") {
-      const conditions: string[] = [pc("a.date_achat", periode)];
+      const conditions: string[] = [`a.shop_id = ${Number(shopId)}`, pc("a.date_achat", periode)];
       const params: unknown[] = [];
       if (statut !== "all") { conditions.push("a.statut = ?"); params.push(statut); }
       const where = "WHERE " + conditions.join(" AND ");
@@ -110,7 +113,7 @@ router.get("/api/admin/rapports", async (req, res) => {
 
     // ── DEPENSES ─────────────────────────────────────────────────────────────
     else if (type === "depenses") {
-      const conditions: string[] = ["fe.type = 'depense'", pc("fe.date_entree", periode)];
+      const conditions: string[] = [`fe.shop_id = ${Number(shopId)}`, "fe.type = 'depense'", pc("fe.date_entree", periode)];
       const params: unknown[] = [];
       if (utilisateur !== "all") { conditions.push("fe.admin_id = ?"); params.push(Number(utilisateur)); }
       const where = "WHERE " + conditions.join(" AND ");
@@ -138,7 +141,7 @@ router.get("/api/admin/rapports", async (req, res) => {
 
     // ── RENTREES ─────────────────────────────────────────────────────────────
     else if (type === "rentrees") {
-      const conditions: string[] = ["fe.type = 'rentree'", pc("fe.date_entree", periode)];
+      const conditions: string[] = [`fe.shop_id = ${Number(shopId)}`, "fe.type = 'rentree'", pc("fe.date_entree", periode)];
       const params: unknown[] = [];
       if (utilisateur !== "all") { conditions.push("fe.admin_id = ?"); params.push(Number(utilisateur)); }
       const where = "WHERE " + conditions.join(" AND ");
@@ -166,7 +169,7 @@ router.get("/api/admin/rapports", async (req, res) => {
 
     // ── COMBINE (dépenses + rentrées) ─────────────────────────────────────────
     else if (type === "combine") {
-      const conditions: string[] = ["fe.type IN ('depense','rentree')", pc("fe.date_entree", periode)];
+      const conditions: string[] = [`fe.shop_id = ${Number(shopId)}`, "fe.type IN ('depense','rentree')", pc("fe.date_entree", periode)];
       const params: unknown[] = [];
       if (utilisateur !== "all") { conditions.push("fe.admin_id = ?"); params.push(Number(utilisateur)); }
       const where = "WHERE " + conditions.join(" AND ");
@@ -194,7 +197,7 @@ router.get("/api/admin/rapports", async (req, res) => {
 
     // ── FINANCIER (tous types finance) ────────────────────────────────────────
     else if (type === "financier") {
-      const conditions: string[] = [pc("fe.date_entree", periode)];
+      const conditions: string[] = [`fe.shop_id = ${Number(shopId)}`, pc("fe.date_entree", periode)];
       const params: unknown[] = [];
       if (utilisateur !== "all") { conditions.push("fe.admin_id = ?"); params.push(Number(utilisateur)); }
       const where = "WHERE " + conditions.join(" AND ");
@@ -223,6 +226,7 @@ router.get("/api/admin/rapports", async (req, res) => {
     // ── MOBILE MONEY ──────────────────────────────────────────────────────────
     else if (type === "mobile_money") {
       const conditions: string[] = [
+        `f.shop_id = ${Number(shopId)}`,
         "f.mode_paiement IN ('moov_money','tmoney','mobile_money')",
         pc("f.created_at", periode),
         "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)",
@@ -254,7 +258,7 @@ router.get("/api/admin/rapports", async (req, res) => {
 
     // ── CLIENTS ───────────────────────────────────────────────────────────────
     else if (type === "clients") {
-      const conditions: string[] = [pc("bc.created_at", periode)];
+      const conditions: string[] = [`bc.shop_id = ${Number(shopId)}`, pc("bc.created_at", periode)];
       const params: unknown[] = [];
       const where = "WHERE " + conditions.join(" AND ");
       const [r] = await pool.execute<mysql.RowDataPacket[]>(
@@ -342,7 +346,7 @@ router.get("/api/admin/rapports", async (req, res) => {
           LEFT JOIN orders _so        ON _so.id = f.order_id AND _so.status = 'delivered'
           LEFT JOIN admin_users au    ON au.id  = f.admin_id
           LEFT JOIN utilisateurs util ON util.id = f.admin_id
-          WHERE ${pVentes}
+          WHERE f.shop_id = ${Number(shopId)} AND ${pVentes}
             AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL))
          UNION ALL
          (SELECT fe.reference, fe.date_entree AS created_at,
@@ -352,14 +356,14 @@ router.get("/api/admin/rapports", async (req, res) => {
           FROM finance_entries fe
           LEFT JOIN admin_users au2 ON au2.id = fe.admin_id
           LEFT JOIN utilisateurs util2 ON util2.id = fe.admin_id
-          WHERE ${pFinance})
+          WHERE fe.shop_id = ${Number(shopId)} AND ${pFinance})
          UNION ALL
          (SELECT a.reference, a.date_achat AS created_at,
                  frs.nom AS client_nom, NULL AS vendeur,
                  a.montant_total AS total, a.statut
           FROM achats a
           LEFT JOIN fournisseurs frs ON frs.id = a.fournisseur_id
-          WHERE ${pAchats})
+          WHERE a.shop_id = ${Number(shopId)} AND ${pAchats})
          ORDER BY created_at DESC
          LIMIT 500`
       );

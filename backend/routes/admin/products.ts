@@ -175,6 +175,8 @@ router.post("/api/admin/products", async (req, res) => {
     // entrepôt
     if (body.entrepot_id != null) { columns.push("entrepot_id"); values.push(Number(body.entrepot_id) || null); }
     if (body.prix_entrepot != null) { columns.push("prix_entrepot"); values.push(Number(body.prix_entrepot) || null); }
+    if (body.canal_vente) { columns.push("canal_vente"); values.push(body.canal_vente); }
+    if (body.prod_condition) { columns.push("prod_condition"); values.push(body.prod_condition); }
     // shop_id (multi-tenant)
     columns.push("shop_id"); values.push(shopId);
 
@@ -367,7 +369,7 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     // Only include columns that exist in the DB schema
     const alwaysAllowed = ["nom","description","description_longue","categorie_id","marque_id","prix_unitaire",
                            "stock_magasin","stock_boutique","remise","neuf","actif","reference","slug",
-                           "entrepot_id","prix_entrepot"];
+                           "entrepot_id","prix_entrepot","canal_vente","prod_condition"];
     for (const key of alwaysAllowed) {
       if (key in body) { sets.push(`${key} = ?`); vals.push(body[key]); }
     }

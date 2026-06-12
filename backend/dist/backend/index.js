@@ -244,6 +244,17 @@ async function produitCols() {
       }
     }
   }
+  if (!names.has("canal_vente")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN canal_vente ENUM('tous','boutique','en_ligne') NOT NULL DEFAULT 'tous'`);
+      names.add("canal_vente");
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("canal_vente");
+      }
+    }
+  }
   if (names.has("slug") && names.has("shop_id")) {
     try {
       await db.execute(`ALTER TABLE produits DROP INDEX idx_produits_slug`);
@@ -270,7 +281,8 @@ async function produitCols() {
     slug: names.has("slug"),
     entrepot_id: names.has("entrepot_id"),
     prix_entrepot: names.has("prix_entrepot"),
-    shop_id: names.has("shop_id")
+    shop_id: names.has("shop_id"),
+    canal_vente: names.has("canal_vente")
   };
   return _cols;
 }
@@ -322,7 +334,8 @@ async function getProducts(opts) {
     statut,
     includeInactive = false,
     entrepotId,
-    shopId = 1
+    shopId = 1,
+    storefrontOnly = false
   } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
@@ -376,6 +389,9 @@ async function getProducts(opts) {
   if (entrepotId != null) {
     conditions.push("p.entrepot_id = ?");
     params.push(entrepotId);
+  }
+  if (storefrontOnly && cols.canal_vente) {
+    conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))");
   }
   const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -490,7 +506,7 @@ async function getProductsByIds(ids) {
     marque_nom: r.marque_nom ?? null
   }));
 }
-async function getProductBySlug(slugOrRef, shopId = 1) {
+async function getProductBySlug(slugOrRef, shopId = 1, storefrontOnly = false) {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
@@ -515,17 +531,18 @@ async function getProductBySlug(slugOrRef, shopId = 1) {
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}`;
   const shopCondition = cols.shop_id ? " AND p.shop_id = ?" : "";
   const shopParams = cols.shop_id ? [shopId] : [];
+  const canalCondition = storefrontOnly && cols.canal_vente ? " AND (p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))" : "";
   let rows = [];
   if (cols.slug) {
     const [r1] = await db.execute(
-      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition}${canalCondition} LIMIT 1`,
       [slugOrRef, ...shopParams]
     );
     rows = r1;
   }
   if (!rows.length) {
     const [r2] = await db.execute(
-      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition}${canalCondition} LIMIT 1`,
       [slugOrRef, ...shopParams]
     );
     rows = r2;
@@ -554,7 +571,7 @@ async function getProductBySlug(slugOrRef, shopId = 1) {
   };
 }
 async function getProductCount(opts) {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1 } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1, storefrontOnly = false } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
   const params = [];
@@ -603,6 +620,9 @@ async function getProductCount(opts) {
   if (entrepotId != null) {
     conditions.push("p.entrepot_id = ?");
     params.push(entrepotId);
+  }
+  if (storefrontOnly && cols.canal_vente) {
+    conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))");
   }
   const [rows] = await db.execute(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,
@@ -2480,7 +2500,7 @@ async function getStockBoutiqueList(opts) {
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
   const searchLike = search ? `%${search}%` : null;
-  const p1Conds = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
+  const p1Conds = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)", "(p.canal_vente IS NULL OR p.canal_vente IN ('tous','boutique'))"];
   const p1Params = [];
   if (searchLike) {
     p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)");
@@ -2504,7 +2524,7 @@ async function getStockBoutiqueList(opts) {
      WHERE ${p1Conds.join(" AND ")}`,
     p1Params
   );
-  const p2Conds = [`p.shop_id = ${Number(shopId)}`];
+  const p2Conds = [`p.shop_id = ${Number(shopId)}`, "(p.canal_vente IS NULL OR p.canal_vente IN ('tous','boutique'))"];
   const p2Params = [];
   if (searchLike) {
     p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)");
@@ -5419,6 +5439,14 @@ router2.post("/api/admin/products", async (req, res) => {
       columns.push("prix_entrepot");
       values.push(Number(body.prix_entrepot) || null);
     }
+    if (body.canal_vente) {
+      columns.push("canal_vente");
+      values.push(body.canal_vente);
+    }
+    if (body.prod_condition) {
+      columns.push("prod_condition");
+      values.push(body.prod_condition);
+    }
     columns.push("shop_id");
     values.push(shopId);
     const placeholders = columns.map(() => "?").join(",");
@@ -5641,7 +5669,9 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       "reference",
       "slug",
       "entrepot_id",
-      "prix_entrepot"
+      "prix_entrepot",
+      "canal_vente",
+      "prod_condition"
     ];
     for (const key of alwaysAllowed) {
       if (key in body) {
@@ -8687,12 +8717,12 @@ router25.get("/api/products", async (req, res) => {
     }
     if (slugExact) {
       const { getProductBySlug: getProductBySlug2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const product = await getProductBySlug2(slugExact, shopId);
+      const product = await getProductBySlug2(slugExact, shopId, true);
       return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId }),
-      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId })
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId, storefrontOnly: true }),
+      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId, storefrontOnly: true })
     ]);
     const isFiltered = search || categoryId || promoOnly || newOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
     const data = isFiltered ? products : seededShuffle(products, Math.floor(Date.now() / (1e3 * 60 * 60)));
@@ -9839,6 +9869,7 @@ function periodClause(col, periode) {
 router30.get("/api/admin/rapports", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const type = req.query.type || "ventes";
   const periode = req.query.periode || "ce_mois";
   const statut = req.query.statut || "all";
@@ -9847,12 +9878,14 @@ router30.get("/api/admin/rapports", async (req, res) => {
     let rows = [];
     let utilisateurs = [];
     const [uRows] = await db.execute(
-      `SELECT id, nom FROM admin_users WHERE actif = 1 ORDER BY nom`
+      `SELECT id, nom FROM admin_users WHERE actif = 1 AND shop_id = ? ORDER BY nom`,
+      [shopId]
     );
     utilisateurs = uRows;
     const pc = periodClause;
     if (type === "ventes") {
       const conditions = [
+        `f.shop_id = ${Number(shopId)}`,
         pc("f.created_at", periode),
         "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)"
       ];
@@ -9889,7 +9922,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "achats") {
-      const conditions = [pc("a.date_achat", periode)];
+      const conditions = [`a.shop_id = ${Number(shopId)}`, pc("a.date_achat", periode)];
       const params = [];
       if (statut !== "all") {
         conditions.push("a.statut = ?");
@@ -9916,7 +9949,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "depenses") {
-      const conditions = ["fe.type = 'depense'", pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, "fe.type = 'depense'", pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -9944,7 +9977,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "rentrees") {
-      const conditions = ["fe.type = 'rentree'", pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, "fe.type = 'rentree'", pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -9972,7 +10005,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "combine") {
-      const conditions = ["fe.type IN ('depense','rentree')", pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, "fe.type IN ('depense','rentree')", pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -10000,7 +10033,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "financier") {
-      const conditions = [pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -10029,6 +10062,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       rows = r;
     } else if (type === "mobile_money") {
       const conditions = [
+        `f.shop_id = ${Number(shopId)}`,
         "f.mode_paiement IN ('moov_money','tmoney','mobile_money')",
         pc("f.created_at", periode),
         "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)"
@@ -10057,7 +10091,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "clients") {
-      const conditions = [pc("bc.created_at", periode)];
+      const conditions = [`bc.shop_id = ${Number(shopId)}`, pc("bc.created_at", periode)];
       const params = [];
       const where = "WHERE " + conditions.join(" AND ");
       const [r] = await db.execute(
@@ -10136,7 +10170,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
           LEFT JOIN orders _so        ON _so.id = f.order_id AND _so.status = 'delivered'
           LEFT JOIN admin_users au    ON au.id  = f.admin_id
           LEFT JOIN utilisateurs util ON util.id = f.admin_id
-          WHERE ${pVentes}
+          WHERE f.shop_id = ${Number(shopId)} AND ${pVentes}
             AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL))
          UNION ALL
          (SELECT fe.reference, fe.date_entree AS created_at,
@@ -10146,14 +10180,14 @@ router30.get("/api/admin/rapports", async (req, res) => {
           FROM finance_entries fe
           LEFT JOIN admin_users au2 ON au2.id = fe.admin_id
           LEFT JOIN utilisateurs util2 ON util2.id = fe.admin_id
-          WHERE ${pFinance})
+          WHERE fe.shop_id = ${Number(shopId)} AND ${pFinance})
          UNION ALL
          (SELECT a.reference, a.date_achat AS created_at,
                  frs.nom AS client_nom, NULL AS vendeur,
                  a.montant_total AS total, a.statut
           FROM achats a
           LEFT JOIN fournisseurs frs ON frs.id = a.fournisseur_id
-          WHERE ${pAchats})
+          WHERE a.shop_id = ${Number(shopId)} AND ${pAchats})
          ORDER BY created_at DESC
          LIMIT 500`
       );
@@ -10177,6 +10211,7 @@ var SITE_COND = `(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT 
 router31.get("/api/admin/tendances", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const periode = req.query.periode || "mensuelle";
   const annee = Number(req.query.annee) || (/* @__PURE__ */ new Date()).getFullYear();
   const prevAnnee = annee - 1;
@@ -10189,7 +10224,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
          COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye_total
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
          AND ${SITE_COND}`,
       [annee]
     );
@@ -10210,7 +10245,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY MONTH(f.created_at)
          ORDER BY mois`,
@@ -10227,7 +10262,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY QUARTER(f.created_at)
          ORDER BY mois`,
@@ -10244,7 +10279,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY YEAR(f.created_at)
          ORDER BY mois`
@@ -10289,7 +10324,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
              total DECIMAL(12,2) PATH '$.total'
            )
          ) AS jt
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule' AND jt.nom IS NOT NULL
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule' AND jt.nom IS NOT NULL
            AND ${SITE_COND}
          GROUP BY jt.nom
          ORDER BY ca DESC
@@ -10312,7 +10347,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
          COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) = ? AND f.statut != 'annule' AND f.statut_paiement != 'non_paye'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule' AND f.statut_paiement != 'non_paye'
          AND ${SITE_COND}
        GROUP BY f.mode_paiement
        ORDER BY montant DESC`,
@@ -10337,7 +10372,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
               COALESCE(SUM(f.total), 0) AS ca
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) IN (?, ?) AND f.statut != 'annule'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) IN (?, ?) AND f.statut != 'annule'
          AND ${SITE_COND}
        GROUP BY annee, mois
        ORDER BY annee, mois`,
@@ -10379,6 +10414,7 @@ ensurePrixAchat().catch(console.error);
 router32.get("/api/admin/performance-produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const dateDebut = req.query.date_debut || new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 1).toISOString().slice(0, 10);
   const dateFin = req.query.date_fin || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const top = Math.min(50, Math.max(5, Number(req.query.top) || 10));
@@ -10409,7 +10445,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
              total  DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ? AND f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND jt.nom IS NOT NULL
            AND (
@@ -10420,7 +10456,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
          GROUP BY jt.nom, jt.ref
          ORDER BY ca DESC
          LIMIT ${top}`,
-        [dateDebut, dateFin]
+        [shopId, dateDebut, dateFin]
       );
       produits = rows.map((r) => {
         const ca = Math.round(Number(r.ca ?? 0));
@@ -10465,7 +10501,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
              total DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ? AND f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND (
              f.source IS NULL
@@ -10474,7 +10510,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
            )
          GROUP BY DATE(f.created_at)
          ORDER BY date`,
-        [dateDebut, dateFin]
+        [shopId, dateDebut, dateFin]
       );
       evolution = evRows.map((r) => ({
         date: String(r.date).slice(0, 10),
@@ -12482,6 +12518,8 @@ var allowedOrigins = new Set(
     "https://togolese.tg",
     "https://www.togolese.tg",
     "https://store.togolese.fr",
+    "https://afrisika.com",
+    "https://www.afrisika.com",
     "http://localhost:3000",
     "http://localhost:3003"
   ].map(originFromUrl).filter(Boolean)

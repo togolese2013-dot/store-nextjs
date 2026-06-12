@@ -205,15 +205,15 @@ router.get("/api/products", async (req, res) => {
     // Lookup by slug — search slug column then fallback to reference
     if (slugExact) {
       const { getProductBySlug } = await import("@/lib/db");
-      const product = await getProductBySlug(slugExact, shopId);
+      const product = await getProductBySlug(slugExact, shopId, true);
       return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
 
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId }),
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId, storefrontOnly: true }),
       referenceExact
         ? Promise.resolve(1)
-        : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId }),
+        : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId, storefrontOnly: true }),
     ]);
 
     // Shuffle when no active filter — order changes every hour

@@ -1943,7 +1943,7 @@ export async function getStockBoutiqueList(opts: {
   const searchLike = search ? `%${search}%` : null;
 
   // ── Part 1 : products WITHOUT variants (existing boutique_stock logic) ──────
-  const p1Conds: string[] = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
+  const p1Conds: string[] = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)", "(p.canal_vente IS NULL OR p.canal_vente IN ('tous','boutique'))"];
   const p1Params: (string | number | null)[] = [];
   if (searchLike) { p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)"); p1Params.push(searchLike, searchLike); }
   if (filter === "faible")     p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
@@ -1967,7 +1967,7 @@ export async function getStockBoutiqueList(opts: {
   );
 
   // ── Part 2 : products WITH variants (one row per variant) ──────────────────
-  const p2Conds: string[] = [`p.shop_id = ${Number(shopId)}`];
+  const p2Conds: string[] = [`p.shop_id = ${Number(shopId)}`, "(p.canal_vente IS NULL OR p.canal_vente IN ('tous','boutique'))"];
   const p2Params: (string | number | null)[] = [];
   if (searchLike) { p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)"); p2Params.push(searchLike, searchLike, searchLike); }
   if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");

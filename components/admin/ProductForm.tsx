@@ -39,6 +39,7 @@ interface ProductData {
   images:             string[];
   entrepot_id:        number | null;
   prix_entrepot:      number | "";
+  canal_vente:        'tous' | 'boutique' | 'en_ligne';
 }
 
 interface EntrepotItem {
@@ -101,6 +102,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     image_url:          initial?.image_url          ?? "",
     entrepot_id:        (initial as Record<string, unknown>)?.entrepot_id as number | null ?? null,
     prix_entrepot:      (initial as Record<string, unknown>)?.prix_entrepot as number | "" ?? "",
+    canal_vente:        ((initial as Record<string, unknown>)?.canal_vente as 'tous' | 'boutique' | 'en_ligne') ?? 'tous',
     ...initial,
     images:             secondaryImages,
   });
@@ -290,6 +292,7 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       if (form.images.length > 0) payload.images = form.images;
       payload.entrepot_id   = form.entrepot_id ?? null;
       payload.prix_entrepot = form.entrepot_id && form.prix_entrepot !== "" ? Number(form.prix_entrepot) : null;
+      payload.canal_vente   = form.canal_vente;
       const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur"); return; }
@@ -531,6 +534,33 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                   <Toggle checked={form.neuf} onChange={v => set("neuf", v)} label='Marquer comme "Nouveau"' color="brand" />
                 )}
                 <Toggle checked={form.actif} onChange={v => set("actif", v)} label="Produit actif (visible)" color="green" />
+              </div>
+
+              {/* Canal de vente */}
+              <div>
+                <label className={labelCls}>Canal de vente</label>
+                <div className="flex gap-2 flex-wrap">
+                  {([
+                    { value: 'tous',     label: 'Partout',            desc: 'Boutique + Site' },
+                    { value: 'boutique', label: 'Boutique uniquement', desc: 'Admin seulement' },
+                    { value: 'en_ligne', label: 'En ligne uniquement', desc: 'Site client seul' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => set("canal_vente", opt.value)}
+                      className="px-3 py-2 rounded-xl border text-sm font-medium transition-all text-left"
+                      style={{
+                        borderColor: form.canal_vente === opt.value ? '#C9601E' : '#e2e8f0',
+                        background:  form.canal_vente === opt.value ? '#FFF4EE' : '#fff',
+                        color:       form.canal_vente === opt.value ? '#C9601E' : '#64748b',
+                      }}
+                    >
+                      <div className="font-semibold">{opt.label}</div>
+                      <div className="text-xs opacity-70">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
 

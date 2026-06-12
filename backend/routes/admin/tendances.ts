@@ -15,8 +15,9 @@ router.get("/api/admin/tendances", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
-  const periode = (req.query.periode as string) || "mensuelle";
-  const annee   = Number(req.query.annee) || new Date().getFullYear();
+  const shopId    = session.shop_id ?? 1;
+  const periode   = (req.query.periode as string) || "mensuelle";
+  const annee     = Number(req.query.annee) || new Date().getFullYear();
   const prevAnnee = annee - 1;
 
   try {
@@ -29,7 +30,7 @@ router.get("/api/admin/tendances", async (req, res) => {
          COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye_total
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
          AND ${SITE_COND}`,
       [annee]
     );
@@ -52,7 +53,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY MONTH(f.created_at)
          ORDER BY mois`,
@@ -69,7 +70,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY QUARTER(f.created_at)
          ORDER BY mois`,
@@ -87,7 +88,7 @@ router.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY YEAR(f.created_at)
          ORDER BY mois`
@@ -137,7 +138,7 @@ router.get("/api/admin/tendances", async (req, res) => {
              total DECIMAL(12,2) PATH '$.total'
            )
          ) AS jt
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule' AND jt.nom IS NOT NULL
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule' AND jt.nom IS NOT NULL
            AND ${SITE_COND}
          GROUP BY jt.nom
          ORDER BY ca DESC
@@ -161,7 +162,7 @@ router.get("/api/admin/tendances", async (req, res) => {
          COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) = ? AND f.statut != 'annule' AND f.statut_paiement != 'non_paye'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule' AND f.statut_paiement != 'non_paye'
          AND ${SITE_COND}
        GROUP BY f.mode_paiement
        ORDER BY montant DESC`,
@@ -188,7 +189,7 @@ router.get("/api/admin/tendances", async (req, res) => {
               COALESCE(SUM(f.total), 0) AS ca
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) IN (?, ?) AND f.statut != 'annule'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) IN (?, ?) AND f.statut != 'annule'
          AND ${SITE_COND}
        GROUP BY annee, mois
        ORDER BY annee, mois`,

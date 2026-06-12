@@ -19,6 +19,7 @@ router.get("/api/admin/performance-produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
+  const shopId    = session.shop_id ?? 1;
   const dateDebut = (req.query.date_debut as string) || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
   const dateFin   = (req.query.date_fin   as string) || new Date().toISOString().slice(0, 10);
   const top       = Math.min(50, Math.max(5, Number(req.query.top) || 10));
@@ -55,7 +56,7 @@ router.get("/api/admin/performance-produits", async (req, res) => {
              total  DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ? AND f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND jt.nom IS NOT NULL
            AND (
@@ -66,7 +67,7 @@ router.get("/api/admin/performance-produits", async (req, res) => {
          GROUP BY jt.nom, jt.ref
          ORDER BY ca DESC
          LIMIT ${top}`,
-        [dateDebut, dateFin]
+        [shopId, dateDebut, dateFin]
       );
 
       produits = rows.map(r => {
@@ -116,7 +117,7 @@ router.get("/api/admin/performance-produits", async (req, res) => {
              total DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ? AND f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND (
              f.source IS NULL
@@ -125,7 +126,7 @@ router.get("/api/admin/performance-produits", async (req, res) => {
            )
          GROUP BY DATE(f.created_at)
          ORDER BY date`,
-        [dateDebut, dateFin]
+        [shopId, dateDebut, dateFin]
       );
       evolution = evRows.map(r => ({
         date:     String(r.date).slice(0, 10),

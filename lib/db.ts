@@ -224,6 +224,19 @@ export async function produitCols() {
     }
   }
 
+  // Auto-migrate: add canal_vente column if missing
+  if (!names.has("canal_vente")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN canal_vente ENUM('tous','boutique','en_ligne') NOT NULL DEFAULT 'tous'`);
+      names.add("canal_vente");
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("canal_vente");
+      }
+    }
+  }
+
   // Replace global slug unique index with per-shop composite index
   if (names.has("slug") && names.has("shop_id")) {
     try { await db.execute(`ALTER TABLE produits DROP INDEX idx_produits_slug`); } catch { /* already dropped */ }
@@ -247,6 +260,7 @@ export async function produitCols() {
     entrepot_id:     names.has("entrepot_id"),
     prix_entrepot:   names.has("prix_entrepot"),
     shop_id:         names.has("shop_id"),
+    canal_vente:     names.has("canal_vente"),
   };
   return _cols;
 }
@@ -301,12 +315,13 @@ export async function getProducts(opts?: {
   includeInactive?: boolean;
   entrepotId?: number;
   shopId?: number;
+  storefrontOnly?: boolean;
 }): Promise<Product[]> {
   const {
     categoryId, marqueId, search, referenceExact, promoOnly, newOnly,
     inStock, minPrice, maxPrice,
     limit = 60, offset = 0, statut, includeInactive = false, entrepotId,
-    shopId = 1,
+    shopId = 1, storefrontOnly = false,
   } = opts ?? {};
 
   const cols = await produitCols();
@@ -328,6 +343,7 @@ export async function getProducts(opts?: {
   if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
   if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
+  if (storefrontOnly && cols.canal_vente) { conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))"); }
 
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -454,7 +470,7 @@ export async function getProductsByIds(ids: number[]): Promise<Product[]> {
   })) as Product[];
 }
 
-export async function getProductBySlug(slugOrRef: string, shopId = 1): Promise<Product | null> {
+export async function getProductBySlug(slugOrRef: string, shopId = 1, storefrontOnly = false): Promise<Product | null> {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
@@ -483,12 +499,13 @@ export async function getProductBySlug(slugOrRef: string, shopId = 1): Promise<P
 
   const shopCondition = cols.shop_id ? " AND p.shop_id = ?" : "";
   const shopParams    = cols.shop_id ? [shopId] : [];
+  const canalCondition = (storefrontOnly && cols.canal_vente) ? " AND (p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))" : "";
 
   // 1. Try slug column first (if it exists)
   let rows: mysql.RowDataPacket[] = [];
   if (cols.slug) {
     const [r1] = await db.execute<mysql.RowDataPacket[]>(
-      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition}${canalCondition} LIMIT 1`,
       [slugOrRef, ...shopParams]
     );
     rows = r1;
@@ -496,7 +513,7 @@ export async function getProductBySlug(slugOrRef: string, shopId = 1): Promise<P
   // 2. Fallback: try reference
   if (!rows.length) {
     const [r2] = await db.execute<mysql.RowDataPacket[]>(
-      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition}${canalCondition} LIMIT 1`,
       [slugOrRef, ...shopParams]
     );
     rows = r2;
@@ -539,8 +556,9 @@ export async function getProductCount(opts?: {
   includeInactive?: boolean;
   entrepotId?: number;
   shopId?: number;
+  storefrontOnly?: boolean;
 }): Promise<number> {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1 } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1, storefrontOnly = false } = opts ?? {};
   const cols = await produitCols();
 
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
@@ -559,6 +577,7 @@ export async function getProductCount(opts?: {
   if (minPrice != null && !isNaN(minPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) >= ?"); params.push(minPrice); }
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
   if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
+  if (storefrontOnly && cols.canal_vente) { conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))"); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,

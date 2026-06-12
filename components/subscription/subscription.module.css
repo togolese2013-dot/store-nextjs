@@ -1,0 +1,410 @@
+/* ============================================
+   subscription.module.css
+   Afrisika / ShopSaaS design tokens
+   ============================================ */
+
+/* ── Card (SubscriptionCard) ──────────────── */
+.wsCard {
+  position: relative;
+  background: white;
+  border: 1px solid #E8E1D4;
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.25s ease;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  color: #14110E;
+}
+.wsCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(20, 17, 14, 0.18);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 18px 40px -22px rgba(20,17,14,0.25);
+}
+.wsCard:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(224,122,44,0.18);
+}
+.wsTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.wsIcon {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  background: var(--tint-bg);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  transition: transform 0.25s ease;
+}
+.wsCard:hover .wsIcon { transform: scale(1.04) rotate(-1.5deg); }
+.wsTag {
+  font-size: 10px;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6B635B;
+  font-weight: 500;
+  padding: 4px 9px;
+  border: 1px solid #E8E1D4;
+  background: #FBF7F1;
+  border-radius: 999px;
+}
+.wsName {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.1;
+  margin: 0 0 6px;
+}
+.wsDesc {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #6B635B;
+  margin: 0 0 18px;
+}
+.wsFoot {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px dashed #E8E1D4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wsCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #14110E;
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 99px;
+  background: var(--accent);
+}
+.wsCta {
+  width: 34px; height: 34px;
+  border-radius: 999px;
+  background: #FBF7F1;
+  color: #14110E;
+  border: 1px solid #E8E1D4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  flex-shrink: 0;
+}
+.wsCard:hover .wsCta {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  transform: translateX(2px);
+}
+
+/* Sub-card specifics */
+.subCard { /* inherits wsCard */ }
+.subRenew {
+  font-size: 12px !important;
+  color: #8A8278 !important;
+  margin: 0 !important;
+}
+.subChangeBtn {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--tint-bg);
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+  white-space: nowrap;
+}
+.wsCard:hover .subChangeBtn { border-color: var(--accent); }
+
+/* ── Modal backdrop & drawer ──────────────── */
+.subBackdrop {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(20,17,14,0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.subBackdrop.on { opacity: 1; pointer-events: auto; }
+
+.subDrawer {
+  width: min(700px, 100%);
+  max-height: 90vh;
+  background: #FBF7F1;
+  border-radius: 24px 24px 0 0;
+  overflow-y: auto;
+  transform: translateY(32px);
+  transition: transform 0.3s cubic-bezier(0.32,0,0.22,1);
+  box-shadow: 0 -8px 40px -8px rgba(20,17,14,0.18);
+}
+.subBackdrop.on .subDrawer { transform: translateY(0); }
+
+.subDrawerHandle {
+  width: 36px; height: 4px;
+  border-radius: 99px;
+  background: #D6CCBA;
+  margin: 14px auto 0;
+}
+
+/* Toast */
+.subToastWrap {
+  position: sticky; top: 0; z-index: 5;
+  margin: 0 28px;
+  transform: translateY(12px);
+}
+.subToast {
+  background: #14110E; color: white;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 8px 24px -8px rgba(20,17,14,0.4);
+}
+
+/* Header */
+.subDrawerHead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid #E8E1D4;
+}
+.subDrawerTitle { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+.subClose {
+  width: 32px; height: 32px; border-radius: 99px;
+  background: white; border: 1px solid #E8E1D4;
+  display: grid; place-items: center;
+  color: #6B635B;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.subClose:hover { background: #14110E; color: white; border-color: #14110E; }
+
+/* Sections */
+.subSection {
+  padding: 22px 28px;
+  border-bottom: 1px solid #E8E1D4;
+}
+.subSection:last-of-type { border-bottom: 0; }
+.subSectionLabel {
+  font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: #8A8278; font-weight: 600;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  margin-bottom: 16px;
+}
+
+/* Current plan banner */
+.subCurrentPlan {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #14110E; color: white;
+  border-radius: 16px; padding: 18px 22px; gap: 16px;
+}
+.subPlanBadge { display: inline-flex; align-items: center; gap: 10px; }
+.subPlanIcon {
+  width: 40px; height: 40px; border-radius: 11px;
+  background: rgba(255,255,255,0.08);
+  display: grid; place-items: center;
+  color: #F2A765;
+}
+.subPlanName { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+.subPlanName span { color: #F2A765; }
+.subPlanMeta { font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+.subStatusPill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 14px; border-radius: 99px;
+  background: rgba(45,138,95,0.18); color: #5DCFA0;
+  font-size: 12.5px; font-weight: 500;
+}
+.subStatusDot {
+  width: 7px; height: 7px; border-radius: 99px;
+  background: #5DCFA0; position: relative;
+}
+.subStatusDot::after {
+  content: ""; position: absolute; inset: -4px;
+  border-radius: 99px; background: #5DCFA0; opacity: 0.3;
+  animation: pulseDot 1.6s infinite;
+}
+@keyframes pulseDot {
+  0%, 100% { transform: scale(0.6); opacity: 0.5; }
+  50%       { transform: scale(1.6); opacity: 0; }
+}
+
+/* Billing toggle */
+.billingToggle {
+  display: inline-flex;
+  background: white; border: 1px solid #E8E1D4;
+  border-radius: 99px; padding: 3px; gap: 2px;
+}
+.billingBtn {
+  padding: 5px 12px; border-radius: 99px; border: 0;
+  font-size: 12px; font-weight: 500;
+  background: transparent; color: #6B635B;
+  transition: all 0.15s ease;
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+}
+.billingBtnOn { background: #14110E; color: white; }
+.billingBadge {
+  font-size: 10px; padding: 1px 6px; border-radius: 99px;
+  background: #FBE9D6; color: #B8501A; font-weight: 600;
+}
+.billingBadgeOn { background: rgba(242,167,101,0.2); color: #F2A765; }
+
+/* Plan option cards */
+.subPlansGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.subPlanOpt {
+  border: 1.5px solid #E8E1D4; border-radius: 14px;
+  padding: 16px; background: white;
+  cursor: pointer; text-align: left; position: relative;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.subPlanOpt:hover {
+  border-color: #B8501A;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -8px rgba(184,80,26,0.15);
+}
+.subPlanOptCurrent { border-color: #B8501A; background: #FBE9D6; }
+.subPlanOptCurrent:hover { transform: none; }
+.subPlanOptName { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 4px; color: #14110E; }
+.subPlanOptPrice { font-size: 20px; font-weight: 500; letter-spacing: -0.03em; color: #14110E; font-variant-numeric: tabular-nums; }
+.subPlanOptPrice small { font-size: 11px; color: #6B635B; font-weight: 400; letter-spacing: 0; }
+.subPlanOptAnnual { font-size: 10.5px; color: #B8501A; margin-top: 2px; font-weight: 500; }
+.subPlanOptFeats { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.subPlanOptFeat {
+  font-size: 11.5px; color: #6B635B;
+  display: flex; align-items: center; gap: 6px;
+}
+.subPlanOptFeat::before {
+  content: ""; flex-shrink: 0;
+  width: 4px; height: 4px; border-radius: 99px; background: #B8501A;
+}
+.subCurrentBadge {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #B8501A; background: rgba(184,80,26,0.12);
+  padding: 2px 8px; border-radius: 99px;
+}
+.subPlanOptCta {
+  margin-top: 14px; width: 100%; padding: 8px; border-radius: 8px;
+  font-size: 12px; font-weight: 500; text-align: center;
+  border: 1.5px solid #E8E1D4; background: white; color: #14110E;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.subPlanOpt:not(.subPlanOptCurrent):hover .subPlanOptCta {
+  background: #14110E; color: white; border-color: #14110E;
+}
+.subPlanOptCtaActive,
+.subPlanOptCurrent .subPlanOptCta {
+  background: #B8501A !important; color: white !important;
+  border-color: #B8501A !important; cursor: default;
+}
+
+/* Confirmation block */
+.subConfirmBlock {
+  margin-top: 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.subConfirmLabel { font-size: 11.5px; color: #6B635B; text-align: center; margin-bottom: 2px; }
+.subConfirmBtn {
+  width: 100%; padding: 8px; border-radius: 8px; border: 0;
+  background: #14110E; color: white; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.subCancelBtn {
+  width: 100%; padding: 7px; border-radius: 8px;
+  border: 1px solid #E8E1D4; background: white; color: #6B635B;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+}
+
+/* Payment method */
+.subPayRow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; background: white;
+  border: 1px solid #E8E1D4; border-radius: 12px;
+}
+.subPayLeft { display: flex; align-items: center; gap: 12px; }
+.subPayIcon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 700; letter-spacing: -0.02em;
+}
+.subPayName { font-size: 14px; font-weight: 500; }
+.subPayDetail { font-size: 12px; color: #6B635B; margin-top: 1px; }
+.subPayEdit {
+  font-size: 12.5px; font-weight: 500; color: #B8501A;
+  padding: 5px 12px; border-radius: 99px;
+  background: #FBE9D6; border: 0; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.subPayEdit:hover { background: #F2D4BB; }
+.subPayList { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.subPayOption {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid #E8E1D4; background: white;
+  cursor: pointer; text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  font: inherit;
+  width: 100%;
+}
+.subPayOption:hover { border-color: #B8501A; }
+.subPayOptionIcon {
+  width: 34px; height: 34px; border-radius: 9px;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+
+/* Billing history */
+.subHistoryRow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid #F0EBE0; gap: 12px;
+}
+.subHistoryRow:last-child { border-bottom: 0; }
+.subHistoryDate {
+  font-size: 12px; color: #6B635B; min-width: 100px;
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+.subHistoryPlan { font-size: 13px; font-weight: 500; flex: 1; }
+.subHistoryAmount {
+  font-size: 13px; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+.subHistoryStatus {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 99px;
+  background: #E4ECE6; color: #2D6A4F;
+}
+.subDownloadBtn {
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid #E8E1D4; background: white; color: #6B635B;
+  display: grid; place-items: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.subDownloadBtnDone { background: #14110E; color: white; border-color: #14110E; }
+
+/* Cancel */
+.subCancelSection { padding: 14px 28px 28px; text-align: center; }
+.subCancelLink {
+  font-size: 12.5px; color: #8A8278;
+  background: none; border: 0; cursor: pointer;
+  text-decoration: underline; text-decoration-color: transparent;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+.subCancelLink:hover { color: #C84B3A; text-decoration-color: #C84B3A; }
