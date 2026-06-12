@@ -15,7 +15,7 @@ export const useUI = (): UIStore => {
 };
 
 /* ── helpers ────────────────────────────────────────────────────── */
-const PLAN_MAP: Record<string, PlanName> = { basic: 'Basic', pro: 'Pro', business: 'Business' };
+const PLAN_MAP: Record<string, PlanName> = { basic: 'Basic', pro: 'Pro', business: 'Business', free: 'Basic' };
 const PLAN_PRICE: Record<PlanName, number> = { Basic: 9000, Pro: 25000, Business: 75000 };
 const PLAN_API: Record<PlanName, string> = { Basic: 'basic', Pro: 'pro', Business: 'business' };
 
