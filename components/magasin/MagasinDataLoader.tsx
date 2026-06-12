@@ -279,7 +279,6 @@ function MagasinShellWithUI({
       onExport={handleExport}
       onSwitchWorkspace={onSwitchWorkspace}
       onCreateProduct={onCreateProduct ?? (() => ui.openForm('product'))}
-      onEdit={(p) => ui.openDetail('product', p)}
       onDelete={(p) => ui.confirmDelete('le produit', p.name, {
         onConfirm: () => ui.config.onDeleteRow?.('product', p),
       })}
