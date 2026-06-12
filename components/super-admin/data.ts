@@ -5,11 +5,11 @@ import type {
 import { I } from './icons';
 
 /* ─── Pricing & status colors ─────────────────────────────────────── */
-export const PLAN_PRICE: Record<string, number> = { Starter: 9000, Business: 25000, Enterprise: 75000 };
+export const PLAN_PRICE: Record<string, number> = { Basic: 9000, Pro: 25000, Business: 75000 };
 export const PLAN_ST: Record<string, React.CSSProperties> = {
-  Starter:    { background: 'var(--blue-bg)', color: 'var(--blue)' },
-  Business:   { background: 'var(--accent-bg)', color: 'var(--accent)' },
-  Enterprise: { background: 'var(--gold-bg)', color: 'var(--gold)' },
+  Basic:    { background: 'var(--blue-bg)', color: 'var(--blue)' },
+  Pro:      { background: 'var(--accent-bg)', color: 'var(--accent)' },
+  Business: { background: 'var(--gold-bg)', color: 'var(--gold)' },
 };
 export const CITIES = ['Lomé', 'Kara', 'Sokodé', 'Atakpamé', 'Kpalimé', 'Aného', 'Dapaong'];
 /** Avatar palette for newly invited tenants */
@@ -24,9 +24,9 @@ export const TENANT_TABS = [
 
 /* ─── Plans ───────────────────────────────────────────────────────── */
 export const PLANS0: Plan[] = [
-  { name: 'Starter', color: '#3B6A8F', price: '9 000', period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['1 espace de travail (Boutique)', '1 point de vente · 2 équipiers', 'Caisse & gestion de stock', 'Paiement mobile (Wave, Orange)', 'Support par email'] },
-  { name: 'Business', color: '#34396B', price: '25 000', period: '/ mois', count: 0, mrr: 0, pop: true, feats: ['Tous les espaces (Magasin, Store, CRM…)', 'Multi-points de vente · 5 équipiers', 'E-commerce & livraison', 'CRM, fidélité & campagnes', 'Rapports avancés consolidés', 'Support prioritaire'] },
-  { name: 'Enterprise', color: '#8B5E2E', price: '75 000', period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['Espaces & équipiers illimités', 'Multi-boutiques & multi-pays', 'Intégrations sur mesure (API)', 'Gestionnaire de compte dédié', 'SLA 99,9% · support 24/7', 'Formation & onboarding inclus'] },
+  { name: 'Basic',    color: '#3B6A8F', price: '9 000',  period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['1 espace de travail (Boutique)', '1 point de vente · 2 équipiers', 'Caisse & gestion de stock', 'Paiement mobile (Wave, Orange)', 'Support par email'] },
+  { name: 'Pro',      color: '#34396B', price: '25 000', period: '/ mois', count: 0, mrr: 0, pop: true,  feats: ['Tous les espaces (Magasin, Store, CRM…)', 'Multi-points de vente · 5 équipiers', 'E-commerce & livraison', 'CRM, fidélité & campagnes', 'Rapports avancés consolidés', 'Support prioritaire'] },
+  { name: 'Business', color: '#8B5E2E', price: '75 000', period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['Espaces & équipiers illimités', 'Multi-boutiques & multi-pays', 'Intégrations sur mesure (API)', 'Gestionnaire de compte dédié', 'SLA 99,9% · support 24/7', 'Formation & onboarding inclus'] },
 ];
 
 /* ─── Invoices ────────────────────────────────────────────────────── */

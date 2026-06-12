@@ -113,10 +113,10 @@ export function Modal({ title, sub, children, footer, onClose, wide }: {
 export function PlanPick({ value, onChange }: { value: string; onChange: (p: string) => void }) {
   return (
     <div className="pick">
-      {['Starter', 'Business', 'Enterprise'].map((p) => (
+      {['Basic', 'Pro', 'Business'].map((p) => (
         <div key={p} className={`opt ${value === p ? 'on' : ''}`} onClick={() => onChange(p)}>
           <span className="radio" />
-          <div><div style={{ fontWeight: 600, fontSize: 13.5 }}>{p}</div><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{p === 'Starter' ? '1 espace · 2 équipiers' : p === 'Business' ? 'Tous les espaces · 5 équipiers' : 'Illimité · support 24/7'}</div></div>
+          <div><div style={{ fontWeight: 600, fontSize: 13.5 }}>{p}</div><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{p === 'Basic' ? '1 espace · 2 équipiers' : p === 'Pro' ? 'Tous les espaces · 5 équipiers' : 'Illimité · support 24/7'}</div></div>
           <span className="po-price">{fmt(PLAN_PRICE[p])} F</span>
         </div>
       ))}

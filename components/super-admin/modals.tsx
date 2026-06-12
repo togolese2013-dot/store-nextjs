@@ -12,7 +12,7 @@ function InviteModal({ close }: { close: () => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [city, setCity]       = useState('Lomé');
-  const [plan, setPlan]       = useState<PlanName>('Starter');
+  const [plan, setPlan]       = useState<PlanName>('Basic');
   const ok = name.trim() && email.trim() && username.trim() && password.length >= 6;
   return (
     <Modal title="Créer une boutique" sub="Un compte admin sera créé automatiquement · essai de 14 jours" onClose={close}

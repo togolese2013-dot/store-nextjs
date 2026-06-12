@@ -15,9 +15,9 @@ export const useUI = (): UIStore => {
 };
 
 /* ── helpers ────────────────────────────────────────────────────── */
-const PLAN_MAP: Record<string, PlanName> = { basic: 'Starter', pro: 'Business', business: 'Enterprise' };
-const PLAN_PRICE: Record<PlanName, number> = { Starter: 9000, Business: 25000, Enterprise: 75000 };
-const PLAN_API: Record<PlanName, string> = { Starter: 'basic', Business: 'pro', Enterprise: 'business' };
+const PLAN_MAP: Record<string, PlanName> = { basic: 'Basic', pro: 'Pro', business: 'Business' };
+const PLAN_PRICE: Record<PlanName, number> = { Basic: 9000, Pro: 25000, Business: 75000 };
+const PLAN_API: Record<PlanName, string> = { Basic: 'basic', Pro: 'pro', Business: 'business' };
 
 function statusFromDB(s: string): TenantStatus {
   if (s === 'active') return 'Actif';
