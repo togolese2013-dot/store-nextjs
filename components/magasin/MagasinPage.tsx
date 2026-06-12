@@ -238,7 +238,6 @@ export default function MagasinPage({
               selected={selected}
               onToggle={toggle}
               onToggleAll={toggleAll}
-              onEdit={onEdit}
               onDelete={onDelete}
               onArchive={onArchive}
               totalCount={totalCount}
