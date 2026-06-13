@@ -71,6 +71,7 @@ const MODULES: Record<string, {
       { label: "Vérifications KYC",     href: "/admin/verifications",     icon: ShieldCheck },
       { label: "Zones de livraison",    href: "/admin/settings/delivery", icon: MapPin },
       { label: "Paiements config",      href: "/admin/settings/payment",  icon: CreditCard },
+      { label: "Parrainage",            href: "/admin/parrainage",        icon: Link2 },
     ],
   },
   crm: {
@@ -82,7 +83,6 @@ const MODULES: Record<string, {
       { label: "Clients",            href: "/admin/crm",             icon: Users },
       { label: "Conversations Séréna", href: "/admin/serena",        icon: MessageCircle },
       { label: "Fidélité",           href: "/admin/fidelite",        icon: Gift },
-      { label: "Parrainage",         href: "/admin/parrainage",      icon: Link2 },
       { label: "Newsletter",         href: "/admin/newsletter",      icon: Mail },
       { label: "Comptes clients",    href: "/admin/comptes-clients", icon: UserCheck },
       { label: "Réseaux Sociaux",    href: "/admin/social",          icon: Share2 },
@@ -143,7 +143,7 @@ const ROUTE_TO_MODULE: [string, string][] = [
   ["/admin/crm",                   "crm"],
   ["/admin/serena",                "crm"],
   ["/admin/fidelite",              "crm"],
-  ["/admin/parrainage",            "crm"],
+  ["/admin/parrainage",            "store"],
   ["/admin/newsletter",            "crm"],
   ["/admin/comptes-clients",       "crm"],
 ];
