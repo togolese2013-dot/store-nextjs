@@ -1178,7 +1178,7 @@ export default function CheckoutPage() {
                   </div>
                   {referralDiscount > 0 && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-emerald-600 font-semibold">Remise parrainage −10%</span>
+                      <span className="text-emerald-600 font-semibold">Remise parrainage −{filleulPct}%</span>
                       <span className="text-emerald-600 font-bold">−{formatPrice(referralDiscount)}</span>
                     </div>
                   )}
