@@ -38,7 +38,7 @@ export default function ParrainageClient({ initialReferrals }: Props) {
   const [settingsSaved, setSettingsSaved]   = useState(false);
 
   useEffect(() => {
-    fetch("/api/admin/referrals/settings")
+    fetch("/api/admin/referrals/settings", { credentials: "include" })
       .then(r => r.json())
       .then(d => {
         if (typeof d.filleul_pct === "number") setFilleulPct(d.filleul_pct);
@@ -57,6 +57,7 @@ export default function ParrainageClient({ initialReferrals }: Props) {
     try {
       await fetch("/api/admin/referrals/settings", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filleul_pct: filleulPct, parrain_pct: parrainPct }),
       });
@@ -74,6 +75,7 @@ export default function ParrainageClient({ initialReferrals }: Props) {
     try {
       const res = await fetch("/api/admin/referrals", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nom: nom.trim(), telephone: telephone.trim() }),
       });
@@ -103,7 +105,7 @@ export default function ParrainageClient({ initialReferrals }: Props) {
     if (!confirm("Supprimer ce code de parrainage ?")) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/admin/referrals/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/referrals/${id}`, { method: "DELETE", credentials: "include" });
       if (res.ok) setReferrals(prev => prev.filter(r => r.id !== id));
     } finally {
       setDeletingId(null);
