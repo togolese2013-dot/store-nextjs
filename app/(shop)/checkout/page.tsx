@@ -783,7 +783,7 @@ export default function CheckoutPage() {
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
                 <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">3</div>
-                  Code promo / parrain
+                  Code promo
                 </h2>
                 {coupon ? (
                   <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
@@ -820,7 +820,7 @@ export default function CheckoutPage() {
                       onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
                       onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCoupon())}
                       onBlur={applyCoupon}
-                      placeholder="Code promo ou code parrain"
+                      placeholder="Code promo"
                       className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white pr-10"
                     />
                     {couponLoading && (
