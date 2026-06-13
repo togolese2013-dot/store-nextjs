@@ -156,6 +156,9 @@ export default function CheckoutPage() {
   const [zones,        setZones]        = useState<DeliveryZone[]>([]);
   const [refCode,      setRefCode]      = useState<string | null>(null);
   const [filleulPct,   setFilleulPct]   = useState(10);
+  const [refInput,     setRefInput]     = useState("");
+  const [refError,     setRefError]     = useState("");
+  const [refLoading,   setRefLoading]   = useState(false);
   const [couponInput,  setCouponInput]  = useState("");
   const [coupon,       setCoupon]       = useState<{ code: string; type: string; valeur: number; remise: number } | null>(null);
   const [couponError,  setCouponError]  = useState("");
@@ -300,6 +303,23 @@ export default function CheckoutPage() {
       setCouponError("Erreur réseau.");
     } finally {
       setCouponLoading(false);
+    }
+  }
+
+  async function applyReferral() {
+    const code = refInput.trim().toUpperCase();
+    if (!code) return;
+    setRefError("");
+    setRefLoading(true);
+    try {
+      const res  = await fetch(`/api/referrals/validate?code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (!data.valid) { setRefError("Code parrain invalide ou introuvable."); }
+      else             { setRefCode(code); setRefError(""); }
+    } catch {
+      setRefError("Erreur réseau.");
+    } finally {
+      setRefLoading(false);
     }
   }
 
@@ -806,10 +826,48 @@ export default function CheckoutPage() {
                 {couponError && <p className="text-xs text-red-500 mt-2">{couponError}</p>}
               </div>
 
-              {/* Mode de paiement — 4 cartes horizontales */}
+              {/* Code parrain */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
                 <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">4</div>
+                  Code parrain
+                </h2>
+                {refCode ? (
+                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                    <div>
+                      <p className="text-sm font-bold text-emerald-800">{refCode}</p>
+                      <p className="text-xs text-emerald-600">
+                        Remise parrainage −{filleulPct}% appliquée → <span className="font-bold">{formatPrice(referralDiscount)}</span>
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => { setRefCode(null); setRefInput(""); }}
+                      className="text-xs text-emerald-600 hover:text-red-500 font-semibold transition-colors">
+                      Retirer
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={refInput}
+                      onChange={e => { setRefInput(e.target.value.toUpperCase()); setRefError(""); }}
+                      onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyReferral())}
+                      onBlur={applyReferral}
+                      placeholder="Code parrain (optionnel)"
+                      className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white pr-10"
+                    />
+                    {refLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
+                    )}
+                  </div>
+                )}
+                {refError && <p className="text-xs text-red-500 mt-2">{refError}</p>}
+              </div>
+
+              {/* Mode de paiement — 4 cartes horizontales */}
+              <div className="bg-white rounded-3xl border border-slate-100 p-6">
+                <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">5</div>
                   Mode de paiement
                 </h2>
 
