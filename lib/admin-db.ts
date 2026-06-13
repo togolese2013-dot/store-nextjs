@@ -3924,7 +3924,7 @@ export async function listReferrals() {
   );
   return rows as {
     id: number; nom: string; telephone: string; code: string;
-    uses_count: number; created_at: string;
+    uses_count: number; gains_total: number; created_at: string;
   }[];
 }
 

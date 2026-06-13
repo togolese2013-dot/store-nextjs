@@ -1,6 +1,6 @@
 import express from "express";
 import { emitAdminEvent } from "../lib/admin-events";
-import { createOrder, addOrderEvent, createPaymentPlan, ensureOrderVente } from "@/lib/admin-db";
+import { createOrder, addOrderEvent, createPaymentPlan, ensureOrderVente, getSetting } from "@/lib/admin-db";
 import { sendOrderNotifications } from "../lib/whatsapp";
 import { db } from "@/lib/db";
 import { getClientSession } from "../lib/client-auth";
@@ -165,8 +165,13 @@ async function validateOrderPricing(
       }
     }
 
-    // 3a. Referral discount (10% of subtotal if valid ref_code cookie)
-    const referralDiscount = ref_code ? Math.round(serverSubtotal * 0.10) : 0;
+    // 3a. Referral discount (rate from settings, default 10%)
+    let filleulPct = 10;
+    try {
+      const v = await getSetting("referral_filleul_pct");
+      if (v) filleulPct = Math.max(0, Math.min(100, Number(v)));
+    } catch {}
+    const referralDiscount = ref_code ? Math.round(serverSubtotal * filleulPct / 100) : 0;
 
     // 3b. Validate coupon discount
     let serverRemise = 0;
@@ -294,12 +299,23 @@ router.post("/api/orders", async (req, res) => {
       );
     }
 
-    // Increment referral uses_count if a valid ref_code was applied
+    // Increment referral uses_count + credit parrain gain
     if (ref_code) {
-      pool.execute(
-        `UPDATE referrals SET uses_count = uses_count + 1 WHERE code = ?`,
-        [String(ref_code).trim().toUpperCase()]
-      ).catch(() => {});
+      (async () => {
+        try {
+          const safeCode = String(ref_code).trim().toUpperCase();
+          let parrainPct = 5;
+          try {
+            const v = await getSetting("referral_parrain_pct");
+            if (v) parrainPct = Math.max(0, Math.min(100, Number(v)));
+          } catch {}
+          const gain = Math.round(Number(pricing.subtotal) * parrainPct / 100);
+          await pool.execute(
+            `UPDATE referrals SET uses_count = uses_count + 1, gains_total = COALESCE(gains_total, 0) + ? WHERE code = ?`,
+            [gain, safeCode]
+          );
+        } catch {}
+      })();
     }
 
     // Increment coupon uses_count

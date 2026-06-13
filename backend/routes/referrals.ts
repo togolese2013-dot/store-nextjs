@@ -1,5 +1,7 @@
 import express from "express";
 import { db as pool } from "@/lib/db";
+import { getSession } from "../lib/auth";
+import { getSetting, setSetting } from "@/lib/admin-db";
 import mysql from "mysql2/promise";
 
 const router = express.Router();
@@ -14,11 +16,18 @@ async function ensureReferralsTable() {
       telephone   VARCHAR(30)  NOT NULL,
       code        VARCHAR(20)  NOT NULL UNIQUE,
       uses_count  INT UNSIGNED NOT NULL DEFAULT 0,
+      gains_total DECIMAL(12,2) NOT NULL DEFAULT 0,
       created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_code      (code),
       INDEX idx_telephone (telephone)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  // Add gains_total if table already existed without it
+  try {
+    await pool.execute(`ALTER TABLE referrals ADD COLUMN gains_total DECIMAL(12,2) NOT NULL DEFAULT 0`);
+  } catch (e: any) {
+    if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+  }
 }
 ensureReferralsTable().catch(console.error);
 
@@ -122,6 +131,115 @@ router.get("/api/referrals/validate", async (req, res) => {
   } catch (err) {
     console.error("[referrals/validate]", err);
     res.status(500).json({ valid: false });
+  }
+});
+
+// ─── GET /api/admin/referrals/settings ───────────────────────────────────────
+
+router.get("/api/admin/referrals/settings", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifié." });
+
+    const [filleulPct, parrainPct] = await Promise.all([
+      getSetting("referral_filleul_pct").catch(() => "10"),
+      getSetting("referral_parrain_pct").catch(() => "5"),
+    ]);
+
+    res.json({
+      filleul_pct: Number(filleulPct || "10"),
+      parrain_pct: Number(parrainPct || "5"),
+    });
+  } catch (err) {
+    console.error("[referrals/settings/get]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+// ─── POST /api/admin/referrals/settings ──────────────────────────────────────
+
+router.post("/api/admin/referrals/settings", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifié." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Accès refusé." });
+    }
+
+    const filleulPct = Math.max(0, Math.min(100, Number(req.body.filleul_pct ?? 10)));
+    const parrainPct = Math.max(0, Math.min(100, Number(req.body.parrain_pct ?? 5)));
+
+    await Promise.all([
+      setSetting("referral_filleul_pct", String(filleulPct)),
+      setSetting("referral_parrain_pct", String(parrainPct)),
+    ]);
+
+    res.json({ ok: true, filleul_pct: filleulPct, parrain_pct: parrainPct });
+  } catch (err) {
+    console.error("[referrals/settings/post]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+// ─── DELETE /api/admin/referrals/:id ─────────────────────────────────────────
+// Admin only — delete a referral code.
+
+router.delete("/api/admin/referrals/:id", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifié." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Accès refusé." });
+    }
+
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "ID invalide." });
+
+    await pool.execute(`DELETE FROM referrals WHERE id = ?`, [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[referrals/delete]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+// ─── POST /api/admin/referrals ────────────────────────────────────────────────
+// Admin only — create a referral code manually.
+
+router.post("/api/admin/referrals", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifié." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Accès refusé." });
+    }
+
+    const { nom, telephone } = req.body as { nom?: string; telephone?: string };
+    if (!nom?.trim() || !telephone?.trim()) {
+      return res.status(400).json({ error: "Nom et téléphone obligatoires." });
+    }
+
+    const safeName  = String(nom).trim().slice(0, 100);
+    const safePhone = String(telephone).trim().replace(/\s+/g, "").slice(0, 30);
+
+    const [[existing]] = await pool.execute<mysql.RowDataPacket[]>(
+      `SELECT code, nom, uses_count FROM referrals WHERE telephone = ? LIMIT 1`,
+      [safePhone]
+    );
+    if (existing) {
+      return res.status(409).json({ error: "Un code existe déjà pour ce numéro.", code: existing.code });
+    }
+
+    const code = await uniqueCode(safeName);
+    await pool.execute(
+      `INSERT INTO referrals (nom, telephone, code) VALUES (?, ?, ?)`,
+      [safeName, safePhone, code]
+    );
+
+    res.json({ code, nom: safeName, uses_count: 0 });
+  } catch (err) {
+    console.error("[referrals/admin-post]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 

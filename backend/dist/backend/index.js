@@ -5,8 +5,13 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -9096,7 +9101,13 @@ async function validateOrderPricing(items, zone_livraison, delivery_fee_claimed,
         serverFee = Number(delivery_fee_claimed ?? 0);
       }
     }
-    const referralDiscount = ref_code ? Math.round(serverSubtotal * 0.1) : 0;
+    let filleulPct = 10;
+    try {
+      const v = await getSetting("referral_filleul_pct");
+      if (v) filleulPct = Math.max(0, Math.min(100, Number(v)));
+    } catch {
+    }
+    const referralDiscount = ref_code ? Math.round(serverSubtotal * filleulPct / 100) : 0;
     let serverRemise = 0;
     if (coupon_code) {
       try {
@@ -9210,11 +9221,23 @@ router27.post("/api/orders", async (req, res) => {
       );
     }
     if (ref_code) {
-      pool2.execute(
-        `UPDATE referrals SET uses_count = uses_count + 1 WHERE code = ?`,
-        [String(ref_code).trim().toUpperCase()]
-      ).catch(() => {
-      });
+      (async () => {
+        try {
+          const safeCode = String(ref_code).trim().toUpperCase();
+          let parrainPct = 5;
+          try {
+            const v = await getSetting("referral_parrain_pct");
+            if (v) parrainPct = Math.max(0, Math.min(100, Number(v)));
+          } catch {
+          }
+          const gain = Math.round(Number(pricing.subtotal) * parrainPct / 100);
+          await pool2.execute(
+            `UPDATE referrals SET uses_count = uses_count + 1, gains_total = COALESCE(gains_total, 0) + ? WHERE code = ?`,
+            [gain, safeCode]
+          );
+        } catch {
+        }
+      })();
     }
     if (coupon_code) {
       pool2.execute(
@@ -10784,6 +10807,7 @@ var analytics_default = router35;
 // routes/referrals.ts
 var import_express36 = __toESM(require("express"));
 init_db();
+init_admin_db();
 var router36 = import_express36.default.Router();
 async function ensureReferralsTable() {
   await db.execute(`
@@ -10793,11 +10817,17 @@ async function ensureReferralsTable() {
       telephone   VARCHAR(30)  NOT NULL,
       code        VARCHAR(20)  NOT NULL UNIQUE,
       uses_count  INT UNSIGNED NOT NULL DEFAULT 0,
+      gains_total DECIMAL(12,2) NOT NULL DEFAULT 0,
       created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_code      (code),
       INDEX idx_telephone (telephone)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  try {
+    await db.execute(`ALTER TABLE referrals ADD COLUMN gains_total DECIMAL(12,2) NOT NULL DEFAULT 0`);
+  } catch (e) {
+    if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+  }
 }
 ensureReferralsTable().catch(console.error);
 function generateCode2(nom) {
@@ -10875,6 +10905,89 @@ router36.get("/api/referrals/validate", async (req, res) => {
   } catch (err) {
     console.error("[referrals/validate]", err);
     res.status(500).json({ valid: false });
+  }
+});
+router36.get("/api/admin/referrals/settings", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifi\xE9." });
+    const [filleulPct, parrainPct] = await Promise.all([
+      getSetting("referral_filleul_pct").catch(() => "10"),
+      getSetting("referral_parrain_pct").catch(() => "5")
+    ]);
+    res.json({
+      filleul_pct: Number(filleulPct || "10"),
+      parrain_pct: Number(parrainPct || "5")
+    });
+  } catch (err) {
+    console.error("[referrals/settings/get]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+router36.post("/api/admin/referrals/settings", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifi\xE9." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+    }
+    const filleulPct = Math.max(0, Math.min(100, Number(req.body.filleul_pct ?? 10)));
+    const parrainPct = Math.max(0, Math.min(100, Number(req.body.parrain_pct ?? 5)));
+    await Promise.all([
+      setSetting("referral_filleul_pct", String(filleulPct)),
+      setSetting("referral_parrain_pct", String(parrainPct))
+    ]);
+    res.json({ ok: true, filleul_pct: filleulPct, parrain_pct: parrainPct });
+  } catch (err) {
+    console.error("[referrals/settings/post]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+router36.delete("/api/admin/referrals/:id", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifi\xE9." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+    }
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "ID invalide." });
+    await db.execute(`DELETE FROM referrals WHERE id = ?`, [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[referrals/delete]", err);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+router36.post("/api/admin/referrals", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Non authentifi\xE9." });
+    if (!["super_admin", "admin"].includes(session.role)) {
+      return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+    }
+    const { nom, telephone } = req.body;
+    if (!nom?.trim() || !telephone?.trim()) {
+      return res.status(400).json({ error: "Nom et t\xE9l\xE9phone obligatoires." });
+    }
+    const safeName = String(nom).trim().slice(0, 100);
+    const safePhone = String(telephone).trim().replace(/\s+/g, "").slice(0, 30);
+    const [[existing]] = await db.execute(
+      `SELECT code, nom, uses_count FROM referrals WHERE telephone = ? LIMIT 1`,
+      [safePhone]
+    );
+    if (existing) {
+      return res.status(409).json({ error: "Un code existe d\xE9j\xE0 pour ce num\xE9ro.", code: existing.code });
+    }
+    const code = await uniqueCode(safeName);
+    await db.execute(
+      `INSERT INTO referrals (nom, telephone, code) VALUES (?, ?, ?)`,
+      [safeName, safePhone, code]
+    );
+    res.json({ code, nom: safeName, uses_count: 0 });
+  } catch (err) {
+    console.error("[referrals/admin-post]", err);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 var referrals_default = router36;

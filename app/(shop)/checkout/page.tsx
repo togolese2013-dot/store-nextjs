@@ -155,6 +155,7 @@ export default function CheckoutPage() {
   const [orderRef,     setOrderRef]     = useState("");
   const [zones,        setZones]        = useState<DeliveryZone[]>([]);
   const [refCode,      setRefCode]      = useState<string | null>(null);
+  const [filleulPct,   setFilleulPct]   = useState(10);
   const [couponInput,  setCouponInput]  = useState("");
   const [coupon,       setCoupon]       = useState<{ code: string; type: string; valeur: number; remise: number } | null>(null);
   const [couponError,  setCouponError]  = useState("");
@@ -176,6 +177,10 @@ export default function CheckoutPage() {
     fetch("/api/public/delivery-zones")
       .then(r => r.json())
       .then(d => Array.isArray(d) && setZones(d))
+      .catch(() => {});
+    fetch("/api/admin/referrals/settings")
+      .then(r => r.json())
+      .then(d => { if (typeof d.filleul_pct === "number") setFilleulPct(d.filleul_pct); })
       .catch(() => {});
   }, []);
 
@@ -212,7 +217,7 @@ export default function CheckoutPage() {
 
   const selectedZone     = zones.find(z => z.nom === form.zone);
   const deliveryFee      = selectedZone?.fee ?? 0;
-  const referralDiscount = refCode ? Math.round(selectedTotal * 0.10) : 0;
+  const referralDiscount = refCode ? Math.round(selectedTotal * filleulPct / 100) : 0;
   const couponDiscount   = coupon?.remise ?? 0;
   const grandTotal       = selectedTotal + deliveryFee - referralDiscount - couponDiscount;
   const montantTranche   = nbTranches > 0
