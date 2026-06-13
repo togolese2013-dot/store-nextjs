@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link2, Plus, Trash2, X, Copy, Check, Users, Settings, Save } from "lucide-react";
 
 type Referral = {
@@ -15,13 +15,15 @@ type Referral = {
 
 interface Props {
   initialReferrals: Referral[];
+  initialFilleulPct: number;
+  initialParrainPct: number;
 }
 
 function formatPrice(n: number) {
   return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " FCFA";
 }
 
-export default function ParrainageClient({ initialReferrals }: Props) {
+export default function ParrainageClient({ initialReferrals, initialFilleulPct, initialParrainPct }: Props) {
   const [referrals, setReferrals] = useState<Referral[]>(initialReferrals);
   const [showModal, setShowModal]   = useState(false);
   const [nom, setNom]               = useState("");
@@ -32,20 +34,10 @@ export default function ParrainageClient({ initialReferrals }: Props) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // Settings
-  const [filleulPct, setFilleulPct] = useState(10);
-  const [parrainPct, setParrainPct] = useState(5);
+  const [filleulPct, setFilleulPct] = useState(initialFilleulPct);
+  const [parrainPct, setParrainPct] = useState(initialParrainPct);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved]   = useState(false);
-
-  useEffect(() => {
-    fetch("/api/admin/referrals/settings", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => {
-        if (typeof d.filleul_pct === "number") setFilleulPct(d.filleul_pct);
-        if (typeof d.parrain_pct === "number") setParrainPct(d.parrain_pct);
-      })
-      .catch(() => {});
-  }, []);
 
   const totalUses   = referrals.reduce((s, r) => s + r.uses_count, 0);
   const activeCount = referrals.filter(r => r.uses_count > 0).length;
