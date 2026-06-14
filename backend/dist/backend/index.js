@@ -12722,7 +12722,6 @@ router45.put("/api/admin/saas/plans", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const { plans, global: globalCfg } = req.body;
-  console.log("[PUT saas/plans] body:", JSON.stringify(req.body).substring(0, 1200));
   try {
     const { updatePlanFull: updatePlanFull2, updateSaasSettings: updateSaasSettings2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
     if (plans) {
