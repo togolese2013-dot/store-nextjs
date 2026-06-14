@@ -30,7 +30,7 @@ function defaultsFor(schema: EntitySchema): Record<string, any> {
 
 function mapIncoming(kind: string, data: any): Record<string, any> {
   if (!data) return {};
-  if (kind === "product")   return { name: data.name, sku: data.sku, status: data.status, cat: data.cat, brand: data.brand, price: data.price, stock: data.stock, target: data.target, variants: [] };
+  if (kind === "product")   return { name: data.name, sku: data.sku, status: data.status, cat: data.cat, brand: data.brand, price: data.price, cost: data.cost, stock: data.stock, target: data.target, variants: [] };
   if (kind === "supplier")  return { name: data.name, country: data.country, status: data.status, delay: data.delay, notes: "" };
   if (kind === "brand")     return { name: data.name, country: data.country, status: data.status };
   if (kind === "category")  return { name: data.name, subcats: data.subcats, color: data.color };
