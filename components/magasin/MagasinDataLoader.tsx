@@ -47,6 +47,7 @@ interface ApiProduct {
   stock_boutique?: number | null;
   actif?: number | boolean | null;
   image_url?: string | null;
+  prix_entrepot?: number | null;
 }
 
 interface StatsResponse {
