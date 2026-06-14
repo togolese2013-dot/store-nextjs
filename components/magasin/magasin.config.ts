@@ -184,7 +184,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
           nom:            values.name,
           reference:      values.sku,
           prix_unitaire:  Number(values.price) || 0,
-          prix_entrepot:  values.cost ? Number(values.cost) : null,
+          prix_entrepot:  values.cost ? Number(values.cost) : undefined,
           stock_magasin:  Number(values.stock) || 0,
           actif:          values.status === "Brouillon" ? 0 : 1,
         };
