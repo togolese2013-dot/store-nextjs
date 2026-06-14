@@ -271,6 +271,7 @@ export default function PlansPage() {
   const [saving,  setSaving]  = useState(false);
   const [saved,   setSaved]   = useState(false);
   const [loading, setLoading] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
 
   const fetchConfig = useCallback(async () => {
     setLoading(true);
@@ -309,16 +310,23 @@ export default function PlansPage() {
 
   async function saveConfig() {
     setSaving(true);
+    setSaveErr('');
     try {
-      await fetch('/api/admin/saas/plans', {
+      const res  = await fetch('/api/admin/saas/plans', {
         method: 'PUT', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plans, global }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveErr(data.error ?? `Erreur serveur (${res.status})`);
+        return;
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
+      await fetchConfig();
     } catch {
-      alert('Erreur lors de la sauvegarde.');
+      setSaveErr('Erreur réseau — veuillez réessayer.');
     } finally { setSaving(false); }
   }
 
@@ -347,6 +355,15 @@ export default function PlansPage() {
           {saved ? '✓ Sauvegardé' : saving ? 'Sauvegarde…' : 'Sauvegarder'}
         </button>
       </PageHead>
+
+      {/* Erreur save */}
+      {saveErr && (
+        <div style={{ margin: '0 28px', padding: '10px 14px', background: 'var(--danger-bg, #F7DCCB)', border: '1px solid var(--danger, #9C3A14)', borderRadius: 9, fontSize: 13, color: 'var(--danger, #9C3A14)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {saveErr}
+          <button onClick={() => setSaveErr('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, fontSize: 16, lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       {/* ── KPIs — classes globales SuperAdmin.css ── */}
       <div className="kpis">
