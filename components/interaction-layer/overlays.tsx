@@ -2,7 +2,7 @@
    Overlays — Export, Import, AI drawer, History, Notifications,
    Command palette, Filter panel.
    ============================================================ */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Drawer } from "./shell";
 import { Modal } from "./shell";
 import { Field, Segmented, ImageDrop } from "./fields";
@@ -105,13 +105,40 @@ export function ImportModal({ scope, onClose, toast }: ImportModalProps) {
 interface AIDrawerProps { onClose: () => void; toast: (m: string) => void; }
 export function AIDrawer({ onClose, toast }: AIDrawerProps) {
   const config = useConfig();
-  const list = config.ai ?? DEFAULT_AI;
+  const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
+
+  const fetchSuggestions = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res  = await fetch("/api/admin/ai/suggestions", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Erreur serveur"); return; }
+      if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+        setSuggestions(data.suggestions as AiSuggestion[]);
+      } else {
+        setSuggestions(config.ai ?? DEFAULT_AI);
+      }
+    } catch {
+      setError("Erreur réseau");
+      setSuggestions(config.ai ?? DEFAULT_AI);
+    } finally { setLoading(false); }
+  }, [config.ai]);
+
+  useEffect(() => { fetchSuggestions(); }, [fetchSuggestions]);
+
   const tones: Record<string, [string, string]> = {
     danger: ["var(--danger-bg)", "var(--danger)"],
     accent: ["var(--accent-bg)", "var(--accent)"],
     ok:     ["var(--ok-bg)",     "var(--ok)"],
   };
   const Icon = Icons;
+
   return (
     <Drawer
       eyebrow={`${config.name ?? "App"} · Assistant`}
@@ -120,31 +147,50 @@ export function AIDrawer({ onClose, toast }: AIDrawerProps) {
       onClose={onClose}
       footer={
         <button className="btn pri" style={{ width: "100%", justifyContent: "center" }}
-          onClick={() => { onClose(); toast("Analyse IA relancée"); }}>
-          <Icon.sparkles size={14} /> Régénérer les suggestions
+          disabled={loading}
+          onClick={() => fetchSuggestions()}>
+          <Icon.sparkles size={14} />
+          {loading ? "Analyse en cours…" : "Régénérer les suggestions"}
         </button>
       }
     >
-      <p className="sub" style={{ margin: 0 }}>{list.length} actions recommandées par l'assistant.</p>
-      {list.map((s, i) => {
-        const [bg, c] = tones[s.tone];
-        const Ic = Icons[s.ic];
-        return (
-          <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 13, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: "grid", placeItems: "center", background: bg, color: c }}><Ic size={17} /></div>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "-.01em" }}>{s.t}</div>
-                <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>{s.d}</div>
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p className="sub" style={{ margin: 0 }}>Analyse de votre boutique en cours…</p>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 13, padding: 16, height: 88, opacity: 0.5 + i * 0.1,
+              backgroundImage: "linear-gradient(90deg, var(--bg-2) 0%, var(--border) 50%, var(--bg-2) 100%)",
+              backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+          ))}
+        </div>
+      ) : error ? (
+        <div style={{ background: "var(--danger-bg)", border: "1px solid var(--danger)", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "var(--danger)" }}>
+          {error}
+        </div>
+      ) : (
+        <>
+          <p className="sub" style={{ margin: 0 }}>{suggestions.length} actions recommandées par l&apos;assistant.</p>
+          {suggestions.map((s, i) => {
+            const [bg, c] = tones[s.tone] ?? tones.accent;
+            const Ic = Icons[s.ic] ?? Icons.sparkles;
+            return (
+              <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 13, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: "grid", placeItems: "center", background: bg, color: c }}><Ic size={17} /></div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "-.01em" }}>{s.t}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>{s.d}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, paddingLeft: 45 }}>
+                  <button className="btn sm pri" onClick={() => { onClose(); toast(s.cta); }}>{s.cta}</button>
+                  <button className="btn sm" onClick={() => { setSuggestions(prev => prev.filter((_, j) => j !== i)); toast("Suggestion ignorée"); }}>Ignorer</button>
+                </div>
               </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, paddingLeft: 45 }}>
-              <button className="btn sm pri" onClick={() => { onClose(); toast("Suggestion appliquée"); }}>{s.cta}</button>
-              <button className="btn sm" onClick={() => toast("Suggestion ignorée")}>Ignorer</button>
-            </div>
-          </div>
-        );
-      })}
+            );
+          })}
+        </>
+      )}
     </Drawer>
   );
 }

@@ -60,7 +60,8 @@ import adminEntrepotsRoutes, { ensureEntrepotsTable } from "./routes/admin/entre
 import adminTombolaRoutes from "./routes/admin/tombola";
 import adminOnboardingRoutes from "./routes/admin/onboarding";
 import adminSaasDashboardRoutes from "./routes/admin/saas-dashboard";
-import adminBillingRoutes from "./routes/admin/billing";
+import adminBillingRoutes       from "./routes/admin/billing";
+import adminAiRoutes            from "./routes/admin/ai";
 import { expireShopSubscriptions } from "@/lib/shops";
 import { startReviewNotifier } from "./lib/review-notifier";
 
@@ -206,6 +207,7 @@ app.use(adminTombolaRoutes);
 app.use(adminOnboardingRoutes);
 app.use(adminSaasDashboardRoutes);
 app.use(adminBillingRoutes);
+app.use(adminAiRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);

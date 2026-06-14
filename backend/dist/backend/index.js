@@ -5073,7 +5073,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express47 = __toESM(require("express"));
+var import_express48 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -12844,6 +12844,102 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
 });
 var billing_default = router46;
 
+// routes/admin/ai.ts
+var import_express47 = __toESM(require("express"));
+init_db();
+var router47 = import_express47.default.Router();
+router47.post("/api/admin/ai/suggestions", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY manquant." });
+  const shopId = session.shop_id ?? 1;
+  const pool2 = db;
+  try {
+    const [[stats]] = await pool2.execute(`
+      SELECT
+        COUNT(CASE WHEN p.stock_magasin <= 5 AND p.entrepot_id IS NULL THEN 1 END)                                   AS stock_bas,
+        COUNT(CASE WHEN p.description IS NULL OR p.description = ''    THEN 1 END)                                   AS sans_description,
+        COUNT(CASE WHEN p.categorie_id IS NULL                         THEN 1 END)                                   AS sans_categorie,
+        COUNT(CASE WHEN p.prix_entrepot IS NOT NULL AND p.prix_entrepot > 0
+                        AND p.prix_unitaire > 0
+                        AND ((p.prix_unitaire - p.prix_entrepot) / p.prix_unitaire) < 0.30 THEN 1 END)               AS marge_faible,
+        COUNT(CASE WHEN (p.image_url IS NULL OR p.image_url = '')      THEN 1 END)                                   AS sans_image,
+        COUNT(*)                                                                                                       AS total
+      FROM produits p
+      WHERE p.actif = 1 AND p.shop_id = ?
+    `, [shopId]);
+    const [prodsStockBas] = await pool2.execute(`
+      SELECT nom, stock_magasin FROM produits
+      WHERE actif = 1 AND shop_id = ? AND stock_magasin <= 5 AND entrepot_id IS NULL
+      ORDER BY stock_magasin ASC LIMIT 5
+    `, [shopId]);
+    const [[ventes]] = await pool2.execute(`
+      SELECT COUNT(*) AS nb, COALESCE(SUM(total), 0) AS ca
+      FROM factures
+      WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    `, [shopId]).catch(() => [[{ nb: 0, ca: 0 }]]);
+    const context = {
+      total_produits: Number(stats.total),
+      stock_bas: Number(stats.stock_bas),
+      sans_description: Number(stats.sans_description),
+      sans_categorie: Number(stats.sans_categorie),
+      marge_faible: Number(stats.marge_faible),
+      sans_image: Number(stats.sans_image),
+      produits_critiques: prodsStockBas.map((p) => ({ nom: p.nom, stock: Number(p.stock_magasin) })),
+      ventes_7j: Number(ventes.nb),
+      ca_7j_fcfa: Number(ventes.ca)
+    };
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        system: `Tu es l'assistant IA d'une application de gestion de boutique africaine.
+G\xE9n\xE8re exactement 4 suggestions d'actions prioritaires bas\xE9es sur les donn\xE9es fournies.
+R\xE9ponds UNIQUEMENT avec un tableau JSON valide, sans texte ni markdown autour.
+Format de chaque \xE9l\xE9ment :
+{ "ic": string, "tone": string, "t": string, "d": string, "cta": string }
+R\xE8gles :
+- ic : une valeur parmi exactement : alert, box, folder, sparkles, adj, bell, store
+- tone : "danger" (urgent/critique), "accent" (important), "ok" (opportunit\xE9/positif)
+- t : titre court \u2264 60 caract\xE8res
+- d : description actionnable \u2264 120 caract\xE8res
+- cta : texte du bouton \u2264 28 caract\xE8res
+Priorit\xE9 : stock critique > marge faible > donn\xE9es manquantes > optimisations.
+Langue : fran\xE7ais, ton professionnel et concis.`,
+        messages: [{
+          role: "user",
+          content: `Donn\xE9es de la boutique : ${JSON.stringify(context)}`
+        }]
+      })
+    });
+    if (!claudeRes.ok) {
+      const err = await claudeRes.text();
+      return res.status(500).json({ error: `Claude API error: ${claudeRes.status} \u2014 ${err.slice(0, 200)}` });
+    }
+    const claudeData = await claudeRes.json();
+    const text = claudeData.content?.[0]?.text ?? "[]";
+    let suggestions;
+    try {
+      const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      suggestions = JSON.parse(clean);
+      if (!Array.isArray(suggestions)) throw new Error("not array");
+    } catch {
+      suggestions = [];
+    }
+    res.json({ suggestions, context });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+var ai_default = router47;
+
 // index.ts
 init_shops();
 
@@ -12933,7 +13029,7 @@ function startReviewNotifier() {
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express47.default)();
+var app = (0, import_express48.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -13008,8 +13104,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express47.default.json({ limit: "5mb" }));
-app.use(import_express47.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express48.default.json({ limit: "5mb" }));
+app.use(import_express48.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -13057,6 +13153,7 @@ app.use(tombola_default);
 app.use(onboarding_default);
 app.use(saas_dashboard_default);
 app.use(billing_default);
+app.use(ai_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {
