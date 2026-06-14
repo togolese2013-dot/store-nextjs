@@ -1,7 +1,7 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import { createAdminUser, getAdminByUsername } from "@/lib/admin-db";
-import { createShop, getShopBySlug } from "@/lib/shops";
+import { createShop, getShopBySlug, activateBasicPlan } from "@/lib/shops";
 import { sendMail } from "../../lib/mailer";
 import { welcomeShopEmail } from "../../lib/email-templates";
 
@@ -47,6 +47,11 @@ router.post("/api/admin/onboarding", async (req, res) => {
     // ── Créer la boutique ────────────────────────────────────────────
     const plan = ["free", "basic", "pro"].includes(shop_plan) ? (shop_plan as "free" | "basic" | "pro") : "free";
     const shopId = await createShop({ nom: shop_nom.trim(), slug, email: shop_email.trim(), plan });
+
+    // Basic is free — activate immediately (skip trial)
+    if (plan === "basic" || plan === "free") {
+      await activateBasicPlan(shopId);
+    }
 
     // ── Créer l'admin de la boutique ─────────────────────────────────
     const password_hash = await bcrypt.hash(admin_password, 12);
