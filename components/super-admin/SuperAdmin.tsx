@@ -79,6 +79,18 @@ function Shell({ userName = 'Admin', userRole = 'Super Admin' }: SuperAdminProps
               </div>
               <I.chevD />
             </button>
+            <button
+              onClick={async () => {
+                await fetch('/api/admin/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+                window.location.href = '/admin/login';
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 4px', marginTop: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#C84B3A', fontSize: 13, fontFamily: 'inherit', borderRadius: 8, transition: 'background .12s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(200,75,58,0.08)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <I.logout size={15} />
+              <span>Déconnexion</span>
+            </button>
           </div>
         </div>
       </aside>

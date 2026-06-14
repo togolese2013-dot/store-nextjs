@@ -48,6 +48,7 @@ export const I = {
   pause:  (p?: IconProps) => <Ic size={p?.size} d={<><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></>} />,
   play:   (p?: IconProps) => <Ic size={p?.size} d="M6 4l14 8-14 8V4Z" />,
   edit:   (p?: IconProps) => <Ic size={p?.size} d={<><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" /></>} />,
+  logout: (p?: IconProps) => <Ic size={p?.size} d={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></>} />,
   send:   (p?: IconProps) => <Ic size={p?.size} d={<><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></>} />,
   refresh:(p?: IconProps) => <Ic size={p?.size} d={<><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></>} />,
   userPlus:(p?: IconProps) => <Ic size={p?.size} d={<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></>} />,
