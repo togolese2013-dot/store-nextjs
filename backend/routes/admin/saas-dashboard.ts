@@ -300,6 +300,8 @@ router.put("/api/admin/saas/plans", async (req, res) => {
     };
   };
 
+  console.log('[PUT saas/plans] body:', JSON.stringify(req.body).substring(0, 1200));
+
   try {
     const { updatePlanFull, updateSaasSettings } = await import("@/lib/plan-configs");
 
