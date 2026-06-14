@@ -300,27 +300,47 @@ export function FilterPanel({ onClose, toast }: FilterPanelProps) {
 interface CommandPaletteProps { onClose: () => void; navigate: (pg: string) => void; ui: UIApi; }
 export function CommandPalette({ onClose, navigate, ui }: CommandPaletteProps) {
   const config = useConfig();
-  const [q, setQ] = useState("");
+  const [q, setQ]             = useState("");
+  const [aiAnswer, setAiAnswer]   = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { setAiAnswer(""); }, [q]);
 
-  const ql = q.toLowerCase();
+  const isAiMode  = q.startsWith("?");
+  const aiQuestion = isAiMode ? q.slice(1).trim() : "";
+  const ql = isAiMode ? "" : q.toLowerCase();
+
+  const askAI = useCallback(async () => {
+    if (!aiQuestion || aiLoading) return;
+    setAiLoading(true);
+    setAiAnswer("");
+    try {
+      const res  = await fetch("/api/admin/ai/query", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: aiQuestion }),
+      });
+      const data = await res.json();
+      setAiAnswer(res.ok ? (data.answer ?? "Pas de réponse.") : (data.error ?? "Erreur serveur."));
+    } catch { setAiAnswer("Erreur réseau."); }
+    finally { setAiLoading(false); }
+  }, [aiQuestion, aiLoading]);
+
   const navList = config.paletteNav ?? DEFAULT_PALETTE_NAV;
-  const pages = navList.filter((p) => p.l.toLowerCase().includes(ql));
+  const pages   = navList.filter((p) => p.l.toLowerCase().includes(ql));
 
   const baseActions = config.paletteActions
     ? config.paletteActions(ui)
     : [
-        { l: "Créer un produit",            ic: "plus" as const, run: () => ui.openForm("product") },
-        { l: "Créer un bon d'achat",         ic: "plus" as const, run: () => ui.openForm("po") },
-        { l: "Nouvel ajustement de stock",   ic: "adj"  as const, run: () => ui.openForm("adjustment") },
-        { l: "Exporter le catalogue",        ic: "download" as const, run: () => ui.openExport("Produits") },
+        { l: "Créer un produit",           ic: "plus"     as const, run: () => ui.openForm("product")    },
+        { l: "Créer un bon d'achat",        ic: "plus"     as const, run: () => ui.openForm("po")         },
+        { l: "Nouvel ajustement de stock",  ic: "adj"      as const, run: () => ui.openForm("adjustment") },
+        { l: "Exporter le catalogue",       ic: "download" as const, run: () => ui.openExport("Produits") },
       ];
   const actions = baseActions.filter((a) => !ql || a.l.toLowerCase().includes(ql));
 
-  const sg = config.searchGroup
-    ? config.searchGroup(ui)
-    : { title: "Résultats", items: [] };
+  const sg = config.searchGroup ? config.searchGroup(ui) : { title: "Résultats", items: [] };
   const results = (sg.items ?? []).filter((r) => !ql || r.label.toLowerCase().includes(ql) || (r.sub ?? "").toLowerCase().includes(ql)).slice(0, 6);
 
   const Sec = ({ title, children }: { title: string; children: React.ReactNode }) =>
@@ -337,7 +357,7 @@ export function CommandPalette({ onClose, navigate, ui }: CommandPaletteProps) {
       <button className="ux-mi" style={{ padding: "9px 10px" }} onClick={onClick}>
         <span className="ic">{Ic ? <Ic size={16} /> : null}</span>
         <span style={{ flex: 1 }}>{label}</span>
-        {sub && <span style={{ fontSize: 11, color: "var(--muted-2)", fontFamily: "Geist Mono, monospace" }}>{sub}</span>}
+        {sub && <span style={{ fontSize: 11, color: "var(--muted-2)", fontFamily: "var(--font-geist-mono, monospace)" }}>{sub}</span>}
       </button>
     );
   };
@@ -345,30 +365,78 @@ export function CommandPalette({ onClose, navigate, ui }: CommandPaletteProps) {
   return (
     <div className="ux-palette" onMouseDown={(e) => e.stopPropagation()}>
       <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "15px 18px", borderBottom: "1px solid var(--border)" }}>
-        <Icons.search size={18} />
+        {isAiMode
+          ? <span style={{ color: "var(--accent)", flexShrink: 0, display: "grid", placeItems: "center" }}><Icons.sparkles size={18} /></span>
+          : <span style={{ flexShrink: 0, display: "grid", placeItems: "center" }}><Icons.search size={18} /></span>
+        }
         <input
           ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Rechercher un produit, une page, une action…"
+          onKeyDown={(e) => { if (e.key === "Enter" && isAiMode) askAI(); }}
+          placeholder={isAiMode ? "Posez votre question à l'IA…" : "Rechercher · ou taper ? pour interroger l'IA"}
           style={{ flex: 1, border: 0, outline: 0, background: "transparent", fontSize: 15 }}
         />
+        {isAiMode && aiQuestion && (
+          <button
+            onClick={askAI} disabled={aiLoading}
+            style={{ padding: "5px 12px", borderRadius: 7, border: "none", background: "var(--accent)", color: "white", fontSize: 12.5, fontWeight: 600, cursor: aiLoading ? "not-allowed" : "pointer", opacity: aiLoading ? 0.6 : 1, fontFamily: "inherit" }}
+          >
+            {aiLoading ? "…" : "↵ Envoyer"}
+          </button>
+        )}
         <span className="k">Esc</span>
       </div>
+
       <div style={{ maxHeight: "52vh", overflowY: "auto", padding: 6 }}>
-        <Sec title="Actions rapides">
-          {actions.map((a) => <Row key={a.l} iconName={a.ic} label={a.l} onClick={() => { onClose(); a.run(); }} />)}
-        </Sec>
-        <Sec title="Pages">
-          {pages.map((p) => <Row key={p.pg} iconName={p.ic} label={p.l} onClick={() => { onClose(); navigate(p.pg); }} />)}
-        </Sec>
-        <Sec title={sg.title}>
-          {results.map((r, i) => <Row key={i} iconName={r.icon ?? "box"} label={r.label} sub={r.sub} onClick={() => { onClose(); r.onClick?.(); }} />)}
-        </Sec>
-        {!pages.length && !results.length && !actions.length && (
-          <div style={{ padding: 26, textAlign: "center", color: "var(--muted-2)", fontSize: 13 }}>
-            Aucun résultat pour « {q} »
+        {isAiMode ? (
+          <div style={{ padding: "10px 12px" }}>
+            {!aiQuestion && !aiAnswer && (
+              <div style={{ padding: "18px 12px", color: "var(--muted-2)", fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ fontWeight: 500, marginBottom: 8, color: "var(--muted)" }}>Exemples de questions :</div>
+                {["? ventes aujourd'hui", "? produit le plus vendu ce mois", "? combien de clients au total", "? stock critique"].map(ex => (
+                  <button key={ex} className="ux-mi" style={{ width: "100%", textAlign: "left", fontSize: 12.5, padding: "7px 10px" }}
+                    onClick={() => setQ(ex)}>
+                    <span className="ic"><Icons.sparkles size={14} /></span>
+                    <span>{ex.slice(2)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {(aiLoading || aiAnswer) && (
+              <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                  <Icons.sparkles size={12} /> Assistant IA
+                </div>
+                {aiLoading ? (
+                  <div style={{ display: "flex", gap: 4, alignItems: "center", color: "var(--muted-2)", fontSize: 13 }}>
+                    <span style={{ animation: "ux-fade .5s infinite alternate" }}>●</span>
+                    <span style={{ animation: "ux-fade .5s .2s infinite alternate" }}>●</span>
+                    <span style={{ animation: "ux-fade .5s .4s infinite alternate" }}>●</span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--ink)" }}>{aiAnswer}</div>
+                )}
+              </div>
+            )}
           </div>
+        ) : (
+          <>
+            <Sec title="Actions rapides">
+              {actions.map((a) => <Row key={a.l} iconName={a.ic} label={a.l} onClick={() => { onClose(); a.run(); }} />)}
+            </Sec>
+            <Sec title="Pages">
+              {pages.map((p) => <Row key={p.pg} iconName={p.ic} label={p.l} onClick={() => { onClose(); navigate(p.pg); }} />)}
+            </Sec>
+            <Sec title={sg.title}>
+              {results.map((r, i) => <Row key={i} iconName={r.icon ?? "box"} label={r.label} sub={r.sub} onClick={() => { onClose(); r.onClick?.(); }} />)}
+            </Sec>
+            {!pages.length && !results.length && !actions.length && (
+              <div style={{ padding: 26, textAlign: "center", color: "var(--muted-2)", fontSize: 13 }}>
+                Aucun résultat pour « {q} » — tapez <strong>?</strong> pour demander à l&apos;IA
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

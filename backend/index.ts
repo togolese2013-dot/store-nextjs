@@ -295,6 +295,22 @@ try {
   // Expire overdue subscriptions on startup + every 6 hours
   expireShopSubscriptions().catch(e => console.error("[billing] expireShopSubscriptions:", e));
   setInterval(() => expireShopSubscriptions().catch(e => console.error("[billing] expireShopSubscriptions:", e)), 6 * 60 * 60 * 1000);
+
+  // Weekly AI report — every Monday at 08:00
+  (async () => {
+    const { runWeeklyReportsForAllShops } = await import("./routes/admin/ai");
+    const now = new Date();
+    const daysUntilMon = (1 - now.getDay() + 7) % 7 || 7;
+    const nextMon = new Date(now);
+    nextMon.setDate(now.getDate() + daysUntilMon);
+    nextMon.setHours(8, 0, 0, 0);
+    const delay = nextMon.getTime() - now.getTime();
+    console.log(`[weekly-report] cron scheduled in ${Math.round(delay / 3600000)}h`);
+    setTimeout(() => {
+      runWeeklyReportsForAllShops();
+      setInterval(runWeeklyReportsForAllShops, 7 * 24 * 60 * 60 * 1000);
+    }, delay);
+  })().catch(e => console.error("[weekly-report] schedule error:", e));
 });
 
 export default app;
