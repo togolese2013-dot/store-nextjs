@@ -75,6 +75,7 @@ export const NAV: NavGroup[] = [
     { ic: I.store, l: 'Boutiques', pg: 'tenants' },
     { ic: I.card, l: 'Facturation', pg: 'billing' },
     { ic: I.layers, l: 'Plans & tarifs', pg: 'plans' },
+    { ic: I.cog, l: 'Limites des plans', pg: 'limits' },
     { ic: I.life, l: 'Support', pg: 'support' },
     { ic: I.activity, l: 'Santé système', pg: 'system' },
     { ic: I.history, l: "Journal d'audit", pg: 'logs' },
@@ -83,11 +84,11 @@ export const NAV: NavGroup[] = [
 ];
 export const PAGE_LABELS: Record<PageId, string> = {
   overview: "Vue d'ensemble", tenants: 'Boutiques', billing: 'Facturation',
-  plans: 'Plans & tarifs', support: 'Support', system: 'Santé système', logs: "Journal d'audit",
+  plans: 'Plans & tarifs', limits: 'Limites des plans', support: 'Support', system: 'Santé système', logs: "Journal d'audit",
 };
 export const SEARCH_PH: Record<PageId, string> = {
   overview: 'Rechercher…', tenants: 'Rechercher une boutique, ville, plan…',
-  billing: 'Rechercher une facture, boutique…', plans: 'Rechercher…',
+  billing: 'Rechercher une facture, boutique…', plans: 'Rechercher…', limits: 'Rechercher…',
   support: 'Rechercher un ticket, boutique…', system: 'Rechercher un service…',
   logs: 'Rechercher une action, membre…',
 };

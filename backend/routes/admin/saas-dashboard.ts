@@ -240,4 +240,26 @@ router.delete("/api/admin/saas/shops/:id", async (req, res) => {
   }
 });
 
+// ── GET /api/admin/saas/plan-configs ────────────────────────────────────────
+router.get("/api/admin/saas/plan-configs", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  const { getAllPlanLimits } = await import("@/lib/plan-configs");
+  const configs = await getAllPlanLimits();
+  res.json({ configs });
+});
+
+// ── PATCH /api/admin/saas/plan-configs/:plan ────────────────────────────────
+router.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  const plan = req.params.plan;
+  if (!["basic", "pro", "business"].includes(plan)) {
+    return res.status(400).json({ error: "Plan invalide." });
+  }
+  const { updatePlanLimits } = await import("@/lib/plan-configs");
+  await updatePlanLimits(plan, req.body);
+  res.json({ ok: true });
+});
+
 export default router;

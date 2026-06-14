@@ -30,7 +30,21 @@ router.post("/api/admin/entrepots", async (req, res) => {
   const { id, nom, telephone, adresse, notes, actif } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
   try {
-    const newId = await upsertEntrepot({ id: id ? Number(id) : undefined, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false }, session.shop_id ?? 1);
+    const shopId = session.shop_id ?? 1;
+    // Plan limit: max_entrepots (only for new entrepôts, not edits)
+    if (!id && shopId !== 1 && session.role !== "super_admin") {
+      const { getPlanLimits } = await import("@/lib/plan-configs");
+      const { getShopById }   = await import("@/lib/shops");
+      const shop   = await getShopById(shopId).catch(() => null);
+      const limits = await getPlanLimits(shop?.plan ?? "basic");
+      if (limits.max_entrepots > 0) {
+        const existing = await listEntrepots(shopId);
+        if (existing.length >= limits.max_entrepots) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_entrepots} entrepôt(s) maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
+    const newId = await upsertEntrepot({ id: id ? Number(id) : undefined, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false }, shopId);
     res.json({ ok: true, id: newId });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

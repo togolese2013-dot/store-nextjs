@@ -1,5 +1,6 @@
 import express from "express";
 import bcrypt from "bcryptjs";
+import { db } from "@/lib/db";
 import { getSession } from "../../lib/auth";
 import {
   listAdminUsers, createAdminUser, updateAdminUser,
@@ -58,6 +59,23 @@ router.post("/api/admin/users", async (req, res) => {
     // Check username uniqueness
     const existing = await getAdminByUsername(username.trim().toLowerCase());
     if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est déjà utilisé." });
+
+    // Plan limit: max_users per shop
+    const targetShopId = req.body.shop_id ? Number(req.body.shop_id) : (session.shop_id ?? 1);
+    if (targetShopId !== 1) {
+      const { getPlanLimits } = await import("@/lib/plan-configs");
+      const { getShopById }   = await import("@/lib/shops");
+      const shop   = await getShopById(targetShopId).catch(() => null);
+      const limits = await getPlanLimits(shop?.plan ?? "basic");
+      if (limits.max_users > 0) {
+        const [[count]] = await (db as import("mysql2/promise").Pool).execute<import("mysql2/promise").RowDataPacket[]>(
+          "SELECT COUNT(*) AS cnt FROM admin_users WHERE shop_id = ?", [targetShopId]
+        );
+        if (Number(count?.cnt ?? 0) >= limits.max_users) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_users} utilisateur(s) maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
 
     const hash = await bcrypt.hash(password, 12);
     await createAdminUser({

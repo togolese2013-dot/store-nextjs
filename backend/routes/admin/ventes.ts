@@ -1,4 +1,5 @@
 import express from "express";
+import { db } from "@/lib/db";
 import { getSession } from "../../lib/auth";
 import { hasPageAccess } from "@/lib/admin-permissions";
 import { emitAdminEvent } from "../../lib/admin-events";
@@ -58,7 +59,31 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: session.shop_id ?? 1 });
+
+    // Plan limit: ventes/jour + ventes/mois (skip super_admin and shop #1)
+    const shopId = session.shop_id ?? 1;
+    if (shopId !== 1 && session.role !== "super_admin") {
+      const { getPlanLimits } = await import("@/lib/plan-configs");
+      const { getShopById }   = await import("@/lib/shops");
+      const shop   = await getShopById(shopId).catch(() => null);
+      const limits = await getPlanLimits(shop?.plan ?? "basic");
+      if (limits.max_ventes_jour > 0 || limits.max_ventes_mois > 0) {
+        const [[counts]] = await (db as import("mysql2/promise").Pool).execute<import("mysql2/promise").RowDataPacket[]>(
+          `SELECT
+             SUM(DATE(created_at)=CURDATE()) AS today,
+             SUM(YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())) AS mois
+           FROM factures WHERE shop_id = ?`, [shopId]
+        );
+        if (limits.max_ventes_jour > 0 && Number(counts?.today ?? 0) >= limits.max_ventes_jour) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_ventes_jour} ventes par jour maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+        if (limits.max_ventes_mois > 0 && Number(counts?.mois ?? 0) >= limits.max_ventes_mois) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_ventes_mois} ventes par mois maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
+
+    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: shopId });
     emitAdminEvent("vente");
     if (body.client_tel) {
       const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];

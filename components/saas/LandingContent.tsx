@@ -103,7 +103,7 @@ const T = {
         desc: 'Pour tester et démarrer.',
         cta: 'Commencer gratuitement — toujours', highlighted: false,
         href: '/saas/onboarding', external: false,
-        features: ['5 produits max', '10 commandes / mois', '1 utilisateur admin', 'Gestion de stock basique', 'Support par email'],
+        features: ['20 produits max', '40 ventes / mois', '15 commandes en ligne / mois', '1 utilisateur admin', '1 entrepôt max', 'Support par email'],
         upsell: true, urgency: false, subline: false,
       },
       {
@@ -254,7 +254,7 @@ const T = {
         desc: 'To test and get started.',
         cta: 'Get started free — forever', highlighted: false,
         href: '/saas/onboarding', external: false,
-        features: ['5 products max', '10 orders / month', '1 admin user', 'Basic inventory management', 'Email support'],
+        features: ['20 products max', '40 sales / month', '15 online orders / month', '1 admin user', '1 warehouse max', 'Email support'],
         upsell: true, urgency: false, subline: false,
       },
       {

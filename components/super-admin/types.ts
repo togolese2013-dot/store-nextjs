@@ -1,7 +1,7 @@
 import type React from 'react';
 
 export type PageId =
-  | 'overview' | 'tenants' | 'billing' | 'plans' | 'support' | 'system' | 'logs';
+  | 'overview' | 'tenants' | 'billing' | 'plans' | 'limits' | 'support' | 'system' | 'logs';
 
 export type PlanName = 'Basic' | 'Pro' | 'Business' | string;
 export type TenantStatus = 'Actif' | 'Essai' | 'Suspendu' | 'Impayé' | 'Inactif';

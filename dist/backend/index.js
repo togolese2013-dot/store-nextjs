@@ -4579,29 +4579,25 @@ var init_admin_db = __esm({
   }
 });
 
-// index.ts
-var index_exports = {};
-__export(index_exports, {
-  default: () => index_default
-});
-module.exports = __toCommonJS(index_exports);
-var import_dotenv = require("dotenv");
-var import_path = require("path");
-var import_express47 = __toESM(require("express"));
-var import_cors = __toESM(require("cors"));
-var import_cookie_parser = __toESM(require("cookie-parser"));
-var import_helmet = __toESM(require("helmet"));
-var import_express_rate_limit = require("express-rate-limit");
-
-// routes/admin/auth.ts
-var import_express = __toESM(require("express"));
-var import_bcryptjs = __toESM(require("bcryptjs"));
-init_admin_db();
-init_db();
-
 // ../lib/shops.ts
-init_db();
-var _ensured = false;
+var shops_exports = {};
+__export(shops_exports, {
+  activateBasicPlan: () => activateBasicPlan,
+  activateShopSubscription: () => activateShopSubscription,
+  createShop: () => createShop,
+  ensureShopsTable: () => ensureShopsTable,
+  expireShopSubscriptions: () => expireShopSubscriptions,
+  getShopByDomain: () => getShopByDomain,
+  getShopById: () => getShopById,
+  getShopBySlug: () => getShopBySlug,
+  getShopPayments: () => getShopPayments,
+  isShopAccessAllowed: () => isShopAccessAllowed,
+  listShops: () => listShops,
+  listShopsWithStats: () => listShopsWithStats,
+  recordShopPayment: () => recordShopPayment,
+  setShopDomain: () => setShopDomain,
+  updateShop: () => updateShop
+});
 async function ensureShopsTable() {
   if (_ensured) return;
   await db.execute(`
@@ -4710,6 +4706,13 @@ async function createShop(data) {
   );
   return result.insertId;
 }
+async function listShops() {
+  await ensureShopsTable();
+  const [rows] = await db.execute(
+    "SELECT * FROM shops ORDER BY created_at DESC"
+  );
+  return rows.map((r) => ({ ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null }));
+}
 async function updateShop(id, data) {
   await ensureShopsTable();
   const sets = [];
@@ -4757,6 +4760,21 @@ async function listShopsWithStats() {
     product_count: Number(r.product_count),
     admin_count: Number(r.admin_count)
   }));
+}
+function isShopAccessAllowed(shop) {
+  if (shop.id === 1) return true;
+  if (!shop.actif) return false;
+  if (shop.subscription_status === "suspended") return false;
+  if (shop.plan === "basic") return true;
+  if (shop.subscription_status === "trial") {
+    if (!shop.trial_ends_at) return true;
+    return new Date(shop.trial_ends_at) > /* @__PURE__ */ new Date();
+  }
+  if (shop.subscription_status === "active") {
+    if (!shop.current_period_end) return true;
+    return new Date(shop.current_period_end) > /* @__PURE__ */ new Date();
+  }
+  return true;
 }
 async function activateShopSubscription(shopId, plan, durationMonths) {
   await ensureShopsTable();
@@ -4817,6 +4835,117 @@ async function expireShopSubscriptions() {
       AND id != 1
   `);
 }
+var _ensured;
+var init_shops = __esm({
+  "../lib/shops.ts"() {
+    "use strict";
+    init_db();
+    _ensured = false;
+  }
+});
+
+// ../lib/plan-configs.ts
+var plan_configs_exports = {};
+__export(plan_configs_exports, {
+  getAllPlanLimits: () => getAllPlanLimits,
+  getPlanLimits: () => getPlanLimits,
+  updatePlanLimits: () => updatePlanLimits
+});
+async function ensureTable2() {
+  if (tableReady) return;
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS plan_configs (
+      plan               VARCHAR(20) NOT NULL PRIMARY KEY,
+      max_produits       INT NOT NULL DEFAULT 20,
+      max_ventes_jour    INT NOT NULL DEFAULT 20,
+      max_ventes_mois    INT NOT NULL DEFAULT 40,
+      max_commandes_mois INT NOT NULL DEFAULT 15,
+      max_entrepots      INT NOT NULL DEFAULT 1,
+      max_users          INT NOT NULL DEFAULT 1,
+      updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+  for (const [plan, d] of Object.entries(DEFAULTS)) {
+    await db.execute(
+      `INSERT IGNORE INTO plan_configs
+       (plan, max_produits, max_ventes_jour, max_ventes_mois, max_commandes_mois, max_entrepots, max_users)
+       VALUES (?,?,?,?,?,?,?)`,
+      [plan, d.max_produits, d.max_ventes_jour, d.max_ventes_mois, d.max_commandes_mois, d.max_entrepots, d.max_users]
+    );
+  }
+  tableReady = true;
+}
+async function getPlanLimits(plan) {
+  try {
+    await ensureTable2();
+    const [rows] = await db.execute(
+      "SELECT * FROM plan_configs WHERE plan = ?",
+      [plan]
+    );
+    if (rows[0]) return rows[0];
+  } catch {
+  }
+  return DEFAULTS[plan] ?? DEFAULTS.basic;
+}
+async function getAllPlanLimits() {
+  try {
+    await ensureTable2();
+    const [rows] = await db.execute(
+      "SELECT * FROM plan_configs ORDER BY FIELD(plan,'basic','pro','business')"
+    );
+    return rows;
+  } catch {
+    return Object.values(DEFAULTS);
+  }
+}
+async function updatePlanLimits(plan, limits) {
+  await ensureTable2();
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(limits)) {
+    if (v !== void 0) {
+      sets.push(`${k} = ?`);
+      vals.push(Number(v));
+    }
+  }
+  if (!sets.length) return;
+  vals.push(plan);
+  await db.execute(`UPDATE plan_configs SET ${sets.join(", ")} WHERE plan = ?`, vals);
+}
+var DEFAULTS, tableReady;
+var init_plan_configs = __esm({
+  "../lib/plan-configs.ts"() {
+    "use strict";
+    init_db();
+    DEFAULTS = {
+      basic: { plan: "basic", max_produits: 20, max_ventes_jour: 20, max_ventes_mois: 40, max_commandes_mois: 15, max_entrepots: 1, max_users: 1 },
+      pro: { plan: "pro", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 5 },
+      business: { plan: "business", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 0 }
+    };
+    tableReady = false;
+  }
+});
+
+// index.ts
+var index_exports = {};
+__export(index_exports, {
+  default: () => index_default
+});
+module.exports = __toCommonJS(index_exports);
+var import_dotenv = require("dotenv");
+var import_path = require("path");
+var import_express47 = __toESM(require("express"));
+var import_cors = __toESM(require("cors"));
+var import_cookie_parser = __toESM(require("cookie-parser"));
+var import_helmet = __toESM(require("helmet"));
+var import_express_rate_limit = require("express-rate-limit");
+
+// routes/admin/auth.ts
+var import_express = __toESM(require("express"));
+var import_bcryptjs = __toESM(require("bcryptjs"));
+init_admin_db();
+init_db();
+init_shops();
 
 // lib/auth.ts
 var import_jose = require("jose");
@@ -5234,6 +5363,7 @@ function hasPageAccess(role, permissions, module2, pageId) {
 // routes/admin/products.ts
 init_db();
 init_admin_db();
+init_shops();
 
 // lib/plan-limits.ts
 var PLAN_LIMITS = {
@@ -6135,6 +6265,7 @@ var stock_boutique_default = router5;
 
 // routes/admin/ventes.ts
 var import_express6 = __toESM(require("express"));
+init_db();
 
 // lib/whatsapp.ts
 init_admin_db();
@@ -6498,7 +6629,29 @@ router6.post("/api/admin/ventes/factures", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: session.shop_id ?? 1 });
+    const shopId = session.shop_id ?? 1;
+    if (shopId !== 1 && session.role !== "super_admin") {
+      const { getPlanLimits: getPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+      const { getShopById: getShopById2 } = await Promise.resolve().then(() => (init_shops(), shops_exports));
+      const shop = await getShopById2(shopId).catch(() => null);
+      const limits = await getPlanLimits2(shop?.plan ?? "basic");
+      if (limits.max_ventes_jour > 0 || limits.max_ventes_mois > 0) {
+        const [[counts]] = await db.execute(
+          `SELECT
+             SUM(DATE(created_at)=CURDATE()) AS today,
+             SUM(YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())) AS mois
+           FROM factures WHERE shop_id = ?`,
+          [shopId]
+        );
+        if (limits.max_ventes_jour > 0 && Number(counts?.today ?? 0) >= limits.max_ventes_jour) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_ventes_jour} ventes par jour maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+        if (limits.max_ventes_mois > 0 && Number(counts?.mois ?? 0) >= limits.max_ventes_mois) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_ventes_mois} ventes par mois maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
+    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: shopId });
     emitAdminEvent("vente");
     if (body.client_tel) {
       const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];
@@ -7135,6 +7288,7 @@ var upload_default = router11;
 // routes/admin/settings.ts
 var import_express12 = __toESM(require("express"));
 init_admin_db();
+init_shops();
 
 // lib/vercel-domains.ts
 var TOKEN = process.env.VERCEL_TOKEN;
@@ -7670,6 +7824,7 @@ var events_default = router18;
 // routes/admin/users.ts
 var import_express19 = __toESM(require("express"));
 var import_bcryptjs2 = __toESM(require("bcryptjs"));
+init_db();
 init_admin_db();
 var router19 = import_express19.default.Router();
 async function requireSuperAdmin(req, res) {
@@ -7708,6 +7863,22 @@ router19.post("/api/admin/users", async (req, res) => {
     }
     const existing = await getAdminByUsername(username.trim().toLowerCase());
     if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est d\xE9j\xE0 utilis\xE9." });
+    const targetShopId = req.body.shop_id ? Number(req.body.shop_id) : session.shop_id ?? 1;
+    if (targetShopId !== 1) {
+      const { getPlanLimits: getPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+      const { getShopById: getShopById2 } = await Promise.resolve().then(() => (init_shops(), shops_exports));
+      const shop = await getShopById2(targetShopId).catch(() => null);
+      const limits = await getPlanLimits2(shop?.plan ?? "basic");
+      if (limits.max_users > 0) {
+        const [[count]] = await db.execute(
+          "SELECT COUNT(*) AS cnt FROM admin_users WHERE shop_id = ?",
+          [targetShopId]
+        );
+        if (Number(count?.cnt ?? 0) >= limits.max_users) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_users} utilisateur(s) maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
     const hash = await import_bcryptjs2.default.hash(password, 12);
     await createAdminUser({
       nom,
@@ -8567,6 +8738,7 @@ var livreur_default = router24;
 var import_express25 = __toESM(require("express"));
 init_db();
 init_admin_db();
+init_shops();
 var router25 = import_express25.default.Router();
 var _shopCache = /* @__PURE__ */ new Map();
 var SHOP_CACHE_TTL = 6e4;
@@ -9005,9 +9177,9 @@ function clearClientCookie(res) {
 
 // routes/account.ts
 var router26 = import_express26.default.Router();
-var tableReady = false;
-async function ensureTable2() {
-  if (tableReady) return;
+var tableReady2 = false;
+async function ensureTable3() {
+  if (tableReady2) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS client_users (
       id           INT AUTO_INCREMENT PRIMARY KEY,
@@ -9021,7 +9193,7 @@ async function ensureTable2() {
       updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
-  tableReady = true;
+  tableReady2 = true;
 }
 function isEmail(s) {
   return s.includes("@");
@@ -9046,7 +9218,7 @@ function toPayload(row) {
 }
 router26.post("/api/account/register", async (req, res) => {
   try {
-    await ensureTable2();
+    await ensureTable3();
     const { nom, identifier, password } = req.body;
     if (!nom?.trim() || !identifier?.trim() || !password?.trim()) {
       return res.status(400).json({ error: "Nom, identifiant et mot de passe requis." });
@@ -9082,7 +9254,7 @@ router26.post("/api/account/register", async (req, res) => {
 });
 router26.post("/api/account/login", async (req, res) => {
   try {
-    await ensureTable2();
+    await ensureTable3();
     const { identifier, password } = req.body;
     if (!identifier?.trim() || !password?.trim()) {
       return res.status(400).json({ error: "Identifiant et mot de passe requis." });
@@ -9106,7 +9278,7 @@ router26.post("/api/account/login", async (req, res) => {
 });
 router26.get("/api/account/me", async (req, res) => {
   try {
-    await ensureTable2();
+    await ensureTable3();
     const session = await getClientSession(req);
     if (!session) return res.json({ user: null });
     const pool2 = db;
@@ -9144,7 +9316,7 @@ router26.get("/api/account/google", (_req, res) => {
 router26.get("/api/account/google/callback", async (req, res) => {
   const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3003";
   try {
-    await ensureTable2();
+    await ensureTable3();
     const code = req.query.code;
     if (!code) return res.redirect(`${siteUrl}/?auth_error=no_code`);
     const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -11809,7 +11981,20 @@ router42.post("/api/admin/entrepots", async (req, res) => {
   const { id, nom, telephone, adresse, notes, actif } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
   try {
-    const newId = await upsertEntrepot({ id: id ? Number(id) : void 0, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false }, session.shop_id ?? 1);
+    const shopId = session.shop_id ?? 1;
+    if (!id && shopId !== 1 && session.role !== "super_admin") {
+      const { getPlanLimits: getPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+      const { getShopById: getShopById2 } = await Promise.resolve().then(() => (init_shops(), shops_exports));
+      const shop = await getShopById2(shopId).catch(() => null);
+      const limits = await getPlanLimits2(shop?.plan ?? "basic");
+      if (limits.max_entrepots > 0) {
+        const existing = await listEntrepots(shopId);
+        if (existing.length >= limits.max_entrepots) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_entrepots} entrep\xF4t(s) maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
+    const newId = await upsertEntrepot({ id: id ? Number(id) : void 0, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false }, shopId);
     res.json({ ok: true, id: newId });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -11938,6 +12123,7 @@ var tombola_default = router43;
 var import_express44 = __toESM(require("express"));
 var import_bcryptjs5 = __toESM(require("bcryptjs"));
 init_admin_db();
+init_shops();
 
 // lib/mailer.ts
 var import_resend = require("resend");
@@ -12145,6 +12331,7 @@ var onboarding_default = router44;
 
 // routes/admin/saas-dashboard.ts
 var import_express45 = __toESM(require("express"));
+init_shops();
 init_db();
 var router45 = import_express45.default.Router();
 function requireSuperAdmin2(session, res) {
@@ -12363,10 +12550,29 @@ router45.delete("/api/admin/saas/shops/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
+router45.get("/api/admin/saas/plan-configs", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const { getAllPlanLimits: getAllPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+  const configs = await getAllPlanLimits2();
+  res.json({ configs });
+});
+router45.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const plan = req.params.plan;
+  if (!["basic", "pro", "business"].includes(plan)) {
+    return res.status(400).json({ error: "Plan invalide." });
+  }
+  const { updatePlanLimits: updatePlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+  await updatePlanLimits2(plan, req.body);
+  res.json({ ok: true });
+});
 var saas_dashboard_default = router45;
 
 // routes/admin/billing.ts
 var import_express46 = __toESM(require("express"));
+init_shops();
 
 // lib/cinetpay.ts
 var PLAN_PRICES = {
@@ -12445,6 +12651,9 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
   }
 });
 var billing_default = router46;
+
+// index.ts
+init_shops();
 
 // lib/review-notifier.ts
 init_db();
