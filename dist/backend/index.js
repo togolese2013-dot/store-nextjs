@@ -2235,9 +2235,13 @@ async function deleteCoupon(id, shopId = 1) {
   await db.execute("DELETE FROM coupons WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 async function listAdminCategories(shopId = 1) {
+  try {
+    await db.execute("ALTER TABLE categories ADD COLUMN color VARCHAR(20) NULL");
+  } catch {
+  }
   const [rows] = await db.execute(
     `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
-            COUNT(p.id) AS nb_produits
+            c.color, COUNT(p.id) AS nb_produits
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
      WHERE c.shop_id = ?
@@ -2247,17 +2251,21 @@ async function listAdminCategories(shopId = 1) {
   );
   return rows.map((r) => ({ ...r, nb_produits: Number(r.nb_produits) }));
 }
-async function createCategory(nom, description, shopId = 1) {
+async function createCategory(nom, description, shopId = 1, color) {
+  try {
+    await db.execute("ALTER TABLE categories ADD COLUMN color VARCHAR(20) NULL");
+  } catch {
+  }
   const [result] = await db.execute(
-    "INSERT INTO categories (nom, description, shop_id) VALUES (?,?,?)",
-    [nom, description, shopId]
+    "INSERT INTO categories (nom, description, shop_id, color) VALUES (?,?,?,?)",
+    [nom, description, shopId, color ?? null]
   );
   return result.insertId;
 }
-async function updateCategory(id, nom, description, shopId = 1) {
+async function updateCategory(id, nom, description, shopId = 1, color) {
   await db.execute(
-    "UPDATE categories SET nom=?, description=? WHERE id=? AND shop_id=?",
-    [nom, description, id, shopId]
+    "UPDATE categories SET nom=?, description=?, color=? WHERE id=? AND shop_id=?",
+    [nom, description, color ?? null, id, shopId]
   );
 }
 async function deleteCategory(id, shopId = 1) {
@@ -7397,16 +7405,16 @@ router14.post("/api/admin/categories", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Droits insuffisants." });
-  const { nom, description = "" } = req.body;
+  const { nom, description = "", color } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1);
+  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1, color ?? null);
   res.json({ success: true, id });
 });
 router14.patch("/api/admin/categories/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  const { nom, description = "" } = req.body;
-  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1);
+  const { nom, description = "", color } = req.body;
+  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1, color ?? void 0);
   res.json({ success: true });
 });
 router14.delete("/api/admin/categories/:id", async (req, res) => {

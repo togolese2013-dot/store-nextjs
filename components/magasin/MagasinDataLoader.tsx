@@ -89,7 +89,9 @@ function mapProduct(p: ApiProduct, idx: number): MagasinProduct {
     target:   50,
     price:    Number(p.prix_unitaire ?? 0),
     cost:     p.prix_entrepot != null ? Number(p.prix_entrepot) : undefined,
-    margin:   0,
+    margin:   p.prix_entrepot && p.prix_unitaire && Number(p.prix_unitaire) > 0
+                ? Math.round((1 - Number(p.prix_entrepot) / Number(p.prix_unitaire)) * 100)
+                : 0,
     swatch,
     initial:  (p.nom?.[0] ?? 'P').toUpperCase(),
     imageUrl: resolveImage(p.image_url),

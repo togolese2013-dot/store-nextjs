@@ -1604,9 +1604,10 @@ export interface AdminCategory {
 }
 
 export async function listAdminCategories(shopId = 1): Promise<AdminCategory[]> {
+  try { await db.execute("ALTER TABLE categories ADD COLUMN color VARCHAR(20) NULL"); } catch { /* exists */ }
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
-            COUNT(p.id) AS nb_produits
+            c.color, COUNT(p.id) AS nb_produits
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
      WHERE c.shop_id = ?
@@ -1617,18 +1618,19 @@ export async function listAdminCategories(shopId = 1): Promise<AdminCategory[]> 
   return rows.map(r => ({ ...r, nb_produits: Number(r.nb_produits) })) as AdminCategory[];
 }
 
-export async function createCategory(nom: string, description: string, shopId = 1) {
+export async function createCategory(nom: string, description: string, shopId = 1, color?: string) {
+  try { await db.execute("ALTER TABLE categories ADD COLUMN color VARCHAR(20) NULL"); } catch { /* exists */ }
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    "INSERT INTO categories (nom, description, shop_id) VALUES (?,?,?)",
-    [nom, description, shopId]
+    "INSERT INTO categories (nom, description, shop_id, color) VALUES (?,?,?,?)",
+    [nom, description, shopId, color ?? null]
   );
   return result.insertId;
 }
 
-export async function updateCategory(id: number, nom: string, description: string, shopId = 1) {
+export async function updateCategory(id: number, nom: string, description: string, shopId = 1, color?: string) {
   await db.execute(
-    "UPDATE categories SET nom=?, description=? WHERE id=? AND shop_id=?",
-    [nom, description, id, shopId]
+    "UPDATE categories SET nom=?, description=?, color=? WHERE id=? AND shop_id=?",
+    [nom, description, color ?? null, id, shopId]
   );
 }
 

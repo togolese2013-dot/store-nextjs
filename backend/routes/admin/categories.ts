@@ -19,17 +19,17 @@ router.post("/api/admin/categories", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Droits insuffisants." });
-  const { nom, description = "" } = req.body;
+  const { nom, description = "", color } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1);
+  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1, color ?? null);
   res.json({ success: true, id });
 });
 
 router.patch("/api/admin/categories/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  const { nom, description = "" } = req.body;
-  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1);
+  const { nom, description = "", color } = req.body;
+  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1, color ?? undefined);
   res.json({ success: true });
 });
 

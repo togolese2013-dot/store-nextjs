@@ -204,7 +204,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
         onRefresh?.();
       }
       if (kind === "category") {
-        const body = { nom: values.name, description: values.desc || '' };
+        const body = { nom: values.name, description: values.desc || '', color: values.color || null };
         if (mode === "edit" && values._raw?.id) {
           await fetch(`/api/admin/categories/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         } else {
