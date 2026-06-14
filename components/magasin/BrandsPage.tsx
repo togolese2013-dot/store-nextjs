@@ -134,7 +134,7 @@ export default function BrandsPage({ brands = SAMPLE_BRANDS }: BrandsPageProps) 
                       </span>
                     </td>
                     <td className={styles.actionsCell}>
-                      <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('brand', 'edit', b) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('la marque', b.name) }], 'right'); }}>
+                      <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('brand', 'edit', b) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('la marque', b.name, { onConfirm: () => ui.config.onDeleteRow?.('brand', b) }) }], 'right'); }}>
                         <MoreIcon size={16} />
                       </button>
                     </td>

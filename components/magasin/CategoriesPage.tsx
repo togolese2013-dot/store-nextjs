@@ -113,7 +113,7 @@ export default function CategoriesPage({ categories = SAMPLE_CATEGORIES }: Categ
                   <FolderIcon size={12} />
                   {cat.subcats} sous-catégorie{cat.subcats > 1 ? 's' : ''}
                 </div>
-                <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('category', 'edit', cat) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('la catégorie', cat.name) }], 'right'); }}>
+                <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('category', 'edit', cat) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('la catégorie', cat.name, { onConfirm: () => ui.config.onDeleteRow?.('category', cat) }) }], 'right'); }}>
                   <MoreIcon size={16} />
                 </button>
               </div>

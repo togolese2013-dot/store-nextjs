@@ -228,6 +228,14 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
         await fetch(`/api/admin/products/${row.id}`, { method: "DELETE" });
         onRefresh?.();
       }
+      if (kind === "category" && row.id) {
+        await fetch(`/api/admin/categories/${row.id}`, { method: "DELETE" });
+        onRefreshMeta?.();
+      }
+      if (kind === "brand" && row.id) {
+        await fetch(`/api/admin/marques/${row.id}`, { method: "DELETE" });
+        onRefreshMeta?.();
+      }
     },
 
     onArchiveRow: async (kind, row) => {
