@@ -24,9 +24,9 @@ export const TENANT_TABS = [
 
 /* ─── Plans ───────────────────────────────────────────────────────── */
 export const PLANS0: Plan[] = [
-  { name: 'Basic',    color: '#3B6A8F', price: '9 000',  period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['1 espace de travail (Boutique)', '1 point de vente · 2 équipiers', 'Caisse & gestion de stock', 'Paiement mobile (Wave, Orange)', 'Support par email'] },
-  { name: 'Pro',      color: '#34396B', price: '25 000', period: '/ mois', count: 0, mrr: 0, pop: true,  feats: ['Tous les espaces (Magasin, Store, CRM…)', 'Multi-points de vente · 5 équipiers', 'E-commerce & livraison', 'CRM, fidélité & campagnes', 'Rapports avancés consolidés', 'Support prioritaire'] },
-  { name: 'Business', color: '#8B5E2E', price: '75 000', period: '/ mois', count: 0, mrr: 0, pop: false, feats: ['Espaces & équipiers illimités', 'Multi-boutiques & multi-pays', 'Intégrations sur mesure (API)', 'Gestionnaire de compte dédié', 'SLA 99,9% · support 24/7', 'Formation & onboarding inclus'] },
+  { name: 'Basic',    color: '#6B635B', price: 'Gratuit', period: '',        count: 0, mrr: 0, pop: false, feats: ['20 produits max', '40 ventes / mois', '15 commandes en ligne / mois', '1 utilisateur admin', '1 entrepôt max', 'Support par email'] },
+  { name: 'Pro',      color: '#C9601E', price: '9 900',  period: '/ mois',  count: 0, mrr: 0, pop: true,  feats: ['Produits illimités', 'Commandes illimitées', '5 utilisateurs admin', 'WhatsApp CRM inclus', 'Finance & rapports avancés', 'Coupons & fidélité', 'Support prioritaire WhatsApp'] },
+  { name: 'Business', color: '#1F3D6E', price: '24 900', period: '/ mois',  count: 0, mrr: 0, pop: false, feats: ['Tout du plan Pro', 'Utilisateurs illimités', 'Multi-entrepôts', 'API & webhooks', 'Marque blanche', 'Gestionnaire de compte dédié', 'SLA 99,9%'] },
 ];
 
 /* ─── Invoices ────────────────────────────────────────────────────── */
@@ -75,7 +75,6 @@ export const NAV: NavGroup[] = [
     { ic: I.store, l: 'Boutiques', pg: 'tenants' },
     { ic: I.card, l: 'Facturation', pg: 'billing' },
     { ic: I.layers, l: 'Plans & tarifs', pg: 'plans' },
-    { ic: I.cog, l: 'Limites des plans', pg: 'limits' },
     { ic: I.life, l: 'Support', pg: 'support' },
     { ic: I.activity, l: 'Santé système', pg: 'system' },
     { ic: I.history, l: "Journal d'audit", pg: 'logs' },
@@ -84,11 +83,11 @@ export const NAV: NavGroup[] = [
 ];
 export const PAGE_LABELS: Record<PageId, string> = {
   overview: "Vue d'ensemble", tenants: 'Boutiques', billing: 'Facturation',
-  plans: 'Plans & tarifs', limits: 'Limites des plans', support: 'Support', system: 'Santé système', logs: "Journal d'audit",
+  plans: 'Plans & tarifs', support: 'Support', system: 'Santé système', logs: "Journal d'audit",
 };
 export const SEARCH_PH: Record<PageId, string> = {
   overview: 'Rechercher…', tenants: 'Rechercher une boutique, ville, plan…',
-  billing: 'Rechercher une facture, boutique…', plans: 'Rechercher…', limits: 'Rechercher…',
+  billing: 'Rechercher une facture, boutique…', plans: 'Rechercher…',
   support: 'Rechercher un ticket, boutique…', system: 'Rechercher un service…',
   logs: 'Rechercher une action, membre…',
 };

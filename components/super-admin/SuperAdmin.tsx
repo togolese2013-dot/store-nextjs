@@ -29,7 +29,6 @@ import OverviewPage from './pages/OverviewPage';
 import TenantsPage from './pages/TenantsPage';
 import BillingPage from './pages/BillingPage';
 import PlansPage from './pages/PlansPage';
-import LimitsPage from './pages/LimitsPage';
 import SupportPage from './pages/SupportPage';
 import SystemPage from './pages/SystemPage';
 import LogsPage from './pages/LogsPage';
@@ -105,7 +104,6 @@ function Shell({ userName = 'Admin', userRole = 'Super Admin' }: SuperAdminProps
         {page === 'tenants' && <TenantsPage />}
         {page === 'billing' && <BillingPage />}
         {page === 'plans' && <PlansPage />}
-        {page === 'limits' && <LimitsPage />}
         {page === 'support' && <SupportPage />}
         {page === 'system' && <SystemPage />}
         {page === 'logs' && <LogsPage />}
