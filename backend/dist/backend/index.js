@@ -450,6 +450,7 @@ async function getProducts(opts) {
     marque_nom: r.marque_nom ?? null,
     avg_rating: null,
     review_count: null,
+    actif: r.actif === 1 || r.actif === true ? 1 : 0,
     entrepot_id: r.entrepot_id ? Number(r.entrepot_id) : null,
     prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
     entrepot_nom: r.entrepot_nom ?? null,
@@ -630,14 +631,15 @@ async function getProductCount(opts) {
   );
   return Number(rows[0]?.cnt ?? 0);
 }
-async function getProductStatusCounts() {
+async function getProductStatusCounts(shopId = 1) {
   const [rows] = await db.execute(
     `SELECT
        COUNT(*) AS total,
        SUM(COALESCE(stock_boutique, 0) > 5)             AS disponible,
        SUM(COALESCE(stock_boutique, 0) BETWEEN 1 AND 5) AS faible,
        SUM(COALESCE(stock_boutique, 0) = 0)             AS epuise
-     FROM produits`
+     FROM produits WHERE shop_id = ?`,
+    [shopId]
   );
   const r = rows[0];
   return {
@@ -2233,9 +2235,13 @@ async function deleteCoupon(id, shopId = 1) {
   await db.execute("DELETE FROM coupons WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 async function listAdminCategories(shopId = 1) {
+  try {
+    await db.execute("ALTER TABLE categories ADD COLUMN color VARCHAR(20) NULL");
+  } catch {
+  }
   const [rows] = await db.execute(
     `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
-            COUNT(p.id) AS nb_produits
+            c.color, COUNT(p.id) AS nb_produits
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
      WHERE c.shop_id = ?
@@ -2245,17 +2251,21 @@ async function listAdminCategories(shopId = 1) {
   );
   return rows.map((r) => ({ ...r, nb_produits: Number(r.nb_produits) }));
 }
-async function createCategory(nom, description, shopId = 1) {
+async function createCategory(nom, description, shopId = 1, color) {
+  try {
+    await db.execute("ALTER TABLE categories ADD COLUMN color VARCHAR(20) NULL");
+  } catch {
+  }
   const [result] = await db.execute(
-    "INSERT INTO categories (nom, description, shop_id) VALUES (?,?,?)",
-    [nom, description, shopId]
+    "INSERT INTO categories (nom, description, shop_id, color) VALUES (?,?,?,?)",
+    [nom, description, shopId, color ?? null]
   );
   return result.insertId;
 }
-async function updateCategory(id, nom, description, shopId = 1) {
+async function updateCategory(id, nom, description, shopId = 1, color) {
   await db.execute(
-    "UPDATE categories SET nom=?, description=? WHERE id=? AND shop_id=?",
-    [nom, description, id, shopId]
+    "UPDATE categories SET nom=?, description=?, color=? WHERE id=? AND shop_id=?",
+    [nom, description, color ?? null, id, shopId]
   );
 }
 async function deleteCategory(id, shopId = 1) {
@@ -2400,15 +2410,15 @@ async function updateProductStock(produit_id, _entrepot_id, stock) {
     [stock, produit_id]
   );
 }
-async function getStockStats() {
+async function getStockStats(shopId = 1) {
   const [rows] = await db.execute(`
     SELECT
       COUNT(*)                                                                                   AS en_stock,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) = 0 THEN 1 ELSE 0 END)                           AS en_rupture,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) > 0 AND COALESCE(stock_magasin, 0) <= 5 THEN 1 ELSE 0 END) AS stock_faible,
       COALESCE(SUM(prix_unitaire * COALESCE(stock_magasin, 0)), 0)                               AS valeur_totale
-    FROM produits
-  `);
+    FROM produits WHERE shop_id = ?
+  `, [shopId]);
   const r = rows[0];
   return {
     en_stock: Number(r.en_stock ?? 0),
@@ -4569,29 +4579,25 @@ var init_admin_db = __esm({
   }
 });
 
-// index.ts
-var index_exports = {};
-__export(index_exports, {
-  default: () => index_default
-});
-module.exports = __toCommonJS(index_exports);
-var import_dotenv = require("dotenv");
-var import_path = require("path");
-var import_express47 = __toESM(require("express"));
-var import_cors = __toESM(require("cors"));
-var import_cookie_parser = __toESM(require("cookie-parser"));
-var import_helmet = __toESM(require("helmet"));
-var import_express_rate_limit = require("express-rate-limit");
-
-// routes/admin/auth.ts
-var import_express = __toESM(require("express"));
-var import_bcryptjs = __toESM(require("bcryptjs"));
-init_admin_db();
-init_db();
-
 // ../lib/shops.ts
-init_db();
-var _ensured = false;
+var shops_exports = {};
+__export(shops_exports, {
+  activateBasicPlan: () => activateBasicPlan,
+  activateShopSubscription: () => activateShopSubscription,
+  createShop: () => createShop,
+  ensureShopsTable: () => ensureShopsTable,
+  expireShopSubscriptions: () => expireShopSubscriptions,
+  getShopByDomain: () => getShopByDomain,
+  getShopById: () => getShopById,
+  getShopBySlug: () => getShopBySlug,
+  getShopPayments: () => getShopPayments,
+  isShopAccessAllowed: () => isShopAccessAllowed,
+  listShops: () => listShops,
+  listShopsWithStats: () => listShopsWithStats,
+  recordShopPayment: () => recordShopPayment,
+  setShopDomain: () => setShopDomain,
+  updateShop: () => updateShop
+});
 async function ensureShopsTable() {
   if (_ensured) return;
   await db.execute(`
@@ -4700,6 +4706,13 @@ async function createShop(data) {
   );
   return result.insertId;
 }
+async function listShops() {
+  await ensureShopsTable();
+  const [rows] = await db.execute(
+    "SELECT * FROM shops ORDER BY created_at DESC"
+  );
+  return rows.map((r) => ({ ...r, actif: Boolean(r.actif), custom_domain: r.custom_domain ?? null }));
+}
 async function updateShop(id, data) {
   await ensureShopsTable();
   const sets = [];
@@ -4748,6 +4761,21 @@ async function listShopsWithStats() {
     admin_count: Number(r.admin_count)
   }));
 }
+function isShopAccessAllowed(shop) {
+  if (shop.id === 1) return true;
+  if (!shop.actif) return false;
+  if (shop.subscription_status === "suspended") return false;
+  if (shop.plan === "basic") return true;
+  if (shop.subscription_status === "trial") {
+    if (!shop.trial_ends_at) return true;
+    return new Date(shop.trial_ends_at) > /* @__PURE__ */ new Date();
+  }
+  if (shop.subscription_status === "active") {
+    if (!shop.current_period_end) return true;
+    return new Date(shop.current_period_end) > /* @__PURE__ */ new Date();
+  }
+  return true;
+}
 async function activateShopSubscription(shopId, plan, durationMonths) {
   await ensureShopsTable();
   const [rows] = await db.execute(
@@ -4761,6 +4789,13 @@ async function activateShopSubscription(shopId, plan, durationMonths) {
   await db.execute(
     `UPDATE shops SET plan = ?, subscription_status = 'active', current_period_end = ? WHERE id = ?`,
     [plan, newEnd.toISOString().slice(0, 19).replace("T", " "), shopId]
+  );
+}
+async function activateBasicPlan(shopId) {
+  await ensureShopsTable();
+  await db.execute(
+    `UPDATE shops SET plan = 'basic', subscription_status = 'active', current_period_end = NULL WHERE id = ?`,
+    [shopId]
   );
 }
 async function recordShopPayment(data) {
@@ -4800,6 +4835,256 @@ async function expireShopSubscriptions() {
       AND id != 1
   `);
 }
+var _ensured;
+var init_shops = __esm({
+  "../lib/shops.ts"() {
+    "use strict";
+    init_db();
+    _ensured = false;
+  }
+});
+
+// ../lib/plan-configs.ts
+var plan_configs_exports = {};
+__export(plan_configs_exports, {
+  getAllPlanLimits: () => getAllPlanLimits,
+  getPlanLimits: () => getPlanLimits,
+  getPlanPrice: () => getPlanPrice,
+  getPlansWithPrices: () => getPlansWithPrices,
+  getSaasSettings: () => getSaasSettings,
+  updatePlanFull: () => updatePlanFull,
+  updatePlanLimits: () => updatePlanLimits,
+  updateSaasSettings: () => updateSaasSettings
+});
+async function ensureTable2() {
+  if (tableReady) return;
+  const pool2 = db;
+  await pool2.execute(`
+    CREATE TABLE IF NOT EXISTS plan_configs (
+      plan               VARCHAR(20) NOT NULL PRIMARY KEY,
+      max_produits       INT NOT NULL DEFAULT 20,
+      max_ventes_jour    INT NOT NULL DEFAULT 20,
+      max_ventes_mois    INT NOT NULL DEFAULT 40,
+      max_commandes_mois INT NOT NULL DEFAULT 15,
+      max_entrepots      INT NOT NULL DEFAULT 1,
+      max_users          INT NOT NULL DEFAULT 1,
+      updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+  for (const [plan, d] of Object.entries(DEFAULTS)) {
+    await pool2.execute(
+      `INSERT IGNORE INTO plan_configs
+       (plan, max_produits, max_ventes_jour, max_ventes_mois, max_commandes_mois, max_entrepots, max_users)
+       VALUES (?,?,?,?,?,?,?)`,
+      [plan, d.max_produits, d.max_ventes_jour, d.max_ventes_mois, d.max_commandes_mois, d.max_entrepots, d.max_users]
+    );
+  }
+  tableReady = true;
+}
+async function ensurePriceCols() {
+  if (priceColsReady) return;
+  const pool2 = db;
+  await pool2.execute(`ALTER TABLE plan_configs ADD COLUMN prix_mensuel INT NOT NULL DEFAULT 0`).catch(() => {
+  });
+  await pool2.execute(`ALTER TABLE plan_configs ADD COLUMN prix_annuel  INT NOT NULL DEFAULT 0`).catch(() => {
+  });
+  await pool2.execute(`UPDATE plan_configs SET prix_mensuel = 9900,  prix_annuel = 7920  WHERE plan = 'pro'      AND prix_mensuel = 0`).catch(() => {
+  });
+  await pool2.execute(`UPDATE plan_configs SET prix_mensuel = 24900, prix_annuel = 19920 WHERE plan = 'business' AND prix_mensuel = 0`).catch(() => {
+  });
+  priceColsReady = true;
+}
+async function ensureSaasSettings() {
+  if (settingsReady) return;
+  const pool2 = db;
+  await pool2.execute(`
+    CREATE TABLE IF NOT EXISTS saas_settings (
+      \`key\`   VARCHAR(50) NOT NULL PRIMARY KEY,
+      \`value\` TEXT        NOT NULL
+    )
+  `);
+  await pool2.execute(`
+    INSERT IGNORE INTO saas_settings (\`key\`, \`value\`) VALUES
+      ('trial_days',      '14'),
+      ('yearly_discount', '20'),
+      ('whatsapp_number', '+228 90 527 912')
+  `);
+  settingsReady = true;
+}
+async function getPlanLimits(plan) {
+  try {
+    await ensureTable2();
+    const [rows] = await db.execute(
+      "SELECT * FROM plan_configs WHERE plan = ?",
+      [plan]
+    );
+    if (rows[0]) return rows[0];
+  } catch {
+  }
+  return DEFAULTS[plan] ?? DEFAULTS.basic;
+}
+async function getAllPlanLimits() {
+  try {
+    await ensureTable2();
+    const [rows] = await db.execute(
+      "SELECT * FROM plan_configs ORDER BY FIELD(plan,'basic','pro','business')"
+    );
+    return rows;
+  } catch {
+    return Object.values(DEFAULTS);
+  }
+}
+async function updatePlanLimits(plan, limits) {
+  await ensureTable2();
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(limits)) {
+    if (v !== void 0) {
+      sets.push(`${k} = ?`);
+      vals.push(Number(v));
+    }
+  }
+  if (!sets.length) return;
+  vals.push(plan);
+  await db.execute(`UPDATE plan_configs SET ${sets.join(", ")} WHERE plan = ?`, vals);
+}
+async function getPlanPrice(plan) {
+  try {
+    await ensureTable2();
+    await ensurePriceCols();
+    const [rows] = await db.execute(
+      "SELECT prix_mensuel FROM plan_configs WHERE plan = ?",
+      [plan]
+    );
+    if (rows[0]) return Number(rows[0].prix_mensuel);
+  } catch {
+  }
+  return DEFAULT_PRICES[plan]?.prix_mensuel ?? 0;
+}
+async function getPlansWithPrices() {
+  await ensureTable2();
+  await ensurePriceCols();
+  const [rows] = await db.execute(`
+    SELECT pc.*,
+      (SELECT COUNT(*) FROM shops s WHERE s.plan = pc.plan) AS boutique_count
+    FROM plan_configs pc
+    ORDER BY FIELD(pc.plan, 'basic', 'pro', 'business')
+  `);
+  return rows.map((r) => ({
+    key: r.plan,
+    prix_mensuel: r.plan === "basic" ? null : Number(r.prix_mensuel) || null,
+    prix_annuel: r.plan === "basic" ? null : Number(r.prix_annuel) || null,
+    boutique_count: Number(r.boutique_count),
+    limits: {
+      produits: r.max_produits === 0 ? null : Number(r.max_produits),
+      ventes: r.max_ventes_mois === 0 ? null : Number(r.max_ventes_mois),
+      commandes: r.max_commandes_mois === 0 ? null : Number(r.max_commandes_mois),
+      admins: r.max_users === 0 ? null : Number(r.max_users),
+      entrepots: r.max_entrepots === 0 ? null : Number(r.max_entrepots)
+    }
+  }));
+}
+async function updatePlanFull(plan, data) {
+  await ensureTable2();
+  await ensurePriceCols();
+  await db.execute(`
+    UPDATE plan_configs SET
+      prix_mensuel       = ?,
+      prix_annuel        = ?,
+      max_produits       = ?,
+      max_ventes_mois    = ?,
+      max_commandes_mois = ?,
+      max_users          = ?,
+      max_entrepots      = ?
+    WHERE plan = ?
+  `, [
+    data.prix_mensuel,
+    data.prix_annuel,
+    data.max_produits,
+    data.max_ventes_mois,
+    data.max_commandes_mois,
+    data.max_users,
+    data.max_entrepots,
+    plan
+  ]);
+}
+async function getSaasSettings() {
+  try {
+    await ensureSaasSettings();
+    const [rows] = await db.execute(
+      "SELECT `key`, `value` FROM saas_settings"
+    );
+    const map = {};
+    for (const r of rows) map[r.key] = r.value;
+    return {
+      trial_days: Number(map.trial_days ?? DEFAULT_SETTINGS.trial_days),
+      yearly_discount: Number(map.yearly_discount ?? DEFAULT_SETTINGS.yearly_discount),
+      whatsapp_number: map.whatsapp_number ?? DEFAULT_SETTINGS.whatsapp_number
+    };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+async function updateSaasSettings(settings) {
+  await ensureSaasSettings();
+  const pool2 = db;
+  const entries = [];
+  if (settings.trial_days !== void 0) entries.push(["trial_days", String(settings.trial_days)]);
+  if (settings.yearly_discount !== void 0) entries.push(["yearly_discount", String(settings.yearly_discount)]);
+  if (settings.whatsapp_number !== void 0) entries.push(["whatsapp_number", settings.whatsapp_number]);
+  for (const [key, value] of entries) {
+    await pool2.execute(
+      "INSERT INTO saas_settings (`key`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value` = ?",
+      [key, value, value]
+    );
+  }
+}
+var DEFAULTS, DEFAULT_PRICES, DEFAULT_SETTINGS, tableReady, priceColsReady, settingsReady;
+var init_plan_configs = __esm({
+  "../lib/plan-configs.ts"() {
+    "use strict";
+    init_db();
+    DEFAULTS = {
+      basic: { plan: "basic", max_produits: 20, max_ventes_jour: 20, max_ventes_mois: 40, max_commandes_mois: 15, max_entrepots: 1, max_users: 1 },
+      pro: { plan: "pro", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 5 },
+      business: { plan: "business", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 0 }
+    };
+    DEFAULT_PRICES = {
+      basic: { prix_mensuel: 0, prix_annuel: 0 },
+      pro: { prix_mensuel: 9900, prix_annuel: 7920 },
+      business: { prix_mensuel: 24900, prix_annuel: 19920 }
+    };
+    DEFAULT_SETTINGS = {
+      trial_days: 14,
+      yearly_discount: 20,
+      whatsapp_number: "+228 90 527 912"
+    };
+    tableReady = false;
+    priceColsReady = false;
+    settingsReady = false;
+  }
+});
+
+// index.ts
+var index_exports = {};
+__export(index_exports, {
+  default: () => index_default
+});
+module.exports = __toCommonJS(index_exports);
+var import_dotenv = require("dotenv");
+var import_path = require("path");
+var import_express47 = __toESM(require("express"));
+var import_cors = __toESM(require("cors"));
+var import_cookie_parser = __toESM(require("cookie-parser"));
+var import_helmet = __toESM(require("helmet"));
+var import_express_rate_limit = require("express-rate-limit");
+
+// routes/admin/auth.ts
+var import_express = __toESM(require("express"));
+var import_bcryptjs = __toESM(require("bcryptjs"));
+init_admin_db();
+init_db();
+init_shops();
 
 // lib/auth.ts
 var import_jose = require("jose");
@@ -5217,6 +5502,7 @@ function hasPageAccess(role, permissions, module2, pageId) {
 // routes/admin/products.ts
 init_db();
 init_admin_db();
+init_shops();
 
 // lib/plan-limits.ts
 var PLAN_LIMITS = {
@@ -5252,10 +5538,11 @@ router2.get("/api/admin/products/stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [stockStats, statusCounts, totalCount] = await Promise.all([
-      getStockStats(),
-      getProductStatusCounts(),
-      db.execute("SELECT COUNT(*) AS cnt FROM produits")
+      getStockStats(shopId),
+      getProductStatusCounts(shopId),
+      db.execute("SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId])
     ]);
     stockStats.en_stock = Number(totalCount[0][0]?.cnt ?? stockStats.en_stock);
     res.json({ stockStats, statusCounts });
@@ -5538,6 +5825,7 @@ router2.get("/api/admin/products/export", async (req, res) => {
     const brandId = req.query.brand ? Number(req.query.brand) : void 0;
     const statut = req.query.statut || void 0;
     const statutFilter = ["disponible", "faible", "epuise"].includes(statut ?? "") ? statut : void 0;
+    const shopId = session.shop_id ?? 1;
     const products = await getProducts({
       search: q,
       categoryId: catId,
@@ -5545,7 +5833,8 @@ router2.get("/api/admin/products/export", async (req, res) => {
       statut: statutFilter,
       includeInactive: true,
       limit: 5e3,
-      offset: 0
+      offset: 0,
+      shopId
     });
     const escape = (v) => {
       const s = v == null ? "" : String(v).replace(/"/g, '""');
@@ -5604,16 +5893,18 @@ router2.get("/api/admin/products/search", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const q = req.query.q || "";
   const limit = Math.min(50, Number(req.query.limit) || 20);
-  const products = await getProducts({ search: q, limit, includeInactive: false });
+  const shopId = session.shop_id ?? 1;
+  const products = await getProducts({ search: q, limit, includeInactive: false, shopId });
   res.json({ products });
 });
 router2.get("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [rows] = await db.query(
-      "SELECT * FROM produits WHERE id = ? LIMIT 1",
-      [req.params.id]
+      "SELECT * FROM produits WHERE id = ? AND shop_id = ? LIMIT 1",
+      [req.params.id, shopId]
     );
     if (!rows.length) return res.status(404).json({ error: "Produit introuvable." });
     res.json({ product: rows[0] });
@@ -6113,6 +6404,7 @@ var stock_boutique_default = router5;
 
 // routes/admin/ventes.ts
 var import_express6 = __toESM(require("express"));
+init_db();
 
 // lib/whatsapp.ts
 init_admin_db();
@@ -6476,7 +6768,29 @@ router6.post("/api/admin/ventes/factures", async (req, res) => {
     if (!body.client_nom || !body.items?.length) {
       return res.status(400).json({ error: "client_nom et items sont requis." });
     }
-    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: session.shop_id ?? 1 });
+    const shopId = session.shop_id ?? 1;
+    if (shopId !== 1 && session.role !== "super_admin") {
+      const { getPlanLimits: getPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+      const { getShopById: getShopById2 } = await Promise.resolve().then(() => (init_shops(), shops_exports));
+      const shop = await getShopById2(shopId).catch(() => null);
+      const limits = await getPlanLimits2(shop?.plan ?? "basic");
+      if (limits.max_ventes_jour > 0 || limits.max_ventes_mois > 0) {
+        const [[counts]] = await db.execute(
+          `SELECT
+             SUM(DATE(created_at)=CURDATE()) AS today,
+             SUM(YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())) AS mois
+           FROM factures WHERE shop_id = ?`,
+          [shopId]
+        );
+        if (limits.max_ventes_jour > 0 && Number(counts?.today ?? 0) >= limits.max_ventes_jour) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_ventes_jour} ventes par jour maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+        if (limits.max_ventes_mois > 0 && Number(counts?.mois ?? 0) >= limits.max_ventes_mois) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_ventes_mois} ventes par mois maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
+    const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: shopId });
     emitAdminEvent("vente");
     if (body.client_tel) {
       const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];
@@ -7113,6 +7427,7 @@ var upload_default = router11;
 // routes/admin/settings.ts
 var import_express12 = __toESM(require("express"));
 init_admin_db();
+init_shops();
 
 // lib/vercel-domains.ts
 var TOKEN = process.env.VERCEL_TOKEN;
@@ -7383,16 +7698,16 @@ router14.post("/api/admin/categories", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Droits insuffisants." });
-  const { nom, description = "" } = req.body;
+  const { nom, description = "", color } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1);
+  const id = await createCategory(nom.trim(), description.trim(), session.shop_id ?? 1, color ?? null);
   res.json({ success: true, id });
 });
 router14.patch("/api/admin/categories/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  const { nom, description = "" } = req.body;
-  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1);
+  const { nom, description = "", color } = req.body;
+  await updateCategory(Number(req.params.id), nom?.trim() ?? "", description?.trim() ?? "", session.shop_id ?? 1, color ?? void 0);
   res.json({ success: true });
 });
 router14.delete("/api/admin/categories/:id", async (req, res) => {
@@ -7648,6 +7963,7 @@ var events_default = router18;
 // routes/admin/users.ts
 var import_express19 = __toESM(require("express"));
 var import_bcryptjs2 = __toESM(require("bcryptjs"));
+init_db();
 init_admin_db();
 var router19 = import_express19.default.Router();
 async function requireSuperAdmin(req, res) {
@@ -7686,6 +8002,22 @@ router19.post("/api/admin/users", async (req, res) => {
     }
     const existing = await getAdminByUsername(username.trim().toLowerCase());
     if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est d\xE9j\xE0 utilis\xE9." });
+    const targetShopId = req.body.shop_id ? Number(req.body.shop_id) : session.shop_id ?? 1;
+    if (targetShopId !== 1) {
+      const { getPlanLimits: getPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+      const { getShopById: getShopById2 } = await Promise.resolve().then(() => (init_shops(), shops_exports));
+      const shop = await getShopById2(targetShopId).catch(() => null);
+      const limits = await getPlanLimits2(shop?.plan ?? "basic");
+      if (limits.max_users > 0) {
+        const [[count]] = await db.execute(
+          "SELECT COUNT(*) AS cnt FROM admin_users WHERE shop_id = ?",
+          [targetShopId]
+        );
+        if (Number(count?.cnt ?? 0) >= limits.max_users) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_users} utilisateur(s) maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
     const hash = await import_bcryptjs2.default.hash(password, 12);
     await createAdminUser({
       nom,
@@ -8545,6 +8877,7 @@ var livreur_default = router24;
 var import_express25 = __toESM(require("express"));
 init_db();
 init_admin_db();
+init_shops();
 var router25 = import_express25.default.Router();
 var _shopCache = /* @__PURE__ */ new Map();
 var SHOP_CACHE_TTL = 6e4;
@@ -8983,9 +9316,9 @@ function clearClientCookie(res) {
 
 // routes/account.ts
 var router26 = import_express26.default.Router();
-var tableReady = false;
-async function ensureTable2() {
-  if (tableReady) return;
+var tableReady2 = false;
+async function ensureTable3() {
+  if (tableReady2) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS client_users (
       id           INT AUTO_INCREMENT PRIMARY KEY,
@@ -8999,7 +9332,7 @@ async function ensureTable2() {
       updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
-  tableReady = true;
+  tableReady2 = true;
 }
 function isEmail(s) {
   return s.includes("@");
@@ -9024,7 +9357,7 @@ function toPayload(row) {
 }
 router26.post("/api/account/register", async (req, res) => {
   try {
-    await ensureTable2();
+    await ensureTable3();
     const { nom, identifier, password } = req.body;
     if (!nom?.trim() || !identifier?.trim() || !password?.trim()) {
       return res.status(400).json({ error: "Nom, identifiant et mot de passe requis." });
@@ -9060,7 +9393,7 @@ router26.post("/api/account/register", async (req, res) => {
 });
 router26.post("/api/account/login", async (req, res) => {
   try {
-    await ensureTable2();
+    await ensureTable3();
     const { identifier, password } = req.body;
     if (!identifier?.trim() || !password?.trim()) {
       return res.status(400).json({ error: "Identifiant et mot de passe requis." });
@@ -9084,7 +9417,7 @@ router26.post("/api/account/login", async (req, res) => {
 });
 router26.get("/api/account/me", async (req, res) => {
   try {
-    await ensureTable2();
+    await ensureTable3();
     const session = await getClientSession(req);
     if (!session) return res.json({ user: null });
     const pool2 = db;
@@ -9122,7 +9455,7 @@ router26.get("/api/account/google", (_req, res) => {
 router26.get("/api/account/google/callback", async (req, res) => {
   const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3003";
   try {
-    await ensureTable2();
+    await ensureTable3();
     const code = req.query.code;
     if (!code) return res.redirect(`${siteUrl}/?auth_error=no_code`);
     const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -11787,7 +12120,20 @@ router42.post("/api/admin/entrepots", async (req, res) => {
   const { id, nom, telephone, adresse, notes, actif } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
   try {
-    const newId = await upsertEntrepot({ id: id ? Number(id) : void 0, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false }, session.shop_id ?? 1);
+    const shopId = session.shop_id ?? 1;
+    if (!id && shopId !== 1 && session.role !== "super_admin") {
+      const { getPlanLimits: getPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+      const { getShopById: getShopById2 } = await Promise.resolve().then(() => (init_shops(), shops_exports));
+      const shop = await getShopById2(shopId).catch(() => null);
+      const limits = await getPlanLimits2(shop?.plan ?? "basic");
+      if (limits.max_entrepots > 0) {
+        const existing = await listEntrepots(shopId);
+        if (existing.length >= limits.max_entrepots) {
+          return res.status(403).json({ error: `Limite atteinte : ${limits.max_entrepots} entrep\xF4t(s) maximum sur votre plan ${shop?.plan}.`, plan_limit: true });
+        }
+      }
+    }
+    const newId = await upsertEntrepot({ id: id ? Number(id) : void 0, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, notes: notes || null, actif: actif !== false }, shopId);
     res.json({ ok: true, id: newId });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -11916,6 +12262,7 @@ var tombola_default = router43;
 var import_express44 = __toESM(require("express"));
 var import_bcryptjs5 = __toESM(require("bcryptjs"));
 init_admin_db();
+init_shops();
 
 // lib/mailer.ts
 var import_resend = require("resend");
@@ -12074,6 +12421,9 @@ router44.post("/api/admin/onboarding", async (req, res) => {
     }
     const plan = ["free", "basic", "pro"].includes(shop_plan) ? shop_plan : "free";
     const shopId = await createShop({ nom: shop_nom.trim(), slug, email: shop_email.trim(), plan });
+    if (plan === "basic" || plan === "free") {
+      await activateBasicPlan(shopId);
+    }
     const password_hash = await import_bcryptjs5.default.hash(admin_password, 12);
     await createAdminUser({
       nom: admin_nom.trim(),
@@ -12120,6 +12470,7 @@ var onboarding_default = router44;
 
 // routes/admin/saas-dashboard.ts
 var import_express45 = __toESM(require("express"));
+init_shops();
 init_db();
 var router45 = import_express45.default.Router();
 function requireSuperAdmin2(session, res) {
@@ -12249,14 +12600,15 @@ router45.get("/api/admin/workspace-stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [rows] = await db.execute(`
       SELECT
-        (SELECT COUNT(*) FROM produits WHERE actif = 1)                                                     AS produits,
-        (SELECT COUNT(*) FROM factures WHERE DATE(created_at) = CURDATE())                                  AS ventes_today,
-        (SELECT COUNT(*) FROM orders WHERE status NOT IN ('cancelled','delivered'))                         AS commandes,
-        (SELECT COUNT(*) FROM boutique_clients)                                                             AS clients,
-        (SELECT COUNT(*) FROM utilisateurs WHERE actif = 1)                                                 AS equipiers
-    `);
+        (SELECT COUNT(*) FROM produits         WHERE actif = 1 AND shop_id = ?)                           AS produits,
+        (SELECT COUNT(*) FROM factures         WHERE DATE(created_at) = CURDATE() AND shop_id = ?)        AS ventes_today,
+        (SELECT COUNT(*) FROM orders           WHERE status NOT IN ('cancelled','delivered') AND shop_id = ?) AS commandes,
+        (SELECT COUNT(*) FROM boutique_clients WHERE shop_id = ?)                                          AS clients,
+        (SELECT COUNT(*) FROM admin_users      WHERE shop_id = ?)                                          AS equipiers
+    `, [shopId, shopId, shopId, shopId, shopId]);
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -12337,16 +12689,87 @@ router45.delete("/api/admin/saas/shops/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
+router45.get("/api/admin/saas/plan-configs", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const { getAllPlanLimits: getAllPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+  const configs = await getAllPlanLimits2();
+  res.json({ configs });
+});
+router45.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const plan = req.params.plan;
+  if (!["basic", "pro", "business"].includes(plan)) {
+    return res.status(400).json({ error: "Plan invalide." });
+  }
+  const { updatePlanLimits: updatePlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+  await updatePlanLimits2(plan, req.body);
+  res.json({ ok: true });
+});
+router45.get("/api/admin/saas/plans", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  try {
+    const { getPlansWithPrices: getPlansWithPrices2, getSaasSettings: getSaasSettings2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+    const [plans, global] = await Promise.all([getPlansWithPrices2(), getSaasSettings2()]);
+    res.json({ plans, global });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.put("/api/admin/saas/plans", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const { plans, global: globalCfg } = req.body;
+  try {
+    const { updatePlanFull: updatePlanFull2, updateSaasSettings: updateSaasSettings2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+    if (plans) {
+      for (const p of plans) {
+        if (!["basic", "pro", "business"].includes(p.key)) continue;
+        await updatePlanFull2(p.key, {
+          prix_mensuel: p.prix_mensuel ?? 0,
+          prix_annuel: p.prix_annuel ?? 0,
+          max_produits: p.limits.produits === null ? 0 : p.limits.produits ?? 0,
+          max_ventes_mois: p.limits.ventes === null ? 0 : p.limits.ventes ?? 0,
+          max_commandes_mois: p.limits.commandes === null ? 0 : p.limits.commandes ?? 0,
+          max_users: p.limits.admins === null ? 0 : p.limits.admins ?? 0,
+          max_entrepots: p.limits.entrepots === null ? 0 : p.limits.entrepots ?? 0
+        });
+      }
+    }
+    if (globalCfg) {
+      await updateSaasSettings2({
+        trial_days: globalCfg.trial_days,
+        yearly_discount: globalCfg.yearly_discount,
+        whatsapp_number: globalCfg.whatsapp_number
+      });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 var saas_dashboard_default = router45;
 
 // routes/admin/billing.ts
 var import_express46 = __toESM(require("express"));
+init_shops();
 
 // lib/cinetpay.ts
 var PLAN_PRICES = {
-  basic: 9900,
-  pro: 24900
+  basic: 0,
+  pro: 9900,
+  business: 24900
 };
+async function getPlanPrice2(plan) {
+  try {
+    const { getPlanPrice: dbPrice } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+    return await dbPrice(plan);
+  } catch {
+    return PLAN_PRICES[plan] ?? 0;
+  }
+}
 
 // routes/admin/billing.ts
 var router46 = import_express46.default.Router();
@@ -12381,7 +12804,7 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { plan, duration_months = 1, operator, mm_reference } = req.body;
-  if (!plan || !["basic", "pro"].includes(plan)) {
+  if (!plan || !["basic", "pro", "business"].includes(plan)) {
     return res.status(400).json({ error: "Plan invalide." });
   }
   if (!operator || !["moov", "yas"].includes(operator)) {
@@ -12392,7 +12815,16 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
   }
   const months = Math.min(Math.max(Number(duration_months) || 1, 1), 12);
   const planKey = plan;
-  const amount = PLAN_PRICES[planKey] * months;
+  const pricePerMonth = await getPlanPrice2(planKey);
+  const amount = pricePerMonth * months;
+  if (planKey === "basic") {
+    try {
+      await activateBasicPlan(session.shop_id);
+      return res.json({ ok: true, activated: true });
+    } catch (err) {
+      return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    }
+  }
   const transactionId = `SAAS-${session.shop_id}-${planKey.toUpperCase()}-${Date.now()}`;
   try {
     await recordShopPayment({
@@ -12405,12 +12837,15 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
       operator,
       mmReference: mm_reference.trim()
     });
-    res.json({ ok: true, transactionId });
+    res.json({ ok: true, transactionId, amount });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
 var billing_default = router46;
+
+// index.ts
+init_shops();
 
 // lib/review-notifier.ts
 init_db();

@@ -1,14 +1,17 @@
 const CINETPAY_INIT_URL  = "https://api-checkout.cinetpay.com/v2/payment";
 const CINETPAY_CHECK_URL = "https://api-checkout.cinetpay.com/v2/payment/check";
 
-export const PLAN_PRICES: Record<"basic" | "pro", number> = {
-  basic: 0,
-  pro:   24900,
+/** Hardcoded fallback prices (FCFA/mois). DB prices take priority via getPlanPrice(). */
+export const PLAN_PRICES: Record<string, number> = {
+  basic:    0,
+  pro:      9900,
+  business: 24900,
 };
 
-export const PLAN_LABELS: Record<"basic" | "pro", string> = {
-  basic: "Basic",
-  pro:   "Pro",
+export const PLAN_LABELS: Record<string, string> = {
+  basic:    "Basic",
+  pro:      "Pro",
+  business: "Business",
 };
 
 export interface CinetPayInitResult {
@@ -20,6 +23,16 @@ export interface CinetPayStatus {
   status:   "ACCEPTED" | "REFUSED" | "PENDING";
   amount:   number;
   metadata: string;
+}
+
+/** Returns the monthly price for a plan from DB (falls back to PLAN_PRICES). */
+export async function getPlanPrice(plan: string): Promise<number> {
+  try {
+    const { getPlanPrice: dbPrice } = await import("@/lib/plan-configs");
+    return await dbPrice(plan);
+  } catch {
+    return PLAN_PRICES[plan] ?? 0;
+  }
 }
 
 export async function initPaiement(params: {

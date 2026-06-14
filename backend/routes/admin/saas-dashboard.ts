@@ -262,4 +262,74 @@ router.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── GET /api/admin/saas/plans — plans + prix + limites + settings ─────────────
+router.get("/api/admin/saas/plans", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+  try {
+    const { getPlansWithPrices, getSaasSettings } = await import("@/lib/plan-configs");
+    const [plans, global] = await Promise.all([getPlansWithPrices(), getSaasSettings()]);
+    res.json({ plans, global });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── PUT /api/admin/saas/plans — sauvegarder plans + settings ─────────────────
+router.put("/api/admin/saas/plans", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin(session, res)) return;
+
+  const { plans, global: globalCfg } = req.body as {
+    plans?: Array<{
+      key:          string;
+      prix_mensuel: number | null;
+      prix_annuel:  number | null;
+      limits: {
+        produits:  number | null;
+        ventes:    number | null;
+        commandes: number | null;
+        admins:    number | null;
+        entrepots: number | null;
+      };
+    }>;
+    global?: {
+      trial_days?:      number;
+      yearly_discount?: number;
+      whatsapp_number?: string;
+    };
+  };
+
+  try {
+    const { updatePlanFull, updateSaasSettings } = await import("@/lib/plan-configs");
+
+    if (plans) {
+      for (const p of plans) {
+        if (!["basic", "pro", "business"].includes(p.key)) continue;
+        await updatePlanFull(p.key, {
+          prix_mensuel:       p.prix_mensuel       ?? 0,
+          prix_annuel:        p.prix_annuel        ?? 0,
+          max_produits:       p.limits.produits    === null ? 0 : (p.limits.produits    ?? 0),
+          max_ventes_mois:    p.limits.ventes      === null ? 0 : (p.limits.ventes      ?? 0),
+          max_commandes_mois: p.limits.commandes   === null ? 0 : (p.limits.commandes   ?? 0),
+          max_users:          p.limits.admins      === null ? 0 : (p.limits.admins      ?? 0),
+          max_entrepots:      p.limits.entrepots   === null ? 0 : (p.limits.entrepots   ?? 0),
+        });
+      }
+    }
+
+    if (globalCfg) {
+      await updateSaasSettings({
+        trial_days:      globalCfg.trial_days,
+        yearly_discount: globalCfg.yearly_discount,
+        whatsapp_number: globalCfg.whatsapp_number,
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 export default router;

@@ -1,7 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { getShopById, getShopPayments, recordShopPayment, activateBasicPlan } from "@/lib/shops";
-import { PLAN_PRICES } from "../../lib/cinetpay";
+import { getPlanPrice } from "../../lib/cinetpay";
 
 const router = express.Router();
 
@@ -50,7 +50,7 @@ router.post("/api/admin/billing/initiate", async (req, res) => {
     mm_reference?:    string;
   };
 
-  if (!plan || !["basic", "pro"].includes(plan)) {
+  if (!plan || !["basic", "pro", "business"].includes(plan)) {
     return res.status(400).json({ error: "Plan invalide." });
   }
   if (!operator || !["moov", "yas"].includes(operator)) {
@@ -60,9 +60,10 @@ router.post("/api/admin/billing/initiate", async (req, res) => {
     return res.status(400).json({ error: "Référence de transaction requise." });
   }
 
-  const months  = Math.min(Math.max(Number(duration_months) || 1, 1), 12);
-  const planKey = plan as "basic" | "pro";
-  const amount  = PLAN_PRICES[planKey] * months;
+  const months       = Math.min(Math.max(Number(duration_months) || 1, 1), 12);
+  const planKey      = plan as "basic" | "pro" | "business";
+  const pricePerMonth = await getPlanPrice(planKey);
+  const amount       = pricePerMonth * months;
 
   // Basic is free — activate immediately, no payment record needed
   if (planKey === "basic") {
@@ -74,7 +75,6 @@ router.post("/api/admin/billing/initiate", async (req, res) => {
     }
   }
 
-  // Unique transaction ID — shop + plan + timestamp
   const transactionId = `SAAS-${session.shop_id}-${planKey.toUpperCase()}-${Date.now()}`;
 
   try {
@@ -89,7 +89,7 @@ router.post("/api/admin/billing/initiate", async (req, res) => {
       mmReference:    mm_reference.trim(),
     });
 
-    res.json({ ok: true, transactionId });
+    res.json({ ok: true, transactionId, amount });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
