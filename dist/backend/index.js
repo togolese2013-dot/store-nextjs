@@ -5,13 +5,8 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res, err) => function __init() {
-  if (err) throw err[0];
-  try {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  } catch (e) {
-    throw err = [e], e;
-  }
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -35,17 +30,17 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// lib/utils.ts
+// ../lib/utils.ts
 var finalPrice, formatPrice;
 var init_utils = __esm({
-  "lib/utils.ts"() {
+  "../lib/utils.ts"() {
     "use strict";
     finalPrice = (p) => p.remise > 0 ? Math.max(0, p.prix_unitaire - p.remise) : p.prix_unitaire;
     formatPrice = (n) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n) + " FCFA";
   }
 });
 
-// lib/db.ts
+// ../lib/db.ts
 var db_exports = {};
 __export(db_exports, {
   checkReviewsTable: () => checkReviewsTable,
@@ -249,6 +244,17 @@ async function produitCols() {
       }
     }
   }
+  if (!names.has("canal_vente")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN canal_vente ENUM('tous','boutique','en_ligne') NOT NULL DEFAULT 'tous'`);
+      names.add("canal_vente");
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("canal_vente");
+      }
+    }
+  }
   if (names.has("slug") && names.has("shop_id")) {
     try {
       await db.execute(`ALTER TABLE produits DROP INDEX idx_produits_slug`);
@@ -275,7 +281,8 @@ async function produitCols() {
     slug: names.has("slug"),
     entrepot_id: names.has("entrepot_id"),
     prix_entrepot: names.has("prix_entrepot"),
-    shop_id: names.has("shop_id")
+    shop_id: names.has("shop_id"),
+    canal_vente: names.has("canal_vente")
   };
   return _cols;
 }
@@ -327,7 +334,8 @@ async function getProducts(opts) {
     statut,
     includeInactive = false,
     entrepotId,
-    shopId = 1
+    shopId = 1,
+    storefrontOnly = false
   } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
@@ -381,6 +389,9 @@ async function getProducts(opts) {
   if (entrepotId != null) {
     conditions.push("p.entrepot_id = ?");
     params.push(entrepotId);
+  }
+  if (storefrontOnly && cols.canal_vente) {
+    conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))");
   }
   const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -495,7 +506,7 @@ async function getProductsByIds(ids) {
     marque_nom: r.marque_nom ?? null
   }));
 }
-async function getProductBySlug(slugOrRef, shopId = 1) {
+async function getProductBySlug(slugOrRef, shopId = 1, storefrontOnly = false) {
   const cols = await produitCols();
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
@@ -520,17 +531,18 @@ async function getProductBySlug(slugOrRef, shopId = 1) {
      ${cols.marque_id ? "LEFT JOIN marques m ON p.marque_id = m.id" : ""}`;
   const shopCondition = cols.shop_id ? " AND p.shop_id = ?" : "";
   const shopParams = cols.shop_id ? [shopId] : [];
+  const canalCondition = storefrontOnly && cols.canal_vente ? " AND (p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))" : "";
   let rows = [];
   if (cols.slug) {
     const [r1] = await db.execute(
-      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      `${selectSql} WHERE p.slug = ? AND p.actif = 1${shopCondition}${canalCondition} LIMIT 1`,
       [slugOrRef, ...shopParams]
     );
     rows = r1;
   }
   if (!rows.length) {
     const [r2] = await db.execute(
-      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition} LIMIT 1`,
+      `${selectSql} WHERE p.reference = ? AND p.actif = 1${shopCondition}${canalCondition} LIMIT 1`,
       [slugOrRef, ...shopParams]
     );
     rows = r2;
@@ -559,7 +571,7 @@ async function getProductBySlug(slugOrRef, shopId = 1) {
   };
 }
 async function getProductCount(opts) {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1 } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1, storefrontOnly = false } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
   const params = [];
@@ -609,20 +621,24 @@ async function getProductCount(opts) {
     conditions.push("p.entrepot_id = ?");
     params.push(entrepotId);
   }
+  if (storefrontOnly && cols.canal_vente) {
+    conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))");
+  }
   const [rows] = await db.execute(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,
     params
   );
   return Number(rows[0]?.cnt ?? 0);
 }
-async function getProductStatusCounts() {
+async function getProductStatusCounts(shopId = 1) {
   const [rows] = await db.execute(
     `SELECT
        COUNT(*) AS total,
        SUM(COALESCE(stock_boutique, 0) > 5)             AS disponible,
        SUM(COALESCE(stock_boutique, 0) BETWEEN 1 AND 5) AS faible,
        SUM(COALESCE(stock_boutique, 0) = 0)             AS epuise
-     FROM produits`
+     FROM produits WHERE shop_id = ?`,
+    [shopId]
   );
   const r = rows[0];
   return {
@@ -682,7 +698,7 @@ async function getProductVariants(productId) {
 }
 var import_promise, db, _cols, _hasReviews;
 var init_db = __esm({
-  "lib/db.ts"() {
+  "../lib/db.ts"() {
     "use strict";
     import_promise = __toESM(require("mysql2/promise"));
     init_utils();
@@ -692,7 +708,7 @@ var init_db = __esm({
   }
 });
 
-// lib/admin-db.ts
+// ../lib/admin-db.ts
 var admin_db_exports = {};
 __export(admin_db_exports, {
   accepterLivraison: () => accepterLivraison,
@@ -2385,15 +2401,15 @@ async function updateProductStock(produit_id, _entrepot_id, stock) {
     [stock, produit_id]
   );
 }
-async function getStockStats() {
+async function getStockStats(shopId = 1) {
   const [rows] = await db.execute(`
     SELECT
       COUNT(*)                                                                                   AS en_stock,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) = 0 THEN 1 ELSE 0 END)                           AS en_rupture,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) > 0 AND COALESCE(stock_magasin, 0) <= 5 THEN 1 ELSE 0 END) AS stock_faible,
       COALESCE(SUM(prix_unitaire * COALESCE(stock_magasin, 0)), 0)                               AS valeur_totale
-    FROM produits
-  `);
+    FROM produits WHERE shop_id = ?
+  `, [shopId]);
   const r = rows[0];
   return {
     en_stock: Number(r.en_stock ?? 0),
@@ -2485,7 +2501,7 @@ async function getStockBoutiqueList(opts) {
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const remiseCol = cols.remise ? "COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)" : "0";
   const searchLike = search ? `%${search}%` : null;
-  const p1Conds = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)"];
+  const p1Conds = [`p.shop_id = ${Number(shopId)}`, "NOT EXISTS (SELECT 1 FROM product_variants pv2 WHERE pv2.produit_id = p.id)", "(p.canal_vente IS NULL OR p.canal_vente IN ('tous','boutique'))"];
   const p1Params = [];
   if (searchLike) {
     p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)");
@@ -2509,7 +2525,7 @@ async function getStockBoutiqueList(opts) {
      WHERE ${p1Conds.join(" AND ")}`,
     p1Params
   );
-  const p2Conds = [`p.shop_id = ${Number(shopId)}`];
+  const p2Conds = [`p.shop_id = ${Number(shopId)}`, "(p.canal_vente IS NULL OR p.canal_vente IN ('tous','boutique'))"];
   const p2Params = [];
   if (searchLike) {
     p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)");
@@ -4544,7 +4560,7 @@ async function markTombolaNotified(sessionId) {
 }
 var _ensurePromises, _settingsCacheMap, _finCols, _ventesStatsCache;
 var init_admin_db = __esm({
-  "lib/admin-db.ts"() {
+  "../lib/admin-db.ts"() {
     "use strict";
     init_db();
     _ensurePromises = /* @__PURE__ */ new Map();
@@ -4554,7 +4570,7 @@ var init_admin_db = __esm({
   }
 });
 
-// backend/index.ts
+// index.ts
 var index_exports = {};
 __export(index_exports, {
   default: () => index_default
@@ -4568,13 +4584,13 @@ var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
 var import_express_rate_limit = require("express-rate-limit");
 
-// backend/routes/admin/auth.ts
+// routes/admin/auth.ts
 var import_express = __toESM(require("express"));
 var import_bcryptjs = __toESM(require("bcryptjs"));
 init_admin_db();
 init_db();
 
-// lib/shops.ts
+// ../lib/shops.ts
 init_db();
 var _ensured = false;
 async function ensureShopsTable() {
@@ -4748,6 +4764,13 @@ async function activateShopSubscription(shopId, plan, durationMonths) {
     [plan, newEnd.toISOString().slice(0, 19).replace("T", " "), shopId]
   );
 }
+async function activateBasicPlan(shopId) {
+  await ensureShopsTable();
+  await db.execute(
+    `UPDATE shops SET plan = 'basic', subscription_status = 'active', current_period_end = NULL WHERE id = ?`,
+    [shopId]
+  );
+}
 async function recordShopPayment(data) {
   await ensureShopsTable();
   await db.execute(
@@ -4786,7 +4809,7 @@ async function expireShopSubscriptions() {
   `);
 }
 
-// backend/lib/auth.ts
+// lib/auth.ts
 var import_jose = require("jose");
 init_admin_db();
 var jwtSecret = process.env.JWT_SECRET;
@@ -4856,7 +4879,7 @@ function clearAuthCookie(res) {
   });
 }
 
-// backend/lib/security-log.ts
+// lib/security-log.ts
 init_db();
 async function ensureSecurityLogsTable() {
   await db.execute(`
@@ -4909,7 +4932,7 @@ async function getSecurityLogs(limit = 100, shopId) {
   }
 }
 
-// backend/routes/admin/auth.ts
+// routes/admin/auth.ts
 function getIp(req) {
   return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ?? req.socket?.remoteAddress ?? "unknown";
 }
@@ -5179,17 +5202,17 @@ router.post("/api/admin/auth/refresh", async (req, res) => {
 });
 var auth_default = router;
 
-// backend/routes/admin/products.ts
+// routes/admin/products.ts
 var import_express2 = __toESM(require("express"));
 
-// backend/lib/admin-events.ts
+// lib/admin-events.ts
 var import_events = require("events");
 var adminEmitter = globalThis.__adminEmitter ?? (globalThis.__adminEmitter = new import_events.EventEmitter().setMaxListeners(200));
 function emitAdminEvent(type, payload) {
   adminEmitter.emit("admin", { type, ts: Date.now(), ...payload ?? {} });
 }
 
-// lib/admin-permissions.ts
+// ../lib/admin-permissions.ts
 function hasPageAccess(role, permissions, module2, pageId) {
   if (role === "super_admin") return true;
   if (!permissions) return false;
@@ -5199,11 +5222,11 @@ function hasPageAccess(role, permissions, module2, pageId) {
   return perm.some((p) => pageId === p || pageId.startsWith(p + "/"));
 }
 
-// backend/routes/admin/products.ts
+// routes/admin/products.ts
 init_db();
 init_admin_db();
 
-// backend/lib/plan-limits.ts
+// lib/plan-limits.ts
 var PLAN_LIMITS = {
   basic: 20,
   pro: Infinity,
@@ -5217,7 +5240,7 @@ function planLimitLabel(plan) {
   return limit === Infinity ? "illimit\xE9" : String(limit);
 }
 
-// backend/routes/admin/products.ts
+// routes/admin/products.ts
 var router2 = import_express2.default.Router();
 function validateImageUrl(url) {
   if (!url || typeof url !== "string" || url.trim() === "") return null;
@@ -5237,10 +5260,11 @@ router2.get("/api/admin/products/stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [stockStats, statusCounts, totalCount] = await Promise.all([
-      getStockStats(),
-      getProductStatusCounts(),
-      db.execute("SELECT COUNT(*) AS cnt FROM produits")
+      getStockStats(shopId),
+      getProductStatusCounts(shopId),
+      db.execute("SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId])
     ]);
     stockStats.en_stock = Number(totalCount[0][0]?.cnt ?? stockStats.en_stock);
     res.json({ stockStats, statusCounts });
@@ -5424,6 +5448,14 @@ router2.post("/api/admin/products", async (req, res) => {
       columns.push("prix_entrepot");
       values.push(Number(body.prix_entrepot) || null);
     }
+    if (body.canal_vente) {
+      columns.push("canal_vente");
+      values.push(body.canal_vente);
+    }
+    if (body.prod_condition) {
+      columns.push("prod_condition");
+      values.push(body.prod_condition);
+    }
     columns.push("shop_id");
     values.push(shopId);
     const placeholders = columns.map(() => "?").join(",");
@@ -5515,6 +5547,7 @@ router2.get("/api/admin/products/export", async (req, res) => {
     const brandId = req.query.brand ? Number(req.query.brand) : void 0;
     const statut = req.query.statut || void 0;
     const statutFilter = ["disponible", "faible", "epuise"].includes(statut ?? "") ? statut : void 0;
+    const shopId = session.shop_id ?? 1;
     const products = await getProducts({
       search: q,
       categoryId: catId,
@@ -5522,7 +5555,8 @@ router2.get("/api/admin/products/export", async (req, res) => {
       statut: statutFilter,
       includeInactive: true,
       limit: 5e3,
-      offset: 0
+      offset: 0,
+      shopId
     });
     const escape = (v) => {
       const s = v == null ? "" : String(v).replace(/"/g, '""');
@@ -5581,16 +5615,18 @@ router2.get("/api/admin/products/search", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const q = req.query.q || "";
   const limit = Math.min(50, Number(req.query.limit) || 20);
-  const products = await getProducts({ search: q, limit, includeInactive: false });
+  const shopId = session.shop_id ?? 1;
+  const products = await getProducts({ search: q, limit, includeInactive: false, shopId });
   res.json({ products });
 });
 router2.get("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [rows] = await db.query(
-      "SELECT * FROM produits WHERE id = ? LIMIT 1",
-      [req.params.id]
+      "SELECT * FROM produits WHERE id = ? AND shop_id = ? LIMIT 1",
+      [req.params.id, shopId]
     );
     if (!rows.length) return res.status(404).json({ error: "Produit introuvable." });
     res.json({ product: rows[0] });
@@ -5646,7 +5682,9 @@ router2.patch("/api/admin/products/:id", async (req, res) => {
       "reference",
       "slug",
       "entrepot_id",
-      "prix_entrepot"
+      "prix_entrepot",
+      "canal_vente",
+      "prod_condition"
     ];
     for (const key of alwaysAllowed) {
       if (key in body) {
@@ -5728,7 +5766,7 @@ router2.delete("/api/admin/products/:id", async (req, res) => {
 });
 var products_default = router2;
 
-// backend/routes/admin/variants.ts
+// routes/admin/variants.ts
 var import_express3 = __toESM(require("express"));
 init_db();
 var router3 = import_express3.default.Router();
@@ -5885,7 +5923,7 @@ router3.delete("/api/admin/products/:productId/variants/:id", async (req, res) =
 });
 var variants_default = router3;
 
-// backend/routes/admin/stock.ts
+// routes/admin/stock.ts
 var import_express4 = __toESM(require("express"));
 init_admin_db();
 var router4 = import_express4.default.Router();
@@ -5989,7 +6027,7 @@ router4.post("/api/admin/stock/ajustement", async (req, res) => {
 });
 var stock_default = router4;
 
-// backend/routes/admin/stock-boutique.ts
+// routes/admin/stock-boutique.ts
 var import_express5 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -6086,10 +6124,10 @@ router5.get("/api/admin/stock-boutique/entrees", async (req, res) => {
 });
 var stock_boutique_default = router5;
 
-// backend/routes/admin/ventes.ts
+// routes/admin/ventes.ts
 var import_express6 = __toESM(require("express"));
 
-// backend/lib/whatsapp.ts
+// lib/whatsapp.ts
 init_admin_db();
 var WA_API = "https://graph.facebook.com/v19.0";
 function cleanPhone(num) {
@@ -6405,7 +6443,7 @@ async function sendWaDeliveryConfirmation(order) {
   }
 }
 
-// backend/routes/admin/ventes.ts
+// routes/admin/ventes.ts
 init_admin_db();
 var router6 = import_express6.default.Router();
 router6.get("/api/admin/ventes/factures", async (req, res) => {
@@ -6561,7 +6599,7 @@ router6.get("/api/admin/ventes/livraisons", async (req, res) => {
 });
 var ventes_default = router6;
 
-// backend/routes/admin/livraisons.ts
+// routes/admin/livraisons.ts
 var import_express7 = __toESM(require("express"));
 init_admin_db();
 var router7 = import_express7.default.Router();
@@ -6643,7 +6681,7 @@ router7.delete("/api/admin/livreurs/:id", async (req, res) => {
 });
 var livraisons_default = router7;
 
-// backend/routes/admin/finance.ts
+// routes/admin/finance.ts
 var import_express8 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -6766,7 +6804,7 @@ router8.delete("/api/admin/finance", async (req, res) => {
 });
 var finance_default = router8;
 
-// backend/routes/admin/clients.ts
+// routes/admin/clients.ts
 var import_express9 = __toESM(require("express"));
 init_admin_db();
 var router9 = import_express9.default.Router();
@@ -6837,7 +6875,7 @@ router9.delete("/api/admin/clients/:id", async (req, res) => {
 });
 var clients_default = router9;
 
-// backend/routes/admin/orders.ts
+// routes/admin/orders.ts
 var import_express10 = __toESM(require("express"));
 init_db();
 init_admin_db();
@@ -7026,7 +7064,7 @@ router10.delete("/api/admin/orders/:id", async (req, res) => {
 });
 var orders_default = router10;
 
-// backend/routes/admin/upload.ts
+// routes/admin/upload.ts
 var import_express11 = __toESM(require("express"));
 var import_cloudinary = require("cloudinary");
 var MAX_SIZE = 10 * 1024 * 1024;
@@ -7085,11 +7123,11 @@ router11.post("/api/admin/upload", async (req, res) => {
 });
 var upload_default = router11;
 
-// backend/routes/admin/settings.ts
+// routes/admin/settings.ts
 var import_express12 = __toESM(require("express"));
 init_admin_db();
 
-// backend/lib/vercel-domains.ts
+// lib/vercel-domains.ts
 var TOKEN = process.env.VERCEL_TOKEN;
 var PROJECT_ID = process.env.VERCEL_PROJECT_ID;
 var TEAM_ID = process.env.VERCEL_TEAM_ID;
@@ -7151,7 +7189,7 @@ async function checkVercelDomain(domain) {
   }
 }
 
-// backend/routes/admin/settings.ts
+// routes/admin/settings.ts
 var router12 = import_express12.default.Router();
 router12.get("/api/admin/settings", async (req, res) => {
   const session = await getSession(req);
@@ -7247,7 +7285,7 @@ router12.delete("/api/admin/settings/domain", async (req, res) => {
 });
 var settings_default = router12;
 
-// backend/routes/admin/fournisseurs.ts
+// routes/admin/fournisseurs.ts
 var import_express13 = __toESM(require("express"));
 init_admin_db();
 var router13 = import_express13.default.Router();
@@ -7344,7 +7382,7 @@ router13.delete("/api/admin/achats/:id", async (req, res) => {
 });
 var fournisseurs_default = router13;
 
-// backend/routes/admin/categories.ts
+// routes/admin/categories.ts
 var import_express14 = __toESM(require("express"));
 init_admin_db();
 var router14 = import_express14.default.Router();
@@ -7404,7 +7442,7 @@ router14.delete("/api/admin/marques/:id", async (req, res) => {
 });
 var categories_default = router14;
 
-// backend/routes/admin/boutique-clients.ts
+// routes/admin/boutique-clients.ts
 var import_express15 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -7482,7 +7520,7 @@ router15.delete("/api/admin/boutique-clients/:id", async (req, res) => {
 });
 var boutique_clients_default = router15;
 
-// backend/routes/admin/newsletter.ts
+// routes/admin/newsletter.ts
 var import_express16 = __toESM(require("express"));
 init_admin_db();
 var router16 = import_express16.default.Router();
@@ -7510,7 +7548,7 @@ router16.delete("/api/admin/newsletter", async (req, res) => {
 });
 var newsletter_default = router16;
 
-// backend/routes/admin/schema.ts
+// routes/admin/schema.ts
 var import_express17 = __toESM(require("express"));
 init_db();
 var router17 = import_express17.default.Router();
@@ -7561,7 +7599,7 @@ router17.post("/api/admin/schema/migrate", async (req, res) => {
 });
 var schema_default = router17;
 
-// backend/routes/admin/events.ts
+// routes/admin/events.ts
 var import_express18 = __toESM(require("express"));
 var router18 = import_express18.default.Router();
 function sseSetup(res) {
@@ -7620,7 +7658,7 @@ router18.get("/api/admin/events", async (req, res) => res.redirect(307, "/api/ad
 router18.get("/api/admin/orders/sse", async (req, res) => res.redirect(307, "/api/admin/sse"));
 var events_default = router18;
 
-// backend/routes/admin/users.ts
+// routes/admin/users.ts
 var import_express19 = __toESM(require("express"));
 var import_bcryptjs2 = __toESM(require("bcryptjs"));
 init_admin_db();
@@ -7827,7 +7865,7 @@ router19.put("/api/admin/team/:id/permissions", async (req, res) => {
 });
 var users_default = router19;
 
-// backend/routes/admin/reviews.ts
+// routes/admin/reviews.ts
 var import_express20 = __toESM(require("express"));
 init_admin_db();
 var router20 = import_express20.default.Router();
@@ -7849,7 +7887,7 @@ router20.post("/api/admin/reviews", async (req, res) => {
 });
 var reviews_default = router20;
 
-// backend/routes/admin/payment-plans.ts
+// routes/admin/payment-plans.ts
 var import_express21 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -7942,7 +7980,7 @@ router21.delete("/api/admin/payment-plans/:id", async (req, res) => {
 });
 var payment_plans_default = router21;
 
-// backend/routes/admin/verifications.ts
+// routes/admin/verifications.ts
 var import_express22 = __toESM(require("express"));
 init_db();
 var router22 = import_express22.default.Router();
@@ -7997,7 +8035,7 @@ router22.patch("/api/admin/verifications/:id", async (req, res) => {
 });
 var verifications_default = router22;
 
-// backend/routes/admin/commerciaux.ts
+// routes/admin/commerciaux.ts
 var import_express23 = __toESM(require("express"));
 init_db();
 var router23 = import_express23.default.Router();
@@ -8168,7 +8206,7 @@ router23.put("/api/admin/commerciaux/:id/produits", async (req, res) => {
 });
 var commerciaux_default = router23;
 
-// backend/routes/livreur.ts
+// routes/livreur.ts
 var import_express24 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -8516,7 +8554,7 @@ router24.patch("/api/livreur/orders/:id/fail", async (req, res) => {
 });
 var livreur_default = router24;
 
-// backend/routes/public.ts
+// routes/public.ts
 var import_express25 = __toESM(require("express"));
 init_db();
 init_admin_db();
@@ -8692,12 +8730,12 @@ router25.get("/api/products", async (req, res) => {
     }
     if (slugExact) {
       const { getProductBySlug: getProductBySlug2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const product = await getProductBySlug2(slugExact, shopId);
+      const product = await getProductBySlug2(slugExact, shopId, true);
       return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId }),
-      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId })
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId, storefrontOnly: true }),
+      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId, storefrontOnly: true })
     ]);
     const isFiltered = search || categoryId || promoOnly || newOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
     const data = isFiltered ? products : seededShuffle(products, Math.floor(Date.now() / (1e3 * 60 * 60)));
@@ -8914,13 +8952,13 @@ router25.get("/api/resolve-domain", async (req, res) => {
 });
 var public_default = router25;
 
-// backend/routes/account.ts
+// routes/account.ts
 var import_express26 = __toESM(require("express"));
 var import_bcryptjs3 = __toESM(require("bcryptjs"));
 init_db();
 init_admin_db();
 
-// backend/lib/client-auth.ts
+// lib/client-auth.ts
 var import_jose2 = require("jose");
 var SECRET2 = new TextEncoder().encode(
   process.env.JWT_SECRET || "togolese-shop-secret-change-in-production-2024"
@@ -8956,7 +8994,7 @@ function clearClientCookie(res) {
   res.clearCookie(CLIENT_COOKIE, { path: "/" });
 }
 
-// backend/routes/account.ts
+// routes/account.ts
 var router26 = import_express26.default.Router();
 var tableReady = false;
 async function ensureTable2() {
@@ -9397,7 +9435,7 @@ router26.delete("/api/account/addresses/:id", async (req, res) => {
 });
 var account_default = router26;
 
-// backend/routes/orders.ts
+// routes/orders.ts
 var import_express27 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -9606,7 +9644,7 @@ router27.post("/api/orders", async (req, res) => {
 });
 var orders_default2 = router27;
 
-// backend/routes/mobile-money.ts
+// routes/mobile-money.ts
 var import_express28 = __toESM(require("express"));
 init_db();
 init_admin_db();
@@ -9802,10 +9840,10 @@ router28.post("/api/webhooks/fedapay", async (req, res) => {
 });
 var mobile_money_default = router28;
 
-// backend/index.ts
+// index.ts
 init_admin_db();
 
-// backend/routes/admin/security-logs.ts
+// routes/admin/security-logs.ts
 var import_express29 = __toESM(require("express"));
 var router29 = import_express29.default.Router();
 router29.get("/api/admin/security-logs", async (req, res) => {
@@ -9821,7 +9859,7 @@ router29.get("/api/admin/security-logs", async (req, res) => {
 });
 var security_logs_default = router29;
 
-// backend/routes/admin/rapports.ts
+// routes/admin/rapports.ts
 var import_express30 = __toESM(require("express"));
 init_db();
 var router30 = import_express30.default.Router();
@@ -9844,6 +9882,7 @@ function periodClause(col, periode) {
 router30.get("/api/admin/rapports", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const type = req.query.type || "ventes";
   const periode = req.query.periode || "ce_mois";
   const statut = req.query.statut || "all";
@@ -9852,12 +9891,14 @@ router30.get("/api/admin/rapports", async (req, res) => {
     let rows = [];
     let utilisateurs = [];
     const [uRows] = await db.execute(
-      `SELECT id, nom FROM admin_users WHERE actif = 1 ORDER BY nom`
+      `SELECT id, nom FROM admin_users WHERE actif = 1 AND shop_id = ? ORDER BY nom`,
+      [shopId]
     );
     utilisateurs = uRows;
     const pc = periodClause;
     if (type === "ventes") {
       const conditions = [
+        `f.shop_id = ${Number(shopId)}`,
         pc("f.created_at", periode),
         "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)"
       ];
@@ -9894,7 +9935,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "achats") {
-      const conditions = [pc("a.date_achat", periode)];
+      const conditions = [`a.shop_id = ${Number(shopId)}`, pc("a.date_achat", periode)];
       const params = [];
       if (statut !== "all") {
         conditions.push("a.statut = ?");
@@ -9921,7 +9962,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "depenses") {
-      const conditions = ["fe.type = 'depense'", pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, "fe.type = 'depense'", pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -9949,7 +9990,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "rentrees") {
-      const conditions = ["fe.type = 'rentree'", pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, "fe.type = 'rentree'", pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -9977,7 +10018,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "combine") {
-      const conditions = ["fe.type IN ('depense','rentree')", pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, "fe.type IN ('depense','rentree')", pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -10005,7 +10046,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "financier") {
-      const conditions = [pc("fe.date_entree", periode)];
+      const conditions = [`fe.shop_id = ${Number(shopId)}`, pc("fe.date_entree", periode)];
       const params = [];
       if (utilisateur !== "all") {
         conditions.push("fe.admin_id = ?");
@@ -10034,6 +10075,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       rows = r;
     } else if (type === "mobile_money") {
       const conditions = [
+        `f.shop_id = ${Number(shopId)}`,
         "f.mode_paiement IN ('moov_money','tmoney','mobile_money')",
         pc("f.created_at", periode),
         "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)"
@@ -10062,7 +10104,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
       );
       rows = r;
     } else if (type === "clients") {
-      const conditions = [pc("bc.created_at", periode)];
+      const conditions = [`bc.shop_id = ${Number(shopId)}`, pc("bc.created_at", periode)];
       const params = [];
       const where = "WHERE " + conditions.join(" AND ");
       const [r] = await db.execute(
@@ -10141,7 +10183,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
           LEFT JOIN orders _so        ON _so.id = f.order_id AND _so.status = 'delivered'
           LEFT JOIN admin_users au    ON au.id  = f.admin_id
           LEFT JOIN utilisateurs util ON util.id = f.admin_id
-          WHERE ${pVentes}
+          WHERE f.shop_id = ${Number(shopId)} AND ${pVentes}
             AND (f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL))
          UNION ALL
          (SELECT fe.reference, fe.date_entree AS created_at,
@@ -10151,14 +10193,14 @@ router30.get("/api/admin/rapports", async (req, res) => {
           FROM finance_entries fe
           LEFT JOIN admin_users au2 ON au2.id = fe.admin_id
           LEFT JOIN utilisateurs util2 ON util2.id = fe.admin_id
-          WHERE ${pFinance})
+          WHERE fe.shop_id = ${Number(shopId)} AND ${pFinance})
          UNION ALL
          (SELECT a.reference, a.date_achat AS created_at,
                  frs.nom AS client_nom, NULL AS vendeur,
                  a.montant_total AS total, a.statut
           FROM achats a
           LEFT JOIN fournisseurs frs ON frs.id = a.fournisseur_id
-          WHERE ${pAchats})
+          WHERE a.shop_id = ${Number(shopId)} AND ${pAchats})
          ORDER BY created_at DESC
          LIMIT 500`
       );
@@ -10172,7 +10214,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
 });
 var rapports_default = router30;
 
-// backend/routes/admin/tendances.ts
+// routes/admin/tendances.ts
 var import_express31 = __toESM(require("express"));
 init_db();
 var router31 = import_express31.default.Router();
@@ -10182,6 +10224,7 @@ var SITE_COND = `(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT 
 router31.get("/api/admin/tendances", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const periode = req.query.periode || "mensuelle";
   const annee = Number(req.query.annee) || (/* @__PURE__ */ new Date()).getFullYear();
   const prevAnnee = annee - 1;
@@ -10194,7 +10237,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
          COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye_total
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
          AND ${SITE_COND}`,
       [annee]
     );
@@ -10215,7 +10258,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY MONTH(f.created_at)
          ORDER BY mois`,
@@ -10232,7 +10275,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY QUARTER(f.created_at)
          ORDER BY mois`,
@@ -10249,7 +10292,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
            COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant_paye
          FROM factures f
          ${SITE_JOIN}
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ${Number(shopId)} AND f.statut != 'annule'
            AND ${SITE_COND}
          GROUP BY YEAR(f.created_at)
          ORDER BY mois`
@@ -10294,7 +10337,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
              total DECIMAL(12,2) PATH '$.total'
            )
          ) AS jt
-         WHERE YEAR(f.created_at) = ? AND f.statut != 'annule' AND jt.nom IS NOT NULL
+         WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule' AND jt.nom IS NOT NULL
            AND ${SITE_COND}
          GROUP BY jt.nom
          ORDER BY ca DESC
@@ -10317,7 +10360,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
          COALESCE(SUM(CASE WHEN f.statut_paiement = 'paye_total' THEN f.total ELSE COALESCE(f.montant_acompte, 0) END), 0) AS montant
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) = ? AND f.statut != 'annule' AND f.statut_paiement != 'non_paye'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) = ? AND f.statut != 'annule' AND f.statut_paiement != 'non_paye'
          AND ${SITE_COND}
        GROUP BY f.mode_paiement
        ORDER BY montant DESC`,
@@ -10342,7 +10385,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
               COALESCE(SUM(f.total), 0) AS ca
        FROM factures f
        ${SITE_JOIN}
-       WHERE YEAR(f.created_at) IN (?, ?) AND f.statut != 'annule'
+       WHERE f.shop_id = ${Number(shopId)} AND YEAR(f.created_at) IN (?, ?) AND f.statut != 'annule'
          AND ${SITE_COND}
        GROUP BY annee, mois
        ORDER BY annee, mois`,
@@ -10370,7 +10413,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
 });
 var tendances_default = router31;
 
-// backend/routes/admin/performance-produits.ts
+// routes/admin/performance-produits.ts
 var import_express32 = __toESM(require("express"));
 init_db();
 var router32 = import_express32.default.Router();
@@ -10384,6 +10427,7 @@ ensurePrixAchat().catch(console.error);
 router32.get("/api/admin/performance-produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const shopId = session.shop_id ?? 1;
   const dateDebut = req.query.date_debut || new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 1).toISOString().slice(0, 10);
   const dateFin = req.query.date_fin || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const top = Math.min(50, Math.max(5, Number(req.query.top) || 10));
@@ -10414,7 +10458,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
              total  DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ? AND f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND jt.nom IS NOT NULL
            AND (
@@ -10425,7 +10469,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
          GROUP BY jt.nom, jt.ref
          ORDER BY ca DESC
          LIMIT ${top}`,
-        [dateDebut, dateFin]
+        [shopId, dateDebut, dateFin]
       );
       produits = rows.map((r) => {
         const ca = Math.round(Number(r.ca ?? 0));
@@ -10470,7 +10514,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
              total DECIMAL(12,2)  PATH '$.total'
            )
          ) AS jt
-         WHERE f.statut != 'annule'
+         WHERE f.shop_id = ? AND f.statut != 'annule'
            AND DATE(f.created_at) BETWEEN ? AND ?
            AND (
              f.source IS NULL
@@ -10479,7 +10523,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
            )
          GROUP BY DATE(f.created_at)
          ORDER BY date`,
-        [dateDebut, dateFin]
+        [shopId, dateDebut, dateFin]
       );
       evolution = evRows.map((r) => ({
         date: String(r.date).slice(0, 10),
@@ -10496,7 +10540,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
 });
 var performance_produits_default = router32;
 
-// backend/routes/admin/whatsapp-inbox.ts
+// routes/admin/whatsapp-inbox.ts
 var import_express33 = __toESM(require("express"));
 init_db();
 init_admin_db();
@@ -10742,7 +10786,7 @@ router33.delete("/api/admin/whatsapp/threads/:phone", async (req, res) => {
 });
 var whatsapp_inbox_default = router33;
 
-// backend/routes/whatsapp-webhook.ts
+// routes/whatsapp-webhook.ts
 var import_express34 = __toESM(require("express"));
 init_db();
 var router34 = import_express34.default.Router();
@@ -10806,7 +10850,7 @@ router34.post("/api/webhooks/whatsapp", async (req, res) => {
 });
 var whatsapp_webhook_default = router34;
 
-// backend/routes/analytics.ts
+// routes/analytics.ts
 var import_express35 = __toESM(require("express"));
 init_db();
 var import_http = __toESM(require("http"));
@@ -11113,7 +11157,7 @@ router35.get("/api/admin/analytics", async (req, res) => {
 });
 var analytics_default = router35;
 
-// backend/routes/referrals.ts
+// routes/referrals.ts
 var import_express36 = __toESM(require("express"));
 init_db();
 var router36 = import_express36.default.Router();
@@ -11211,7 +11255,7 @@ router36.get("/api/referrals/validate", async (req, res) => {
 });
 var referrals_default = router36;
 
-// backend/routes/admin/delivery-zones.ts
+// routes/admin/delivery-zones.ts
 var import_express37 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -11288,7 +11332,7 @@ router37.delete("/api/admin/delivery-zones/:id", async (req, res) => {
 });
 var delivery_zones_default = router37;
 
-// backend/routes/admin/coupons.ts
+// routes/admin/coupons.ts
 var import_express38 = __toESM(require("express"));
 init_admin_db();
 init_db();
@@ -11367,7 +11411,7 @@ router38.post("/api/admin/coupons", async (req, res) => {
 });
 var coupons_default = router38;
 
-// backend/routes/admin/social.ts
+// routes/admin/social.ts
 var import_express39 = __toESM(require("express"));
 var router39 = import_express39.default.Router();
 var N8N_WEBHOOK = "https://n8n.togolese.fr/webhook/facebook-publisher";
@@ -11481,7 +11525,7 @@ router39.post("/api/admin/social/publish", async (req, res) => {
 });
 var social_default = router39;
 
-// backend/routes/admin/whatsapp-campagne.ts
+// routes/admin/whatsapp-campagne.ts
 var import_express40 = __toESM(require("express"));
 init_db();
 var router40 = import_express40.default.Router();
@@ -11588,7 +11632,7 @@ router40.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
 });
 var whatsapp_campagne_default = router40;
 
-// backend/routes/admin/livreur-inscriptions.ts
+// routes/admin/livreur-inscriptions.ts
 var import_express41 = __toESM(require("express"));
 var import_bcryptjs4 = __toESM(require("bcryptjs"));
 var import_cloudinary2 = require("cloudinary");
@@ -11730,7 +11774,7 @@ router41.post("/api/admin/livreur-inscriptions/:id/reject", async (req, res) => 
 });
 var livreur_inscriptions_default = router41;
 
-// backend/routes/admin/entrepots.ts
+// routes/admin/entrepots.ts
 var import_express42 = __toESM(require("express"));
 init_admin_db();
 var router42 = import_express42.default.Router();
@@ -11777,7 +11821,7 @@ router42.delete("/api/admin/entrepots/:id", async (req, res) => {
 });
 var entrepots_default = router42;
 
-// backend/routes/admin/tombola.ts
+// routes/admin/tombola.ts
 var import_express43 = __toESM(require("express"));
 init_admin_db();
 var router43 = import_express43.default.Router();
@@ -11881,12 +11925,12 @@ router43.delete("/api/admin/tombola/:id", async (req, res) => {
 });
 var tombola_default = router43;
 
-// backend/routes/admin/onboarding.ts
+// routes/admin/onboarding.ts
 var import_express44 = __toESM(require("express"));
 var import_bcryptjs5 = __toESM(require("bcryptjs"));
 init_admin_db();
 
-// backend/lib/mailer.ts
+// lib/mailer.ts
 var import_resend = require("resend");
 var RESEND_API_KEY = process.env.RESEND_API_KEY;
 var FROM_ADDRESS = process.env.RESEND_FROM || "onboarding@resend.dev";
@@ -11917,7 +11961,7 @@ async function sendMail(opts) {
   }
 }
 
-// backend/lib/email-templates.ts
+// lib/email-templates.ts
 var BRAND_COLOR = "#6366f1";
 function base(title, body) {
   return `<!DOCTYPE html>
@@ -12006,7 +12050,7 @@ Pour toute aide : support@togolese.tg`;
   return { subject: `\u{1F389} Votre boutique ${shopNom} est pr\xEAte \u2014 ShopSaaS`, html, text };
 }
 
-// backend/routes/admin/onboarding.ts
+// routes/admin/onboarding.ts
 var router44 = import_express44.default.Router();
 var SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
 router44.post("/api/admin/onboarding", async (req, res) => {
@@ -12043,6 +12087,9 @@ router44.post("/api/admin/onboarding", async (req, res) => {
     }
     const plan = ["free", "basic", "pro"].includes(shop_plan) ? shop_plan : "free";
     const shopId = await createShop({ nom: shop_nom.trim(), slug, email: shop_email.trim(), plan });
+    if (plan === "basic" || plan === "free") {
+      await activateBasicPlan(shopId);
+    }
     const password_hash = await import_bcryptjs5.default.hash(admin_password, 12);
     await createAdminUser({
       nom: admin_nom.trim(),
@@ -12087,7 +12134,7 @@ router44.get("/api/admin/onboarding/check-slug", async (req, res) => {
 });
 var onboarding_default = router44;
 
-// backend/routes/admin/saas-dashboard.ts
+// routes/admin/saas-dashboard.ts
 var import_express45 = __toESM(require("express"));
 init_db();
 var router45 = import_express45.default.Router();
@@ -12218,14 +12265,15 @@ router45.get("/api/admin/workspace-stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [rows] = await db.execute(`
       SELECT
-        (SELECT COUNT(*) FROM produits WHERE actif = 1)                                                     AS produits,
-        (SELECT COUNT(*) FROM factures WHERE DATE(created_at) = CURDATE())                                  AS ventes_today,
-        (SELECT COUNT(*) FROM orders WHERE status NOT IN ('cancelled','delivered'))                         AS commandes,
-        (SELECT COUNT(*) FROM boutique_clients)                                                             AS clients,
-        (SELECT COUNT(*) FROM utilisateurs WHERE actif = 1)                                                 AS equipiers
-    `);
+        (SELECT COUNT(*) FROM produits         WHERE actif = 1 AND shop_id = ?)                           AS produits,
+        (SELECT COUNT(*) FROM factures         WHERE DATE(created_at) = CURDATE() AND shop_id = ?)        AS ventes_today,
+        (SELECT COUNT(*) FROM orders           WHERE status NOT IN ('cancelled','delivered') AND shop_id = ?) AS commandes,
+        (SELECT COUNT(*) FROM boutique_clients WHERE shop_id = ?)                                          AS clients,
+        (SELECT COUNT(*) FROM admin_users      WHERE shop_id = ?)                                          AS equipiers
+    `, [shopId, shopId, shopId, shopId, shopId]);
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -12308,16 +12356,16 @@ router45.delete("/api/admin/saas/shops/:id", async (req, res) => {
 });
 var saas_dashboard_default = router45;
 
-// backend/routes/admin/billing.ts
+// routes/admin/billing.ts
 var import_express46 = __toESM(require("express"));
 
-// backend/lib/cinetpay.ts
+// lib/cinetpay.ts
 var PLAN_PRICES = {
-  basic: 9900,
+  basic: 0,
   pro: 24900
 };
 
-// backend/routes/admin/billing.ts
+// routes/admin/billing.ts
 var router46 = import_express46.default.Router();
 var MERCHANT_NUMBERS = {
   moov: process.env.MERCHANT_MOOV ?? "98165380",
@@ -12362,6 +12410,14 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
   const months = Math.min(Math.max(Number(duration_months) || 1, 1), 12);
   const planKey = plan;
   const amount = PLAN_PRICES[planKey] * months;
+  if (planKey === "basic") {
+    try {
+      await activateBasicPlan(session.shop_id);
+      return res.json({ ok: true, activated: true });
+    } catch (err) {
+      return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    }
+  }
   const transactionId = `SAAS-${session.shop_id}-${planKey.toUpperCase()}-${Date.now()}`;
   try {
     await recordShopPayment({
@@ -12381,7 +12437,7 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
 });
 var billing_default = router46;
 
-// backend/lib/review-notifier.ts
+// lib/review-notifier.ts
 init_db();
 var SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
 var DELAY_HOURS = 48;
@@ -12462,7 +12518,7 @@ function startReviewNotifier() {
   }).catch((e) => console.error("[review-notifier] startup error:", e));
 }
 
-// backend/index.ts
+// index.ts
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
