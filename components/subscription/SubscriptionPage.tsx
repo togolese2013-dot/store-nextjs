@@ -79,10 +79,39 @@ export function SubscriptionPage({ onBack }: Props) {
   }
 
   function openPayStep(planId: PlanId) {
+    const plan = PLANS.find(p => p.id === planId)!
+    if (plan.priceM === 0) {
+      activateFree(planId)
+      return
+    }
     setConfirmPlan(planId)
     setPayStep(true)
     setReference('')
     setPayError(null)
+  }
+
+  async function activateFree(planId: PlanId) {
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/admin/billing/initiate', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId, duration_months: 1, operator: 'moov', mm_reference: 'GRATUIT' }),
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error ?? 'Erreur'); return }
+      setConfirmPlan(null)
+      showToast('Plan Basic activé gratuitement ✓')
+      fetch('/api/admin/billing', { credentials: 'include' })
+        .then(r => r.json())
+        .then(d => { if (d && !d.error) setInfo(d) })
+        .catch(() => {})
+    } catch {
+      showToast('Erreur réseau.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function submitPayment() {
@@ -108,7 +137,6 @@ export function SubscriptionPage({ onBack }: Props) {
       setConfirmPlan(null)
       setReference('')
       showToast(`Paiement ${plan.name} soumis — en attente de validation ✓`)
-      // Refetch billing info
       fetch('/api/admin/billing', { credentials: 'include' })
         .then(r => r.json())
         .then(d => { if (d && !d.error) setInfo(d) })
@@ -372,8 +400,8 @@ export function SubscriptionPage({ onBack }: Props) {
                         {isConfirming ? (
                           <div className={styles.confirmBlock} onClick={e => e.stopPropagation()}>
                             <p className={styles.confirmLabel}>Confirmer le changement ?</p>
-                            <button className={styles.confirmBtn} onClick={() => openPayStep(p.id as PlanId)}>
-                              Payer {fmtFCFA(price(p))}
+                            <button className={styles.confirmBtn} onClick={() => openPayStep(p.id as PlanId)} disabled={submitting}>
+                              {p.priceM === 0 ? 'Activer gratuitement' : `Payer ${fmtFCFA(price(p))}`}
                             </button>
                             <button
                               className={styles.cancelBtn}

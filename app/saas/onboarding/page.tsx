@@ -437,7 +437,7 @@ export default function OnboardingPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   {([
-                    { id: "basic", label: "Basic", price: "9 000 F", period: "/ mois", feats: ["Boutique & caisse", "Gestion des stocks", "2 équipiers"] },
+                    { id: "basic", label: "Basic", price: "Gratuit", period: "", feats: ["Boutique & caisse", "Gestion des stocks", "2 équipiers"] },
                     { id: "pro",   label: "Pro",   price: "25 000 F", period: "/ mois", feats: ["Tous les espaces", "E-commerce & CRM", "5 équipiers"] },
                   ] as const).map(p => (
                     <button key={p.id} type="button" onClick={() => setPlan(p.id)}

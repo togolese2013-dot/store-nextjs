@@ -2,7 +2,7 @@ const CINETPAY_INIT_URL  = "https://api-checkout.cinetpay.com/v2/payment";
 const CINETPAY_CHECK_URL = "https://api-checkout.cinetpay.com/v2/payment/check";
 
 export const PLAN_PRICES: Record<"basic" | "pro", number> = {
-  basic: 9900,
+  basic: 0,
   pro:   24900,
 };
 

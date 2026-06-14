@@ -249,6 +249,14 @@ export async function activateShopSubscription(
   );
 }
 
+export async function activateBasicPlan(shopId: number): Promise<void> {
+  await ensureShopsTable();
+  await db.execute(
+    `UPDATE shops SET plan = 'basic', subscription_status = 'active', current_period_end = NULL WHERE id = ?`,
+    [shopId]
+  );
+}
+
 export async function recordShopPayment(data: {
   shopId:         number;
   transactionId:  string;

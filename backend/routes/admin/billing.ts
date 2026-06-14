@@ -1,6 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
-import { getShopById, getShopPayments, recordShopPayment } from "@/lib/shops";
+import { getShopById, getShopPayments, recordShopPayment, activateBasicPlan } from "@/lib/shops";
 import { PLAN_PRICES } from "../../lib/cinetpay";
 
 const router = express.Router();
@@ -63,6 +63,16 @@ router.post("/api/admin/billing/initiate", async (req, res) => {
   const months  = Math.min(Math.max(Number(duration_months) || 1, 1), 12);
   const planKey = plan as "basic" | "pro";
   const amount  = PLAN_PRICES[planKey] * months;
+
+  // Basic is free — activate immediately, no payment record needed
+  if (planKey === "basic") {
+    try {
+      await activateBasicPlan(session.shop_id);
+      return res.json({ ok: true, activated: true });
+    } catch (err) {
+      return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    }
+  }
 
   // Unique transaction ID — shop + plan + timestamp
   const transactionId = `SAAS-${session.shop_id}-${planKey.toUpperCase()}-${Date.now()}`;

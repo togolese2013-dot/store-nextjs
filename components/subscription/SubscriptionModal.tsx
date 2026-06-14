@@ -88,10 +88,39 @@ export function SubscriptionModal({ open, onClose, shopPlan = 'basic' }: Props) 
   }
 
   function openPayStep(planId: PlanId) {
+    const plan = PLANS.find(p => p.id === planId)!
+    if (plan.priceM === 0) {
+      activateFree(planId)
+      return
+    }
     setConfirmPlan(planId)
     setPayStep(true)
     setReference('')
     setPayError(null)
+  }
+
+  async function activateFree(planId: PlanId) {
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/admin/billing/initiate', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId, duration_months: 1, operator: 'moov', mm_reference: 'GRATUIT' }),
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error ?? 'Erreur'); return }
+      setConfirmPlan(null)
+      showToast('Plan Basic activé gratuitement ✓')
+      fetch('/api/admin/billing', { credentials: 'include' })
+        .then(r => r.json())
+        .then(d => { if (d && !d.error) setInfo(d) })
+        .catch(() => {})
+    } catch {
+      showToast('Erreur réseau.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function submitPayment() {
@@ -337,8 +366,8 @@ export function SubscriptionModal({ open, onClose, shopPlan = 'basic' }: Props) 
                         {isConfirming ? (
                           <div className={styles.subConfirmBlock} onClick={e => e.stopPropagation()}>
                             <div className={styles.subConfirmLabel}>Confirmer le changement ?</div>
-                            <button className={styles.subConfirmBtn} onClick={() => openPayStep(p.id as PlanId)}>
-                              Payer {fmtFCFA(price(p))}
+                            <button className={styles.subConfirmBtn} onClick={() => openPayStep(p.id as PlanId)} disabled={submitting}>
+                              {p.priceM === 0 ? 'Activer gratuitement' : `Payer ${fmtFCFA(price(p))}`}
                             </button>
                             <button
                               className={styles.subCancelBtn}

@@ -99,7 +99,7 @@ const T = {
     },
     plans: [
       {
-        name: 'Basic', price: '2 000', priceYearly: '1 600', period: '/ mois (FCFA)',
+        name: 'Basic', price: 'Gratuit', priceYearly: 'Gratuit', period: '',
         desc: 'Pour tester et démarrer.',
         cta: 'Commencer gratuitement — toujours', highlighted: false,
         href: '/saas/onboarding', external: false,
@@ -250,7 +250,7 @@ const T = {
     },
     plans: [
       {
-        name: 'Basic', price: '2 000', priceYearly: '1 600', period: '/ month (FCFA)',
+        name: 'Basic', price: 'Free', priceYearly: 'Free', period: '',
         desc: 'To test and get started.',
         cta: 'Get started free — forever', highlighted: false,
         href: '/saas/onboarding', external: false,
@@ -762,9 +762,11 @@ export default function LandingContent() {
                         {lang === 'fr' ? 'facturé annuellement' : 'billed annually'}
                       </div>
                     )}
-                    <div className={`text-[12px] mt-1.5 ${dark ? 'text-white/40' : 'text-[#A09890]'}`}>
-                      {t.pricingSection.payments}
-                    </div>
+                    {plan.name !== 'Basic' && (
+                      <div className={`text-[12px] mt-1.5 ${dark ? 'text-white/40' : 'text-[#A09890]'}`}>
+                        {t.pricingSection.payments}
+                      </div>
+                    )}
                   </div>
                   {plan.external ? (
                     <a
