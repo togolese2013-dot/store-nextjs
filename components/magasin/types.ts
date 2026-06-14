@@ -111,6 +111,7 @@ export interface Variant {
 }
 
 export interface Supplier {
+  id?: number;
   name: string;
   /** 2-letter initials */
   init: string;
@@ -128,6 +129,7 @@ export interface Supplier {
 export type PurchaseOrderStatus = 'En attente' | 'Confirmé' | 'Expédié' | 'Reçu' | 'Annulé';
 
 export interface PurchaseOrder {
+  id?: number;
   ref: string;
   supplier: string;
   date: string;

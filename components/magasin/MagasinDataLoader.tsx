@@ -154,6 +154,9 @@ export default function MagasinDataLoader({
   const [totalCount,  setTotalCount]  = useState(0);
   const [categories,  setCategories]  = useState<import('./types').Category[]>([]);
   const [brands,      setBrands]      = useState<import('./types').Brand[]>([]);
+  const [suppliers,   setSuppliers]   = useState<import('./types').Supplier[]>([]);
+  const [warehouses,  setWarehouses]  = useState<import('./types').Warehouse[]>([]);
+  const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
 
   /* UI state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -191,6 +194,27 @@ export default function MagasinDataLoader({
         name: b.nom, init: (b.nom?.[0] ?? 'M').toUpperCase(),
         color: '#3B6A8F', products: b.product_count ?? 0, revenue: 0,
       })));
+
+      const [suppRes, whRes, achatRes] = await Promise.all([
+        fetch('/api/admin/fournisseurs').then(r => r.json()).catch(() => ({})),
+        fetch('/api/admin/entrepots').then(r => r.json()).catch(() => ({})),
+        fetch('/api/admin/achats').then(r => r.json()).catch(() => ({})),
+      ]);
+      if (suppRes.fournisseurs) setSuppliers(suppRes.fournisseurs.map((f: any) => ({
+        id: f.id, name: f.nom, init: (f.nom?.[0] ?? 'F').toUpperCase(),
+        color: '#C9601E', country: f.pays ?? '', products: 0, total: 0,
+        delay: f.delai_livraison ?? 0, status: f.actif ? 'Actif' : 'Inactif',
+      })));
+      if (whRes.entrepots) setWarehouses(whRes.entrepots.map((e: any) => ({
+        id: String(e.id), name: e.nom, location: e.adresse ?? '',
+        color: '#3B6A8F', capacity: 0, occupied: 0, products: 0,
+      })));
+      if (achatRes.achats) setOrders(achatRes.achats.map((a: any) => ({
+        id: a.id, ref: a.reference ?? `BCH-${a.id}`,
+        supplier: a.fournisseur_nom ?? '—', date: a.date_achat ?? '—',
+        products: a.items?.length ?? 0, amount: Number(a.montant_total ?? 0),
+        status: a.statut === 'recu' ? 'Reçu' : a.statut === 'annule' ? 'Annulé' : a.statut === 'confirme' ? 'Confirmé' : 'En attente',
+      })));
     } catch { /* keep current */ }
   }, []);
 
@@ -226,8 +250,8 @@ export default function MagasinDataLoader({
 
   /* ── Sync live data into interaction-layer config store ── */
   useEffect(() => {
-    setMagasinData({ PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands });
-  }, [allProducts, categories, brands]);
+    setMagasinData({ PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands, SUPPLIERS: suppliers, WAREHOUSES: warehouses });
+  }, [allProducts, categories, brands, suppliers, warehouses]);
 
   /* ── Build config (stable ref — onRefresh triggers re-fetch) ── */
   const config = useMemo(() => createMagasinConfig({
@@ -243,6 +267,9 @@ export default function MagasinDataLoader({
         products={allProducts}
         categories={categories}
         brands={brands}
+        suppliers={suppliers}
+        warehouses={warehouses}
+        orders={orders}
         kpis={kpis}
         tabs={tabs}
         searchQuery={searchQuery}
@@ -270,6 +297,9 @@ interface ShellWithUIProps extends Props {
   products: MagasinProduct[];
   categories: import('./types').Category[];
   brands: import('./types').Brand[];
+  suppliers: import('./types').Supplier[];
+  warehouses: import('./types').Warehouse[];
+  orders: import('./types').PurchaseOrder[];
   kpis: KpiCard[];
   tabs: TabSpec[];
   searchQuery: string;
@@ -284,7 +314,7 @@ interface ShellWithUIProps extends Props {
 }
 
 function MagasinShellWithUI({
-  products, categories, brands, kpis, tabs, searchQuery, onSearch,
+  products, categories, brands, suppliers, warehouses, orders, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
   fetchProducts, currentSearchQuery, currentPage,
@@ -303,6 +333,9 @@ function MagasinShellWithUI({
       products={products}
       categories={categories}
       brands={brands}
+      suppliers={suppliers}
+      warehouses={warehouses}
+      orders={orders}
       kpis={kpis}
       tabs={tabs}
       searchQuery={searchQuery}

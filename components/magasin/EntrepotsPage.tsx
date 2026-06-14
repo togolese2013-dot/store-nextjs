@@ -91,7 +91,7 @@ export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: Entrep
               <div className={styles.catCardBody}>
                 <div className={styles.catCardTop}>
                   <div className={styles.catCardName}>{w.name}</div>
-                  <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('warehouse', 'edit', w) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('l\'entrepôt', w.name) }], 'right'); }}><MoreIcon size={16} /></button>
+                  <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('warehouse', 'edit', w) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('l\'entrepôt', w.name, { onConfirm: () => ui.config.onDeleteRow?.('warehouse', w) }) }], 'right'); }}><MoreIcon size={16} /></button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--muted)' }}>
                   <MapPinIcon size={12} />{w.location}

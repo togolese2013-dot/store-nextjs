@@ -221,6 +221,27 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
         }
         onRefreshMeta?.();
       }
+      if (kind === "supplier") {
+        const body = { nom: values.name, email: values.email || null, telephone: values.phone || null, note: values.notes || null };
+        if (mode === "edit" && values._raw?.id) {
+          await fetch(`/api/admin/fournisseurs/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        } else {
+          await fetch("/api/admin/fournisseurs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        }
+        onRefreshMeta?.();
+      }
+      if (kind === "warehouse") {
+        const body: Record<string, any> = { nom: values.name, adresse: values.location || null, notes: null };
+        if (mode === "edit" && values._raw?.id) body.id = Number(values._raw.id);
+        await fetch("/api/admin/entrepots", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        onRefreshMeta?.();
+      }
+      if (kind === "po") {
+        const items = (values.lines || []).map((l: any) => ({ nom: l.product, quantite: Number(l.qty) || 1, prix_unitaire: 0 }));
+        const body = { date_achat: values.date || new Date().toISOString().slice(0,10), items: items.length ? items : [{ nom: 'Article', quantite: 1, prix_unitaire: 0 }], note: values.notes || null };
+        await fetch("/api/admin/achats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        onRefreshMeta?.();
+      }
     },
 
     onDeleteRow: async (kind, row) => {
@@ -234,6 +255,18 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
       }
       if (kind === "brand" && row.id) {
         await fetch(`/api/admin/marques/${row.id}`, { method: "DELETE" });
+        onRefreshMeta?.();
+      }
+      if (kind === "supplier" && row.id) {
+        await fetch(`/api/admin/fournisseurs/${row.id}`, { method: "DELETE" });
+        onRefreshMeta?.();
+      }
+      if (kind === "warehouse" && row.id) {
+        await fetch(`/api/admin/entrepots/${row.id}`, { method: "DELETE" });
+        onRefreshMeta?.();
+      }
+      if (kind === "po" && row.id) {
+        await fetch(`/api/admin/achats/${row.id}`, { method: "DELETE" });
         onRefreshMeta?.();
       }
     },

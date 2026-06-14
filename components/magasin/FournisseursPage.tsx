@@ -121,7 +121,7 @@ export default function FournisseursPage({ suppliers = SAMPLE_SUPPLIERS }: Fourn
                       </span>
                     </td>
                     <td className={styles.actionsCell}>
-                      <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('supplier', 'edit', s) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le fournisseur', s.name) }], 'right'); }}><MoreIcon size={16} /></button>
+                      <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('supplier', 'edit', s) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le fournisseur', s.name, { onConfirm: () => ui.config.onDeleteRow?.('supplier', s) }) }], 'right'); }}><MoreIcon size={16} /></button>
                     </td>
                   </tr>
                 );

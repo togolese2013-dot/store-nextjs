@@ -115,7 +115,7 @@ export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsA
                     <span className={styles.tag} style={STATUS_STYLE[o.status]}>{o.status}</span>
                   </td>
                   <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('po', 'edit', o) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le bon d\'achat', o.ref) }], 'right'); }}><MoreIcon size={16} /></button>
+                    <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('po', 'edit', o) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le bon d\'achat', o.ref, { onConfirm: () => ui.config.onDeleteRow?.('po', o) }) }], 'right'); }}><MoreIcon size={16} /></button>
                   </td>
                 </tr>
               ))}
