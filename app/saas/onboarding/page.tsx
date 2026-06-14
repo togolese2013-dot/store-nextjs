@@ -173,7 +173,7 @@ export default function OnboardingPage() {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const res = await fetch(`${BACKEND}/api/admin/onboarding`, {
+      const res = await fetch(`/api/admin/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
