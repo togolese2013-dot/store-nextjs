@@ -184,6 +184,7 @@ export function createMagasinConfig({ onRefresh }: MagasinConfigOpts = {}): AppC
           nom:            values.name,
           reference:      values.sku,
           prix_unitaire:  Number(values.price) || 0,
+          prix_entrepot:  values.cost ? Number(values.cost) : null,
           stock_magasin:  Number(values.stock) || 0,
           actif:          values.status === "Actif" ? 1 : 0,
         };

@@ -23,6 +23,8 @@ export interface Product {
   target: number;
   /** Price HT in cents of base currency (or major units; format with toLocaleString) */
   price: number;
+  /** Purchase / cost price */
+  cost?: number;
   /** Margin in % */
   margin: number;
   /** Color used as thumbnail background */
