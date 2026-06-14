@@ -1788,15 +1788,15 @@ export async function updateProductStock(produit_id: number, _entrepot_id: numbe
 }
 
 /* ─── Stock dashboard stats ─── */
-export async function getStockStats() {
+export async function getStockStats(shopId = 1) {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT
       COUNT(*)                                                                                   AS en_stock,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) = 0 THEN 1 ELSE 0 END)                           AS en_rupture,
       SUM(CASE WHEN COALESCE(stock_magasin, 0) > 0 AND COALESCE(stock_magasin, 0) <= 5 THEN 1 ELSE 0 END) AS stock_faible,
       COALESCE(SUM(prix_unitaire * COALESCE(stock_magasin, 0)), 0)                               AS valeur_totale
-    FROM produits
-  `);
+    FROM produits WHERE shop_id = ?
+  `, [shopId]);
   const r = rows[0];
   return {
     en_stock:      Number(r.en_stock      ?? 0),

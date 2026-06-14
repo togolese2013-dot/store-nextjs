@@ -142,14 +142,15 @@ router.get("/api/admin/workspace-stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [rows] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(`
       SELECT
-        (SELECT COUNT(*) FROM produits WHERE actif = 1)                                                     AS produits,
-        (SELECT COUNT(*) FROM factures WHERE DATE(created_at) = CURDATE())                                  AS ventes_today,
-        (SELECT COUNT(*) FROM orders WHERE status NOT IN ('cancelled','delivered'))                         AS commandes,
-        (SELECT COUNT(*) FROM boutique_clients)                                                             AS clients,
-        (SELECT COUNT(*) FROM utilisateurs WHERE actif = 1)                                                 AS equipiers
-    `);
+        (SELECT COUNT(*) FROM produits       WHERE actif = 1 AND shop_id = ?)             AS produits,
+        (SELECT COUNT(*) FROM factures       WHERE DATE(created_at) = CURDATE() AND shop_id = ?) AS ventes_today,
+        (SELECT COUNT(*) FROM orders         WHERE status NOT IN ('cancelled','delivered') AND shop_id = ?) AS commandes,
+        (SELECT COUNT(*) FROM boutique_clients WHERE shop_id = ?)                          AS clients,
+        (SELECT COUNT(*) FROM utilisateurs   WHERE actif = 1 AND shop_id = ?)             AS equipiers
+    `, [shopId, shopId, shopId, shopId, shopId]);
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

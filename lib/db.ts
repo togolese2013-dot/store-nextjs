@@ -586,7 +586,7 @@ export async function getProductCount(opts?: {
   return Number(rows[0]?.cnt ?? 0);
 }
 
-export async function getProductStatusCounts(): Promise<{
+export async function getProductStatusCounts(shopId = 1): Promise<{
   total: number; disponible: number; faible: number; epuise: number;
 }> {
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -595,7 +595,8 @@ export async function getProductStatusCounts(): Promise<{
        SUM(COALESCE(stock_boutique, 0) > 5)             AS disponible,
        SUM(COALESCE(stock_boutique, 0) BETWEEN 1 AND 5) AS faible,
        SUM(COALESCE(stock_boutique, 0) = 0)             AS epuise
-     FROM produits`
+     FROM produits WHERE shop_id = ?`,
+    [shopId]
   );
   const r = (rows as mysql.RowDataPacket[])[0];
   return {

@@ -30,10 +30,11 @@ router.get("/api/admin/products/stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [stockStats, statusCounts, totalCount] = await Promise.all([
-      getStockStats(),
-      getProductStatusCounts(),
-      (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM produits"),
+      getStockStats(shopId),
+      getProductStatusCounts(shopId),
+      (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId]),
     ]);
     stockStats.en_stock = Number((totalCount[0] as mysql.RowDataPacket[])[0]?.cnt ?? stockStats.en_stock);
     res.json({ stockStats, statusCounts });
@@ -284,10 +285,11 @@ router.get("/api/admin/products/export", async (req, res) => {
       ? statut as "disponible" | "faible" | "epuise"
       : undefined;
 
+    const shopId = session.shop_id ?? 1;
     const products = await getProducts({
       search: q, categoryId: catId, marqueId: brandId,
       statut: statutFilter, includeInactive: true,
-      limit: 5000, offset: 0,
+      limit: 5000, offset: 0, shopId,
     });
 
     // Build CSV
@@ -332,7 +334,8 @@ router.get("/api/admin/products/search", async (req, res) => {
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   const q     = (req.query.q as string) || "";
   const limit = Math.min(50, Number(req.query.limit) || 20);
-  const products = await getProducts({ search: q, limit, includeInactive: false });
+  const shopId = session.shop_id ?? 1;
+  const products = await getProducts({ search: q, limit, includeInactive: false, shopId });
   res.json({ products });
 });
 
@@ -340,8 +343,9 @@ router.get("/api/admin/products/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
+    const shopId = session.shop_id ?? 1;
     const [rows] = await (db as import("mysql2/promise").Pool).query<mysql.RowDataPacket[]>(
-      "SELECT * FROM produits WHERE id = ? LIMIT 1", [req.params.id]
+      "SELECT * FROM produits WHERE id = ? AND shop_id = ? LIMIT 1", [req.params.id, shopId]
     );
     if (!rows.length) return res.status(404).json({ error: "Produit introuvable." });
     res.json({ product: rows[0] });
