@@ -281,7 +281,7 @@ function MagasinShellWithUI({
       onExport={handleExport}
       onSwitchWorkspace={onSwitchWorkspace}
       onCreateProduct={onCreateProduct ?? (() => ui.openForm('product'))}
-      onActivePageChange={(p) => router.replace(`/admin/magasin?page=${p}`, { scroll: false })}
+      onActivePageChange={(p) => { window.history.replaceState(null, '', `/admin/magasin?page=${p}`); }}
       onDelete={(p) => ui.confirmDelete('le produit', p.name, {
         onConfirm: () => ui.config.onDeleteRow?.('product', p),
       })}
