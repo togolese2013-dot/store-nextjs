@@ -5,8 +5,8 @@
 import type { AppConfig } from "@/components/interaction-layer";
 
 interface MagasinConfigOpts {
-  /** Called after successful form submit — use to refresh product list */
   onRefresh?: () => void;
+  onRefreshMeta?: () => void;
 }
 
 /* Shared live-data store — updated by setMagasinData() from the DataLoader */
@@ -16,7 +16,7 @@ export function setMagasinData(d: Record<string, any>) {
   _data = { ..._data, ...d };
 }
 
-export function createMagasinConfig({ onRefresh }: MagasinConfigOpts = {}): AppConfig {
+export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigOpts = {}): AppConfig {
   return {
     name: "Magasin",
     data: () => _data,
@@ -203,7 +203,24 @@ export function createMagasinConfig({ onRefresh }: MagasinConfigOpts = {}): AppC
         }
         onRefresh?.();
       }
-      /* category, brand, supplier, warehouse: extend here as APIs are ready */
+      if (kind === "category") {
+        const body = { nom: values.name, description: values.desc || '' };
+        if (mode === "edit" && values._raw?.id) {
+          await fetch(`/api/admin/categories/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        } else {
+          await fetch("/api/admin/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        }
+        onRefreshMeta?.();
+      }
+      if (kind === "brand") {
+        const body = { nom: values.name, description: values.desc || '' };
+        if (mode === "edit" && values._raw?.id) {
+          await fetch(`/api/admin/marques/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        } else {
+          await fetch("/api/admin/marques", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        }
+        onRefreshMeta?.();
+      }
     },
 
     onDeleteRow: async (kind, row) => {

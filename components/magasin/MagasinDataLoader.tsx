@@ -150,6 +150,8 @@ export default function MagasinDataLoader({
   const [kpis,        setKpis]        = useState<KpiCard[]>(SAMPLE_KPIS);
   const [tabs,        setTabs]        = useState<TabSpec[]>(DEFAULT_TABS);
   const [totalCount,  setTotalCount]  = useState(0);
+  const [categories,  setCategories]  = useState<import('./types').Category[]>([]);
+  const [brands,      setBrands]      = useState<import('./types').Brand[]>([]);
 
   /* UI state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,6 +174,24 @@ export default function MagasinDataLoader({
     } catch { /* keep current */ }
   }, []);
 
+  /* ── Fetch categories + brands ── */
+  const fetchMeta = useCallback(async () => {
+    try {
+      const [catRes, brandRes] = await Promise.all([
+        fetch('/api/admin/categories').then(r => r.json()),
+        fetch('/api/admin/marques').then(r => r.json()),
+      ]);
+      if (catRes.data) setCategories(catRes.data.map((c: any) => ({
+        id: String(c.id), name: c.nom, color: c.color ?? '#C9601E',
+        products: c.product_count ?? 0, revenue: 0, subcats: 0,
+      })));
+      if (brandRes.data) setBrands(brandRes.data.map((b: any) => ({
+        name: b.nom, init: (b.nom?.[0] ?? 'M').toUpperCase(),
+        color: '#3B6A8F', products: b.product_count ?? 0, revenue: 0,
+      })));
+    } catch { /* keep current */ }
+  }, []);
+
   /* ── Fetch stats (once on mount) ── */
   useEffect(() => {
     let cancelled = false;
@@ -186,7 +206,7 @@ export default function MagasinDataLoader({
   }, []);
 
   /* ── Initial load ── */
-  useEffect(() => { fetchProducts('', 1); }, [fetchProducts]);
+  useEffect(() => { fetchProducts('', 1); fetchMeta(); }, [fetchProducts, fetchMeta]);
 
   /* ── Debounced search ── */
   function handleSearch(q: string) {
@@ -204,12 +224,13 @@ export default function MagasinDataLoader({
 
   /* ── Sync live data into interaction-layer config store ── */
   useEffect(() => {
-    setMagasinData({ PRODUCTS: allProducts });
-  }, [allProducts]);
+    setMagasinData({ PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands });
+  }, [allProducts, categories, brands]);
 
   /* ── Build config (stable ref — onRefresh triggers re-fetch) ── */
   const config = useMemo(() => createMagasinConfig({
     onRefresh: () => fetchProducts(searchQuery, page),
+    onRefreshMeta: () => fetchMeta(),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []); // intentionally stable — fetchProducts/searchQuery/page accessed via closure at call time
 
@@ -218,6 +239,8 @@ export default function MagasinDataLoader({
       <MagasinShellWithUI
         defaultPage={defaultPage}
         products={allProducts}
+        categories={categories}
+        brands={brands}
         kpis={kpis}
         tabs={tabs}
         searchQuery={searchQuery}
@@ -243,6 +266,8 @@ export default function MagasinDataLoader({
 interface ShellWithUIProps extends Props {
   defaultPage: PageId;
   products: MagasinProduct[];
+  categories: import('./types').Category[];
+  brands: import('./types').Brand[];
   kpis: KpiCard[];
   tabs: TabSpec[];
   searchQuery: string;
@@ -257,7 +282,7 @@ interface ShellWithUIProps extends Props {
 }
 
 function MagasinShellWithUI({
-  products, kpis, tabs, searchQuery, onSearch,
+  products, categories, brands, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
   fetchProducts, currentSearchQuery, currentPage,
@@ -274,6 +299,8 @@ function MagasinShellWithUI({
     <MagasinShell
       defaultPage={defaultPage}
       products={products}
+      categories={categories}
+      brands={brands}
       kpis={kpis}
       tabs={tabs}
       searchQuery={searchQuery}
