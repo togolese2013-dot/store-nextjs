@@ -118,6 +118,7 @@ export interface MagasinShellProps {
 
   onSwitchWorkspace?: () => void;
   onCreateProduct?:   () => void;
+  onActivePageChange?: (p: PageId) => void;
 
   onDelete?:  (p: Product) => void;
   onArchive?: (p: Product) => void;
@@ -160,12 +161,18 @@ export default function MagasinShell({
   pageSize,
   onPageChange,
   onExport,
+  onActivePageChange,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
 }: MagasinShellProps) {
   const ui = useUI();
   const [activePage, setActivePage] = useState<PageId>(defaultPage);
+
+  function navigate(p: PageId) {
+    setActivePage(p);
+    onActivePageChange?.(p);
+  }
 
   const navId = PAGE_TO_NAV[activePage];
 
@@ -182,7 +189,7 @@ export default function MagasinShell({
       <Sidebar
         groups={groups}
         onSwitchWorkspace={onSwitchWorkspace}
-        onNav={id => { const p = NAV_TO_PAGE[id]; if (p) setActivePage(p); }}
+        onNav={id => { const p = NAV_TO_PAGE[id]; if (p) navigate(p); }}
         activeId={navId}
         userName={userName}
         userRole={userRole}

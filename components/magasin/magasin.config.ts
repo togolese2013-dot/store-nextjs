@@ -186,7 +186,7 @@ export function createMagasinConfig({ onRefresh }: MagasinConfigOpts = {}): AppC
           prix_unitaire:  Number(values.price) || 0,
           prix_entrepot:  values.cost ? Number(values.cost) : null,
           stock_magasin:  Number(values.stock) || 0,
-          actif:          values.status === "Actif" ? 1 : 0,
+          actif:          values.status === "Brouillon" ? 0 : 1,
         };
         if (mode === "edit" && values._raw?.id) {
           await fetch(`/api/admin/products/${values._raw.id}`, {
