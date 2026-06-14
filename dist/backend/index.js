@@ -450,6 +450,7 @@ async function getProducts(opts) {
     marque_nom: r.marque_nom ?? null,
     avg_rating: null,
     review_count: null,
+    actif: r.actif === 1 || r.actif === true ? 1 : 0,
     entrepot_id: r.entrepot_id ? Number(r.entrepot_id) : null,
     prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
     entrepot_nom: r.entrepot_nom ?? null,
