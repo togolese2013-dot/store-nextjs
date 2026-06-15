@@ -1,5 +1,6 @@
 /**
- * MouvementDrawer — create a stock movement (Entrée / Sortie / Transfert).
+ * MouvementDrawer — create a stock movement (Sortie → Boutique / Transfert).
+ * Entrée supprimée — les réceptions passent par la page Achats.
  * Steps: form → loading → success
  * Products fetched from real API (/api/admin/stock/produits).
  */
@@ -25,15 +26,13 @@ interface DrawerProd {
 }
 
 const MV_TYPES = [
-  { id: 'entree',    label: 'Entrée',            short: 'Entrée stock'       },
   { id: 'sortie',    label: 'Sortie → Boutique', short: 'Sortie boutique'    },
-  { id: 'transfert', label: 'Transfert',         short: 'Transfert entrepôt' },
+  { id: 'transfert', label: 'Transfert entrepôt', short: 'Transfert entrepôt' },
 ] as const;
 type MvTypeId = typeof MV_TYPES[number]['id'];
 
 const RAISONS: Record<MvTypeId, string[]> = {
-  entree:    ['Réception fournisseur', 'Retour client', 'Correction inventaire', 'Autre'],
-  sortie:    ['Transfert boutique', 'Commande en ligne', 'Autre'],
+  sortie:    ['Transfert boutique', 'Commande en ligne', 'Retour client', 'Autre'],
   transfert: ['Rééquilibrage stock', 'Urgence commande', 'Réorganisation', 'Autre'],
 };
 
@@ -122,7 +121,6 @@ export default function MouvementDrawer({
   const [search,    setSearch]    = useState('');
   const [showSugg,  setShowSugg]  = useState(false);
   const [qty,       setQty]       = useState(1);
-  const [supplier,  setSupplier]  = useState('');
   const [srcWh,     setSrcWh]     = useState('Lomé Central');
   const [dstWh,     setDstWh]     = useState('Lomé Nord');
   const [raison,    setRaison]    = useState(RAISONS[defaultType][0]);
@@ -165,16 +163,13 @@ export default function MouvementDrawer({
   const suggestions = useMemo(() => {
     const q = search.toLowerCase().trim();
     return produits
-      .filter(p => p.stock > 0 && (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)))
-      .slice(0, 6);
+      .filter(p => !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q))
+      .slice(0, 8);
   }, [search, produits]);
 
-  const sel      = produits.find(p => p.name === product);
-  const maxQty   = sel?.stock ?? 0;
-  const isEntree = type === 'entree';
-  const valid    = isEntree
-    ? qty >= 1 && !!product
-    : qty >= 1 && qty <= maxQty && !!product;
+  const sel    = produits.find(p => p.name === product);
+  const maxQty = sel?.stock ?? 0;
+  const valid  = qty >= 1 && qty <= maxQty && !!product;
 
   // ── Confirm → real API ─────────────────────────────────────────────────────
 
@@ -192,18 +187,13 @@ export default function MouvementDrawer({
         return;
       }
 
-      const endpoint = type === 'entree' ? '/api/admin/stock/entree' : '/api/admin/stock/sortie';
-      const noteStr  = type === 'entree'
-        ? `${raison}${supplier ? ` — ${supplier}` : ''}`
-        : raison;
-
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/admin/stock/sortie', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           produit_id: sel!.produit_id,
           quantite:   qty,
-          note:       noteStr,
+          note:       raison,
           ...(sel?.variant_id ? { variant_id: sel.variant_id } : {}),
         }),
       });
@@ -233,13 +223,6 @@ export default function MouvementDrawer({
   // ── Flux nodes ─────────────────────────────────────────────────────────────
 
   const FluxNodes = () => {
-    if (type === 'entree') return (
-      <>
-        <TrNode label={supplier || 'Fournisseur'} sub="Source"      icon={<IcTruck />} />
-        <TransferRail fast={isLoading} />
-        <TrNode label="Stock Magasin"             sub="Destination" icon={<IcBox />}   dest />
-      </>
-    );
     if (type === 'sortie') return (
       <>
         <TrNode label="Stock Magasin" sub="Source"      icon={<IcBox />}   />
@@ -256,9 +239,8 @@ export default function MouvementDrawer({
     );
   };
 
-  const successTitle = { entree: 'Entrée enregistrée !', sortie: 'Sortie enregistrée !', transfert: 'Transfert effectué !' };
+  const successTitle = { sortie: 'Sortie enregistrée !', transfert: 'Transfert effectué !' };
   const successMsg   = {
-    entree:    `${qty} × ${product} ajouté${qty > 1 ? 's' : ''} au Stock Magasin`,
     sortie:    `${qty} × ${product} transféré${qty > 1 ? 's' : ''} vers la Boutique`,
     transfert: `${qty} × ${product} de ${srcWh} → ${dstWh}`,
   };
@@ -299,7 +281,7 @@ export default function MouvementDrawer({
 
   // ── FORM ───────────────────────────────────────────────────────────────────
 
-  const confirmLabel = type === 'entree' ? "Confirmer l'entrée" : type === 'sortie' ? 'Confirmer la sortie' : 'Confirmer le transfert';
+  const confirmLabel = type === 'sortie' ? 'Confirmer la sortie' : 'Confirmer le transfert';
 
   return (
     <div style={drawerCss} onMouseDown={e => e.stopPropagation()}>
@@ -316,7 +298,7 @@ export default function MouvementDrawer({
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Type selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {MV_TYPES.map(t => (
             <button key={t.id} type="button" onClick={() => setType(t.id)} disabled={isLoading}
               style={{ padding: '8px 6px', borderRadius: 9, border: `1.5px solid ${type === t.id ? 'var(--accent)' : 'var(--border)'}`, textAlign: 'center', fontSize: 12, fontWeight: 600, lineHeight: 1.35, cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit', background: type === t.id ? 'var(--accent-bg)' : 'var(--surface)', color: type === t.id ? 'var(--accent)' : 'var(--muted)' }}>
@@ -327,15 +309,6 @@ export default function MouvementDrawer({
 
         {/* Flux */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><FluxNodes /></div>
-
-        {/* Fournisseur (entrée only) */}
-        {type === 'entree' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <label style={labelCss}>Fournisseur (optionnel)</label>
-            <input style={inputCss} placeholder="Ex: Wax Distributions…" value={supplier} disabled={isLoading}
-              onChange={e => setSupplier(e.target.value)} />
-          </div>
-        )}
 
         {/* Entrepôts (transfert only) */}
         {type === 'transfert' && (
@@ -354,7 +327,7 @@ export default function MouvementDrawer({
         {/* Product autocomplete */}
         <div className="mv-sugg" style={{ display: 'flex', flexDirection: 'column', gap: 7, position: 'relative' }}>
           <label style={labelCss}>
-            {type === 'entree' ? 'Produit à recevoir' : type === 'sortie' ? 'Produit à transférer' : 'Produit à déplacer'}
+            {type === 'sortie' ? 'Produit à transférer' : 'Produit à déplacer'}
           </label>
           <div style={{ position: 'relative' }}>
             <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -407,15 +380,15 @@ export default function MouvementDrawer({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
           <label style={labelCss}>
             Quantité
-            {!isEntree && sel && (
+            {sel && (
               <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 11 }}> / {maxQty} disponibles en magasin</span>
             )}
           </label>
           <input style={{ ...inputCss, textAlign: 'center', fontFamily: 'Geist Mono,monospace' }}
-            type="number" min={1} max={isEntree ? undefined : maxQty}
+            type="number" min={1} max={maxQty || undefined}
             value={qty} disabled={isLoading}
             onChange={e => setQty(Math.max(1, Number(e.target.value)))} />
-          {!isEntree && qty > maxQty && (
+          {qty > maxQty && maxQty > 0 && (
             <span style={{ fontSize: 11, color: 'var(--danger)' }}>Stock insuffisant ({maxQty} dispo)</span>
           )}
         </div>
@@ -437,8 +410,8 @@ export default function MouvementDrawer({
               </div>
               <span style={{ color: 'var(--muted)' }}>{qty} × {sel.name}</span>
             </div>
-            <span style={{ fontFamily: 'Geist Mono,monospace', fontWeight: 600, color: type === 'entree' ? 'var(--ok)' : 'var(--danger)' }}>
-              {type === 'entree' ? '+' : '−'}{qty}
+            <span style={{ fontFamily: 'Geist Mono,monospace', fontWeight: 600, color: 'var(--danger)' }}>
+              −{qty}
             </span>
           </div>
         )}
