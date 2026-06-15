@@ -116,7 +116,7 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
           return fetch('/api/admin/products?limit=500', { credentials: 'include' })
             .then(r2 => r2.json())
             .then(d2 => {
-              const arr = Array.isArray(d2.data) ? d2.data : [];
+              const arr = Array.isArray(d2.products) ? d2.products : Array.isArray(d2.data) ? d2.data : [];
               setDrawerProds(arr.map((p: { id?: number; nom?: string; reference?: string; stock_magasin?: number }) => ({
                 produit_id: p.id ?? 0,
                 nom:        p.nom ?? '',

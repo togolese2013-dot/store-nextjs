@@ -39,12 +39,16 @@ export async function getProduitsWithStock(): Promise<ProduitStock[]> {
   }
 
   // UNION: products without variants + one row per variant
+  // COLLATE utf8mb4_unicode_ci on all string columns to avoid collation mismatch
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT * FROM (
-       SELECT p.id AS produit_id, p.nom,
-              p.reference,
+       SELECT p.id AS produit_id,
+              CONVERT(p.nom USING utf8mb4) COLLATE utf8mb4_unicode_ci AS nom,
+              CONVERT(p.reference USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reference,
               COALESCE(p.stock_magasin, 0) AS stock,
-              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+              0 AS variants_count,
+              NULL AS variant_id,
+              CONVERT(NULL USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM produits p
        WHERE p.actif = 1
          AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
@@ -52,12 +56,12 @@ export async function getProduitsWithStock(): Promise<ProduitStock[]> {
        UNION ALL
 
        SELECT p.id AS produit_id,
-              CONCAT(p.nom, ' — ', pv.nom) AS nom,
-              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              CONVERT(CONCAT(p.nom, ' — ', pv.nom) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS nom,
+              CONVERT(COALESCE(NULLIF(pv.reference_sku,''), p.reference) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reference,
               pv.stock AS stock,
               1 AS variants_count,
               pv.id AS variant_id,
-              pv.nom AS variant_nom
+              CONVERT(pv.nom USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM product_variants pv
        JOIN produits p ON p.id = pv.produit_id
        WHERE p.actif = 1
