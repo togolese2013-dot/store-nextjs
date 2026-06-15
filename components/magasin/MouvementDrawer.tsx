@@ -26,12 +26,14 @@ interface DrawerProd {
 }
 
 const MV_TYPES = [
-  { id: 'sortie',    label: 'Sortie → Boutique', short: 'Sortie boutique'    },
+  { id: 'entree',    label: 'Entrée stock',       short: 'Entrée stock'       },
+  { id: 'sortie',    label: 'Sortie → Boutique',  short: 'Sortie boutique'    },
   { id: 'transfert', label: 'Transfert entrepôt', short: 'Transfert entrepôt' },
 ] as const;
 type MvTypeId = typeof MV_TYPES[number]['id'];
 
 const RAISONS: Record<MvTypeId, string[]> = {
+  entree:    ['Réception fournisseur', 'Retour client', 'Correction inventaire', 'Autre'],
   sortie:    ['Transfert boutique', 'Commande en ligne', 'Retour client', 'Autre'],
   transfert: ['Rééquilibrage stock', 'Urgence commande', 'Réorganisation', 'Autre'],
 };
@@ -114,27 +116,49 @@ export default function MouvementDrawer({
   // API products
   const [produits,     setProduits]    = useState<DrawerProd[]>([]);
   const [loadingProds, setLoadingProds] = useState(true);
+  const [fetchError,   setFetchError]  = useState('');
 
   // Form state
-  const [type,      setType]      = useState<MvTypeId>(defaultType);
-  const [product,   setProduct]   = useState('');
-  const [search,    setSearch]    = useState('');
-  const [showSugg,  setShowSugg]  = useState(false);
-  const [qty,       setQty]       = useState(1);
-  const [srcWh,     setSrcWh]     = useState('Lomé Central');
-  const [dstWh,     setDstWh]     = useState('Lomé Nord');
-  const [raison,    setRaison]    = useState(RAISONS[defaultType][0]);
-  const [step,      setStep]      = useState<'form' | 'loading' | 'success'>('form');
-  const [apiError,  setApiError]  = useState('');
+  const [type,     setType]     = useState<MvTypeId>(defaultType);
+  const [product,  setProduct]  = useState('');
+  const [search,   setSearch]   = useState('');
+  const [showSugg, setShowSugg] = useState(false);
+  const [qty,      setQty]      = useState(1);
+  const [supplier, setSupplier] = useState('');
+  const [srcWh,    setSrcWh]    = useState('Lomé Central');
+  const [dstWh,    setDstWh]    = useState('Lomé Nord');
+  const [raison,   setRaison]   = useState(RAISONS[defaultType][0]);
+  const [step,     setStep]     = useState<'form' | 'loading' | 'success'>('form');
+  const [apiError, setApiError] = useState('');
   const isLoading = step === 'loading';
 
-  // Fetch products on mount
+  // Fetch products — essaie /stock/produits, fallback /products
   useEffect(() => {
     fetch('/api/admin/stock/produits', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
         const raw: Array<{ produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string }> =
           Array.isArray(d.produits) ? d.produits : [];
+        if (raw.length > 0) return raw;
+        // fallback si vide
+        throw new Error('empty');
+      })
+      .catch(async () => {
+        // Fallback : endpoint produits principal
+        const r2 = await fetch('/api/admin/products?limit=500', { credentials: 'include' });
+        const d2 = await r2.json();
+        const arr = Array.isArray(d2.data) ? d2.data : Array.isArray(d2) ? d2 : [];
+        return arr.map((p: { id?: number; nom?: string; reference?: string; stock_magasin?: number }) => ({
+          produit_id: p.id ?? 0,
+          nom:        p.nom ?? '',
+          reference:  p.reference ?? '',
+          stock:      p.stock_magasin ?? 0,
+          variant_id: undefined,
+          variant_nom: undefined,
+        }));
+      })
+      .then((raw: Array<{ produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string }>) => {
         setProduits(raw.map((p, i) => ({
           produit_id: p.produit_id,
           name:       p.variant_nom ? `${p.nom} — ${p.variant_nom}` : p.nom,
@@ -145,7 +169,7 @@ export default function MouvementDrawer({
           variant_id: p.variant_id,
         })));
       })
-      .catch(() => {})
+      .catch(e => setFetchError(String(e)))
       .finally(() => setLoadingProds(false));
   }, []);
 
@@ -167,9 +191,12 @@ export default function MouvementDrawer({
       .slice(0, 8);
   }, [search, produits]);
 
-  const sel    = produits.find(p => p.name === product);
-  const maxQty = sel?.stock ?? 0;
-  const valid  = qty >= 1 && qty <= maxQty && !!product;
+  const sel      = produits.find(p => p.name === product);
+  const maxQty   = sel?.stock ?? 0;
+  const isEntree = type === 'entree';
+  const valid    = isEntree
+    ? qty >= 1 && !!product
+    : qty >= 1 && qty <= maxQty && !!product;
 
   // ── Confirm → real API ─────────────────────────────────────────────────────
 
@@ -187,13 +214,17 @@ export default function MouvementDrawer({
         return;
       }
 
-      const res = await fetch('/api/admin/stock/sortie', {
+      const endpoint = type === 'entree' ? '/api/admin/stock/entree' : '/api/admin/stock/sortie';
+      const noteStr  = type === 'entree' && supplier
+        ? `${raison} — ${supplier}`
+        : raison;
+      const res = await fetch(endpoint, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           produit_id: sel!.produit_id,
           quantite:   qty,
-          note:       raison,
+          note:       noteStr,
           ...(sel?.variant_id ? { variant_id: sel.variant_id } : {}),
         }),
       });
@@ -223,6 +254,13 @@ export default function MouvementDrawer({
   // ── Flux nodes ─────────────────────────────────────────────────────────────
 
   const FluxNodes = () => {
+    if (type === 'entree') return (
+      <>
+        <TrNode label={supplier || 'Fournisseur'} sub="Source"      icon={<IcTruck />} />
+        <TransferRail fast={isLoading} />
+        <TrNode label="Stock Magasin"             sub="Destination" icon={<IcBox />}   dest />
+      </>
+    );
     if (type === 'sortie') return (
       <>
         <TrNode label="Stock Magasin" sub="Source"      icon={<IcBox />}   />
@@ -239,8 +277,9 @@ export default function MouvementDrawer({
     );
   };
 
-  const successTitle = { sortie: 'Sortie enregistrée !', transfert: 'Transfert effectué !' };
+  const successTitle = { entree: 'Entrée enregistrée !', sortie: 'Sortie enregistrée !', transfert: 'Transfert effectué !' };
   const successMsg   = {
+    entree:    `${qty} × ${product} ajouté${qty > 1 ? 's' : ''} au Stock Magasin`,
     sortie:    `${qty} × ${product} transféré${qty > 1 ? 's' : ''} vers la Boutique`,
     transfert: `${qty} × ${product} de ${srcWh} → ${dstWh}`,
   };
@@ -281,7 +320,7 @@ export default function MouvementDrawer({
 
   // ── FORM ───────────────────────────────────────────────────────────────────
 
-  const confirmLabel = type === 'sortie' ? 'Confirmer la sortie' : 'Confirmer le transfert';
+  const confirmLabel = type === 'entree' ? "Confirmer l'entrée" : type === 'sortie' ? 'Confirmer la sortie' : 'Confirmer le transfert';
 
   return (
     <div style={drawerCss} onMouseDown={e => e.stopPropagation()}>
@@ -298,7 +337,7 @@ export default function MouvementDrawer({
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Type selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           {MV_TYPES.map(t => (
             <button key={t.id} type="button" onClick={() => setType(t.id)} disabled={isLoading}
               style={{ padding: '8px 6px', borderRadius: 9, border: `1.5px solid ${type === t.id ? 'var(--accent)' : 'var(--border)'}`, textAlign: 'center', fontSize: 12, fontWeight: 600, lineHeight: 1.35, cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit', background: type === t.id ? 'var(--accent-bg)' : 'var(--surface)', color: type === t.id ? 'var(--accent)' : 'var(--muted)' }}>
@@ -309,6 +348,15 @@ export default function MouvementDrawer({
 
         {/* Flux */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><FluxNodes /></div>
+
+        {/* Fournisseur (entrée only) */}
+        {type === 'entree' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <label style={labelCss}>Fournisseur (optionnel)</label>
+            <input style={inputCss} placeholder="Ex: Wax Distributions…" value={supplier} disabled={isLoading}
+              onChange={e => setSupplier(e.target.value)} />
+          </div>
+        )}
 
         {/* Entrepôts (transfert only) */}
         {type === 'transfert' && (
@@ -327,7 +375,7 @@ export default function MouvementDrawer({
         {/* Product autocomplete */}
         <div className="mv-sugg" style={{ display: 'flex', flexDirection: 'column', gap: 7, position: 'relative' }}>
           <label style={labelCss}>
-            {type === 'sortie' ? 'Produit à transférer' : 'Produit à déplacer'}
+            {type === 'entree' ? 'Produit à recevoir' : type === 'sortie' ? 'Produit à transférer' : 'Produit à déplacer'}
           </label>
           <div style={{ position: 'relative' }}>
             <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -335,7 +383,7 @@ export default function MouvementDrawer({
             </svg>
             <input
               style={{ ...inputCss, paddingLeft: 32, paddingRight: search ? 28 : 12 }}
-              placeholder={loadingProds ? 'Chargement…' : 'Rechercher un produit…'}
+              placeholder={loadingProds ? 'Chargement…' : fetchError ? 'Erreur chargement produits' : 'Rechercher un produit…'}
               value={search} autoComplete="off" disabled={isLoading || loadingProds}
               onChange={e => { setSearch(e.target.value); setProduct(''); setShowSugg(true); }}
               onFocus={() => setShowSugg(true)}
@@ -380,15 +428,15 @@ export default function MouvementDrawer({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
           <label style={labelCss}>
             Quantité
-            {sel && (
+            {!isEntree && sel && (
               <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 11 }}> / {maxQty} disponibles en magasin</span>
             )}
           </label>
           <input style={{ ...inputCss, textAlign: 'center', fontFamily: 'Geist Mono,monospace' }}
-            type="number" min={1} max={maxQty || undefined}
+            type="number" min={1} max={isEntree ? undefined : (maxQty || undefined)}
             value={qty} disabled={isLoading}
             onChange={e => setQty(Math.max(1, Number(e.target.value)))} />
-          {qty > maxQty && maxQty > 0 && (
+          {!isEntree && qty > maxQty && maxQty > 0 && (
             <span style={{ fontSize: 11, color: 'var(--danger)' }}>Stock insuffisant ({maxQty} dispo)</span>
           )}
         </div>
@@ -410,8 +458,8 @@ export default function MouvementDrawer({
               </div>
               <span style={{ color: 'var(--muted)' }}>{qty} × {sel.name}</span>
             </div>
-            <span style={{ fontFamily: 'Geist Mono,monospace', fontWeight: 600, color: 'var(--danger)' }}>
-              −{qty}
+            <span style={{ fontFamily: 'Geist Mono,monospace', fontWeight: 600, color: isEntree ? 'var(--ok)' : 'var(--danger)' }}>
+              {isEntree ? '+' : '−'}{qty}
             </span>
           </div>
         )}
