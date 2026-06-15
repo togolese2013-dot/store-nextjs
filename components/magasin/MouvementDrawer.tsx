@@ -130,7 +130,7 @@ export default function MouvementDrawer({
     })),
   [produitsProp]);
 
-  const loadingProds = produits.length === 0 && produitsProp.length === 0;
+  const loadingProds = false;
 
   // Form state
   const [type,     setType]     = useState<MvTypeId>(defaultType);

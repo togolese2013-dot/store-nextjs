@@ -92,29 +92,6 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
     return () => { mountedRef.current = false; };
   }, []);
 
-  async function openDrawer() {
-    // Fetch produits dans le même contexte que les mouvements (marche toujours)
-    try {
-      const r = await fetch('/api/admin/stock/produits', { credentials: 'include' });
-      const d = await r.json();
-      if (Array.isArray(d.produits) && d.produits.length > 0) {
-        setDrawerProds(d.produits);
-      } else {
-        // Fallback endpoint produits principal
-        const r2 = await fetch('/api/admin/products?limit=500', { credentials: 'include' });
-        const d2 = await r2.json();
-        const arr = Array.isArray(d2.data) ? d2.data : [];
-        setDrawerProds(arr.map((p: { id?: number; nom?: string; reference?: string; stock_magasin?: number }) => ({
-          produit_id: p.id ?? 0,
-          nom:        p.nom ?? '',
-          reference:  p.reference ?? '',
-          stock:      p.stock_magasin ?? 0,
-        })));
-      }
-    } catch { /* ouvre le drawer quand même, liste vide */ }
-    setShowDrawer(true);
-  }
-
   const fetchMovements = useCallback(async () => {
     setLoading(true);
     try {
@@ -127,7 +104,30 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
     finally { if (mountedRef.current) setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchMovements(); }, [fetchMovements]);
+  useEffect(() => {
+    fetchMovements();
+    // Fetch produits au montage — même contexte que mouvements
+    fetch('/api/admin/stock/produits', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.produits) && d.produits.length > 0) {
+          setDrawerProds(d.produits);
+        } else {
+          return fetch('/api/admin/products?limit=500', { credentials: 'include' })
+            .then(r2 => r2.json())
+            .then(d2 => {
+              const arr = Array.isArray(d2.data) ? d2.data : [];
+              setDrawerProds(arr.map((p: { id?: number; nom?: string; reference?: string; stock_magasin?: number }) => ({
+                produit_id: p.id ?? 0,
+                nom:        p.nom ?? '',
+                reference:  p.reference ?? '',
+                stock:      p.stock_magasin ?? 0,
+              })));
+            });
+        }
+      })
+      .catch(() => {});
+  }, [fetchMovements]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -208,7 +208,7 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
           <button
             type="button"
             style={xferBtnStyle}
-            onClick={() => openDrawer()}
+            onClick={() => setShowDrawer(true)}
             onMouseEnter={e => {
               (e.currentTarget as HTMLButtonElement).style.animation = 'none';
               (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.12)';
