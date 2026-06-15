@@ -20,7 +20,7 @@ export interface ProduitStock {
   variant_nom?:   string;
 }
 
-export async function getProduitsWithStock(): Promise<ProduitStock[]> {
+export async function getProduitsWithStock(shopId: number): Promise<ProduitStock[]> {
   // Check if product_variants table exists before using it in queries
   let hasVariantsTable = false;
   try {
@@ -33,12 +33,13 @@ export async function getProduitsWithStock(): Promise<ProduitStock[]> {
       `SELECT p.id AS produit_id, p.nom, p.reference,
               COALESCE(p.stock_magasin, 0) AS stock,
               0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
-       FROM produits p WHERE p.actif = 1 ORDER BY p.nom`
+       FROM produits p WHERE p.actif = 1 AND p.shop_id = ? ORDER BY p.nom`,
+      [shopId]
     );
     return rows as ProduitStock[];
   }
 
-  // UNION: products without variants + one row per variant
+  // UNION: products without variants + one row per variant, filtered by shop
   // COLLATE utf8mb4_unicode_ci on all string columns to avoid collation mismatch
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT * FROM (
@@ -50,7 +51,7 @@ export async function getProduitsWithStock(): Promise<ProduitStock[]> {
               NULL AS variant_id,
               CONVERT(NULL USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM produits p
-       WHERE p.actif = 1
+       WHERE p.actif = 1 AND p.shop_id = ?
          AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
 
        UNION ALL
@@ -64,9 +65,10 @@ export async function getProduitsWithStock(): Promise<ProduitStock[]> {
               CONVERT(pv.nom USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM product_variants pv
        JOIN produits p ON p.id = pv.produit_id
-       WHERE p.actif = 1
+       WHERE p.actif = 1 AND p.shop_id = ?
      ) AS combined
-     ORDER BY nom ASC`
+     ORDER BY nom ASC`,
+    [shopId, shopId]
   );
   return rows as ProduitStock[];
 }

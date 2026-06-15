@@ -12,7 +12,7 @@ router.get("/api/admin/stock/produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const produits = await getProduitsWithStock();
+    const produits = await getProduitsWithStock(session.shop_id);
     res.json({ produits });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

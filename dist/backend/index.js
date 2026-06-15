@@ -899,7 +899,7 @@ function runOnce(key, fn) {
   if (!_ensurePromises.has(key)) _ensurePromises.set(key, fn());
   return _ensurePromises.get(key);
 }
-async function getProduitsWithStock() {
+async function getProduitsWithStock(shopId) {
   let hasVariantsTable = false;
   try {
     await db.execute("SELECT 1 FROM product_variants LIMIT 0");
@@ -911,7 +911,8 @@ async function getProduitsWithStock() {
       `SELECT p.id AS produit_id, p.nom, p.reference,
               COALESCE(p.stock_magasin, 0) AS stock,
               0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
-       FROM produits p WHERE p.actif = 1 ORDER BY p.nom`
+       FROM produits p WHERE p.actif = 1 AND p.shop_id = ? ORDER BY p.nom`,
+      [shopId]
     );
     return rows2;
   }
@@ -925,7 +926,7 @@ async function getProduitsWithStock() {
               NULL AS variant_id,
               CONVERT(NULL USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM produits p
-       WHERE p.actif = 1
+       WHERE p.actif = 1 AND p.shop_id = ?
          AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
 
        UNION ALL
@@ -939,9 +940,10 @@ async function getProduitsWithStock() {
               CONVERT(pv.nom USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM product_variants pv
        JOIN produits p ON p.id = pv.produit_id
-       WHERE p.actif = 1
+       WHERE p.actif = 1 AND p.shop_id = ?
      ) AS combined
-     ORDER BY nom ASC`
+     ORDER BY nom ASC`,
+    [shopId, shopId]
   );
   return rows;
 }
@@ -6888,7 +6890,7 @@ router4.get("/api/admin/stock/produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const produits = await getProduitsWithStock();
+    const produits = await getProduitsWithStock(session.shop_id);
     res.json({ produits });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
