@@ -17,6 +17,7 @@ export default function BoutiquePageClient({ shopName, userName, userRole }: Pro
       userRole={userRole}
       onSwitchWorkspace={() => router.push('/admin')}
       onNewSale={() => router.push('/admin/ventes')}
+      onRequestTransfer={() => router.push('/admin/magasin')}
     />
   );
 }

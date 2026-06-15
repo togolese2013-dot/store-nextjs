@@ -48,6 +48,7 @@ export interface BoutiqueShellProps {
   clients?: BoutiqueClient[];
   onSwitchWorkspace?: () => void;
   onNewSale?: () => void;
+  onRequestTransfer?: (sku: string) => void;
   userName?: string;
   userRole?: string;
   shopName?: string;
@@ -61,6 +62,7 @@ export default function BoutiqueShell({
   clients     = SAMPLE_CLIENTS,
   onSwitchWorkspace,
   onNewSale,
+  onRequestTransfer,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
@@ -113,7 +115,7 @@ export default function BoutiqueShell({
         {/* Page routing */}
         {page === 'overview' && <OverviewPage sales={sales} onNewSale={onNewSale} />}
         {page === 'ventes'   && <VentesPage sales={sales} onNewSale={onNewSale} />}
-        {page === 'stock'    && <StockPage stock={stock} />}
+        {page === 'stock'    && <StockPage stock={stock} onRequestTransfer={onRequestTransfer} />}
         {page === 'finance'  && <FinancePage movements={movements} />}
         {page === 'clients'  && <ClientsPage clients={clients} />}
       </main>

@@ -170,6 +170,7 @@ function mapBoutiqueClient(c: ApiBoutiqueClient): BoutiqueClient {
 interface Props {
   onSwitchWorkspace?: () => void;
   onNewSale?: () => void;
+  onRequestTransfer?: (sku: string) => void;
   userName?: string;
   userRole?: string;
   shopName?: string;
@@ -178,6 +179,7 @@ interface Props {
 export default function BoutiqueDataLoader({
   onSwitchWorkspace,
   onNewSale,
+  onRequestTransfer,
   userName,
   userRole,
   shopName,
@@ -231,6 +233,7 @@ export default function BoutiqueDataLoader({
       clients={clients}
       onSwitchWorkspace={onSwitchWorkspace}
       onNewSale={onNewSale}
+      onRequestTransfer={onRequestTransfer}
       userName={userName}
       userRole={userRole}
       shopName={shopName}
