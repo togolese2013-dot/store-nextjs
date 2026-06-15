@@ -20,10 +20,9 @@ import CategoriesPage from './CategoriesPage';
 import BrandsPage from './BrandsPage';
 import VariantesPage from './VariantesPage';
 import FournisseursPage from './FournisseursPage';
-import BonsAchatPage from './BonsAchatPage';
+import AchatsEtMouvementsPage from './AchatsEtMouvementsPage';
 import EntrepotsPage from './EntrepotsPage';
 import AjustementsPage from './AjustementsPage';
-import MouvementsPage from './MouvementsPage';
 import AlertesPage from './AlertesPage';
 import {
   SearchIcon, BellIcon, ChevLeftIcon,
@@ -36,64 +35,60 @@ import styles from './Magasin.module.css';
 /* ─── Types ─────────────────────────────────────────────────────── */
 export type PageId =
   | 'overview' | 'products' | 'categories' | 'brands' | 'variantes'
-  | 'fournisseurs' | 'bons-achat' | 'entrepots'
-  | 'ajustements' | 'mouvements' | 'alertes';
+  | 'fournisseurs' | 'achats-mouvements' | 'entrepots'
+  | 'ajustements' | 'alertes';
 
 const PAGE_LABELS: Record<PageId, string> = {
-  overview:     "Vue d'ensemble",
-  products:     'Produits',
-  categories:   'Catégories',
-  brands:       'Marques',
-  variantes:    'Variantes',
-  fournisseurs: 'Fournisseurs',
-  'bons-achat': "Bons d'achat",
-  entrepots:    'Entrepôts',
-  ajustements:  'Ajustements',
-  mouvements:   'Mouvements',
-  alertes:      'Alertes stock',
+  overview:            "Vue d'ensemble",
+  products:            'Produits',
+  categories:          'Catégories',
+  brands:              'Marques',
+  variantes:           'Variantes',
+  fournisseurs:        'Fournisseurs',
+  'achats-mouvements': 'Achats & Mouvements',
+  entrepots:           'Entrepôts',
+  ajustements:         'Ajustements',
+  alertes:             'Alertes stock',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
-  overview:     'Rechercher…',
-  products:     'Rechercher un produit, SKU, marque…',
-  categories:   'Rechercher une catégorie…',
-  brands:       'Rechercher une marque, pays…',
-  variantes:    'Rechercher un groupe de variantes…',
-  fournisseurs: 'Rechercher un fournisseur, pays…',
-  'bons-achat': 'Rechercher une référence, fournisseur…',
-  entrepots:    'Rechercher un entrepôt, ville…',
-  ajustements:  'Rechercher un produit, SKU…',
-  mouvements:   'Rechercher un produit, type…',
-  alertes:      'Rechercher une règle, produit…',
+  overview:            'Rechercher…',
+  products:            'Rechercher un produit, SKU, marque…',
+  categories:          'Rechercher une catégorie…',
+  brands:              'Rechercher une marque, pays…',
+  variantes:           'Rechercher un groupe de variantes…',
+  fournisseurs:        'Rechercher un fournisseur, pays…',
+  'achats-mouvements': 'Rechercher une référence, fournisseur, produit…',
+  entrepots:           'Rechercher un entrepôt, ville…',
+  ajustements:         'Rechercher un produit, SKU…',
+  alertes:             'Rechercher une règle, produit…',
 };
 
 const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
-  overview:          'overview',
-  products:          'products',
-  categories:        'categories',
-  brands:            'brands',
-  variants:          'variantes',
-  suppliers:         'fournisseurs',
-  'purchase-orders': 'bons-achat',
-  warehouses:        'entrepots',
-  adjustments:       'ajustements',
-  movements:         'mouvements',
-  alerts:            'alertes',
+  overview:            'overview',
+  products:            'products',
+  categories:          'categories',
+  brands:              'brands',
+  variants:            'variantes',
+  suppliers:           'fournisseurs',
+  'achats-mouvements': 'achats-mouvements',
+  warehouses:          'entrepots',
+  adjustments:         'ajustements',
+  alerts:              'alertes',
 };
 
 /** Reverse map — PageId → nav item id (for Sidebar activeId prop) */
 const PAGE_TO_NAV: Record<PageId, string> = {
-  overview:     'overview',
-  products:     'products',
-  categories:   'categories',
-  brands:       'brands',
-  variantes:    'variants',
-  fournisseurs: 'suppliers',
-  'bons-achat': 'purchase-orders',
-  entrepots:    'warehouses',
-  ajustements:  'adjustments',
-  mouvements:   'movements',
-  alertes:      'alerts',
+  overview:            'overview',
+  products:            'products',
+  categories:          'categories',
+  brands:              'brands',
+  variantes:           'variants',
+  fournisseurs:        'suppliers',
+  'achats-mouvements': 'achats-mouvements',
+  entrepots:           'warehouses',
+  ajustements:         'adjustments',
+  alertes:             'alerts',
 };
 
 /* ─── Props ─────────────────────────────────────────────────────── */
@@ -243,12 +238,11 @@ export default function MagasinShell({
         {activePage === 'categories'   && <CategoriesPage categories={categories} />}
         {activePage === 'brands'       && <BrandsPage brands={brands} />}
         {activePage === 'variantes'    && <VariantesPage variants={variants} />}
-        {activePage === 'fournisseurs' && <FournisseursPage suppliers={suppliers} />}
-        {activePage === 'bons-achat'   && <BonsAchatPage orders={orders} />}
-        {activePage === 'entrepots'    && <EntrepotsPage warehouses={warehouses} />}
-        {activePage === 'ajustements'  && <AjustementsPage adjustments={adjustments} />}
-        {activePage === 'mouvements'   && <MouvementsPage movements={movements} />}
-        {activePage === 'alertes'      && <AlertesPage alerts={alerts} />}
+        {activePage === 'fournisseurs'        && <FournisseursPage suppliers={suppliers} />}
+        {activePage === 'achats-mouvements'  && <AchatsEtMouvementsPage orders={orders} />}
+        {activePage === 'entrepots'           && <EntrepotsPage warehouses={warehouses} />}
+        {activePage === 'ajustements'         && <AjustementsPage adjustments={adjustments} />}
+        {activePage === 'alertes'             && <AlertesPage alerts={alerts} />}
       </main>
     </div>
   );

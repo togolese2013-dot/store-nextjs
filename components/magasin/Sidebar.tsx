@@ -27,16 +27,15 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
   {
     section: 'Approvisionnement',
     items: [
-      { icon: TruckIcon,    label: 'Fournisseurs',   id: 'suppliers' },
-      { icon: ReceiptIcon,  label: 'Bons d\'achat',  id: 'purchase-orders' },
-      { icon: WarehouseIcon,label: 'Entrepôts',       id: 'warehouses' },
+      { icon: TruckIcon,    label: 'Fournisseurs',        id: 'suppliers' },
+      { icon: ReceiptIcon,  label: 'Achats & Mouvements', id: 'achats-mouvements' },
+      { icon: WarehouseIcon,label: 'Entrepôts',            id: 'warehouses' },
     ],
   },
   {
     section: 'Stock',
     items: [
-      { icon: AdjustmentsIcon, label: 'Ajustements', id: 'adjustments' },
-      { icon: HistoryIcon,     label: 'Mouvements', id: 'movements' },
+      { icon: AdjustmentsIcon, label: 'Ajustements',  id: 'adjustments' },
       { icon: BoxIcon,         label: 'Alertes stock', id: 'alerts' },
     ],
   },
