@@ -98,10 +98,13 @@ function TrNode({ label, sub, icon, dest = false }: { label: string; sub: string
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
+export type DrawerProdRaw = { produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string };
+
 export interface MouvementDrawerProps {
-  onClose:     () => void;
-  onSuccess?:  () => void;
+  onClose:      () => void;
+  onSuccess?:   () => void;
   defaultType?: MvTypeId;
+  produits?:    DrawerProdRaw[];
 }
 
 // ── Drawer ─────────────────────────────────────────────────────────────────────
@@ -110,13 +113,24 @@ export default function MouvementDrawer({
   onClose,
   onSuccess,
   defaultType = 'sortie',
+  produits: produitsProp = [],
 }: MouvementDrawerProps) {
   injectKeyframes();
 
-  // API products
-  const [produits,     setProduits]    = useState<DrawerProd[]>([]);
-  const [loadingProds, setLoadingProds] = useState(true);
-  const [fetchError,   setFetchError]  = useState('');
+  // Map produits prop → DrawerProd[]
+  const produits = useMemo<DrawerProd[]>(() =>
+    produitsProp.map((p, i) => ({
+      produit_id: p.produit_id,
+      name:       p.variant_nom ? `${p.nom} — ${p.variant_nom}` : p.nom,
+      sku:        p.reference,
+      stock:      p.stock,
+      swatch:     SWATCHES[i % SWATCHES.length],
+      initial:    (p.nom[0] ?? '?').toUpperCase(),
+      variant_id: p.variant_id,
+    })),
+  [produitsProp]);
+
+  const loadingProds = produits.length === 0 && produitsProp.length === 0;
 
   // Form state
   const [type,     setType]     = useState<MvTypeId>(defaultType);
@@ -131,47 +145,6 @@ export default function MouvementDrawer({
   const [step,     setStep]     = useState<'form' | 'loading' | 'success'>('form');
   const [apiError, setApiError] = useState('');
   const isLoading = step === 'loading';
-
-  // Fetch products — essaie /stock/produits, fallback /products
-  useEffect(() => {
-    fetch('/api/admin/stock/produits', { credentials: 'include' })
-      .then(async r => {
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
-        const raw: Array<{ produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string }> =
-          Array.isArray(d.produits) ? d.produits : [];
-        if (raw.length > 0) return raw;
-        // fallback si vide
-        throw new Error('empty');
-      })
-      .catch(async () => {
-        // Fallback : endpoint produits principal
-        const r2 = await fetch('/api/admin/products?limit=500', { credentials: 'include' });
-        const d2 = await r2.json();
-        const arr = Array.isArray(d2.data) ? d2.data : Array.isArray(d2) ? d2 : [];
-        return arr.map((p: { id?: number; nom?: string; reference?: string; stock_magasin?: number }) => ({
-          produit_id: p.id ?? 0,
-          nom:        p.nom ?? '',
-          reference:  p.reference ?? '',
-          stock:      p.stock_magasin ?? 0,
-          variant_id: undefined,
-          variant_nom: undefined,
-        }));
-      })
-      .then((raw: Array<{ produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string }>) => {
-        setProduits(raw.map((p, i) => ({
-          produit_id: p.produit_id,
-          name:       p.variant_nom ? `${p.nom} — ${p.variant_nom}` : p.nom,
-          sku:        p.reference,
-          stock:      p.stock,
-          swatch:     SWATCHES[i % SWATCHES.length],
-          initial:    (p.nom[0] ?? '?').toUpperCase(),
-          variant_id: p.variant_id,
-        })));
-      })
-      .catch(e => setFetchError(String(e)))
-      .finally(() => setLoadingProds(false));
-  }, []);
 
   useEffect(() => {
     setProduct(''); setSearch(''); setQty(1); setStep('form'); setApiError('');
@@ -383,7 +356,7 @@ export default function MouvementDrawer({
             </svg>
             <input
               style={{ ...inputCss, paddingLeft: 32, paddingRight: search ? 28 : 12 }}
-              placeholder={loadingProds ? 'Chargement…' : fetchError ? 'Erreur chargement produits' : 'Rechercher un produit…'}
+              placeholder={loadingProds ? 'Chargement…' : 'Rechercher un produit…'}
               value={search} autoComplete="off" disabled={isLoading || loadingProds}
               onChange={e => { setSearch(e.target.value); setProduct(''); setShowSugg(true); }}
               onFocus={() => setShowSugg(true)}

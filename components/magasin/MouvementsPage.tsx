@@ -83,6 +83,7 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
   const [counts,       setCounts]       = useState<ApiCounts>({ total: 0, entrees: 0, sorties: 0, ajustements: 0 });
   const [loading,      setLoading]      = useState(true);
   const [showDrawer,   setShowDrawer]   = useState(false);
+  const [drawerProds,  setDrawerProds]  = useState<Array<{ produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string }>>([]);
   const [toast,        setToast]        = useState('');
   const mountedRef = useRef(true);
 
@@ -90,6 +91,29 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  async function openDrawer() {
+    // Fetch produits dans le même contexte que les mouvements (marche toujours)
+    try {
+      const r = await fetch('/api/admin/stock/produits', { credentials: 'include' });
+      const d = await r.json();
+      if (Array.isArray(d.produits) && d.produits.length > 0) {
+        setDrawerProds(d.produits);
+      } else {
+        // Fallback endpoint produits principal
+        const r2 = await fetch('/api/admin/products?limit=500', { credentials: 'include' });
+        const d2 = await r2.json();
+        const arr = Array.isArray(d2.data) ? d2.data : [];
+        setDrawerProds(arr.map((p: { id?: number; nom?: string; reference?: string; stock_magasin?: number }) => ({
+          produit_id: p.id ?? 0,
+          nom:        p.nom ?? '',
+          reference:  p.reference ?? '',
+          stock:      p.stock_magasin ?? 0,
+        })));
+      }
+    } catch { /* ouvre le drawer quand même, liste vide */ }
+    setShowDrawer(true);
+  }
 
   const fetchMovements = useCallback(async () => {
     setLoading(true);
@@ -148,6 +172,7 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
         <>
           <Backdrop onClose={() => setShowDrawer(false)} />
           <MouvementDrawer
+            produits={drawerProds}
             onClose={() => setShowDrawer(false)}
             onSuccess={() => {
               showToast('✓ Mouvement enregistré — stock mis à jour');
@@ -183,7 +208,7 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
           <button
             type="button"
             style={xferBtnStyle}
-            onClick={() => setShowDrawer(true)}
+            onClick={() => openDrawer()}
             onMouseEnter={e => {
               (e.currentTarget as HTMLButtonElement).style.animation = 'none';
               (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.12)';
