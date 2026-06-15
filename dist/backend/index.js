@@ -917,10 +917,13 @@ async function getProduitsWithStock() {
   }
   const [rows] = await db.query(
     `SELECT * FROM (
-       SELECT p.id AS produit_id, p.nom,
-              p.reference,
+       SELECT p.id AS produit_id,
+              CONVERT(p.nom USING utf8mb4) COLLATE utf8mb4_unicode_ci AS nom,
+              CONVERT(p.reference USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reference,
               COALESCE(p.stock_magasin, 0) AS stock,
-              0 AS variants_count, NULL AS variant_id, NULL AS variant_nom
+              0 AS variants_count,
+              NULL AS variant_id,
+              CONVERT(NULL USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM produits p
        WHERE p.actif = 1
          AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.produit_id = p.id)
@@ -928,12 +931,12 @@ async function getProduitsWithStock() {
        UNION ALL
 
        SELECT p.id AS produit_id,
-              CONCAT(p.nom, ' \u2014 ', pv.nom) AS nom,
-              COALESCE(NULLIF(pv.reference_sku,''), p.reference) AS reference,
+              CONVERT(CONCAT(p.nom, ' \u2014 ', pv.nom) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS nom,
+              CONVERT(COALESCE(NULLIF(pv.reference_sku,''), p.reference) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reference,
               pv.stock AS stock,
               1 AS variants_count,
               pv.id AS variant_id,
-              pv.nom AS variant_nom
+              CONVERT(pv.nom USING utf8mb4) COLLATE utf8mb4_unicode_ci AS variant_nom
        FROM product_variants pv
        JOIN produits p ON p.id = pv.produit_id
        WHERE p.actif = 1
@@ -4844,120 +4847,7 @@ var init_shops = __esm({
   }
 });
 
-// ../lib/plan-configs.ts
-var plan_configs_exports = {};
-__export(plan_configs_exports, {
-  getAllPlanLimits: () => getAllPlanLimits,
-  getPlanLimits: () => getPlanLimits,
-  updatePlanLimits: () => updatePlanLimits
-});
-async function ensureTable2() {
-  if (tableReady) return;
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS plan_configs (
-      plan               VARCHAR(20) NOT NULL PRIMARY KEY,
-      max_produits       INT NOT NULL DEFAULT 20,
-      max_ventes_jour    INT NOT NULL DEFAULT 20,
-      max_ventes_mois    INT NOT NULL DEFAULT 40,
-      max_commandes_mois INT NOT NULL DEFAULT 15,
-      max_entrepots      INT NOT NULL DEFAULT 1,
-      max_users          INT NOT NULL DEFAULT 1,
-      updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
-  for (const [plan, d] of Object.entries(DEFAULTS)) {
-    await db.execute(
-      `INSERT IGNORE INTO plan_configs
-       (plan, max_produits, max_ventes_jour, max_ventes_mois, max_commandes_mois, max_entrepots, max_users)
-       VALUES (?,?,?,?,?,?,?)`,
-      [plan, d.max_produits, d.max_ventes_jour, d.max_ventes_mois, d.max_commandes_mois, d.max_entrepots, d.max_users]
-    );
-  }
-  tableReady = true;
-}
-async function getPlanLimits(plan) {
-  try {
-    await ensureTable2();
-    const [rows] = await db.execute(
-      "SELECT * FROM plan_configs WHERE plan = ?",
-      [plan]
-    );
-    if (rows[0]) return rows[0];
-  } catch {
-  }
-  return DEFAULTS[plan] ?? DEFAULTS.basic;
-}
-async function getAllPlanLimits() {
-  try {
-    await ensureTable2();
-    const [rows] = await db.execute(
-      "SELECT * FROM plan_configs ORDER BY FIELD(plan,'basic','pro','business')"
-    );
-    return rows;
-  } catch {
-    return Object.values(DEFAULTS);
-  }
-}
-async function updatePlanLimits(plan, limits) {
-  await ensureTable2();
-  const sets = [];
-  const vals = [];
-  for (const [k, v] of Object.entries(limits)) {
-    if (v !== void 0) {
-      sets.push(`${k} = ?`);
-      vals.push(Number(v));
-    }
-  }
-  if (!sets.length) return;
-  vals.push(plan);
-  await db.execute(`UPDATE plan_configs SET ${sets.join(", ")} WHERE plan = ?`, vals);
-}
-var DEFAULTS, tableReady;
-var init_plan_configs = __esm({
-  "../lib/plan-configs.ts"() {
-    "use strict";
-    init_db();
-    DEFAULTS = {
-      basic: { plan: "basic", max_produits: 20, max_ventes_jour: 20, max_ventes_mois: 40, max_commandes_mois: 15, max_entrepots: 1, max_users: 1 },
-      pro: { plan: "pro", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 5 },
-      business: { plan: "business", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 0 }
-    };
-    tableReady = false;
-  }
-});
-
-// index.ts
-var index_exports = {};
-__export(index_exports, {
-  default: () => index_default
-});
-module.exports = __toCommonJS(index_exports);
-var import_dotenv = require("dotenv");
-var import_path = require("path");
-var import_express47 = __toESM(require("express"));
-var import_cors = __toESM(require("cors"));
-var import_cookie_parser = __toESM(require("cookie-parser"));
-var import_helmet = __toESM(require("helmet"));
-var import_express_rate_limit = require("express-rate-limit");
-
-// routes/admin/auth.ts
-var import_express = __toESM(require("express"));
-var import_bcryptjs = __toESM(require("bcryptjs"));
-init_admin_db();
-init_db();
-init_shops();
-
 // lib/auth.ts
-var import_jose = require("jose");
-init_admin_db();
-var jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret) {
-  console.error("FATAL: JWT_SECRET env var is not set. Server cannot start securely.");
-  process.exit(1);
-}
-var SECRET = new TextEncoder().encode(jwtSecret);
-var COOKIE_NAME = "ts_admin_token";
-var TTL = 60 * 60 * 8;
 function cookieDomain() {
   if (process.env.NODE_ENV !== "production") return void 0;
   if (process.env.AUTH_COOKIE_DOMAIN) return process.env.AUTH_COOKIE_DOMAIN;
@@ -5016,6 +4906,931 @@ function clearAuthCookie(res) {
     secure: process.env.NODE_ENV === "production"
   });
 }
+var import_jose, jwtSecret, SECRET, COOKIE_NAME, TTL;
+var init_auth = __esm({
+  "lib/auth.ts"() {
+    "use strict";
+    import_jose = require("jose");
+    init_admin_db();
+    jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error("FATAL: JWT_SECRET env var is not set. Server cannot start securely.");
+      process.exit(1);
+    }
+    SECRET = new TextEncoder().encode(jwtSecret);
+    COOKIE_NAME = "ts_admin_token";
+    TTL = 60 * 60 * 8;
+  }
+});
+
+// lib/whatsapp.ts
+var whatsapp_exports = {};
+__export(whatsapp_exports, {
+  getWaMediaUrl: () => getWaMediaUrl,
+  sendBoutiqueVenteNotif: () => sendBoutiqueVenteNotif,
+  sendOrderNotifications: () => sendOrderNotifications,
+  sendWaAudio: () => sendWaAudio,
+  sendWaDeliveryConfirmation: () => sendWaDeliveryConfirmation,
+  sendWaImage: () => sendWaImage,
+  sendWaTemplate: () => sendWaTemplate,
+  sendWaText: () => sendWaText,
+  uploadWaMedia: () => uploadWaMedia
+});
+function cleanPhone(num) {
+  return num.replace(/[\s+\-()]/g, "");
+}
+async function sendWaTemplate({
+  to,
+  templateName,
+  languageCode = "fr",
+  bodyParams
+}) {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token = await getSetting("wa_access_token");
+    if (!phoneId || !token) {
+      return { success: false, error: "Credentials WhatsApp non configur\xE9s" };
+    }
+    const payload = {
+      messaging_product: "whatsapp",
+      to: cleanPhone(to),
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: languageCode },
+        components: bodyParams.length > 0 ? [{
+          type: "body",
+          parameters: bodyParams.map((text) => ({ type: "text", text }))
+        }] : []
+      }
+    };
+    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+async function sendWaText({
+  to,
+  body
+}) {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token = await getSetting("wa_access_token");
+    if (!phoneId || !token) {
+      return { success: false, error: "Credentials WhatsApp non configur\xE9s" };
+    }
+    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: cleanPhone(to),
+        type: "text",
+        text: { body }
+      })
+    });
+    const responseData = await res.json().catch(() => ({}));
+    console.log("[sendWaText] to:", cleanPhone(to), "status:", res.status, "response:", JSON.stringify(responseData));
+    if (!res.ok) {
+      return { success: false, error: responseData?.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+async function getWaMediaUrl(mediaId) {
+  try {
+    const token = await getSetting("wa_access_token");
+    const res = await fetch(`${WA_API}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url ?? null;
+  } catch {
+    return null;
+  }
+}
+async function uploadWaMedia(buffer, mimeType, filename) {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token = await getSetting("wa_access_token");
+    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", mimeType);
+    form.append("file", new Blob([new Uint8Array(buffer)], { type: mimeType }), filename);
+    const res = await fetch(`${WA_API}/${phoneId}/media`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+    }
+    const data = await res.json();
+    return { success: true, mediaId: data.id };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+async function sendWaImage({
+  to,
+  mediaId,
+  caption = ""
+}) {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token = await getSetting("wa_access_token");
+    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
+    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: cleanPhone(to),
+        type: "image",
+        image: { id: mediaId, caption }
+      })
+    });
+    const responseData = await res.json().catch(() => ({}));
+    console.log("[sendWaImage] to:", cleanPhone(to), "status:", res.status, "response:", JSON.stringify(responseData));
+    if (!res.ok) {
+      return { success: false, error: responseData?.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+async function sendWaAudio({
+  to,
+  mediaId
+}) {
+  try {
+    const phoneId = await getSetting("wa_phone_number_id");
+    const token = await getSetting("wa_access_token");
+    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
+    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: cleanPhone(to),
+        type: "audio",
+        audio: { id: mediaId }
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
+  }
+}
+async function sendBoutiqueVenteNotif({
+  telephone,
+  nom,
+  reference,
+  total,
+  montant_acompte,
+  statut_paiement,
+  items
+}) {
+  try {
+    const [enabled, templateFull, templateAcompte, lang, siteUrl] = await Promise.all([
+      getSetting("wa_boutique_vente_enabled"),
+      getSetting("wa_boutique_vente_template_full"),
+      getSetting("wa_boutique_vente_template_acompte"),
+      getSetting("wa_order_lang"),
+      getSetting("site_url")
+    ]);
+    if (enabled !== "1" || !telephone) return;
+    const languageCode = lang || "fr";
+    const baseUrl = (siteUrl || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://togolese.tg").replace(/\/$/, "");
+    const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+    const articlesList = items.map((i) => `${i.qty}x ${i.nom} - ${fmt(i.total)}`).join("\n");
+    if (statut_paiement === "acompte" && templateAcompte) {
+      const acompte = montant_acompte ?? 0;
+      const resteAPayer = total - acompte;
+      await sendWaTemplate({
+        to: telephone,
+        templateName: templateAcompte,
+        languageCode,
+        bodyParams: [nom, reference, articlesList, fmt(acompte), fmt(resteAPayer), baseUrl]
+      });
+    } else if (templateFull) {
+      await sendWaTemplate({
+        to: telephone,
+        templateName: templateFull,
+        languageCode,
+        bodyParams: [nom, reference, articlesList, fmt(total), baseUrl]
+      });
+    }
+  } catch (e) {
+    console.error("[WA] sendBoutiqueVenteNotif error:", e);
+  }
+}
+async function sendOrderNotifications({
+  id,
+  reference,
+  nom,
+  telephone,
+  items,
+  total
+}) {
+  try {
+    const [
+      clientEnabled,
+      adminEnabled,
+      clientTemplate,
+      adminTemplate,
+      adminNumber,
+      adminNumber2,
+      lang,
+      siteUrl
+    ] = await Promise.all([
+      getSetting("wa_order_client_enabled"),
+      getSetting("wa_order_admin_enabled"),
+      getSetting("wa_order_client_template"),
+      getSetting("wa_order_admin_template"),
+      getSetting("wa_order_admin_number"),
+      getSetting("wa_order_admin_number_2"),
+      getSetting("wa_order_lang"),
+      getSetting("site_url")
+    ]);
+    if (process.env.NODE_ENV !== "production") console.log(`[WA] sendOrderNotifications \u2014 ref=${reference} tel=${telephone}`);
+    const languageCode = lang || "fr";
+    const baseUrl = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
+    const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+    const articlesStr = items.map((item) => {
+      const name = item.nom || item.nom_produit || "Produit";
+      const qty = item.qty ?? item.quantite ?? 1;
+      const prix = item.total ?? (item.prix ? item.prix * qty : null);
+      return prix ? `${qty}x ${name} - ${fmt(prix)}` : `${qty}x ${name}`;
+    }).join(", ");
+    const totalStr = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
+    const trackingUrl = `${baseUrl}/suivi-commande?ref=${encodeURIComponent(reference)}`;
+    const adminUrl = `${baseUrl}/admin/orders`;
+    if (clientEnabled === "1" && clientTemplate && telephone) {
+      const result = await sendWaTemplate({
+        to: telephone,
+        templateName: clientTemplate,
+        languageCode,
+        bodyParams: [nom, reference, articlesStr, totalStr, trackingUrl]
+      });
+      if (process.env.NODE_ENV !== "production") console.log(`[WA] Client notif result (${reference}):`, result);
+    }
+    if (adminEnabled === "1" && adminTemplate && adminNumber) {
+      const result = await sendWaTemplate({
+        to: adminNumber,
+        templateName: adminTemplate,
+        languageCode,
+        bodyParams: [reference, nom, telephone, articlesStr, totalStr, adminUrl]
+      });
+      if (process.env.NODE_ENV !== "production") console.log(`[WA] Admin notif result (${reference}):`, result);
+      if (adminNumber2 && adminNumber2 !== adminNumber) {
+        await sendWaTemplate({
+          to: adminNumber2,
+          templateName: adminTemplate,
+          languageCode,
+          bodyParams: [reference, nom, telephone, articlesStr, totalStr, adminUrl]
+        }).catch((e) => console.error(`[WA] Admin notif #2 error (${reference}):`, e));
+      }
+    }
+  } catch (e) {
+    console.error("[WA] sendOrderNotifications error:", e);
+  }
+}
+async function sendWaDeliveryConfirmation(order) {
+  try {
+    const [enabled, templateName, lang] = await Promise.all([
+      getSetting("wa_delivery_template_enabled"),
+      getSetting("wa_delivery_template"),
+      getSetting("wa_order_lang")
+    ]);
+    if (enabled !== "1" || !templateName || !order.telephone) return;
+    const languageCode = lang || "fr";
+    const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+    let items = [];
+    try {
+      items = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+    } catch {
+      items = [];
+    }
+    const articlesStr = items.map((item) => {
+      const name = item.nom || "Produit";
+      const qty = item.qty ?? item.quantite ?? 1;
+      const prix = item.total ?? (item.prix_unitaire ?? item.prix ?? 0) * qty;
+      return `\u2022 ${qty}x ${name} \u2014 ${fmt(prix)}`;
+    }).join("\n");
+    const livraisonStr = order.delivery_fee > 0 ? `${order.zone_livraison || "Livraison"} \u2014 ${fmt(order.delivery_fee)}` : `${order.zone_livraison || "Livraison"} \u2014 Gratuit`;
+    const result = await sendWaTemplate({
+      to: order.telephone,
+      templateName,
+      languageCode,
+      bodyParams: [
+        order.nom,
+        order.reference,
+        articlesStr,
+        livraisonStr,
+        fmt(order.total)
+      ]
+    });
+    if (!result.success) console.error("[WA] delivery confirmation failed:", result.error);
+  } catch (e) {
+    console.error("[WA] sendWaDeliveryConfirmation error:", e);
+  }
+}
+var WA_API;
+var init_whatsapp = __esm({
+  "lib/whatsapp.ts"() {
+    "use strict";
+    init_admin_db();
+    WA_API = "https://graph.facebook.com/v19.0";
+  }
+});
+
+// ../lib/plan-configs.ts
+var plan_configs_exports = {};
+__export(plan_configs_exports, {
+  getAllPlanLimits: () => getAllPlanLimits,
+  getPlanLimits: () => getPlanLimits,
+  getPlanPrice: () => getPlanPrice,
+  getPlansWithPrices: () => getPlansWithPrices,
+  getSaasSettings: () => getSaasSettings,
+  updatePlanFull: () => updatePlanFull,
+  updatePlanLimits: () => updatePlanLimits,
+  updateSaasSettings: () => updateSaasSettings
+});
+async function ensureTable2() {
+  if (tableReady) return;
+  const pool2 = db;
+  await pool2.execute(`
+    CREATE TABLE IF NOT EXISTS plan_configs (
+      plan               VARCHAR(20) NOT NULL PRIMARY KEY,
+      max_produits       INT NOT NULL DEFAULT 20,
+      max_ventes_jour    INT NOT NULL DEFAULT 20,
+      max_ventes_mois    INT NOT NULL DEFAULT 40,
+      max_commandes_mois INT NOT NULL DEFAULT 15,
+      max_entrepots      INT NOT NULL DEFAULT 1,
+      max_users          INT NOT NULL DEFAULT 1,
+      updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+  for (const [plan, d] of Object.entries(DEFAULTS)) {
+    await pool2.execute(
+      `INSERT IGNORE INTO plan_configs
+       (plan, max_produits, max_ventes_jour, max_ventes_mois, max_commandes_mois, max_entrepots, max_users)
+       VALUES (?,?,?,?,?,?,?)`,
+      [plan, d.max_produits, d.max_ventes_jour, d.max_ventes_mois, d.max_commandes_mois, d.max_entrepots, d.max_users]
+    );
+  }
+  tableReady = true;
+}
+async function ensurePriceCols() {
+  if (priceColsReady) return;
+  const pool2 = db;
+  await pool2.execute(`ALTER TABLE plan_configs ADD COLUMN prix_mensuel INT NOT NULL DEFAULT 0`).catch(() => {
+  });
+  await pool2.execute(`ALTER TABLE plan_configs ADD COLUMN prix_annuel  INT NOT NULL DEFAULT 0`).catch(() => {
+  });
+  await pool2.execute(`UPDATE plan_configs SET prix_mensuel = 9900,  prix_annuel = 7920  WHERE plan = 'pro'      AND prix_mensuel = 0`).catch(() => {
+  });
+  await pool2.execute(`UPDATE plan_configs SET prix_mensuel = 24900, prix_annuel = 19920 WHERE plan = 'business' AND prix_mensuel = 0`).catch(() => {
+  });
+  priceColsReady = true;
+}
+async function ensureSaasSettings() {
+  if (settingsReady) return;
+  const pool2 = db;
+  await pool2.execute(`
+    CREATE TABLE IF NOT EXISTS saas_settings (
+      \`key\`   VARCHAR(50) NOT NULL PRIMARY KEY,
+      \`value\` TEXT        NOT NULL
+    )
+  `);
+  await pool2.execute(`
+    INSERT IGNORE INTO saas_settings (\`key\`, \`value\`) VALUES
+      ('trial_days',      '14'),
+      ('yearly_discount', '20'),
+      ('whatsapp_number', '+228 90 527 912')
+  `);
+  settingsReady = true;
+}
+async function getPlanLimits(plan) {
+  try {
+    await ensureTable2();
+    const [rows] = await db.execute(
+      "SELECT * FROM plan_configs WHERE plan = ?",
+      [plan]
+    );
+    if (rows[0]) return rows[0];
+  } catch {
+  }
+  return DEFAULTS[plan] ?? DEFAULTS.basic;
+}
+async function getAllPlanLimits() {
+  try {
+    await ensureTable2();
+    const [rows] = await db.execute(
+      "SELECT * FROM plan_configs ORDER BY FIELD(plan,'basic','pro','business')"
+    );
+    return rows;
+  } catch {
+    return Object.values(DEFAULTS);
+  }
+}
+async function updatePlanLimits(plan, limits) {
+  await ensureTable2();
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(limits)) {
+    if (v !== void 0) {
+      sets.push(`${k} = ?`);
+      vals.push(Number(v));
+    }
+  }
+  if (!sets.length) return;
+  vals.push(plan);
+  await db.execute(`UPDATE plan_configs SET ${sets.join(", ")} WHERE plan = ?`, vals);
+}
+async function getPlanPrice(plan) {
+  try {
+    await ensureTable2();
+    await ensurePriceCols();
+    const [rows] = await db.execute(
+      "SELECT prix_mensuel FROM plan_configs WHERE plan = ?",
+      [plan]
+    );
+    if (rows[0]) return Number(rows[0].prix_mensuel);
+  } catch {
+  }
+  return DEFAULT_PRICES[plan]?.prix_mensuel ?? 0;
+}
+async function getPlansWithPrices() {
+  await ensureTable2();
+  await ensurePriceCols();
+  const [rows] = await db.execute(`
+    SELECT pc.*,
+      (SELECT COUNT(*) FROM shops s WHERE s.plan = pc.plan) AS boutique_count
+    FROM plan_configs pc
+    ORDER BY FIELD(pc.plan, 'basic', 'pro', 'business')
+  `);
+  return rows.map((r) => ({
+    key: r.plan,
+    prix_mensuel: r.plan === "basic" ? null : Number(r.prix_mensuel) || null,
+    prix_annuel: r.plan === "basic" ? null : Number(r.prix_annuel) || null,
+    boutique_count: Number(r.boutique_count),
+    limits: {
+      produits: r.max_produits === 0 ? null : Number(r.max_produits),
+      ventes: r.max_ventes_mois === 0 ? null : Number(r.max_ventes_mois),
+      commandes: r.max_commandes_mois === 0 ? null : Number(r.max_commandes_mois),
+      admins: r.max_users === 0 ? null : Number(r.max_users),
+      entrepots: r.max_entrepots === 0 ? null : Number(r.max_entrepots)
+    }
+  }));
+}
+async function updatePlanFull(plan, data) {
+  await ensureTable2();
+  await ensurePriceCols();
+  await db.execute(`
+    UPDATE plan_configs SET
+      prix_mensuel       = ?,
+      prix_annuel        = ?,
+      max_produits       = ?,
+      max_ventes_mois    = ?,
+      max_commandes_mois = ?,
+      max_users          = ?,
+      max_entrepots      = ?
+    WHERE plan = ?
+  `, [
+    data.prix_mensuel,
+    data.prix_annuel,
+    data.max_produits,
+    data.max_ventes_mois,
+    data.max_commandes_mois,
+    data.max_users,
+    data.max_entrepots,
+    plan
+  ]);
+}
+async function getSaasSettings() {
+  try {
+    await ensureSaasSettings();
+    const [rows] = await db.execute(
+      "SELECT `key`, `value` FROM saas_settings"
+    );
+    const map = {};
+    for (const r of rows) map[r.key] = r.value;
+    return {
+      trial_days: Number(map.trial_days ?? DEFAULT_SETTINGS.trial_days),
+      yearly_discount: Number(map.yearly_discount ?? DEFAULT_SETTINGS.yearly_discount),
+      whatsapp_number: map.whatsapp_number ?? DEFAULT_SETTINGS.whatsapp_number
+    };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+async function updateSaasSettings(settings) {
+  await ensureSaasSettings();
+  const pool2 = db;
+  const entries = [];
+  if (settings.trial_days !== void 0) entries.push(["trial_days", String(settings.trial_days)]);
+  if (settings.yearly_discount !== void 0) entries.push(["yearly_discount", String(settings.yearly_discount)]);
+  if (settings.whatsapp_number !== void 0) entries.push(["whatsapp_number", settings.whatsapp_number]);
+  for (const [key, value] of entries) {
+    await pool2.execute(
+      "INSERT INTO saas_settings (`key`, `value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value` = ?",
+      [key, value, value]
+    );
+  }
+}
+var DEFAULTS, DEFAULT_PRICES, DEFAULT_SETTINGS, tableReady, priceColsReady, settingsReady;
+var init_plan_configs = __esm({
+  "../lib/plan-configs.ts"() {
+    "use strict";
+    init_db();
+    DEFAULTS = {
+      basic: { plan: "basic", max_produits: 20, max_ventes_jour: 20, max_ventes_mois: 40, max_commandes_mois: 15, max_entrepots: 1, max_users: 1 },
+      pro: { plan: "pro", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 5 },
+      business: { plan: "business", max_produits: 0, max_ventes_jour: 0, max_ventes_mois: 0, max_commandes_mois: 0, max_entrepots: 0, max_users: 0 }
+    };
+    DEFAULT_PRICES = {
+      basic: { prix_mensuel: 0, prix_annuel: 0 },
+      pro: { prix_mensuel: 9900, prix_annuel: 7920 },
+      business: { prix_mensuel: 24900, prix_annuel: 19920 }
+    };
+    DEFAULT_SETTINGS = {
+      trial_days: 14,
+      yearly_discount: 20,
+      whatsapp_number: "+228 90 527 912"
+    };
+    tableReady = false;
+    priceColsReady = false;
+    settingsReady = false;
+  }
+});
+
+// routes/admin/ai.ts
+var ai_exports = {};
+__export(ai_exports, {
+  default: () => ai_default,
+  generateWeeklyReport: () => generateWeeklyReport,
+  runWeeklyReportsForAllShops: () => runWeeklyReportsForAllShops
+});
+async function callClaude(apiKey2, system, user, maxTokens = 1024) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey2, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }]
+    })
+  });
+  if (!res.ok) throw new Error(`Claude API ${res.status}: ${await res.text().then((t) => t.slice(0, 200))}`);
+  const data = await res.json();
+  return data.content?.[0]?.text ?? "";
+}
+function parseJson(text, fallback) {
+  try {
+    const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return JSON.parse(clean);
+  } catch {
+    return fallback;
+  }
+}
+function apiKey() {
+  return process.env.ANTHROPIC_API_KEY ?? null;
+}
+async function generateWeeklyReport(shopId, key) {
+  const pool2 = db;
+  const [[stats]] = await pool2.execute(`
+    SELECT COUNT(*) AS nb_ventes, COALESCE(SUM(total), 0) AS ca,
+           COALESCE(AVG(total), 0) AS panier_moyen
+    FROM factures WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+  `, [shopId]);
+  const [[newClients]] = await pool2.execute(`
+    SELECT COUNT(*) AS cnt FROM boutique_clients
+    WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+  `, [shopId]).catch(() => [[{ cnt: 0 }]]);
+  const [[stockBas]] = await pool2.execute(`
+    SELECT COUNT(*) AS cnt FROM produits
+    WHERE shop_id = ? AND actif = 1 AND stock_magasin <= 5 AND entrepot_id IS NULL
+  `, [shopId]);
+  const [[prevWeek]] = await pool2.execute(`
+    SELECT COALESCE(SUM(total), 0) AS ca_prev
+    FROM factures WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+      AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+  `, [shopId]);
+  const context = {
+    nb_ventes: Number(stats.nb_ventes),
+    ca_fcfa: Number(stats.ca),
+    panier_moyen: Math.round(Number(stats.panier_moyen)),
+    ca_semaine_prec: Number(prevWeek.ca_prev),
+    evolution_pct: prevWeek.ca_prev > 0 ? Math.round((Number(stats.ca) - Number(prevWeek.ca_prev)) / Number(prevWeek.ca_prev) * 100) : null,
+    stock_critique: Number(stockBas.cnt),
+    nouveaux_clients: Number(newClients.cnt)
+  };
+  const report = await callClaude(
+    key,
+    `Tu r\xE9diges des rapports hebdomadaires pour des g\xE9rants de boutiques en Afrique francophone.
+Format : message WhatsApp, 150-200 mots max, fran\xE7ais simple, emojis appropri\xE9s.
+Structure : titre semaine \u2192 chiffres cl\xE9s \u2192 points d'attention \u2192 1 action recommand\xE9e.
+Sois direct, encourageant et concis.`,
+    `Donn\xE9es de la semaine : ${JSON.stringify(context)}`,
+    512
+  );
+  let waSent = false;
+  try {
+    const [admins] = await pool2.execute(`
+      SELECT telephone FROM admin_users
+      WHERE shop_id = ? AND role IN ('super_admin','admin') AND telephone IS NOT NULL AND telephone != ''
+      LIMIT 1
+    `, [shopId]);
+    const phone = admins[0]?.telephone;
+    if (phone) {
+      const { sendWaText: sendWaText2 } = await Promise.resolve().then(() => (init_whatsapp(), whatsapp_exports));
+      await sendWaText2({ to: phone, body: report });
+      waSent = true;
+    }
+  } catch (e) {
+    console.error("[weekly-report] WA send error:", e);
+  }
+  return { report, waSent };
+}
+async function runWeeklyReportsForAllShops() {
+  const key = apiKey();
+  if (!key) {
+    console.error("[weekly-report] ANTHROPIC_API_KEY manquant");
+    return;
+  }
+  const pool2 = db;
+  try {
+    const [shops] = await pool2.execute(
+      `SELECT id FROM shops WHERE actif = 1 AND subscription_status IN ('active','trial')`
+    );
+    for (const shop of shops) {
+      try {
+        const { waSent } = await generateWeeklyReport(Number(shop.id), key);
+        console.log(`[weekly-report] shop ${shop.id} \u2014 WA sent: ${waSent}`);
+      } catch (e) {
+        console.error(`[weekly-report] shop ${shop.id} error:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[weekly-report] cron error:", e);
+  }
+}
+var import_express47, router47, ai_default;
+var init_ai = __esm({
+  "routes/admin/ai.ts"() {
+    "use strict";
+    import_express47 = __toESM(require("express"));
+    init_auth();
+    init_db();
+    router47 = import_express47.default.Router();
+    router47.post("/api/admin/ai/suggestions", async (req, res) => {
+      const session = await getSession(req);
+      if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+      const key = apiKey();
+      if (!key) return res.status(500).json({ error: "ANTHROPIC_API_KEY manquant." });
+      const shopId = session.shop_id ?? 1;
+      const pool2 = db;
+      try {
+        const [[stats]] = await pool2.execute(`
+      SELECT
+        COUNT(CASE WHEN p.stock_magasin <= 5 AND p.entrepot_id IS NULL THEN 1 END)  AS stock_bas,
+        COUNT(CASE WHEN p.description IS NULL OR p.description = ''    THEN 1 END)  AS sans_description,
+        COUNT(CASE WHEN p.categorie_id IS NULL                         THEN 1 END)  AS sans_categorie,
+        COUNT(CASE WHEN p.prix_entrepot IS NOT NULL AND p.prix_entrepot > 0
+                        AND p.prix_unitaire > 0
+                        AND ((p.prix_unitaire - p.prix_entrepot) / p.prix_unitaire) < 0.30 THEN 1 END) AS marge_faible,
+        COUNT(CASE WHEN (p.image_url IS NULL OR p.image_url = '')      THEN 1 END)  AS sans_image,
+        COUNT(*)                                                                      AS total
+      FROM produits p WHERE p.actif = 1 AND p.shop_id = ?
+    `, [shopId]);
+        const [prodsStockBas] = await pool2.execute(`
+      SELECT nom, stock_magasin FROM produits
+      WHERE actif = 1 AND shop_id = ? AND stock_magasin <= 5 AND entrepot_id IS NULL
+      ORDER BY stock_magasin ASC LIMIT 5
+    `, [shopId]);
+        const [[ventes]] = await pool2.execute(`
+      SELECT COUNT(*) AS nb, COALESCE(SUM(total), 0) AS ca
+      FROM factures WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    `, [shopId]).catch(() => [[{ nb: 0, ca: 0 }]]);
+        const context = {
+          total_produits: Number(stats.total),
+          stock_bas: Number(stats.stock_bas),
+          sans_description: Number(stats.sans_description),
+          sans_categorie: Number(stats.sans_categorie),
+          marge_faible: Number(stats.marge_faible),
+          sans_image: Number(stats.sans_image),
+          produits_critiques: prodsStockBas.map((p) => ({ nom: p.nom, stock: Number(p.stock_magasin) })),
+          ventes_7j: Number(ventes.nb),
+          ca_7j_fcfa: Number(ventes.ca)
+        };
+        const text = await callClaude(
+          key,
+          `Tu es l'assistant IA d'une boutique africaine. G\xE9n\xE8re exactement 4 suggestions d'actions prioritaires.
+R\xE9ponds UNIQUEMENT avec un tableau JSON valide.
+Format : { "ic": string, "tone": string, "t": string, "d": string, "cta": string }
+ic : alert | box | folder | sparkles | adj | bell | store
+tone : "danger" (urgent), "accent" (important), "ok" (opportunit\xE9)
+t : titre \u2264 60 chars \xB7 d : description \u2264 120 chars \xB7 cta : bouton \u2264 28 chars
+Langue : fran\xE7ais, ton professionnel.`,
+          `Donn\xE9es : ${JSON.stringify(context)}`
+        );
+        const suggestions = parseJson(text, []);
+        res.json({ suggestions, context });
+      } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+      }
+    });
+    router47.post("/api/admin/ai/classify-products", async (req, res) => {
+      const session = await getSession(req);
+      if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+      const key = apiKey();
+      if (!key) return res.status(500).json({ error: "ANTHROPIC_API_KEY manquant." });
+      const shopId = session.shop_id ?? 1;
+      const pool2 = db;
+      try {
+        const [uncat] = await pool2.execute(`
+      SELECT id, nom, reference FROM produits
+      WHERE shop_id = ? AND actif = 1 AND categorie_id IS NULL LIMIT 60
+    `, [shopId]);
+        if (!uncat.length) return res.json({ classified: 0, message: "Aucun produit sans cat\xE9gorie." });
+        const [cats] = await pool2.execute(`
+      SELECT id, nom FROM categories WHERE shop_id = ?
+    `, [shopId]).catch(() => [[]]);
+        if (!Array.isArray(cats) || !cats.length) {
+          return res.json({ classified: 0, message: "Aucune cat\xE9gorie disponible. Cr\xE9ez-en d'abord." });
+        }
+        const text = await callClaude(
+          key,
+          `Tu es un assistant e-commerce. Classe des produits dans les cat\xE9gories existantes.
+R\xE9ponds UNIQUEMENT avec un tableau JSON : [{ "produit_id": number, "categorie_id": number }]
+Assigne la cat\xE9gorie la plus appropri\xE9e \xE0 chaque produit. Omets les produits sans correspondance claire.`,
+          `Produits : ${JSON.stringify(uncat)}
+Cat\xE9gories : ${JSON.stringify(cats)}`,
+          2048
+        );
+        const assignments = parseJson(text, []);
+        let classified = 0;
+        for (const a of assignments) {
+          if (!a.produit_id || !a.categorie_id) continue;
+          await pool2.execute(
+            "UPDATE produits SET categorie_id = ? WHERE id = ? AND shop_id = ?",
+            [a.categorie_id, a.produit_id, shopId]
+          );
+          classified++;
+        }
+        res.json({ classified, total: uncat.length, assignments });
+      } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+      }
+    });
+    router47.post("/api/admin/ai/stock-forecast", async (req, res) => {
+      const session = await getSession(req);
+      if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+      const key = apiKey();
+      if (!key) return res.status(500).json({ error: "ANTHROPIC_API_KEY manquant." });
+      const shopId = session.shop_id ?? 1;
+      const pool2 = db;
+      try {
+        const [products] = await pool2.execute(`
+      SELECT p.id, p.nom, p.stock_magasin, p.reference, p.prix_unitaire,
+        COALESCE(mv.sorties_30j, 0) AS ventes_30j
+      FROM produits p
+      LEFT JOIN (
+        SELECT produit_id, SUM(quantite) AS sorties_30j
+        FROM boutique_mouvements
+        WHERE type = 'sortie' AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        GROUP BY produit_id
+      ) mv ON mv.produit_id = p.id
+      WHERE p.shop_id = ? AND p.actif = 1 AND p.entrepot_id IS NULL
+        AND (p.stock_magasin <= 30 OR COALESCE(mv.sorties_30j, 0) >= 3)
+      ORDER BY p.stock_magasin ASC, ventes_30j DESC
+      LIMIT 25
+    `, [shopId]).catch(() => [[]]);
+        if (!Array.isArray(products) || !products.length) {
+          return res.json({ forecasts: [], message: "Stock suffisant \u2014 aucun produit \xE0 risque d\xE9tect\xE9." });
+        }
+        const text = await callClaude(
+          key,
+          `Tu analyses les stocks d'une boutique africaine et pr\xE9dis les ruptures.
+R\xE9ponds UNIQUEMENT avec un tableau JSON :
+[{ "produit_id": number, "nom": string, "stock": number, "ventes_30j": number,
+   "jours_restants": number|null, "urgence": "critique"|"attention"|"ok",
+   "recommandation": string, "qte_a_commander": number }]
+jours_restants = stock / (ventes_30j/30), null si ventes_30j = 0.
+urgence: critique < 7j, attention < 20j, ok > 20j ou sans v\xE9locit\xE9.
+recommandation : \u2264 80 chars fran\xE7ais.
+qte_a_commander : stock pour couvrir 45 jours.`,
+          `Produits : ${JSON.stringify(products.map((p) => ({ id: p.id, nom: p.nom, stock: Number(p.stock_magasin), ventes_30j: Number(p.ventes_30j) })))}`
+        );
+        const forecasts = parseJson(text, []);
+        res.json({ forecasts });
+      } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+      }
+    });
+    router47.post("/api/admin/ai/query", async (req, res) => {
+      const session = await getSession(req);
+      if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+      const key = apiKey();
+      if (!key) return res.status(500).json({ error: "ANTHROPIC_API_KEY manquant." });
+      const { question } = req.body;
+      if (!question?.trim()) return res.status(400).json({ error: "Question requise." });
+      const shopId = session.shop_id ?? 1;
+      const pool2 = db;
+      try {
+        const [[ctx]] = await pool2.execute(`
+      SELECT
+        (SELECT COUNT(*) FROM produits         WHERE shop_id = ? AND actif = 1)                                AS total_produits,
+        (SELECT COUNT(*) FROM factures         WHERE shop_id = ? AND DATE(created_at) = CURDATE())             AS ventes_aujourd_hui,
+        (SELECT COALESCE(SUM(total),0) FROM factures WHERE shop_id = ? AND DATE(created_at) = CURDATE())       AS ca_aujourd_hui,
+        (SELECT COUNT(*) FROM factures         WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS ventes_7j,
+        (SELECT COALESCE(SUM(total),0) FROM factures WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS ca_7j,
+        (SELECT COUNT(*) FROM factures         WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS ventes_30j,
+        (SELECT COALESCE(SUM(total),0) FROM factures WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS ca_30j,
+        (SELECT COUNT(*) FROM orders           WHERE shop_id = ? AND status = 'pending')                       AS commandes_en_attente,
+        (SELECT COUNT(*) FROM produits         WHERE shop_id = ? AND actif = 1 AND stock_magasin <= 5 AND entrepot_id IS NULL) AS stock_critique,
+        (SELECT COUNT(*) FROM boutique_clients WHERE shop_id = ?)                                              AS total_clients
+    `, [shopId, shopId, shopId, shopId, shopId, shopId, shopId, shopId, shopId, shopId]);
+        const text = await callClaude(
+          key,
+          `Tu es l'assistant IA d'une boutique africaine. R\xE9ponds en fran\xE7ais, concis et direct (2-4 phrases max).
+Mets les chiffres cl\xE9s en avant. Base-toi uniquement sur les donn\xE9es fournies.
+Si la question est hors contexte boutique, dis-le poliment.`,
+          `Donn\xE9es boutique : ${JSON.stringify(ctx)}
+Question : ${question}`,
+          300
+        );
+        res.json({ answer: text || "Je n'ai pas pu r\xE9pondre \xE0 cette question.", question });
+      } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+      }
+    });
+    router47.post("/api/admin/ai/weekly-report", async (req, res) => {
+      const session = await getSession(req);
+      if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+      const key = apiKey();
+      if (!key) return res.status(500).json({ error: "ANTHROPIC_API_KEY manquant." });
+      const shopId = session.shop_id ?? 1;
+      try {
+        const { report, waSent } = await generateWeeklyReport(shopId, key);
+        res.json({ ok: true, report, waSent });
+      } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+      }
+    });
+    ai_default = router47;
+  }
+});
+
+// index.ts
+var index_exports = {};
+__export(index_exports, {
+  default: () => index_default
+});
+module.exports = __toCommonJS(index_exports);
+var import_dotenv = require("dotenv");
+var import_path = require("path");
+var import_express48 = __toESM(require("express"));
+var import_cors = __toESM(require("cors"));
+var import_cookie_parser = __toESM(require("cookie-parser"));
+var import_helmet = __toESM(require("helmet"));
+var import_express_rate_limit = require("express-rate-limit");
+
+// routes/admin/auth.ts
+var import_express = __toESM(require("express"));
+var import_bcryptjs = __toESM(require("bcryptjs"));
+init_admin_db();
+init_db();
+init_shops();
+init_auth();
 
 // lib/security-log.ts
 init_db();
@@ -5342,6 +6157,7 @@ var auth_default = router;
 
 // routes/admin/products.ts
 var import_express2 = __toESM(require("express"));
+init_auth();
 
 // lib/admin-events.ts
 var import_events = require("events");
@@ -5907,6 +6723,7 @@ var products_default = router2;
 
 // routes/admin/variants.ts
 var import_express3 = __toESM(require("express"));
+init_auth();
 init_db();
 var router3 = import_express3.default.Router();
 var _variantsReady = false;
@@ -6064,6 +6881,7 @@ var variants_default = router3;
 
 // routes/admin/stock.ts
 var import_express4 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router4 = import_express4.default.Router();
 router4.get("/api/admin/stock/produits", async (req, res) => {
@@ -6168,6 +6986,7 @@ var stock_default = router4;
 
 // routes/admin/stock-boutique.ts
 var import_express5 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_db();
 var router5 = import_express5.default.Router();
@@ -6266,324 +7085,8 @@ var stock_boutique_default = router5;
 // routes/admin/ventes.ts
 var import_express6 = __toESM(require("express"));
 init_db();
-
-// lib/whatsapp.ts
-init_admin_db();
-var WA_API = "https://graph.facebook.com/v19.0";
-function cleanPhone(num) {
-  return num.replace(/[\s+\-()]/g, "");
-}
-async function sendWaTemplate({
-  to,
-  templateName,
-  languageCode = "fr",
-  bodyParams
-}) {
-  try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token = await getSetting("wa_access_token");
-    if (!phoneId || !token) {
-      return { success: false, error: "Credentials WhatsApp non configur\xE9s" };
-    }
-    const payload = {
-      messaging_product: "whatsapp",
-      to: cleanPhone(to),
-      type: "template",
-      template: {
-        name: templateName,
-        language: { code: languageCode },
-        components: bodyParams.length > 0 ? [{
-          type: "body",
-          parameters: bodyParams.map((text) => ({ type: "text", text }))
-        }] : []
-      }
-    };
-    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
-    }
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
-  }
-}
-async function sendWaText({
-  to,
-  body
-}) {
-  try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token = await getSetting("wa_access_token");
-    if (!phoneId || !token) {
-      return { success: false, error: "Credentials WhatsApp non configur\xE9s" };
-    }
-    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: cleanPhone(to),
-        type: "text",
-        text: { body }
-      })
-    });
-    const responseData = await res.json().catch(() => ({}));
-    console.log("[sendWaText] to:", cleanPhone(to), "status:", res.status, "response:", JSON.stringify(responseData));
-    if (!res.ok) {
-      return { success: false, error: responseData?.error?.message ?? `HTTP ${res.status}` };
-    }
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
-  }
-}
-async function uploadWaMedia(buffer, mimeType, filename) {
-  try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token = await getSetting("wa_access_token");
-    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
-    const form = new FormData();
-    form.append("messaging_product", "whatsapp");
-    form.append("type", mimeType);
-    form.append("file", new Blob([new Uint8Array(buffer)], { type: mimeType }), filename);
-    const res = await fetch(`${WA_API}/${phoneId}/media`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
-    }
-    const data = await res.json();
-    return { success: true, mediaId: data.id };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
-  }
-}
-async function sendWaImage({
-  to,
-  mediaId,
-  caption = ""
-}) {
-  try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token = await getSetting("wa_access_token");
-    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
-    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: cleanPhone(to),
-        type: "image",
-        image: { id: mediaId, caption }
-      })
-    });
-    const responseData = await res.json().catch(() => ({}));
-    console.log("[sendWaImage] to:", cleanPhone(to), "status:", res.status, "response:", JSON.stringify(responseData));
-    if (!res.ok) {
-      return { success: false, error: responseData?.error?.message ?? `HTTP ${res.status}` };
-    }
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
-  }
-}
-async function sendWaAudio({
-  to,
-  mediaId
-}) {
-  try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token = await getSetting("wa_access_token");
-    if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
-    const res = await fetch(`${WA_API}/${phoneId}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: cleanPhone(to),
-        type: "audio",
-        audio: { id: mediaId }
-      })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: err?.error?.message ?? `HTTP ${res.status}` };
-    }
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
-  }
-}
-async function sendBoutiqueVenteNotif({
-  telephone,
-  nom,
-  reference,
-  total,
-  montant_acompte,
-  statut_paiement,
-  items
-}) {
-  try {
-    const [enabled, templateFull, templateAcompte, lang, siteUrl] = await Promise.all([
-      getSetting("wa_boutique_vente_enabled"),
-      getSetting("wa_boutique_vente_template_full"),
-      getSetting("wa_boutique_vente_template_acompte"),
-      getSetting("wa_order_lang"),
-      getSetting("site_url")
-    ]);
-    if (enabled !== "1" || !telephone) return;
-    const languageCode = lang || "fr";
-    const baseUrl = (siteUrl || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://togolese.tg").replace(/\/$/, "");
-    const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
-    const articlesList = items.map((i) => `${i.qty}x ${i.nom} - ${fmt(i.total)}`).join("\n");
-    if (statut_paiement === "acompte" && templateAcompte) {
-      const acompte = montant_acompte ?? 0;
-      const resteAPayer = total - acompte;
-      await sendWaTemplate({
-        to: telephone,
-        templateName: templateAcompte,
-        languageCode,
-        bodyParams: [nom, reference, articlesList, fmt(acompte), fmt(resteAPayer), baseUrl]
-      });
-    } else if (templateFull) {
-      await sendWaTemplate({
-        to: telephone,
-        templateName: templateFull,
-        languageCode,
-        bodyParams: [nom, reference, articlesList, fmt(total), baseUrl]
-      });
-    }
-  } catch (e) {
-    console.error("[WA] sendBoutiqueVenteNotif error:", e);
-  }
-}
-async function sendOrderNotifications({
-  id,
-  reference,
-  nom,
-  telephone,
-  items,
-  total
-}) {
-  try {
-    const [
-      clientEnabled,
-      adminEnabled,
-      clientTemplate,
-      adminTemplate,
-      adminNumber,
-      adminNumber2,
-      lang,
-      siteUrl
-    ] = await Promise.all([
-      getSetting("wa_order_client_enabled"),
-      getSetting("wa_order_admin_enabled"),
-      getSetting("wa_order_client_template"),
-      getSetting("wa_order_admin_template"),
-      getSetting("wa_order_admin_number"),
-      getSetting("wa_order_admin_number_2"),
-      getSetting("wa_order_lang"),
-      getSetting("site_url")
-    ]);
-    if (process.env.NODE_ENV !== "production") console.log(`[WA] sendOrderNotifications \u2014 ref=${reference} tel=${telephone}`);
-    const languageCode = lang || "fr";
-    const baseUrl = (siteUrl || process.env.FRONTEND_URL || "").replace(/\/$/, "");
-    const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
-    const articlesStr = items.map((item) => {
-      const name = item.nom || item.nom_produit || "Produit";
-      const qty = item.qty ?? item.quantite ?? 1;
-      const prix = item.total ?? (item.prix ? item.prix * qty : null);
-      return prix ? `${qty}x ${name} - ${fmt(prix)}` : `${qty}x ${name}`;
-    }).join(", ");
-    const totalStr = new Intl.NumberFormat("fr-FR").format(total) + " FCFA";
-    const trackingUrl = `${baseUrl}/suivi-commande?ref=${encodeURIComponent(reference)}`;
-    const adminUrl = `${baseUrl}/admin/orders`;
-    if (clientEnabled === "1" && clientTemplate && telephone) {
-      const result = await sendWaTemplate({
-        to: telephone,
-        templateName: clientTemplate,
-        languageCode,
-        bodyParams: [nom, reference, articlesStr, totalStr, trackingUrl]
-      });
-      if (process.env.NODE_ENV !== "production") console.log(`[WA] Client notif result (${reference}):`, result);
-    }
-    if (adminEnabled === "1" && adminTemplate && adminNumber) {
-      const result = await sendWaTemplate({
-        to: adminNumber,
-        templateName: adminTemplate,
-        languageCode,
-        bodyParams: [reference, nom, telephone, articlesStr, totalStr, adminUrl]
-      });
-      if (process.env.NODE_ENV !== "production") console.log(`[WA] Admin notif result (${reference}):`, result);
-      if (adminNumber2 && adminNumber2 !== adminNumber) {
-        await sendWaTemplate({
-          to: adminNumber2,
-          templateName: adminTemplate,
-          languageCode,
-          bodyParams: [reference, nom, telephone, articlesStr, totalStr, adminUrl]
-        }).catch((e) => console.error(`[WA] Admin notif #2 error (${reference}):`, e));
-      }
-    }
-  } catch (e) {
-    console.error("[WA] sendOrderNotifications error:", e);
-  }
-}
-async function sendWaDeliveryConfirmation(order) {
-  try {
-    const [enabled, templateName, lang] = await Promise.all([
-      getSetting("wa_delivery_template_enabled"),
-      getSetting("wa_delivery_template"),
-      getSetting("wa_order_lang")
-    ]);
-    if (enabled !== "1" || !templateName || !order.telephone) return;
-    const languageCode = lang || "fr";
-    const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
-    let items = [];
-    try {
-      items = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
-    } catch {
-      items = [];
-    }
-    const articlesStr = items.map((item) => {
-      const name = item.nom || "Produit";
-      const qty = item.qty ?? item.quantite ?? 1;
-      const prix = item.total ?? (item.prix_unitaire ?? item.prix ?? 0) * qty;
-      return `\u2022 ${qty}x ${name} \u2014 ${fmt(prix)}`;
-    }).join("\n");
-    const livraisonStr = order.delivery_fee > 0 ? `${order.zone_livraison || "Livraison"} \u2014 ${fmt(order.delivery_fee)}` : `${order.zone_livraison || "Livraison"} \u2014 Gratuit`;
-    const result = await sendWaTemplate({
-      to: order.telephone,
-      templateName,
-      languageCode,
-      bodyParams: [
-        order.nom,
-        order.reference,
-        articlesStr,
-        livraisonStr,
-        fmt(order.total)
-      ]
-    });
-    if (!result.success) console.error("[WA] delivery confirmation failed:", result.error);
-  } catch (e) {
-    console.error("[WA] sendWaDeliveryConfirmation error:", e);
-  }
-}
-
-// routes/admin/ventes.ts
+init_auth();
+init_whatsapp();
 init_admin_db();
 var router6 = import_express6.default.Router();
 router6.get("/api/admin/ventes/factures", async (req, res) => {
@@ -6763,6 +7266,7 @@ var ventes_default = router6;
 
 // routes/admin/livraisons.ts
 var import_express7 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router7 = import_express7.default.Router();
 router7.get("/api/admin/livraisons", async (req, res) => {
@@ -6845,6 +7349,7 @@ var livraisons_default = router7;
 
 // routes/admin/finance.ts
 var import_express8 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_db();
 var router8 = import_express8.default.Router();
@@ -6968,6 +7473,7 @@ var finance_default = router8;
 
 // routes/admin/clients.ts
 var import_express9 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router9 = import_express9.default.Router();
 router9.get("/api/admin/clients", async (req, res) => {
@@ -7039,6 +7545,8 @@ var clients_default = router9;
 
 // routes/admin/orders.ts
 var import_express10 = __toESM(require("express"));
+init_auth();
+init_whatsapp();
 init_db();
 init_admin_db();
 var _paymentColReady = false;
@@ -7228,6 +7736,7 @@ var orders_default = router10;
 
 // routes/admin/upload.ts
 var import_express11 = __toESM(require("express"));
+init_auth();
 var import_cloudinary = require("cloudinary");
 var MAX_SIZE = 10 * 1024 * 1024;
 function detectMimeFromBuffer(buf) {
@@ -7287,6 +7796,7 @@ var upload_default = router11;
 
 // routes/admin/settings.ts
 var import_express12 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_shops();
 
@@ -7450,6 +7960,7 @@ var settings_default = router12;
 
 // routes/admin/fournisseurs.ts
 var import_express13 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router13 = import_express13.default.Router();
 router13.get("/api/admin/fournisseurs", async (req, res) => {
@@ -7547,6 +8058,7 @@ var fournisseurs_default = router13;
 
 // routes/admin/categories.ts
 var import_express14 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router14 = import_express14.default.Router();
 router14.get("/api/admin/categories", async (req, res) => {
@@ -7607,6 +8119,7 @@ var categories_default = router14;
 
 // routes/admin/boutique-clients.ts
 var import_express15 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_db();
 var router15 = import_express15.default.Router();
@@ -7685,6 +8198,7 @@ var boutique_clients_default = router15;
 
 // routes/admin/newsletter.ts
 var import_express16 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router16 = import_express16.default.Router();
 router16.get("/api/admin/newsletter", async (req, res) => {
@@ -7713,6 +8227,7 @@ var newsletter_default = router16;
 
 // routes/admin/schema.ts
 var import_express17 = __toESM(require("express"));
+init_auth();
 init_db();
 var router17 = import_express17.default.Router();
 router17.get("/api/admin/schema/columns", async (req, res) => {
@@ -7764,6 +8279,7 @@ var schema_default = router17;
 
 // routes/admin/events.ts
 var import_express18 = __toESM(require("express"));
+init_auth();
 var router18 = import_express18.default.Router();
 function sseSetup(res) {
   res.setHeader("Content-Type", "text/event-stream");
@@ -7825,6 +8341,7 @@ var events_default = router18;
 var import_express19 = __toESM(require("express"));
 var import_bcryptjs2 = __toESM(require("bcryptjs"));
 init_db();
+init_auth();
 init_admin_db();
 var router19 = import_express19.default.Router();
 async function requireSuperAdmin(req, res) {
@@ -8047,6 +8564,7 @@ var users_default = router19;
 
 // routes/admin/reviews.ts
 var import_express20 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router20 = import_express20.default.Router();
 router20.post("/api/admin/reviews", async (req, res) => {
@@ -8069,6 +8587,7 @@ var reviews_default = router20;
 
 // routes/admin/payment-plans.ts
 var import_express21 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_db();
 var router21 = import_express21.default.Router();
@@ -8162,6 +8681,7 @@ var payment_plans_default = router21;
 
 // routes/admin/verifications.ts
 var import_express22 = __toESM(require("express"));
+init_auth();
 init_db();
 var router22 = import_express22.default.Router();
 router22.get("/api/admin/verifications", async (req, res) => {
@@ -8218,6 +8738,7 @@ var verifications_default = router22;
 // routes/admin/commerciaux.ts
 var import_express23 = __toESM(require("express"));
 init_db();
+init_auth();
 var router23 = import_express23.default.Router();
 var pool = db;
 async function ensureCommerciauxTables() {
@@ -8388,6 +8909,7 @@ var commerciaux_default = router23;
 
 // routes/livreur.ts
 var import_express24 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_db();
 var router24 = import_express24.default.Router();
@@ -9619,6 +10141,7 @@ var account_default = router26;
 // routes/orders.ts
 var import_express27 = __toESM(require("express"));
 init_admin_db();
+init_whatsapp();
 init_db();
 var router27 = import_express27.default.Router();
 function normalizeTogoPhone(raw) {
@@ -10026,6 +10549,7 @@ init_admin_db();
 
 // routes/admin/security-logs.ts
 var import_express29 = __toESM(require("express"));
+init_auth();
 var router29 = import_express29.default.Router();
 router29.get("/api/admin/security-logs", async (req, res) => {
   const session = await getSession(req);
@@ -10042,6 +10566,7 @@ var security_logs_default = router29;
 
 // routes/admin/rapports.ts
 var import_express30 = __toESM(require("express"));
+init_auth();
 init_db();
 var router30 = import_express30.default.Router();
 function periodClause(col, periode) {
@@ -10397,6 +10922,7 @@ var rapports_default = router30;
 
 // routes/admin/tendances.ts
 var import_express31 = __toESM(require("express"));
+init_auth();
 init_db();
 var router31 = import_express31.default.Router();
 var MOIS_LABELS = ["Jan", "F\xE9v", "Mar", "Avr", "Mai", "Jun", "Jul", "Ao\xFB", "Sep", "Oct", "Nov", "D\xE9c"];
@@ -10596,6 +11122,7 @@ var tendances_default = router31;
 
 // routes/admin/performance-produits.ts
 var import_express32 = __toESM(require("express"));
+init_auth();
 init_db();
 var router32 = import_express32.default.Router();
 async function ensurePrixAchat() {
@@ -10723,8 +11250,10 @@ var performance_produits_default = router32;
 
 // routes/admin/whatsapp-inbox.ts
 var import_express33 = __toESM(require("express"));
+init_auth();
 init_db();
 init_admin_db();
+init_whatsapp();
 var router33 = import_express33.default.Router();
 var WA_GRAPH = "https://graph.facebook.com/v18.0";
 async function ensureWaMessagesCols() {
@@ -11033,6 +11562,7 @@ var whatsapp_webhook_default = router34;
 
 // routes/analytics.ts
 var import_express35 = __toESM(require("express"));
+init_auth();
 init_db();
 var import_http = __toESM(require("http"));
 var router35 = import_express35.default.Router();
@@ -11438,6 +11968,7 @@ var referrals_default = router36;
 
 // routes/admin/delivery-zones.ts
 var import_express37 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_db();
 var router37 = import_express37.default.Router();
@@ -11515,6 +12046,7 @@ var delivery_zones_default = router37;
 
 // routes/admin/coupons.ts
 var import_express38 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 init_db();
 var router38 = import_express38.default.Router();
@@ -11594,6 +12126,7 @@ var coupons_default = router38;
 
 // routes/admin/social.ts
 var import_express39 = __toESM(require("express"));
+init_auth();
 var router39 = import_express39.default.Router();
 var N8N_WEBHOOK = "https://n8n.togolese.fr/webhook/facebook-publisher";
 var AD_ACCOUNT_ID = "act_976291178146381";
@@ -11708,7 +12241,9 @@ var social_default = router39;
 
 // routes/admin/whatsapp-campagne.ts
 var import_express40 = __toESM(require("express"));
+init_auth();
 init_db();
+init_whatsapp();
 var router40 = import_express40.default.Router();
 function formatTgPhone(num) {
   const digits = num.replace(/[\s+\-()]/g, "");
@@ -11817,6 +12352,7 @@ var whatsapp_campagne_default = router40;
 var import_express41 = __toESM(require("express"));
 var import_bcryptjs4 = __toESM(require("bcryptjs"));
 var import_cloudinary2 = require("cloudinary");
+init_auth();
 init_admin_db();
 init_db();
 import_cloudinary2.v2.config({
@@ -11957,6 +12493,7 @@ var livreur_inscriptions_default = router41;
 
 // routes/admin/entrepots.ts
 var import_express42 = __toESM(require("express"));
+init_auth();
 init_admin_db();
 var router42 = import_express42.default.Router();
 router42.get("/api/admin/entrepots", async (req, res) => {
@@ -12017,6 +12554,8 @@ var entrepots_default = router42;
 
 // routes/admin/tombola.ts
 var import_express43 = __toESM(require("express"));
+init_auth();
+init_whatsapp();
 init_admin_db();
 var router43 = import_express43.default.Router();
 router43.get("/api/admin/tombola", async (req, res) => {
@@ -12331,6 +12870,7 @@ var onboarding_default = router44;
 
 // routes/admin/saas-dashboard.ts
 var import_express45 = __toESM(require("express"));
+init_auth();
 init_shops();
 init_db();
 var router45 = import_express45.default.Router();
@@ -12568,17 +13108,70 @@ router45.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
   await updatePlanLimits2(plan, req.body);
   res.json({ ok: true });
 });
+router45.get("/api/admin/saas/plans", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  try {
+    const { getPlansWithPrices: getPlansWithPrices2, getSaasSettings: getSaasSettings2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+    const [plans, global] = await Promise.all([getPlansWithPrices2(), getSaasSettings2()]);
+    res.json({ plans, global });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router45.put("/api/admin/saas/plans", async (req, res) => {
+  const session = await getSession(req);
+  if (!requireSuperAdmin2(session, res)) return;
+  const { plans, global: globalCfg } = req.body;
+  try {
+    const { updatePlanFull: updatePlanFull2, updateSaasSettings: updateSaasSettings2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+    if (plans) {
+      for (const p of plans) {
+        if (!["basic", "pro", "business"].includes(p.key)) continue;
+        await updatePlanFull2(p.key, {
+          prix_mensuel: p.prix_mensuel ?? 0,
+          prix_annuel: p.prix_annuel ?? 0,
+          max_produits: p.limits.produits === null ? 0 : p.limits.produits ?? 0,
+          max_ventes_mois: p.limits.ventes === null ? 0 : p.limits.ventes ?? 0,
+          max_commandes_mois: p.limits.commandes === null ? 0 : p.limits.commandes ?? 0,
+          max_users: p.limits.admins === null ? 0 : p.limits.admins ?? 0,
+          max_entrepots: p.limits.entrepots === null ? 0 : p.limits.entrepots ?? 0
+        });
+      }
+    }
+    if (globalCfg) {
+      await updateSaasSettings2({
+        trial_days: globalCfg.trial_days,
+        yearly_discount: globalCfg.yearly_discount,
+        whatsapp_number: globalCfg.whatsapp_number
+      });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 var saas_dashboard_default = router45;
 
 // routes/admin/billing.ts
 var import_express46 = __toESM(require("express"));
+init_auth();
 init_shops();
 
 // lib/cinetpay.ts
 var PLAN_PRICES = {
   basic: 0,
-  pro: 24900
+  pro: 9900,
+  business: 24900
 };
+async function getPlanPrice2(plan) {
+  try {
+    const { getPlanPrice: dbPrice } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
+    return await dbPrice(plan);
+  } catch {
+    return PLAN_PRICES[plan] ?? 0;
+  }
+}
 
 // routes/admin/billing.ts
 var router46 = import_express46.default.Router();
@@ -12613,7 +13206,7 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { plan, duration_months = 1, operator, mm_reference } = req.body;
-  if (!plan || !["basic", "pro"].includes(plan)) {
+  if (!plan || !["basic", "pro", "business"].includes(plan)) {
     return res.status(400).json({ error: "Plan invalide." });
   }
   if (!operator || !["moov", "yas"].includes(operator)) {
@@ -12624,7 +13217,8 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
   }
   const months = Math.min(Math.max(Number(duration_months) || 1, 1), 12);
   const planKey = plan;
-  const amount = PLAN_PRICES[planKey] * months;
+  const pricePerMonth = await getPlanPrice2(planKey);
+  const amount = pricePerMonth * months;
   if (planKey === "basic") {
     try {
       await activateBasicPlan(session.shop_id);
@@ -12645,7 +13239,7 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
       operator,
       mmReference: mm_reference.trim()
     });
-    res.json({ ok: true, transactionId });
+    res.json({ ok: true, transactionId, amount });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
@@ -12653,10 +13247,12 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
 var billing_default = router46;
 
 // index.ts
+init_ai();
 init_shops();
 
 // lib/review-notifier.ts
 init_db();
+init_whatsapp();
 var SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
 var DELAY_HOURS = 48;
 async function ensureReviewNotifierCols() {
@@ -12741,7 +13337,7 @@ function startReviewNotifier() {
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express47.default)();
+var app = (0, import_express48.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -12816,8 +13412,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express47.default.json({ limit: "5mb" }));
-app.use(import_express47.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express48.default.json({ limit: "5mb" }));
+app.use(import_express48.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -12865,6 +13461,7 @@ app.use(tombola_default);
 app.use(onboarding_default);
 app.use(saas_dashboard_default);
 app.use(billing_default);
+app.use(ai_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {
@@ -12950,5 +13547,19 @@ app.listen(PORT, async () => {
   startReviewNotifier();
   expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e));
   setInterval(() => expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e)), 6 * 60 * 60 * 1e3);
+  (async () => {
+    const { runWeeklyReportsForAllShops: runWeeklyReportsForAllShops2 } = await Promise.resolve().then(() => (init_ai(), ai_exports));
+    const now = /* @__PURE__ */ new Date();
+    const daysUntilMon = (1 - now.getDay() + 7) % 7 || 7;
+    const nextMon = new Date(now);
+    nextMon.setDate(now.getDate() + daysUntilMon);
+    nextMon.setHours(8, 0, 0, 0);
+    const delay = nextMon.getTime() - now.getTime();
+    console.log(`[weekly-report] cron scheduled in ${Math.round(delay / 36e5)}h`);
+    setTimeout(() => {
+      runWeeklyReportsForAllShops2();
+      setInterval(runWeeklyReportsForAllShops2, 7 * 24 * 60 * 60 * 1e3);
+    }, delay);
+  })().catch((e) => console.error("[weekly-report] schedule error:", e));
 });
 var index_default = app;
