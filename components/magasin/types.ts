@@ -126,16 +126,30 @@ export interface Supplier {
   status: 'Actif' | 'Inactif';
 }
 
-export type PurchaseOrderStatus = 'En attente' | 'Confirmé' | 'Expédié' | 'Reçu' | 'Annulé';
+export type PurchaseOrderStatus =
+  | 'En attente' | 'En transit' | 'Livré' | 'Partiel' | 'Retard' | 'Annulé';
+
+export interface ArticleLigne {
+  id?: number;
+  produit_id?: number | null;
+  name: string;
+  sku: string;
+  qty: number;
+  prix: number;
+}
 
 export interface PurchaseOrder {
   id?: number;
   ref: string;
   supplier: string;
+  supplier_id?: number | null;
   date: string;
+  transport?: 'Avion' | 'Bateau' | 'Camion' | null;
+  arrival?: string | null;
   products: number;
   amount: number;
   status: PurchaseOrderStatus;
+  articles?: ArticleLigne[];
 }
 
 export interface Warehouse {

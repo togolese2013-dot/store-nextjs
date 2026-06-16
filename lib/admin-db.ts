@@ -3163,10 +3163,12 @@ export interface Achat {
   nom_fournisseur?: string;
   reference:      string;
   date_achat:     string;
-  statut:         "en_attente" | "recu";
+  date_arrivee?:  string | null;
+  statut:         "en_attente" | "en_transit" | "retard" | "partiel" | "recu" | "annule";
   montant_total:  number;
   notes:          string | null;
-  transport?:     "avion" | "bateau" | null;
+  transport?:     "avion" | "bateau" | "camion" | null;
+  items_count?:   number;
 }
 
 export interface AchatItem {
@@ -3181,7 +3183,8 @@ export interface AchatItem {
 
 export async function listAchats(shopId = 1, limit = 50, offset = 0): Promise<Achat[]> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT a.*, f.nom AS fournisseur_nom
+    `SELECT a.*, f.nom AS fournisseur_nom,
+       (SELECT COUNT(*) FROM achat_items WHERE achat_id = a.id) AS items_count
      FROM achats a
      LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id
      WHERE a.shop_id = ?
@@ -3234,6 +3237,7 @@ export async function createAchat(data: {
   fournisseur_id: number | null;
   reference?:     string;
   date_achat:     string;
+  date_arrivee?:  string | null;
   statut:         string;
   note:           string | null;
   transport?:     string | null;
@@ -3253,8 +3257,9 @@ export async function createAchat(data: {
       reference = `ACH-${year}-${num}`;
     }
     const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
-    // Ensure transport column exists (try/catch on ER_DUP_FIELDNAME like images_json)
+    // Ensure transport + date_arrivee columns exist
     let hasTransport = false;
+    let hasDateArrivee = false;
     try {
       await conn.execute(`ALTER TABLE achats ADD COLUMN transport VARCHAR(10) NULL`);
       hasTransport = true;
@@ -3264,11 +3269,21 @@ export async function createAchat(data: {
         hasTransport = true;
       }
     }
+    try {
+      await conn.execute(`ALTER TABLE achats ADD COLUMN date_arrivee DATE NULL`);
+      hasDateArrivee = true;
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        hasDateArrivee = true;
+      }
+    }
     const achatCols  = ["shop_id","fournisseur_id","reference","date_achat","statut","montant_total","notes"];
     const achatVals: (string | number | null)[] = [
       shopId, data.fournisseur_id ?? null, reference, data.date_achat, data.statut, montant_total, data.note ?? null,
     ];
-    if (hasTransport) { achatCols.push("transport"); achatVals.push(data.transport ?? null); }
+    if (hasTransport)   { achatCols.push("transport");    achatVals.push(data.transport ?? null); }
+    if (hasDateArrivee) { achatCols.push("date_arrivee"); achatVals.push(data.date_arrivee ?? null); }
     const [res] = await conn.execute<mysql.ResultSetHeader>(
       `INSERT INTO achats (${achatCols.join(",")}) VALUES (${achatCols.map(() => "?").join(",")})`,
       achatVals
@@ -3317,8 +3332,10 @@ export async function deleteAchat(id: number, shopId = 1) {
 export async function updateAchat(id: number, data: {
   fournisseur_id?: number | null;
   date_achat?:     string;
+  date_arrivee?:   string | null;
   transport?:      string | null;
   note?:           string | null;
+  statut?:         string;
   items?: Array<{ produit_id: number | null; designation: string; quantite: number; prix_unitaire: number }>;
 }, shopId = 1) {
   const conn = await db.getConnection();
@@ -3328,8 +3345,10 @@ export async function updateAchat(id: number, data: {
     const vals: (string | number | null)[] = [];
     if ("fournisseur_id" in data) { sets.push("fournisseur_id = ?"); vals.push(data.fournisseur_id ?? null); }
     if (data.date_achat)          { sets.push("date_achat = ?");     vals.push(data.date_achat); }
+    if ("date_arrivee" in data)   { sets.push("date_arrivee = ?");   vals.push(data.date_arrivee ?? null); }
     if ("transport" in data)      { sets.push("transport = ?");      vals.push(data.transport ?? null); }
     if ("note" in data)           { sets.push("notes = ?");          vals.push(data.note ?? null); }
+    if (data.statut)              { sets.push("statut = ?");         vals.push(data.statut); }
     if (data.items) {
       const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
       sets.push("montant_total = ?");
@@ -3358,21 +3377,66 @@ export async function updateAchat(id: number, data: {
   }
 }
 
-export async function recevoirAchat(id: number, shopId = 1) {
+export async function recevoirAchat(
+  id: number,
+  shopId = 1,
+  receivedItems?: Array<{ produit_id: number | null; qty_recue: number }>,
+  dateRecue?: string | null,
+) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.execute<mysql.RowDataPacket[]>("SELECT statut FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
-    if (!rows[0]) throw new Error("Achat introuvable.");
-    if (rows[0].statut !== "en_attente") throw new Error("Cet achat n'est pas en attente.");
-    await conn.execute("UPDATE achats SET statut = 'recu' WHERE id = ? AND shop_id = ?", [id, shopId]);
-    const [items] = await conn.execute<mysql.RowDataPacket[]>(
-      "SELECT produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL", [id]
+    const [rows] = await conn.execute<mysql.RowDataPacket[]>(
+      "SELECT statut FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]
     );
-    if ((items as mysql.RowDataPacket[]).length > 0) {
-      const cases = (items as mysql.RowDataPacket[]).map(() => "WHEN id = ? THEN COALESCE(stock_magasin, 0) + ?").join(" ");
-      const ids   = (items as mysql.RowDataPacket[]).map(i => i.produit_id);
-      const vals  = (items as mysql.RowDataPacket[]).flatMap(i => [i.produit_id, i.quantite]);
+    if (!rows[0]) throw new Error("Achat introuvable.");
+    const FINAL = ["recu", "annule"];
+    if (FINAL.includes(rows[0].statut)) throw new Error("Cet achat est déjà finalisé.");
+
+    // Fetch ordered items to determine stock updates
+    const [items] = await conn.execute<mysql.RowDataPacket[]>(
+      "SELECT id, produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL", [id]
+    );
+    const orderedItems = items as mysql.RowDataPacket[];
+
+    // Build qty map: use receivedItems if provided, else use full ordered qty
+    const qtyMap = new Map<number, number>();
+    if (receivedItems && receivedItems.length > 0) {
+      for (const ri of receivedItems) {
+        if (ri.produit_id != null && ri.qty_recue > 0) {
+          const cur = qtyMap.get(ri.produit_id) ?? 0;
+          qtyMap.set(ri.produit_id, cur + ri.qty_recue);
+        }
+      }
+    } else {
+      for (const oi of orderedItems) {
+        qtyMap.set(Number(oi.produit_id), Number(oi.quantite));
+      }
+    }
+
+    // Determine new status: partial if any item received < ordered
+    let isPartial = false;
+    if (receivedItems) {
+      for (const oi of orderedItems) {
+        const ordered = Number(oi.quantite);
+        const received = qtyMap.get(Number(oi.produit_id)) ?? 0;
+        if (received < ordered) { isPartial = true; break; }
+      }
+    }
+    const newStatut = isPartial ? "partiel" : "recu";
+    const sets = ["statut = ?"];
+    const setVals: (string | number | null)[] = [newStatut];
+    if (dateRecue) { sets.push("date_arrivee = ?"); setVals.push(dateRecue); }
+    setVals.push(id, shopId);
+    await conn.execute(
+      `UPDATE achats SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, setVals
+    );
+
+    // Update stock magasin for received quantities
+    if (qtyMap.size > 0) {
+      const ids = [...qtyMap.keys()];
+      const cases = ids.map(() => "WHEN id = ? THEN COALESCE(stock_magasin, 0) + ?").join(" ");
+      const vals  = ids.flatMap(pid => [pid, qtyMap.get(pid) ?? 0]);
       await conn.execute(
         `UPDATE produits SET stock_magasin = CASE ${cases} END WHERE id IN (${ids.map(() => "?").join(",")})`,
         [...vals, ...ids]

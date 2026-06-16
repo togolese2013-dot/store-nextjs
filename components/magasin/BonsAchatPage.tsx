@@ -14,11 +14,12 @@ import { useUI } from '@/components/interaction-layer';
 type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
 
 const STATUS_STYLE: Record<PurchaseOrderStatus, React.CSSProperties> = {
-  'En attente': { background: 'var(--warn-bg)',      color: 'var(--warn)' },
-  'Confirmé':   { background: 'var(--accent-bg)',    color: 'var(--accent)' },
-  'Expédié':    { background: '#E6E0F0',             color: '#5C4A88' },
-  'Reçu':       { background: 'var(--ok-bg)',        color: 'var(--ok)' },
-  'Annulé':     { background: 'rgba(20,17,14,.06)',  color: 'var(--muted)' },
+  'En attente': { background: 'var(--warn-bg)',       color: 'var(--warn)'   },
+  'En transit': { background: '#E6E0F0',              color: '#5C4A88'       },
+  'Livré':      { background: 'var(--ok-bg)',         color: 'var(--ok)'     },
+  'Partiel':    { background: 'rgba(201,96,30,.12)',  color: '#C9601E'       },
+  'Retard':     { background: 'rgba(156,58,20,.1)',   color: 'var(--danger)' },
+  'Annulé':     { background: 'rgba(20,17,14,.06)',  color: 'var(--muted)'  },
 };
 
 export interface BonsAchatPageProps {
@@ -27,9 +28,9 @@ export interface BonsAchatPageProps {
 
 export default function BonsAchatPage({ orders = SAMPLE_PURCHASE_ORDERS }: BonsAchatPageProps) {
   const ui = useUI();
-  const enCours    = orders.filter(o => o.status !== 'Reçu' && o.status !== 'Annulé').length;
+  const enCours    = orders.filter(o => o.status !== 'Livré' && o.status !== 'Annulé').length;
   const enAttente  = orders.filter(o => o.status === 'En attente').length;
-  const recus      = orders.filter(o => o.status === 'Reçu').length;
+  const recus      = orders.filter(o => o.status === 'Livré').length;
   const totalVal   = orders.filter(o => o.status !== 'Annulé').reduce((s, o) => s + o.amount, 0);
 
   const KPIS: LocalKpi[] = [

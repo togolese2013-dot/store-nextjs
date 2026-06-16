@@ -64,10 +64,10 @@ router.post("/api/admin/achats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { fournisseur_id, reference, date_achat, statut, note, transport, items } = req.body;
+    const { fournisseur_id, reference, date_achat, date_arrivee, statut, note, transport, items } = req.body;
     if (!date_achat)    return res.status(400).json({ error: "La date est obligatoire." });
     if (!items?.length) return res.status(400).json({ error: "Au moins un article est requis." });
-    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference: reference || undefined, date_achat, statut: statut ?? "en_attente", note: note ?? null, transport: transport ?? null, items }, session.shop_id ?? 1);
+    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference: reference || undefined, date_achat, date_arrivee: date_arrivee ?? null, statut: statut ?? "en_attente", note: note ?? null, transport: transport ?? null, items }, session.shop_id ?? 1);
     emitAdminEvent("achat");
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -90,7 +90,7 @@ router.patch("/api/admin/achats/:id", async (req, res) => {
     const id = Number(req.params.id);
     const shopId = session.shop_id ?? 1;
     if (req.body.action === "recevoir") {
-      await recevoirAchat(id, shopId);
+      await recevoirAchat(id, shopId, req.body.received_items, req.body.date_recue ?? null);
     } else {
       await updateAchat(id, req.body, shopId);
     }

@@ -209,12 +209,17 @@ export default function MagasinDataLoader({
         id: String(e.id), name: e.nom, location: e.adresse ?? '',
         color: '#3B6A8F', capacity: 0, occupied: 0, products: 0,
       })));
-      if (achatRes.achats) setOrders(achatRes.achats.map((a: any) => ({
-        id: a.id, ref: a.reference ?? `BCH-${a.id}`,
-        supplier: a.fournisseur_nom ?? '—', date: a.date_achat ?? '—',
-        products: a.items?.length ?? 0, amount: Number(a.montant_total ?? 0),
-        status: a.statut === 'recu' ? 'Reçu' : a.statut === 'annule' ? 'Annulé' : a.statut === 'confirme' ? 'Confirmé' : 'En attente',
-      })));
+      if (achatRes.achats) setOrders(achatRes.achats.map((a: any) => {
+        const s = a.statut ?? '';
+        return {
+          id: a.id, ref: a.reference ?? `ACH-${a.id}`,
+          supplier: a.fournisseur_nom ?? '—', date: a.date_achat ?? '—',
+          transport: a.transport === 'avion' ? 'Avion' : a.transport === 'bateau' ? 'Bateau' : a.transport === 'camion' ? 'Camion' : null,
+          arrival: a.date_arrivee ?? null,
+          products: Number(a.items_count ?? 0), amount: Number(a.montant_total ?? 0),
+          status: s === 'recu' ? 'Livré' : s === 'partiel' ? 'Partiel' : s === 'annule' ? 'Annulé' : s === 'en_transit' ? 'En transit' : s === 'retard' ? 'Retard' : 'En attente',
+        };
+      }));
     } catch { /* keep current */ }
   }, []);
 
