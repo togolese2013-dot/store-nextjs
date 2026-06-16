@@ -7,6 +7,7 @@ import type { AppConfig } from "@/components/interaction-layer";
 interface MagasinConfigOpts {
   onRefresh?: () => void;
   onRefreshMeta?: () => void;
+  onVariantChange?: () => void;
 }
 
 /* Shared live-data store — updated by setMagasinData() from the DataLoader */
@@ -16,7 +17,7 @@ export function setMagasinData(d: Record<string, any>) {
   _data = { ..._data, ...d };
 }
 
-export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigOpts = {}): AppConfig {
+export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange }: MagasinConfigOpts = {}): AppConfig {
   return {
     name: "Magasin",
     data: () => _data,
@@ -253,8 +254,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
         } else {
           await fetch("/api/admin/variant-groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         }
-        window.dispatchEvent(new CustomEvent("variant-group-saved"));
-        onRefreshMeta?.();
+        onVariantChange?.();
       }
       if (kind === "po") {
         const items = (values.lines || []).map((l: any) => ({ nom: l.product, quantite: Number(l.qty) || 1, prix_unitaire: 0 }));
@@ -291,8 +291,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
       }
       if (kind === "variant" && row.id) {
         await fetch(`/api/admin/variant-groups/${row.id}`, { method: "DELETE" });
-        window.dispatchEvent(new CustomEvent("variant-group-saved"));
-        onRefreshMeta?.();
+        onVariantChange?.();
       }
     },
 

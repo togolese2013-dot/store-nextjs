@@ -180,6 +180,20 @@ export default function MagasinDataLoader({
     } catch { /* keep current */ }
   }, []);
 
+  /* ── Fetch variant groups only ── */
+  const fetchVariants = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/variant-groups').then(r => r.json());
+      if (Array.isArray(r.groups)) setVariants(r.groups.map((g: any) => ({
+        id:       String(g.id),
+        name:     g.nom ?? '—',
+        type:     g.type ?? 'Texte',
+        values:   Array.isArray(g.valeurs) ? g.valeurs : (typeof g.valeurs === 'string' ? JSON.parse(g.valeurs) : []),
+        products: 0,
+      })));
+    } catch { /* keep current */ }
+  }, []);
+
   /* ── Fetch categories + brands ── */
   const fetchMeta = useCallback(async () => {
     try {
@@ -251,7 +265,7 @@ export default function MagasinDataLoader({
   }, []);
 
   /* ── Initial load ── */
-  useEffect(() => { fetchProducts('', 1); fetchMeta(); }, [fetchProducts, fetchMeta]);
+  useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); }, [fetchProducts, fetchMeta, fetchVariants]);
 
   /* ── Debounced search ── */
   function handleSearch(q: string) {
@@ -276,6 +290,7 @@ export default function MagasinDataLoader({
   const config = useMemo(() => createMagasinConfig({
     onRefresh: () => fetchProducts(searchQuery, page),
     onRefreshMeta: () => fetchMeta(),
+    onVariantChange: () => fetchVariants(),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []); // intentionally stable — fetchProducts/searchQuery/page accessed via closure at call time
 
