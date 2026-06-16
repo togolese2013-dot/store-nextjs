@@ -101,10 +101,11 @@ function TrNode({ label, sub, icon, dest = false }: { label: string; sub: string
 export type DrawerProdRaw = { produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string };
 
 export interface MouvementDrawerProps {
-  onClose:      () => void;
-  onSuccess?:   () => void;
-  defaultType?: MvTypeId;
-  produits?:    DrawerProdRaw[];
+  onClose:        () => void;
+  onSuccess?:     () => void;
+  defaultType?:   MvTypeId;
+  defaultDstWh?:  string | null; // pré-sélectionne entrepôt destination (Entrée / Transfert)
+  produits?:      DrawerProdRaw[];
 }
 
 // ── Drawer ─────────────────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ export default function MouvementDrawer({
   onClose,
   onSuccess,
   defaultType = 'sortie',
+  defaultDstWh = null,
   produits: produitsProp = [],
 }: MouvementDrawerProps) {
   injectKeyframes();
@@ -229,9 +231,9 @@ export default function MouvementDrawer({
   const FluxNodes = () => {
     if (type === 'entree') return (
       <>
-        <TrNode label={supplier || 'Fournisseur'} sub="Source"      icon={<IcTruck />} />
+        <TrNode label={supplier || 'Fournisseur'}               sub="Source"      icon={<IcTruck />} />
         <TransferRail fast={isLoading} />
-        <TrNode label="Stock Magasin"             sub="Destination" icon={<IcBox />}   dest />
+        <TrNode label={defaultDstWh ?? 'Stock Magasin'} sub="Destination" icon={<IcBox />}   dest />
       </>
     );
     if (type === 'sortie') return (

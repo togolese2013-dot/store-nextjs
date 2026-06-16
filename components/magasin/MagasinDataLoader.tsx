@@ -205,9 +205,14 @@ export default function MagasinDataLoader({
         color: '#C9601E', country: f.pays ?? '', products: 0, total: 0,
         delay: f.delai_livraison ?? 0, status: f.actif ? 'Actif' : 'Inactif',
       })));
-      if (whRes.entrepots) setWarehouses(whRes.entrepots.map((e: any) => ({
+      const WH_COLORS = ['#3B6A8F','#2D6A4F','#5C4A88','#C9601E','#7A2C3A','#D4A437'];
+      if (whRes.entrepots) setWarehouses(whRes.entrepots.map((e: any, i: number) => ({
         id: String(e.id), name: e.nom, location: e.adresse ?? '',
-        color: '#3B6A8F', capacity: 0, occupied: 0, products: 0,
+        color: WH_COLORS[i % WH_COLORS.length],
+        capacity: Number(e.capacite ?? 0),
+        occupied: Number(e.stock_total ?? 0),
+        products: Number(e.products_count ?? 0),
+        principal: Boolean(e.principal),
       })));
       if (achatRes.achats) setOrders(achatRes.achats.map((a: any) => {
         const s = a.statut ?? '';

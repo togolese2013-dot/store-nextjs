@@ -1,47 +1,90 @@
+'use client';
+
 /**
  * EntrepotsPage — warehouse management
  * Route: page id 'entrepots' in MagasinShell
+ * Self-fetching; warehouses prop from MagasinShell ignored.
  */
-'use client';
-import React from 'react';
+
+import React, { useCallback, useEffect, useState } from 'react';
 import type { Warehouse } from './types';
-import { SAMPLE_WAREHOUSES } from './sample-data';
 import Sparkline from './Sparkline';
-import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon, MapPinIcon } from './icons';
+import { DownloadIcon, PlusIcon, MoreIcon, MapPinIcon } from './icons';
 import styles from './Magasin.module.css';
 import { useUI } from '@/components/interaction-layer';
+import EntrepotProduitsDrawer from './EntrepotProduitsDrawer';
+import MouvementDrawer from './MouvementDrawer';
 
-type LocalKpi = { label: string; value: string; unit?: string; delta?: string; deltaColor?: string; sub: string; spark?: number[]; color?: string; serif?: boolean };
+const WH_COLORS = ['#3B6A8F','#2D6A4F','#5C4A88','#C9601E','#7A2C3A','#D4A437'];
+const fmt = (n: number) => n.toLocaleString('fr-FR');
 
-function occupancyColor(pct: number): string {
+function occColor(pct: number): string {
   if (pct > 0.9)  return '#9C3A14';
   if (pct > 0.75) return '#C9601E';
   return '#2D6A4F';
 }
 
-export interface EntrepotsPageProps {
-  warehouses?: Warehouse[];
+function mapWarehouse(e: any, i: number): Warehouse & { id: string } {
+  return {
+    id:        String(e.id),
+    name:      e.nom ?? '—',
+    location:  e.adresse ?? '',
+    color:     WH_COLORS[i % WH_COLORS.length],
+    capacity:  Number(e.capacite ?? 0),
+    occupied:  Number(e.stock_total ?? 0),
+    products:  Number(e.products_count ?? 0),
+    principal: Boolean(e.principal),
+  };
 }
 
-export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: EntrepotsPageProps) {
+export interface EntrepotsPageProps {
+  warehouses?: Warehouse[]; // kept for type compat, ignored — page self-fetches
+}
+
+export default function EntrepotsPage(_props: EntrepotsPageProps) {
   const ui = useUI();
-  const totalCap      = warehouses.reduce((s, w) => s + w.capacity, 0);
-  const totalOccupied = warehouses.reduce((s, w) => s + w.occupied, 0);
-  const totalProducts = warehouses.reduce((s, w) => s + w.products, 0);
+
+  const [list,    setList]    = useState<Warehouse[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Drawer state
+  const [selectedWh, setSelectedWh] = useState<Warehouse | null>(null);
+  const [addToWh,    setAddToWh]    = useState<Warehouse | null>(null);
+
+  const fetchList = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/entrepots').then(r => r.json());
+      if (r.entrepots) setList(r.entrepots.map(mapWarehouse));
+    } catch { /* keep current */ } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchList(); }, [fetchList]);
+
+  // KPIs
+  const totalCap      = list.reduce((s, w) => s + w.capacity, 0);
+  const totalOccupied = list.reduce((s, w) => s + w.occupied, 0);
+  const totalProducts = list.reduce((s, w) => s + w.products, 0);
   const avgPct        = totalCap > 0 ? Math.round((totalOccupied / totalCap) * 100) : 0;
 
-  const KPIS: LocalKpi[] = [
-    { label: 'Entrepôts actifs',   value: String(warehouses.length),  sub: warehouses.map(w => w.location).join(' · ') || 'Aucun entrepôt' },
-    { label: 'Occupation moyenne', value: String(avgPct), unit: '%',  sub: `${totalOccupied.toLocaleString('fr-FR')} / ${totalCap.toLocaleString('fr-FR')} unités`, color: '#C9601E' },
-    { label: 'Produits stockés',   value: String(totalProducts),       sub: `répartis sur ${warehouses.length} site${warehouses.length > 1 ? 's' : ''}`, color: '#2D6A4F' },
-  ];
-
-  const subtitle = warehouses.length === 0
+  const subtitle = loading
+    ? 'Chargement…'
+    : list.length === 0
     ? 'Aucun entrepôt configuré'
-    : `${warehouses.length} entrepôt${warehouses.length > 1 ? 's' : ''} · capacité totale ${totalCap.toLocaleString('fr-FR')} unités · ${totalOccupied.toLocaleString('fr-FR')} occupées (${avgPct}%)`;
+    : `${list.length} entrepôt${list.length > 1 ? 's' : ''} · capacité totale ${fmt(totalCap)} unités · ${fmt(totalOccupied)} occupées (${avgPct}%)`;
+
+  const KPIS = [
+    { label: 'Entrepôts actifs',   value: String(list.length), sub: list.slice(0,3).map(w => w.name).join(' · ') || 'Aucun' },
+    { label: 'Occupation moyenne', value: String(avgPct), unit: '%', sub: `${fmt(totalOccupied)} / ${fmt(totalCap)} unités`, color: '#C9601E',
+      spark: [62,64,66,68,68,70,71,72,72,avgPct%90||73,avgPct] },
+    { label: 'Produits stockés',   value: String(totalProducts), sub: `répartis sur ${list.length} site${list.length > 1 ? 's' : ''}`, color: '#2D6A4F',
+      spark: [220,224,228,230,232,236,238,240,242,245,totalProducts] },
+  ];
 
   return (
     <>
+      {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Magasin · Approvisionnement</div>
@@ -51,23 +94,21 @@ export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: Entrep
           <p className={styles.subtitle}>{subtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn} onClick={() => ui.openExport('Capacité entrepôts')}><DownloadIcon size={14} /> Rapport capacité</button>
+          <button type="button" className={styles.btn} onClick={() => ui.openExport('Capacité entrepôts')}>
+            <DownloadIcon size={14} /> Rapport capacité
+          </button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('warehouse')}>
             <PlusIcon size={14} /> Nouvel entrepôt
           </button>
         </div>
       </div>
 
+      {/* KPIs */}
       <div className={styles.kpis3}>
         {KPIS.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
               <div className={styles.kpiLabel}>{k.label}</div>
-              {k.delta && (
-                <div className={styles.kpiDelta} style={{ color: k.deltaColor }}>
-                  <TrendIcon size={10} />{k.delta}
-                </div>
-              )}
             </div>
             <div className={styles.kpiValueRow}>
               <div className={styles.kpiValue}>{k.value}</div>
@@ -81,51 +122,140 @@ export default function EntrepotsPage({ warehouses = SAMPLE_WAREHOUSES }: Entrep
         ))}
       </div>
 
-      <div className={styles.catCardGrid}>
-        {warehouses.map(w => {
-          const pct = Math.min(1, w.occupied / w.capacity);
-          const barColor = occupancyColor(pct);
+      {/* Principal banner */}
+      {list.filter(w => w.principal).map(w => (
+        <div key={w.id} className={styles.whBanner}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/>
+            <path d="M6 18h12M6 14h12"/>
+          </svg>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>{w.name}</span>
+            <span style={{ fontSize: 12.5, color: 'var(--muted)', marginLeft: 8 }}>
+              Entrepôt principal · tous les nouveaux produits y sont ajoutés par défaut
+            </span>
+          </div>
+          <span className={styles.whPrincipalBadge}>Principal</span>
+        </div>
+      ))}
+
+      {/* Warehouse grid */}
+      <div className={styles.whGrid}>
+        {loading ? (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 48, color: 'var(--muted-2)', fontSize: 13 }}>
+            Chargement…
+          </div>
+        ) : list.length === 0 ? (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 48, color: 'var(--muted-2)', fontSize: 13 }}>
+            Aucun entrepôt · créez votre premier entrepôt
+          </div>
+        ) : list.map(w => {
+          const pct      = w.capacity > 0 ? Math.min(1, w.occupied / w.capacity) : 0;
+          const barColor = occColor(pct);
           return (
-            <div key={w.id} className={styles.catCard}>
-              <div className={styles.catCardAccent} style={{ background: w.color }} />
-              <div className={styles.catCardBody}>
-                <div className={styles.catCardTop}>
-                  <div className={styles.catCardName}>{w.name}</div>
-                  <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [{ label: 'Modifier', icon: 'edit', onClick: () => ui.openForm('warehouse', 'edit', w) }, { sep: true }, { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('l\'entrepôt', w.name, { onConfirm: () => ui.config.onDeleteRow?.('warehouse', w) }) }], 'right'); }}><MoreIcon size={16} /></button>
+            <div key={w.id} className={styles.whCard}>
+              <div className={styles.whCardAccent} style={{ background: w.color }} />
+              <div className={styles.whCardBody}>
+                {/* Header */}
+                <div className={styles.whCardHead}>
+                  <div className={styles.whCardNameWrap}>
+                    <div className={styles.whCardName}>{w.name}</div>
+                    {w.principal && <span className={styles.whPrincipalBadge}>Principal</span>}
+                  </div>
+                  <div onClick={e => e.stopPropagation()}>
+                    <button
+                      type="button" className={styles.rowMenu}
+                      onClick={e => ui.menu(e, [
+                        { label: 'Voir les produits', onClick: () => setSelectedWh(w) },
+                        { label: 'Modifier',          onClick: () => ui.openForm('warehouse', 'edit', w) },
+                        { sep: true },
+                        { label: 'Supprimer', danger: true, onClick: () => ui.confirmDelete("l'entrepôt", w.name, {
+                          onConfirm: () => ui.config.onDeleteRow?.('warehouse', w),
+                        }) },
+                      ], 'right')}
+                    >
+                      <MoreIcon size={16} />
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--muted)' }}>
-                  <MapPinIcon size={12} />{w.location}
+
+                {/* Location */}
+                <div className={styles.whLocation}>
+                  <MapPinIcon size={12} />{w.location || '—'}
                 </div>
+
+                {/* Occupation bar */}
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                  <div className={styles.whOccLabel}>
                     <span style={{ color: 'var(--muted)' }}>Occupation</span>
                     <span style={{ fontFamily: 'Geist Mono, monospace', color: barColor, fontWeight: 500 }}>
-                      {Math.round(pct * 100)}%
+                      {w.capacity > 0 ? `${Math.round(pct * 100)}%` : '—'}
                     </span>
                   </div>
-                  <div className={styles.stockBar} style={{ height: 6 }}>
+                  <div className={styles.whOccTrack}>
                     <div style={{ width: `${pct * 100}%`, height: '100%', background: barColor, borderRadius: 'inherit' }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 11, color: 'var(--muted-2)', fontFamily: 'Geist Mono, monospace' }}>
-                    <span>{w.occupied.toLocaleString('fr-FR')} occupés</span>
-                    <span>{w.capacity.toLocaleString('fr-FR')} total</span>
+                  <div className={styles.whOccFooter}>
+                    <span>{fmt(w.occupied)} occupés</span>
+                    <span>{w.capacity > 0 ? `${fmt(w.capacity)} total` : 'capacité non définie'}</span>
                   </div>
                 </div>
-                <div className={styles.catCardStats}>
-                  <div className={styles.catStat}>
-                    <div className={styles.catStatValue}>{w.products}</div>
-                    <div className={styles.catStatLabel}>Références</div>
+
+                {/* Stats */}
+                <div className={styles.whStats}>
+                  <div>
+                    <div className={styles.whStatVal}>{w.products}</div>
+                    <div className={styles.whStatLabel}>Références</div>
                   </div>
-                  <div className={styles.catStat}>
-                    <div className={styles.catStatValue}>{(w.capacity - w.occupied).toLocaleString('fr-FR')}</div>
-                    <div className={styles.catStatLabel}>Disponible</div>
+                  <div>
+                    <div className={styles.whStatVal}>
+                      {w.capacity > 0 ? fmt(w.capacity - w.occupied) : '—'}
+                    </div>
+                    <div className={styles.whStatLabel}>Disponible</div>
                   </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className={styles.whBtns} onClick={e => e.stopPropagation()}>
+                  <button type="button" className={styles.whBtnSec} onClick={() => setSelectedWh(w)}>
+                    Voir les produits
+                  </button>
+                  <button type="button" className={styles.whBtnPri} onClick={() => setAddToWh(w)}>
+                    <PlusIcon size={12} /> Ajouter
+                  </button>
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* EntrepotProduitsDrawer */}
+      {selectedWh && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(20,17,14,.34)', zIndex: 50 }}
+            onMouseDown={() => setSelectedWh(null)} />
+          <EntrepotProduitsDrawer
+            warehouse={selectedWh}
+            onClose={() => setSelectedWh(null)}
+            onAddProduit={() => { setAddToWh(selectedWh); setSelectedWh(null); }}
+          />
+        </>
+      )}
+
+      {/* MouvementDrawer — entrée stock */}
+      {addToWh && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(20,17,14,.34)', zIndex: 50 }}
+            onMouseDown={() => setAddToWh(null)} />
+          <MouvementDrawer
+            defaultType="entree"
+            defaultDstWh={addToWh.name}
+            onClose={() => setAddToWh(null)}
+            onSuccess={() => { setAddToWh(null); fetchList(); }}
+          />
+        </>
+      )}
     </>
   );
 }

@@ -896,6 +896,10 @@ export interface Entrepot {
   adresse: string | null;
   notes: string | null;
   actif: boolean;
+  principal: boolean;
+  capacite: number;
+  products_count: number;
+  stock_total: number;
 }
 
 export async function ensureEntrepotsTable(): Promise<void> {
@@ -911,22 +915,33 @@ export async function ensureEntrepotsTable(): Promise<void> {
     )`);
     try { await db.execute(`ALTER TABLE produits ADD COLUMN entrepot_id INT UNSIGNED NULL`); } catch { /* exists */ }
     try { await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`); } catch { /* exists */ }
+    try { await db.execute(`ALTER TABLE entrepots ADD COLUMN principal TINYINT(1) NOT NULL DEFAULT 0`); } catch { /* exists */ }
+    try { await db.execute(`ALTER TABLE entrepots ADD COLUMN capacite INT NOT NULL DEFAULT 0`); } catch { /* exists */ }
   });
 }
 
 export async function listEntrepots(shopId = 1): Promise<Entrepot[]> {
   await ensureEntrepotsTable();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots WHERE shop_id = ? ORDER BY nom",
+    `SELECT e.id, e.nom, e.telephone, e.adresse, e.notes, e.actif,
+       COALESCE(e.principal, 0) AS principal,
+       COALESCE(e.capacite, 0) AS capacite,
+       (SELECT COUNT(*) FROM produits p WHERE p.entrepot_id = e.id AND p.actif = 1) AS products_count,
+       (SELECT COALESCE(SUM(p.stock_magasin), 0) FROM produits p WHERE p.entrepot_id = e.id AND p.actif = 1) AS stock_total
+     FROM entrepots e WHERE e.shop_id = ? ORDER BY e.principal DESC, e.nom ASC`,
     [shopId]
   );
   return (rows as mysql.RowDataPacket[]).map(r => ({
-    id:        Number(r.id),
-    nom:       r.nom as string,
-    telephone: (r.telephone ?? null) as string | null,
-    adresse:   (r.adresse ?? null) as string | null,
-    notes:     (r.notes ?? null) as string | null,
-    actif:     Boolean(r.actif),
+    id:             Number(r.id),
+    nom:            r.nom as string,
+    telephone:      (r.telephone ?? null) as string | null,
+    adresse:        (r.adresse ?? null) as string | null,
+    notes:          (r.notes ?? null) as string | null,
+    actif:          Boolean(r.actif),
+    principal:      Boolean(r.principal),
+    capacite:       Number(r.capacite ?? 0),
+    products_count: Number(r.products_count ?? 0),
+    stock_total:    Number(r.stock_total ?? 0),
   }));
 }
 

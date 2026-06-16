@@ -161,6 +161,7 @@ export interface Warehouse {
   capacity: number;
   occupied: number;
   products: number;
+  principal: boolean;
 }
 
 export interface StockAdjustment {

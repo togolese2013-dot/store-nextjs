@@ -1647,12 +1647,25 @@ async function ensureEntrepotsTable() {
       await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`);
     } catch {
     }
+    try {
+      await db.execute(`ALTER TABLE entrepots ADD COLUMN principal TINYINT(1) NOT NULL DEFAULT 0`);
+    } catch {
+    }
+    try {
+      await db.execute(`ALTER TABLE entrepots ADD COLUMN capacite INT NOT NULL DEFAULT 0`);
+    } catch {
+    }
   });
 }
 async function listEntrepots(shopId = 1) {
   await ensureEntrepotsTable();
   const [rows] = await db.execute(
-    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots WHERE shop_id = ? ORDER BY nom",
+    `SELECT e.id, e.nom, e.telephone, e.adresse, e.notes, e.actif,
+       COALESCE(e.principal, 0) AS principal,
+       COALESCE(e.capacite, 0) AS capacite,
+       (SELECT COUNT(*) FROM produits p WHERE p.entrepot_id = e.id AND p.actif = 1) AS products_count,
+       (SELECT COALESCE(SUM(p.stock_magasin), 0) FROM produits p WHERE p.entrepot_id = e.id AND p.actif = 1) AS stock_total
+     FROM entrepots e WHERE e.shop_id = ? ORDER BY e.principal DESC, e.nom ASC`,
     [shopId]
   );
   return rows.map((r) => ({
@@ -1661,7 +1674,11 @@ async function listEntrepots(shopId = 1) {
     telephone: r.telephone ?? null,
     adresse: r.adresse ?? null,
     notes: r.notes ?? null,
-    actif: Boolean(r.actif)
+    actif: Boolean(r.actif),
+    principal: Boolean(r.principal),
+    capacite: Number(r.capacite ?? 0),
+    products_count: Number(r.products_count ?? 0),
+    stock_total: Number(r.stock_total ?? 0)
   }));
 }
 async function upsertEntrepot(data, shopId = 1) {
