@@ -234,6 +234,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
         const body: Record<string, any> = { nom: values.name, adresse: values.location || null, notes: null };
         if (mode === "edit" && values._raw?.id) body.id = Number(values._raw.id);
         await fetch("/api/admin/entrepots", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        window.dispatchEvent(new CustomEvent("warehouse-saved"));
         onRefreshMeta?.();
       }
       if (kind === "po") {

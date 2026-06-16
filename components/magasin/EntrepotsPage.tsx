@@ -78,6 +78,10 @@ export default function EntrepotsPage(_props: EntrepotsPageProps) {
     fetch('/api/admin/billing').then(r => r.json()).then(d => {
       if (d.plan) setPlan(d.plan);
     }).catch(() => {});
+    // Refresh list when a warehouse is created/edited via the global form
+    const handler = () => fetchList();
+    window.addEventListener('warehouse-saved', handler);
+    return () => window.removeEventListener('warehouse-saved', handler);
   }, [fetchList]);
 
   // Plan lock logic
