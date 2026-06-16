@@ -27,6 +27,7 @@ interface ApiProduct {
   name: string;
   sku: string;
   price: number;
+  cost: number | null;  // prix_entrepot — prix d'achat fournisseur
   swatch: string;
   initial: string;
 }
@@ -62,6 +63,7 @@ export default function NouvelAchatDrawer({ onClose, onSaved }: NouvelAchatDrawe
       if (d.products) setProducts(d.products.map((p: any) => ({
         id: p.id, name: p.nom, sku: p.reference ?? '',
         price: Number(p.prix_unitaire ?? 0),
+        cost: p.prix_entrepot != null ? Number(p.prix_entrepot) : null,
         swatch: '#3B6A8F',
         initial: (p.nom?.[0] ?? 'P').toUpperCase(),
       })));
@@ -289,7 +291,8 @@ export default function NouvelAchatDrawer({ onClose, onSaved }: NouvelAchatDrawe
                           <button key={p.sku} type="button" className={styles.suggItem}
                             onClick={() => updateLine(art.id, {
                               produit_id: p.id, designation: p.name, search: p.name,
-                              prix: String(p.price), showSugg: false,
+                              prix: p.cost != null ? String(p.cost) : '',
+                              showSugg: false,
                             })}>
                             <div className={styles.thumbSm} style={{ background: p.swatch }}>{p.initial}</div>
                             <div style={{ flex: 1, minWidth: 0 }}>
