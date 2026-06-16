@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { PageId } from './MagasinShell';
 import MagasinShell from './MagasinShell';
-import type { Product as MagasinProduct, KpiCard, TabSpec } from './types';
+import type { Product as MagasinProduct, KpiCard, TabSpec, Variant } from './types';
 import { SAMPLE_PRODUCTS, SAMPLE_KPIS, DEFAULT_TABS, ACCENT } from './sample-data';
 import { UIProvider, useUI } from '@/components/interaction-layer';
 import { createMagasinConfig, setMagasinData } from './magasin.config';
@@ -157,6 +157,7 @@ export default function MagasinDataLoader({
   const [suppliers,   setSuppliers]   = useState<import('./types').Supplier[]>([]);
   const [warehouses,  setWarehouses]  = useState<import('./types').Warehouse[]>([]);
   const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
+  const [variants,    setVariants]    = useState<Variant[]>([]);
 
   /* UI state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -195,11 +196,19 @@ export default function MagasinDataLoader({
         color: '#3B6A8F', products: b.product_count ?? 0, revenue: 0,
       })));
 
-      const [suppRes, whRes, achatRes] = await Promise.all([
+      const [suppRes, whRes, achatRes, vgRes] = await Promise.all([
         fetch('/api/admin/fournisseurs').then(r => r.json()).catch(() => ({})),
         fetch('/api/admin/entrepots').then(r => r.json()).catch(() => ({})),
         fetch('/api/admin/achats').then(r => r.json()).catch(() => ({})),
+        fetch('/api/admin/variant-groups').then(r => r.json()).catch(() => ({})),
       ]);
+      if (Array.isArray(vgRes.groups)) setVariants(vgRes.groups.map((g: any) => ({
+        id:       String(g.id),
+        name:     g.nom ?? '—',
+        type:     g.type ?? 'Texte',
+        values:   Array.isArray(g.valeurs) ? g.valeurs : (typeof g.valeurs === 'string' ? JSON.parse(g.valeurs) : []),
+        products: 0,
+      })));
       if (suppRes.fournisseurs) setSuppliers(suppRes.fournisseurs.map((f: any) => ({
         id: f.id, name: f.nom, init: (f.nom?.[0] ?? 'F').toUpperCase(),
         color: '#C9601E', country: f.pays ?? '', products: 0, total: 0,
@@ -280,6 +289,7 @@ export default function MagasinDataLoader({
         suppliers={suppliers}
         warehouses={warehouses}
         orders={orders}
+        variants={variants}
         kpis={kpis}
         tabs={tabs}
         searchQuery={searchQuery}
@@ -310,6 +320,7 @@ interface ShellWithUIProps extends Props {
   suppliers: import('./types').Supplier[];
   warehouses: import('./types').Warehouse[];
   orders: import('./types').PurchaseOrder[];
+  variants: Variant[];
   kpis: KpiCard[];
   tabs: TabSpec[];
   searchQuery: string;
@@ -324,7 +335,7 @@ interface ShellWithUIProps extends Props {
 }
 
 function MagasinShellWithUI({
-  products, categories, brands, suppliers, warehouses, orders, kpis, tabs, searchQuery, onSearch,
+  products, categories, brands, suppliers, warehouses, orders, variants, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
   fetchProducts, currentSearchQuery, currentPage,
@@ -346,6 +357,7 @@ function MagasinShellWithUI({
       suppliers={suppliers}
       warehouses={warehouses}
       orders={orders}
+      variants={variants}
       kpis={kpis}
       tabs={tabs}
       searchQuery={searchQuery}

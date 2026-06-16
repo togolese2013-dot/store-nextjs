@@ -1,10 +1,5 @@
 'use client';
-/**
- * VariantesPage — variant group management
- * Route: page id 'variantes' in MagasinShell
- * Self-fetching from /api/admin/variant-groups
- */
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import type { Variant } from './types';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon } from './icons';
@@ -12,40 +7,12 @@ import styles from './Magasin.module.css';
 import { useUI } from '@/components/interaction-layer';
 
 export interface VariantesPageProps {
-  variants?: Variant[]; // kept for type compat, ignored — page self-fetches
+  variants?: Variant[];
 }
 
-function mapGroup(g: any): Variant {
-  const valeurs: string[] = Array.isArray(g.valeurs) ? g.valeurs : [];
-  return {
-    id:       String(g.id),
-    name:     g.nom ?? '—',
-    type:     g.type ?? 'Texte',
-    values:   valeurs,
-    products: 0, // no join for now
-  };
-}
-
-export default function VariantesPage(_props: VariantesPageProps) {
+export default function VariantesPage({ variants = [] }: VariantesPageProps) {
   const ui = useUI();
-  const [list,    setList]    = useState<Variant[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchList = useCallback(async () => {
-    try {
-      const r = await fetch('/api/admin/variant-groups').then(r => r.json());
-      if (r.groups) setList(r.groups.map(mapGroup));
-    } catch { /* keep current */ } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchList();
-    const handler = () => fetchList();
-    window.addEventListener('variant-group-saved', handler);
-    return () => window.removeEventListener('variant-group-saved', handler);
-  }, [fetchList]);
+  const list = variants;
 
   const totalCombinations = list.reduce((s, v) => s + v.values.length, 0);
   const mainGroup         = [...list].sort((a, b) => b.values.length - a.values.length)[0];
@@ -56,9 +23,7 @@ export default function VariantesPage(_props: VariantesPageProps) {
     { label: 'Groupes configurés',    value: String(list.length),              sub: 'groupes de variantes',  color: '#5C4A88', spark: [1,1,2,2,2,3,3,3,4,4,list.length%8||4] },
   ];
 
-  const subtitle = loading
-    ? 'Chargement…'
-    : list.length === 0
+  const subtitle = list.length === 0
     ? 'Aucune variante configurée'
     : `${totalCombinations} valeur${totalCombinations > 1 ? 's' : ''} · ${list.length} groupe${list.length > 1 ? 's' : ''}`;
 
@@ -115,13 +80,7 @@ export default function VariantesPage(_props: VariantesPageProps) {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: 'var(--muted-2)', fontSize: 13 }}>
-                    Chargement…
-                  </td>
-                </tr>
-              ) : list.length === 0 ? (
+              {list.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '48px', color: 'var(--muted-2)', fontSize: 13 }}>
                     Aucun groupe de variantes · créez votre premier groupe
