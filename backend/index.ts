@@ -40,7 +40,7 @@ import publicRoutes         from "./routes/public";
 import accountRoutes        from "./routes/account";
 import ordersRoutes         from "./routes/orders";
 import mobileMoneyRoutes    from "./routes/mobile-money";
-import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes, fixSiteOrderFinanceEntries, ensureShopIdCols } from "@/lib/admin-db";
+import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes, fixSiteOrderFinanceEntries, ensureShopIdCols, backfillAllShopsEntrepots } from "@/lib/admin-db";
 import adminSecurityLogsRoutes from "./routes/admin/security-logs";
 import { ensureSecurityLogsTable } from "./lib/security-log";
 import adminRapportsRoutes  from "./routes/admin/rapports";
@@ -292,6 +292,9 @@ try {
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
   startReviewNotifier();
+  // Backfill entrepôt principal pour tous les produits sans entrepôt assigné
+  backfillAllShopsEntrepots().catch(e => console.error("[startup] backfillAllShopsEntrepots:", e));
+
   // Expire overdue subscriptions on startup + every 6 hours
   expireShopSubscriptions().catch(e => console.error("[billing] expireShopSubscriptions:", e));
   setInterval(() => expireShopSubscriptions().catch(e => console.error("[billing] expireShopSubscriptions:", e)), 6 * 60 * 60 * 1000);

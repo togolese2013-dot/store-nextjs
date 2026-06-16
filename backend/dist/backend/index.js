@@ -724,6 +724,8 @@ __export(admin_db_exports, {
   applyOrderDeliveredEffects: () => applyOrderDeliveredEffects,
   applyOrderPaidEffects: () => applyOrderPaidEffects,
   approveReview: () => approveReview,
+  backfillAllShopsEntrepots: () => backfillAllShopsEntrepots,
+  backfillEntrepotPrincipal: () => backfillEntrepotPrincipal,
   cancelPaymentPlan: () => cancelPaymentPlan,
   countAchats: () => countAchats,
   countBoutiqueClients: () => countBoutiqueClients,
@@ -735,6 +737,7 @@ __export(admin_db_exports, {
   createBoutiqueMouvement: () => createBoutiqueMouvement,
   createCategory: () => createCategory,
   createDevis: () => createDevis,
+  createEntrepotPrincipal: () => createEntrepotPrincipal,
   createFacture: () => createFacture,
   createFinanceEntry: () => createFinanceEntry,
   createFournisseur: () => createFournisseur,
@@ -813,6 +816,7 @@ __export(admin_db_exports, {
   getOrderEvents: () => getOrderEvents,
   getOrdersStats: () => getOrdersStats,
   getPaymentPlanByOrderId: () => getPaymentPlanByOrderId,
+  getPrincipalEntrepot: () => getPrincipalEntrepot,
   getProductEntrepotsForRefs: () => getProductEntrepotsForRefs,
   getProduitsWithStock: () => getProduitsWithStock,
   getRecentBoutiqueMovements: () => getRecentBoutiqueMovements,
@@ -1698,6 +1702,63 @@ async function upsertEntrepot(data, shopId = 1) {
 }
 async function deleteEntrepot(id, shopId = 1) {
   await db.execute("DELETE FROM entrepots WHERE id = ? AND shop_id = ?", [id, shopId]);
+}
+async function createEntrepotPrincipal(shopId, nomBoutique) {
+  await ensureEntrepotsTable();
+  const [existing] = await db.execute(
+    "SELECT id FROM entrepots WHERE shop_id = ? AND principal = 1 LIMIT 1",
+    [shopId]
+  );
+  if (existing[0]) {
+    return Number(existing[0].id);
+  }
+  const [result] = await db.execute(
+    `INSERT INTO entrepots (nom, principal, actif, shop_id) VALUES (?, 1, 1, ?)`,
+    [`Stock ${nomBoutique}`, shopId]
+  );
+  return result.insertId;
+}
+async function getPrincipalEntrepot(shopId) {
+  await ensureEntrepotsTable();
+  const [rows] = await db.execute(
+    "SELECT id FROM entrepots WHERE shop_id = ? AND principal = 1 LIMIT 1",
+    [shopId]
+  );
+  const row = rows[0];
+  return row ? Number(row.id) : null;
+}
+async function backfillEntrepotPrincipal(shopId, nomBoutique) {
+  const nom = nomBoutique ?? `Boutique ${shopId}`;
+  const entrepotId = await createEntrepotPrincipal(shopId, nom);
+  const [result] = await db.execute(
+    "UPDATE produits SET entrepot_id = ? WHERE shop_id = ? AND entrepot_id IS NULL",
+    [entrepotId, shopId]
+  );
+  return result.affectedRows;
+}
+async function backfillAllShopsEntrepots() {
+  try {
+    const [rows] = await db.execute(
+      `SELECT DISTINCT p.shop_id, s.nom AS shop_nom
+       FROM produits p
+       LEFT JOIN shops s ON s.id = p.shop_id
+       WHERE p.entrepot_id IS NULL`
+    );
+    for (const row of rows) {
+      const shopId = Number(row.shop_id);
+      const shopNom = row.shop_nom ?? `Boutique ${shopId}`;
+      try {
+        const updated = await backfillEntrepotPrincipal(shopId, shopNom);
+        if (updated > 0) {
+          console.log(`[entrepot-backfill] shop ${shopId} (${shopNom}): ${updated} produit(s) assign\xE9(s) \xE0 l'entrep\xF4t principal`);
+        }
+      } catch (e) {
+        console.error(`[entrepot-backfill] shop ${shopId}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[entrepot-backfill] skipped:", e.message);
+  }
 }
 async function getProductEntrepotsForRefs(refs) {
   if (!refs.length) return {};
@@ -6485,6 +6546,12 @@ router2.post("/api/admin/products", async (req, res) => {
     if (body.entrepot_id != null) {
       columns.push("entrepot_id");
       values.push(Number(body.entrepot_id) || null);
+    } else {
+      const principalId = await getPrincipalEntrepot(shopId).catch(() => null);
+      if (principalId) {
+        columns.push("entrepot_id");
+        values.push(principalId);
+      }
     }
     if (body.prix_entrepot != null) {
       columns.push("prix_entrepot");
@@ -12920,6 +12987,9 @@ router44.post("/api/admin/onboarding", async (req, res) => {
       password_hash,
       shop_id: shopId
     });
+    createEntrepotPrincipal(shopId, shop_nom.trim()).catch(
+      (e) => console.error("[onboarding] createEntrepotPrincipal failed:", e)
+    );
     const siteBase = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const adminUrl = `${siteBase}/admin`;
     const loginUrl = `${siteBase}/admin/login`;
@@ -13632,6 +13702,7 @@ app.listen(PORT, async () => {
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
   startReviewNotifier();
+  backfillAllShopsEntrepots().catch((e) => console.error("[startup] backfillAllShopsEntrepots:", e));
   expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e));
   setInterval(() => expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e)), 6 * 60 * 60 * 1e3);
   (async () => {

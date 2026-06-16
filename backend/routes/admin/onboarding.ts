@@ -1,6 +1,6 @@
 import express from "express";
 import bcrypt from "bcryptjs";
-import { createAdminUser, getAdminByUsername } from "@/lib/admin-db";
+import { createAdminUser, getAdminByUsername, createEntrepotPrincipal } from "@/lib/admin-db";
 import { createShop, getShopBySlug, activateBasicPlan } from "@/lib/shops";
 import { sendMail } from "../../lib/mailer";
 import { welcomeShopEmail } from "../../lib/email-templates";
@@ -63,6 +63,11 @@ router.post("/api/admin/onboarding", async (req, res) => {
       password_hash,
       shop_id:       shopId,
     });
+
+    // ── Créer entrepôt principal (fire-and-forget — non bloquant) ───────────────
+    createEntrepotPrincipal(shopId, shop_nom.trim()).catch(e =>
+      console.error("[onboarding] createEntrepotPrincipal failed:", e)
+    );
 
     // ── Welcome email (fire-and-forget — don't fail the request if mail fails) ─
     const siteBase = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";

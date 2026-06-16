@@ -965,6 +965,85 @@ export async function deleteEntrepot(id: number, shopId = 1): Promise<void> {
   await db.execute("DELETE FROM entrepots WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
+/**
+ * Crée l'entrepôt principal d'une boutique s'il n'existe pas déjà.
+ * Retourne l'id de l'entrepôt principal (existant ou nouvellement créé).
+ */
+export async function createEntrepotPrincipal(shopId: number, nomBoutique: string): Promise<number> {
+  await ensureEntrepotsTable();
+  const [existing] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id FROM entrepots WHERE shop_id = ? AND principal = 1 LIMIT 1",
+    [shopId]
+  );
+  if ((existing as mysql.RowDataPacket[])[0]) {
+    return Number((existing as mysql.RowDataPacket[])[0].id);
+  }
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO entrepots (nom, principal, actif, shop_id) VALUES (?, 1, 1, ?)`,
+    [`Stock ${nomBoutique}`, shopId]
+  );
+  return result.insertId;
+}
+
+/**
+ * Retourne l'id de l'entrepôt principal de la boutique, ou null si absent.
+ */
+export async function getPrincipalEntrepot(shopId: number): Promise<number | null> {
+  await ensureEntrepotsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id FROM entrepots WHERE shop_id = ? AND principal = 1 LIMIT 1",
+    [shopId]
+  );
+  const row = (rows as mysql.RowDataPacket[])[0];
+  return row ? Number(row.id) : null;
+}
+
+/**
+ * Assigne l'entrepôt principal à tous les produits actifs sans entrepôt (entrepot_id IS NULL).
+ * Crée l'entrepôt principal si nécessaire.
+ * Retourne le nombre de produits mis à jour.
+ */
+export async function backfillEntrepotPrincipal(shopId: number, nomBoutique?: string): Promise<number> {
+  const nom = nomBoutique ?? `Boutique ${shopId}`;
+  const entrepotId = await createEntrepotPrincipal(shopId, nom);
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    "UPDATE produits SET entrepot_id = ? WHERE shop_id = ? AND entrepot_id IS NULL",
+    [entrepotId, shopId]
+  );
+  return result.affectedRows;
+}
+
+/**
+ * Backfill global au démarrage : pour toutes les boutiques qui ont des produits
+ * sans entrepôt assigné, crée l'entrepôt principal si nécessaire et assigne.
+ */
+export async function backfillAllShopsEntrepots(): Promise<void> {
+  try {
+    // Toutes les boutiques avec au moins un produit sans entrepôt
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT DISTINCT p.shop_id, s.nom AS shop_nom
+       FROM produits p
+       LEFT JOIN shops s ON s.id = p.shop_id
+       WHERE p.entrepot_id IS NULL`
+    );
+    for (const row of rows as mysql.RowDataPacket[]) {
+      const shopId  = Number(row.shop_id);
+      const shopNom = (row.shop_nom as string | null) ?? `Boutique ${shopId}`;
+      try {
+        const updated = await backfillEntrepotPrincipal(shopId, shopNom);
+        if (updated > 0) {
+          console.log(`[entrepot-backfill] shop ${shopId} (${shopNom}): ${updated} produit(s) assigné(s) à l'entrepôt principal`);
+        }
+      } catch (e) {
+        console.error(`[entrepot-backfill] shop ${shopId}:`, e);
+      }
+    }
+  } catch (e) {
+    // Ignore if shops table doesn't exist yet (fresh install)
+    console.error("[entrepot-backfill] skipped:", (e as Error).message);
+  }
+}
+
 export async function getProductEntrepotsForRefs(
   refs: string[]
 ): Promise<Record<string, { entrepot_nom: string; telephone: string | null; prix_entrepot: number | null }>> {

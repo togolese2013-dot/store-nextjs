@@ -3,7 +3,7 @@ import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
 import { hasPageAccess } from "@/lib/admin-permissions";
 import { getProducts, getProductCount, getProductStatusCounts, getCategories, db, produitCols, invalidateProduitColsCache } from "@/lib/db";
-import { getStockStats } from "@/lib/admin-db";
+import { getStockStats, getPrincipalEntrepot } from "@/lib/admin-db";
 import { getShopById } from "@/lib/shops";
 import { planLimit } from "../../lib/plan-limits";
 import type mysql from "mysql2/promise";
@@ -173,8 +173,13 @@ router.post("/api/admin/products", async (req, res) => {
     columns.push("images_json"); values.push(imagesJson);
     // slug
     columns.push("slug"); values.push(autoSlug || null);
-    // entrepôt
-    if (body.entrepot_id != null) { columns.push("entrepot_id"); values.push(Number(body.entrepot_id) || null); }
+    // entrepôt — auto-assign entrepôt principal si non fourni
+    if (body.entrepot_id != null) {
+      columns.push("entrepot_id"); values.push(Number(body.entrepot_id) || null);
+    } else {
+      const principalId = await getPrincipalEntrepot(shopId).catch(() => null);
+      if (principalId) { columns.push("entrepot_id"); values.push(principalId); }
+    }
     if (body.prix_entrepot != null) { columns.push("prix_entrepot"); values.push(Number(body.prix_entrepot) || null); }
     if (body.canal_vente) { columns.push("canal_vente"); values.push(body.canal_vente); }
     if (body.prod_condition) { columns.push("prod_condition"); values.push(body.prod_condition); }
