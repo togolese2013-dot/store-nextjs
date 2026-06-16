@@ -753,6 +753,7 @@ __export(admin_db_exports, {
   createStockSortie: () => createStockSortie,
   createTombolaSession: () => createTombolaSession,
   createUtilisateur: () => createUtilisateur,
+  createVariantGroup: () => createVariantGroup,
   createVenteWithStock: () => createVenteWithStock,
   deleteAchat: () => deleteAchat,
   deleteAdminUser: () => deleteAdminUser,
@@ -774,6 +775,7 @@ __export(admin_db_exports, {
   deleteReview: () => deleteReview,
   deleteTombolaSession: () => deleteTombolaSession,
   deleteUtilisateur: () => deleteUtilisateur,
+  deleteVariantGroup: () => deleteVariantGroup,
   ensureAdminUsersCols: () => ensureAdminUsersCols,
   ensureEntrepotsTable: () => ensureEntrepotsTable,
   ensureIndexes: () => ensureIndexes,
@@ -863,6 +865,7 @@ __export(admin_db_exports, {
   listSiteClients: () => listSiteClients,
   listTombolaSessions: () => listTombolaSessions,
   listUtilisateurs: () => listUtilisateurs,
+  listVariantGroups: () => listVariantGroups,
   listWaMessages: () => listWaMessages,
   markMessagesRead: () => markMessagesRead,
   markTombolaNotified: () => markTombolaNotified,
@@ -899,6 +902,7 @@ __export(admin_db_exports, {
   updateTombolaSession: () => updateTombolaSession,
   updateUtilisateur: () => updateUtilisateur,
   updateUtilisateurPassword: () => updateUtilisateurPassword,
+  updateVariantGroup: () => updateVariantGroup,
   upsertClient: () => upsertClient,
   upsertCoupon: () => upsertCoupon,
   upsertDeliveryZone: () => upsertDeliveryZone,
@@ -1726,6 +1730,63 @@ async function getPrincipalEntrepot(shopId) {
   );
   const row = rows[0];
   return row ? Number(row.id) : null;
+}
+async function ensureVariantGroupsTable() {
+  return runOnce("variant_groups", async () => {
+    await db.execute(`CREATE TABLE IF NOT EXISTS variant_groups (
+      id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom        VARCHAR(150) NOT NULL,
+      type       VARCHAR(50)  NOT NULL DEFAULT 'Texte',
+      valeurs    JSON         NOT NULL DEFAULT '[]',
+      shop_id    INT UNSIGNED NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+  });
+}
+async function listVariantGroups(shopId = 1) {
+  await ensureVariantGroupsTable();
+  const [rows] = await db.execute(
+    "SELECT id, nom, type, valeurs FROM variant_groups WHERE shop_id = ? ORDER BY nom ASC",
+    [shopId]
+  );
+  return rows.map((r) => ({
+    id: Number(r.id),
+    nom: r.nom,
+    type: r.type,
+    valeurs: Array.isArray(r.valeurs) ? r.valeurs : typeof r.valeurs === "string" ? JSON.parse(r.valeurs) : []
+  }));
+}
+async function createVariantGroup(data, shopId = 1) {
+  await ensureVariantGroupsTable();
+  const [result] = await db.execute(
+    "INSERT INTO variant_groups (nom, type, valeurs, shop_id) VALUES (?, ?, ?, ?)",
+    [data.nom, data.type, JSON.stringify(data.valeurs), shopId]
+  );
+  return result.insertId;
+}
+async function updateVariantGroup(id, data, shopId = 1) {
+  await ensureVariantGroupsTable();
+  const sets = [];
+  const vals = [];
+  if (data.nom) {
+    sets.push("nom = ?");
+    vals.push(data.nom);
+  }
+  if (data.type) {
+    sets.push("type = ?");
+    vals.push(data.type);
+  }
+  if (data.valeurs) {
+    sets.push("valeurs = ?");
+    vals.push(JSON.stringify(data.valeurs));
+  }
+  if (!sets.length) return;
+  vals.push(id, shopId);
+  await db.execute(`UPDATE variant_groups SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, vals);
+}
+async function deleteVariantGroup(id, shopId = 1) {
+  await ensureVariantGroupsTable();
+  await db.execute("DELETE FROM variant_groups WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 async function backfillEntrepotPrincipal(shopId, nomBoutique) {
   const nom = nomBoutique ?? `Boutique ${shopId}`;
@@ -6879,6 +6940,7 @@ var products_default = router2;
 var import_express3 = __toESM(require("express"));
 init_auth();
 init_db();
+init_admin_db();
 var router3 = import_express3.default.Router();
 var _variantsReady = false;
 async function ensureTable() {
@@ -7026,6 +7088,48 @@ router3.delete("/api/admin/products/:productId/variants/:id", async (req, res) =
       "DELETE FROM product_variants WHERE id=? AND produit_id=?",
       [req.params.id, req.params.productId]
     );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.get("/api/admin/variant-groups", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const groups = await listVariantGroups(session.shop_id ?? 1);
+    res.json({ groups });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.post("/api/admin/variant-groups", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const { nom, type, valeurs } = req.body;
+    if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
+    const id = await createVariantGroup({ nom: nom.trim(), type: type ?? "Texte", valeurs: Array.isArray(valeurs) ? valeurs : [] }, session.shop_id ?? 1);
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.patch("/api/admin/variant-groups/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    await updateVariantGroup(Number(req.params.id), req.body, session.shop_id ?? 1);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.delete("/api/admin/variant-groups/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    await deleteVariantGroup(Number(req.params.id), session.shop_id ?? 1);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

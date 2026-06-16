@@ -1003,6 +1003,67 @@ export async function getPrincipalEntrepot(shopId: number): Promise<number | nul
  * Crée l'entrepôt principal si nécessaire.
  * Retourne le nombre de produits mis à jour.
  */
+// ─── Variant Groups ───────────────────────────────────────────────────────────
+
+export interface VariantGroup {
+  id:            number;
+  nom:           string;
+  type:          string;
+  valeurs:       string[];
+}
+
+async function ensureVariantGroupsTable() {
+  return runOnce("variant_groups", async () => {
+    await db.execute(`CREATE TABLE IF NOT EXISTS variant_groups (
+      id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom        VARCHAR(150) NOT NULL,
+      type       VARCHAR(50)  NOT NULL DEFAULT 'Texte',
+      valeurs    JSON         NOT NULL DEFAULT '[]',
+      shop_id    INT UNSIGNED NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+  });
+}
+
+export async function listVariantGroups(shopId = 1): Promise<VariantGroup[]> {
+  await ensureVariantGroupsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT id, nom, type, valeurs FROM variant_groups WHERE shop_id = ? ORDER BY nom ASC",
+    [shopId]
+  );
+  return (rows as mysql.RowDataPacket[]).map(r => ({
+    id:      Number(r.id),
+    nom:     r.nom as string,
+    type:    r.type as string,
+    valeurs: Array.isArray(r.valeurs) ? r.valeurs : (typeof r.valeurs === 'string' ? JSON.parse(r.valeurs) : []),
+  }));
+}
+
+export async function createVariantGroup(data: { nom: string; type: string; valeurs: string[] }, shopId = 1): Promise<number> {
+  await ensureVariantGroupsTable();
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    "INSERT INTO variant_groups (nom, type, valeurs, shop_id) VALUES (?, ?, ?, ?)",
+    [data.nom, data.type, JSON.stringify(data.valeurs), shopId]
+  );
+  return result.insertId;
+}
+
+export async function updateVariantGroup(id: number, data: { nom?: string; type?: string; valeurs?: string[] }, shopId = 1) {
+  await ensureVariantGroupsTable();
+  const sets: string[] = []; const vals: (string | number)[] = [];
+  if (data.nom)    { sets.push("nom = ?");    vals.push(data.nom); }
+  if (data.type)   { sets.push("type = ?");   vals.push(data.type); }
+  if (data.valeurs){ sets.push("valeurs = ?");vals.push(JSON.stringify(data.valeurs)); }
+  if (!sets.length) return;
+  vals.push(id, shopId);
+  await db.execute(`UPDATE variant_groups SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, vals);
+}
+
+export async function deleteVariantGroup(id: number, shopId = 1) {
+  await ensureVariantGroupsTable();
+  await db.execute("DELETE FROM variant_groups WHERE id = ? AND shop_id = ?", [id, shopId]);
+}
+
 export async function backfillEntrepotPrincipal(shopId: number, nomBoutique?: string): Promise<number> {
   const nom = nomBoutique ?? `Boutique ${shopId}`;
   const entrepotId = await createEntrepotPrincipal(shopId, nom);

@@ -163,4 +163,54 @@ router.delete("/api/admin/products/:productId/variants/:id", async (req, res) =>
   }
 });
 
+// ── Variant Groups ─────────────────────────────────────────────────────────────
+
+import { listVariantGroups, createVariantGroup, updateVariantGroup, deleteVariantGroup } from "@/lib/admin-db";
+
+router.get("/api/admin/variant-groups", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const groups = await listVariantGroups(session.shop_id ?? 1);
+    res.json({ groups });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.post("/api/admin/variant-groups", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const { nom, type, valeurs } = req.body;
+    if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
+    const id = await createVariantGroup({ nom: nom.trim(), type: type ?? "Texte", valeurs: Array.isArray(valeurs) ? valeurs : [] }, session.shop_id ?? 1);
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.patch("/api/admin/variant-groups/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    await updateVariantGroup(Number(req.params.id), req.body, session.shop_id ?? 1);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+router.delete("/api/admin/variant-groups/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    await deleteVariantGroup(Number(req.params.id), session.shop_id ?? 1);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
 export default router;

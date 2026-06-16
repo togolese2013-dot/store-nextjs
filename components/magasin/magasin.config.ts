@@ -101,6 +101,14 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
             { k: "color",    l: "Couleur repère",    t: "color",  full: true },
           ],
         },
+        variant: {
+          label: "groupe de variantes", title: "groupe de variantes", eyebrow: "Variantes",
+          fields: [
+            { k: "name",   l: "Nom du groupe",                   t: "text",     ph: "Taille",       full: true },
+            { k: "type",   l: "Type",                             t: "select",   options: ["Texte", "Couleur", "Taille", "Matière", "Style", "Modèle", "Autre"] },
+            { k: "values", l: "Valeurs (séparées par virgules)", t: "textarea", ph: "S, M, L, XL",  full: true },
+          ],
+        },
         adjustment: {
           label: "ajustement", title: "ajustement", eyebrow: "Stock",
           fields: [
@@ -237,6 +245,17 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
         window.dispatchEvent(new CustomEvent("warehouse-saved"));
         onRefreshMeta?.();
       }
+      if (kind === "variant") {
+        const valeurs = (values.values || '').split(',').map((v: string) => v.trim()).filter(Boolean);
+        const body = { nom: values.name, type: values.type || 'Texte', valeurs };
+        if (mode === "edit" && values._raw?.id) {
+          await fetch(`/api/admin/variant-groups/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        } else {
+          await fetch("/api/admin/variant-groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        }
+        window.dispatchEvent(new CustomEvent("variant-group-saved"));
+        onRefreshMeta?.();
+      }
       if (kind === "po") {
         const items = (values.lines || []).map((l: any) => ({ nom: l.product, quantite: Number(l.qty) || 1, prix_unitaire: 0 }));
         const body = { date_achat: values.date || new Date().toISOString().slice(0,10), items: items.length ? items : [{ nom: 'Article', quantite: 1, prix_unitaire: 0 }], note: values.notes || null };
@@ -268,6 +287,11 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta }: MagasinConfigO
       }
       if (kind === "po" && row.id) {
         await fetch(`/api/admin/achats/${row.id}`, { method: "DELETE" });
+        onRefreshMeta?.();
+      }
+      if (kind === "variant" && row.id) {
+        await fetch(`/api/admin/variant-groups/${row.id}`, { method: "DELETE" });
+        window.dispatchEvent(new CustomEvent("variant-group-saved"));
         onRefreshMeta?.();
       }
     },
