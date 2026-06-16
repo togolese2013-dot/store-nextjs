@@ -161,14 +161,29 @@ function RowMenu({ po, onReceive, onDetail, onDelete }: {
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos,  setPos]  = useState({ top: 0, right: 0 });
+  const btnRef = React.useRef<HTMLButtonElement>(null);
   const canReceive = CAN_RECEIVE.includes(po.status);
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    setOpen(o => !o);
+  };
+
   return (
     <div style={{ position: 'relative' }}>
-      <button className={styles.rowMenu} onClick={() => setOpen(o => !o)} aria-label="Actions">
+      <button ref={btnRef} className={styles.rowMenu} onClick={toggle} aria-label="Actions">
         <MoreIcon size={16} />
       </button>
       {open && (
-        <div className={styles.dropdown} onMouseLeave={() => setOpen(false)}>
+        <div
+          className={styles.dropdown}
+          style={{ position: 'fixed', top: pos.top, right: pos.right, left: 'auto' }}
+          onMouseLeave={() => setOpen(false)}
+        >
           {canReceive && (
             <button className={styles.dropdownItem} onClick={() => { setOpen(false); onReceive(); }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
