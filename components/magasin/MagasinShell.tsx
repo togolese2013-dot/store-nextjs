@@ -25,6 +25,7 @@ import EntrepotsPage from './EntrepotsPage';
 import AjustementsPage from './AjustementsPage';
 import MouvementsPage from './MouvementsPage';
 import AlertesPage from './AlertesPage';
+import ReglagesPage from './ReglagesPage';
 import {
   SearchIcon, BellIcon, ChevLeftIcon,
   DownloadIcon, UploadIcon, SparklesIcon, PlusIcon,
@@ -37,7 +38,8 @@ import styles from './Magasin.module.css';
 export type PageId =
   | 'overview' | 'products' | 'categories' | 'brands' | 'variantes'
   | 'fournisseurs' | 'achats' | 'entrepots'
-  | 'ajustements' | 'mouvements' | 'alertes';
+  | 'ajustements' | 'mouvements' | 'alertes'
+  | 'reglages';
 
 const PAGE_LABELS: Record<PageId, string> = {
   overview:     "Vue d'ensemble",
@@ -51,6 +53,7 @@ const PAGE_LABELS: Record<PageId, string> = {
   ajustements:  'Ajustements',
   mouvements:   'Mouvements',
   alertes:      'Alertes stock',
+  reglages:     'Réglages',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
@@ -65,6 +68,7 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   ajustements:  'Rechercher un produit, SKU…',
   mouvements:   'Rechercher un produit, type…',
   alertes:      'Rechercher une règle, produit…',
+  reglages:     'Rechercher dans les réglages…',
 };
 
 const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
@@ -79,6 +83,7 @@ const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
   adjustments: 'ajustements',
   movements:   'mouvements',
   alerts:      'alertes',
+  settings:    'reglages',
 };
 
 /** Reverse map — PageId → nav item id (for Sidebar activeId prop) */
@@ -94,6 +99,7 @@ const PAGE_TO_NAV: Record<PageId, string> = {
   ajustements:  'adjustments',
   mouvements:   'movements',
   alertes:      'alerts',
+  reglages:     'settings',
 };
 
 /* ─── Props ─────────────────────────────────────────────────────── */
@@ -249,6 +255,7 @@ export default function MagasinShell({
         {activePage === 'ajustements'  && <AjustementsPage adjustments={adjustments} />}
         {activePage === 'mouvements'   && <MouvementsPage movements={movements} />}
         {activePage === 'alertes'      && <AlertesPage alerts={alerts} />}
+        {activePage === 'reglages'     && <ReglagesPage />}
       </main>
     </div>
   );
