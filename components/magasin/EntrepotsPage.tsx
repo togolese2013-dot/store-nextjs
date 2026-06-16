@@ -16,6 +16,13 @@ import EntrepotProduitsDrawer from './EntrepotProduitsDrawer';
 import MouvementDrawer from './MouvementDrawer';
 
 const WH_COLORS = ['#3B6A8F','#2D6A4F','#5C4A88','#C9601E','#7A2C3A','#D4A437'];
+
+const LockIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 function occColor(pct: number): string {
@@ -41,11 +48,16 @@ export interface EntrepotsPageProps {
   warehouses?: Warehouse[]; // kept for type compat, ignored — page self-fetches
 }
 
+// ── Plan limits (Basic = 1 entrepôt) ─────────────────────────────
+const MAX_ENTREPOTS: Record<string, number> = { basic: 1, free: 1 };
+
 export default function EntrepotsPage(_props: EntrepotsPageProps) {
   const ui = useUI();
 
-  const [list,    setList]    = useState<Warehouse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [list,           setList]           = useState<Warehouse[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [plan,           setPlan]           = useState<string | null>(null);
+  const [showUpgrade,    setShowUpgrade]    = useState(false);
 
   // Drawer state
   const [selectedWh, setSelectedWh] = useState<Warehouse | null>(null);
@@ -60,7 +72,22 @@ export default function EntrepotsPage(_props: EntrepotsPageProps) {
     }
   }, []);
 
-  useEffect(() => { fetchList(); }, [fetchList]);
+  useEffect(() => {
+    fetchList();
+    // Fetch plan for limit check
+    fetch('/api/admin/billing').then(r => r.json()).then(d => {
+      if (d.plan) setPlan(d.plan);
+    }).catch(() => {});
+  }, [fetchList]);
+
+  // Plan lock logic
+  const maxWh   = plan ? (MAX_ENTREPOTS[plan] ?? 0) : 0; // 0 = illimité
+  const isLocked = maxWh > 0 && list.length >= maxWh;
+
+  const handleNewWarehouse = () => {
+    if (isLocked) { setShowUpgrade(true); return; }
+    ui.openForm('warehouse');
+  };
 
   // KPIs
   const totalCap      = list.reduce((s, w) => s + w.capacity, 0);
@@ -97,8 +124,17 @@ export default function EntrepotsPage(_props: EntrepotsPageProps) {
           <button type="button" className={styles.btn} onClick={() => ui.openExport('Capacité entrepôts')}>
             <DownloadIcon size={14} /> Rapport capacité
           </button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openForm('warehouse')}>
-            <PlusIcon size={14} /> Nouvel entrepôt
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.primary}`}
+            onClick={handleNewWarehouse}
+            title={isLocked ? 'Disponible sur le plan Pro' : undefined}
+            style={isLocked ? { opacity: 0.65 } : undefined}
+          >
+            {isLocked
+              ? <><LockIcon /> Nouvel entrepôt · Pro</>
+              : <><PlusIcon size={14} /> Nouvel entrepôt</>
+            }
           </button>
         </div>
       </div>
@@ -121,6 +157,24 @@ export default function EntrepotsPage(_props: EntrepotsPageProps) {
           </div>
         ))}
       </div>
+
+      {/* Plan lock banner */}
+      {isLocked && (
+        <div className={styles.lockBanner}>
+          <div className={styles.lockBannerIcon}>
+            <LockIcon size={18} />
+          </div>
+          <div className={styles.lockBannerText}>
+            <div className={styles.lockBannerTitle}>Limite du plan Basic atteinte</div>
+            <div className={styles.lockBannerSub}>
+              Votre plan Basic inclut 1 entrepôt. Passez en Pro pour créer des entrepôts illimités.
+            </div>
+          </div>
+          <a href="/admin/billing" className={styles.lockBannerCta}>
+            Passer en Pro →
+          </a>
+        </div>
+      )}
 
       {/* Principal banner */}
       {list.filter(w => w.principal).map(w => (
@@ -255,6 +309,50 @@ export default function EntrepotsPage(_props: EntrepotsPageProps) {
             onSuccess={() => { setAddToWh(null); fetchList(); }}
           />
         </>
+      )}
+
+      {/* Upgrade modal */}
+      {showUpgrade && (
+        <div className={styles.upgradeOverlay} onMouseDown={() => setShowUpgrade(false)}>
+          <div className={styles.upgradeCard} onMouseDown={e => e.stopPropagation()}>
+            <div className={styles.upgradeCardHead}>
+              <div className={styles.upgradeCardIcon}>
+                <LockIcon size={22} />
+              </div>
+              <div>
+                <p className={styles.upgradeCardTitle}>Limite atteinte</p>
+                <p className={styles.upgradeCardSub}>
+                  Votre plan <strong>Basic</strong> inclut 1 entrepôt.
+                  Passez en Pro pour créer des entrepôts illimités et gérer plusieurs sites de stockage.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.upgradePlans}>
+              <div className={styles.upgradePlan}>
+                <div className={styles.upgradePlanName}>Basic · Actuel</div>
+                <div className={styles.upgradePlanFeature}>🏭 1 entrepôt</div>
+                <div className={styles.upgradePlanFeature}>📦 20 produits</div>
+                <div className={styles.upgradePlanPrice}>Gratuit</div>
+              </div>
+              <div className={`${styles.upgradePlan} ${styles.upgradePlanPro}`}>
+                <div className={styles.upgradePlanName}>Pro · Recommandé</div>
+                <div className={styles.upgradePlanFeature}>🏭 Entrepôts illimités</div>
+                <div className={styles.upgradePlanFeature}>📦 Produits illimités</div>
+                <div className={styles.upgradePlanPrice}>9 900 F / mois</div>
+              </div>
+            </div>
+
+            <div className={styles.upgradeActions}>
+              <button className={styles.upgradeActionsBtn} onClick={() => setShowUpgrade(false)}>
+                Annuler
+              </button>
+              <a href="/admin/billing" className={`${styles.upgradeActionsBtn} ${styles.upgradeActionsPrimary}`}>
+                Voir les plans →
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
