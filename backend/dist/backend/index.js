@@ -7953,6 +7953,7 @@ var import_express12 = __toESM(require("express"));
 init_auth();
 init_admin_db();
 init_shops();
+var import_bcryptjs2 = __toESM(require("bcryptjs"));
 
 // backend/lib/vercel-domains.ts
 var TOKEN = process.env.VERCEL_TOKEN;
@@ -8106,6 +8107,70 @@ router12.delete("/api/admin/settings/domain", async (req, res) => {
     }
     await setShopDomain(shopId, null);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.get("/api/admin/settings/shop-profile", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const [shop, settings] = await Promise.all([getShopById(shopId), getSettings(shopId)]);
+    res.json({
+      nom: shop?.nom ?? "",
+      email: shop?.email ?? "",
+      telephone: settings["shop_telephone"] ?? "",
+      adresse: settings["shop_adresse"] ?? "",
+      ville: settings["shop_ville"] ?? "",
+      pays: settings["shop_pays"] ?? "Togo"
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.patch("/api/admin/settings/shop-profile", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const shopId = session.shop_id ?? 1;
+    const { nom, email, telephone, adresse, ville, pays } = req.body;
+    if (nom || email) await updateShop(shopId, { ...nom ? { nom } : {}, ...email ? { email } : {} });
+    await setSettings({ shop_telephone: telephone ?? "", shop_adresse: adresse ?? "", shop_ville: ville ?? "", shop_pays: pays ?? "Togo" }, shopId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.get("/api/admin/settings/team", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const users = await listAdminUsers(session.shop_id ?? 1);
+    res.json({ users: users.filter((u) => u.actif) });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.post("/api/admin/settings/team", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const { nom, email, role } = req.body;
+    if (!email?.trim() || !email.includes("@")) return res.status(400).json({ error: "Email invalide." });
+    const shopId = session.shop_id ?? 1;
+    const username = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 20) + "_" + Math.floor(Math.random() * 1e3);
+    const tempPassword = Math.random().toString(36).slice(2, 10) + "Aa1!";
+    const password_hash = await import_bcryptjs2.default.hash(tempPassword, 10);
+    const dbRole = role === "Admin" ? "admin" : role === "G\xE9rant" ? "manager" : "staff";
+    await createAdminUser({ nom: nom?.trim() || email.split("@")[0], username, email: email.trim(), role: dbRole, password_hash, shop_id: shopId });
+    res.status(201).json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
@@ -8493,7 +8558,7 @@ var events_default = router18;
 
 // backend/routes/admin/users.ts
 var import_express19 = __toESM(require("express"));
-var import_bcryptjs2 = __toESM(require("bcryptjs"));
+var import_bcryptjs3 = __toESM(require("bcryptjs"));
 init_db();
 init_auth();
 init_admin_db();
@@ -8550,7 +8615,7 @@ router19.post("/api/admin/users", async (req, res) => {
         }
       }
     }
-    const hash = await import_bcryptjs2.default.hash(password, 12);
+    const hash = await import_bcryptjs3.default.hash(password, 12);
     await createAdminUser({
       nom,
       username: username.trim().toLowerCase(),
@@ -8576,7 +8641,7 @@ router19.patch("/api/admin/users/:id", async (req, res) => {
   try {
     const { password, permissions, ...rest } = req.body;
     if (password) {
-      const hash = await import_bcryptjs2.default.hash(String(password), 12);
+      const hash = await import_bcryptjs3.default.hash(String(password), 12);
       await updateAdminPassword(targetId, hash);
     }
     if (isSuperAdmin) {
@@ -8650,7 +8715,7 @@ router19.post("/api/admin/team", async (req, res) => {
     const { nom, poste, email, telephone, numero_plaque, username, motDePasse } = req.body;
     if (!nom || !poste || !motDePasse) return res.status(400).json({ error: "Champs manquants." });
     if (poste === "Livreur" && !telephone) return res.status(400).json({ error: "Le t\xE9l\xE9phone est obligatoire pour un livreur." });
-    const hash = await import_bcryptjs2.default.hash(motDePasse, 12);
+    const hash = await import_bcryptjs3.default.hash(motDePasse, 12);
     const id = await createUtilisateur({ nom, poste, email, telephone, numero_plaque: numero_plaque || void 0, username: username?.trim().toLowerCase() || void 0, motDePasse: hash, mustChangePassword: true });
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -8670,7 +8735,7 @@ router19.patch("/api/admin/team/:id", async (req, res) => {
     if (rest.numero_plaque !== void 0) data.numero_plaque = rest.numero_plaque ? String(rest.numero_plaque) : void 0;
     if (rest.poste !== void 0) data.poste = String(rest.poste);
     if (rest.actif !== void 0) data.actif = Number(rest.actif);
-    if (motDePasse) data.motDePasse = await import_bcryptjs2.default.hash(String(motDePasse), 12);
+    if (motDePasse) data.motDePasse = await import_bcryptjs3.default.hash(String(motDePasse), 12);
     await updateUtilisateur(Number(req.params.id), data);
     res.json({ ok: true });
   } catch (err) {
@@ -9811,7 +9876,7 @@ var public_default = router25;
 
 // backend/routes/account.ts
 var import_express26 = __toESM(require("express"));
-var import_bcryptjs3 = __toESM(require("bcryptjs"));
+var import_bcryptjs4 = __toESM(require("bcryptjs"));
 init_db();
 init_admin_db();
 
@@ -9906,7 +9971,7 @@ router26.post("/api/account/register", async (req, res) => {
     if (existing) {
       return res.status(409).json({ error: "Ce compte existe d\xE9j\xE0. Connectez-vous." });
     }
-    const hash = await import_bcryptjs3.default.hash(password.trim(), 12);
+    const hash = await import_bcryptjs4.default.hash(password.trim(), 12);
     const field = isEmail(identifier) ? "email" : "telephone";
     const pool2 = db;
     const [result] = await pool2.execute(
@@ -9939,7 +10004,7 @@ router26.post("/api/account/login", async (req, res) => {
     if (!user || !user.password_hash) {
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
-    const ok = await import_bcryptjs3.default.compare(password.trim(), user.password_hash);
+    const ok = await import_bcryptjs4.default.compare(password.trim(), user.password_hash);
     if (!ok) {
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
@@ -12504,7 +12569,7 @@ var whatsapp_campagne_default = router40;
 
 // backend/routes/admin/livreur-inscriptions.ts
 var import_express41 = __toESM(require("express"));
-var import_bcryptjs4 = __toESM(require("bcryptjs"));
+var import_bcryptjs5 = __toESM(require("bcryptjs"));
 var import_cloudinary2 = require("cloudinary");
 init_auth();
 init_admin_db();
@@ -12575,7 +12640,7 @@ router41.post("/api/livreur/inscription", async (req, res) => {
     } catch {
       return res.status(400).json({ error: "Impossible d'envoyer la photo. V\xE9rifiez le format (JPEG, PNG, max 10 Mo)." });
     }
-    const hash = await import_bcryptjs4.default.hash(password, 12);
+    const hash = await import_bcryptjs5.default.hash(password, 12);
     const id = await createLivreurInscription({
       nom: nom.trim(),
       telephone: telephone.trim(),
@@ -12814,7 +12879,7 @@ var tombola_default = router43;
 
 // backend/routes/admin/onboarding.ts
 var import_express44 = __toESM(require("express"));
-var import_bcryptjs5 = __toESM(require("bcryptjs"));
+var import_bcryptjs6 = __toESM(require("bcryptjs"));
 init_admin_db();
 init_shops();
 
@@ -12978,7 +13043,7 @@ router44.post("/api/admin/onboarding", async (req, res) => {
     if (plan === "basic" || plan === "free") {
       await activateBasicPlan(shopId);
     }
-    const password_hash = await import_bcryptjs5.default.hash(admin_password, 12);
+    const password_hash = await import_bcryptjs6.default.hash(admin_password, 12);
     await createAdminUser({
       nom: admin_nom.trim(),
       username: admin_username.trim().toLowerCase(),

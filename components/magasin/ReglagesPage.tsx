@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styles from './Magasin.module.css';
 import { useUI } from '@/components/interaction-layer';
 
@@ -27,11 +27,17 @@ const NAV: Array<{ id: SettingsSection; label: string; icon: string }> = [
 const COUNTRIES      = ['Togo', "Côte d'Ivoire", 'Sénégal', 'Mali', 'Ghana', 'Burkina Faso', 'Bénin', 'Nigeria'];
 const CURRENCIES     = ['FCFA (XOF)', 'EUR (€)', 'USD ($)', 'GHS (₵)', 'NGN (₦)'];
 const EXPORT_SCOPES  = ['Produits', 'Fournisseurs', 'Achats', 'Mouvements', 'Ajustements'];
-const MOCK_WAREHOUSES = [
-  { id: 'lome-1', name: 'Lomé Central'  },
-  { id: 'lome-2', name: 'Lomé Nord'     },
-  { id: 'kara-1', name: 'Kara Entrepôt' },
-];
+const ROLE_MAP: Record<string, MemberRole> = {
+  admin: 'Admin', super_admin: 'Admin', manager: 'Gérant', staff: 'Vendeur',
+};
+const ROLE_DB: Record<MemberRole, string> = {
+  Admin: 'admin', Gérant: 'manager', Vendeur: 'staff',
+};
+const MEMBER_COLORS = ['#3B6A8F','#2D6A4F','#5C4A88','#C9601E','#7A2C3A','#D4A437'];
+
+function hashStr(s: string): number {
+  let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h);
+}
 
 // ── Sub-components ────────────────────────────────────────────────
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
@@ -145,59 +151,35 @@ export default function ReglagesPage() {
   const ui = useUI();
   const [section, setSection] = useState<SettingsSection>('general');
   const [saved,   setSaved]   = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Général
-  const [nom,     setNom]     = useState('Lomé Central Store');
-  const [adresse, setAdresse] = useState('12 rue du Commerce, Adidogomé');
-  const [ville,   setVille]   = useState('Lomé');
+  const [nom,     setNom]     = useState('');
+  const [adresse, setAdresse] = useState('');
+  const [ville,   setVille]   = useState('');
   const [pays,    setPays]    = useState('Togo');
-  const [email,   setEmail]   = useState('contact@lomecentral.com');
-  const [tel,     setTel]     = useState('+228 90 12 34 56');
+  const [email,   setEmail]   = useState('');
+  const [tel,     setTel]     = useState('');
 
   // Devise
   const [devise,     setDevise]     = useState('FCFA (XOF)');
   const [separateur, setSeparateur] = useState<ThousandSep>('espace');
   const [symbolePos, setSymbolePos] = useState<SymbolPos>('apres');
-  const [tva,        setTva]        = useState('18');
+  const [tva,        setTva]        = useState('0');
 
   // Stock
-  const [entrepotDefaut, setEntrepotDefaut] = useState('lome-1');
+  const [warehouses,     setWarehouses]     = useState<{ id: string; name: string }[]>([]);
+  const [entrepotDefaut, setEntrepotDefaut] = useState('');
   const [seuilAlerte,    setSeuilAlerte]    = useState('10');
   const [methodeValo,    setMethodeValo]    = useState<ValMethod>('CMUP');
   const [refFormat,      setRefFormat]      = useState('ACH-{YYYY}-{NNN}');
   const [autoRef,        setAutoRef]        = useState(true);
 
   // Équipe
-  const [membres, setMembres] = useState<TeamMember[]>([
-    { nom: 'Kofi Diallo',  email: 'kofi@lomecentral.com',  role: 'Admin',   avi: 'KD', color: '#3B6A8F' },
-    { nom: 'Amina Mensah', email: 'amina@lomecentral.com', role: 'Gérant',  avi: 'AM', color: '#2D6A4F' },
-    { nom: 'Kwame Akon',   email: 'kwame@lomecentral.com', role: 'Vendeur', avi: 'KA', color: '#5C4A88' },
-  ]);
+  const [membres, setMembres] = useState<TeamMember[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole,  setInviteRole]  = useState<MemberRole>('Vendeur');
   const [inviteError, setInviteError] = useState(false);
-
-  const changeRole = (memberEmail: string, role: MemberRole) =>
-    setMembres(prev => prev.map(m => m.email === memberEmail ? { ...m, role } : m));
-
-  const removeMembre = (m: TeamMember) => {
-    ui.confirmDelete('le membre', m.nom, {
-      onConfirm: () => {
-        setMembres(prev => prev.filter(x => x.email !== m.email));
-        ui.toast(`${m.nom} retiré du magasin.`);
-      },
-    });
-  };
-
-  const sendInvite = () => {
-    if (!inviteEmail || !inviteEmail.includes('@')) {
-      setInviteError(true);
-      setTimeout(() => setInviteError(false), 2000);
-      return;
-    }
-    ui.toast(`Invitation envoyée à ${inviteEmail} · Rôle : ${inviteRole}`);
-    setInviteEmail('');
-  };
 
   // Notifs
   const [notifEmail,        setNotifEmail]        = useState(true);
@@ -212,10 +194,148 @@ export default function ReglagesPage() {
   const [exportFmt,   setExportFmt]   = useState<ExportFmt>('Excel');
   const [archiveAuto, setArchiveAuto] = useState('12');
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2200);
-    ui.toast('Réglages enregistrés');
+  // ── Fetch all data on mount ────────────────────────────────────
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/admin/settings/shop-profile').then(r => r.json()).catch(() => ({})),
+      fetch('/api/admin/settings').then(r => r.json()).catch(() => ({})),
+      fetch('/api/admin/settings/team').then(r => r.json()).catch(() => ({ users: [] })),
+      fetch('/api/admin/entrepots').then(r => r.json()).catch(() => ({ entrepots: [] })),
+    ]).then(([profile, settings, team, wh]) => {
+      // Général
+      if (profile.nom)       setNom(profile.nom);
+      if (profile.email)     setEmail(profile.email);
+      if (profile.telephone) setTel(profile.telephone);
+      if (profile.adresse)   setAdresse(profile.adresse);
+      if (profile.ville)     setVille(profile.ville);
+      if (profile.pays)      setPays(profile.pays);
+
+      // Devise
+      if (settings.devise_devise)      setDevise(settings.devise_devise);
+      if (settings.devise_separateur)  setSeparateur(settings.devise_separateur as ThousandSep);
+      if (settings.devise_symbole_pos) setSymbolePos(settings.devise_symbole_pos as SymbolPos);
+      if (settings.devise_tva)         setTva(settings.devise_tva);
+
+      // Stock
+      if (settings.stock_seuil_alerte)  setSeuilAlerte(settings.stock_seuil_alerte);
+      if (settings.stock_methode_valo)  setMethodeValo(settings.stock_methode_valo as ValMethod);
+      if (settings.stock_ref_format)    setRefFormat(settings.stock_ref_format);
+      if (settings.stock_auto_ref !== undefined) setAutoRef(settings.stock_auto_ref === 'true');
+
+      // Warehouses list + default
+      const wlist = (wh.entrepots ?? []).map((e: any) => ({ id: String(e.id), name: e.nom }));
+      setWarehouses(wlist);
+      if (settings.stock_entrepot_defaut) setEntrepotDefaut(settings.stock_entrepot_defaut);
+      else if (wlist[0]) setEntrepotDefaut(wlist[0].id);
+
+      // Notifs
+      if (settings.notif_email         !== undefined) setNotifEmail(settings.notif_email === 'true');
+      if (settings.notif_sms           !== undefined) setNotifSMS(settings.notif_sms === 'true');
+      if (settings.notif_whatsapp      !== undefined) setNotifWhatsApp(settings.notif_whatsapp === 'true');
+      if (settings.notif_rupture_stock !== undefined) setNotifRuptureStock(settings.notif_rupture_stock === 'true');
+      if (settings.notif_nouvel_achat  !== undefined) setNotifNouvelAchat(settings.notif_nouvel_achat === 'true');
+      if (settings.notif_reception     !== undefined) setNotifReception(settings.notif_reception === 'true');
+      if (settings.notif_resume)        setNotifResume(settings.notif_resume as NotifFreq);
+
+      // Données
+      if (settings.donnees_export_fmt)   setExportFmt(settings.donnees_export_fmt as ExportFmt);
+      if (settings.donnees_archive_auto) setArchiveAuto(settings.donnees_archive_auto);
+
+      // Équipe
+      if (team.users) {
+        setMembres((team.users as any[]).map((u, i) => ({
+          nom:   u.nom ?? u.username,
+          email: u.email ?? '',
+          role:  ROLE_MAP[u.role] ?? 'Vendeur',
+          avi:   (u.nom ?? u.username ?? '?').split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase(),
+          color: MEMBER_COLORS[hashStr(u.email ?? u.username ?? String(i)) % MEMBER_COLORS.length],
+        })));
+      }
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const changeRole = (memberEmail: string, role: MemberRole) =>
+    setMembres(prev => prev.map(m => m.email === memberEmail ? { ...m, role } : m));
+
+  const removeMembre = (m: TeamMember) => {
+    ui.confirmDelete('le membre', m.nom, {
+      onConfirm: () => {
+        setMembres(prev => prev.filter(x => x.email !== m.email));
+        ui.toast(`${m.nom} retiré du magasin.`);
+      },
+    });
+  };
+
+  const sendInvite = async () => {
+    if (!inviteEmail || !inviteEmail.includes('@')) {
+      setInviteError(true);
+      setTimeout(() => setInviteError(false), 2000);
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/settings/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        ui.toast(d.error ?? 'Erreur lors de l\'invitation.');
+        return;
+      }
+      ui.toast(`Membre ajouté : ${inviteEmail} · Rôle : ${inviteRole}`);
+      setInviteEmail('');
+      // Refresh team
+      fetch('/api/admin/settings/team').then(r => r.json()).then(d => {
+        if (d.users) setMembres((d.users as any[]).map((u, i) => ({
+          nom: u.nom ?? u.username, email: u.email ?? '', role: ROLE_MAP[u.role] ?? 'Vendeur',
+          avi: (u.nom ?? u.username ?? '?').split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase(),
+          color: MEMBER_COLORS[hashStr(u.email ?? u.username ?? String(i)) % MEMBER_COLORS.length],
+        })));
+      }).catch(() => {});
+    } catch { ui.toast('Erreur réseau.'); }
+  };
+
+  // ── Save all settings ─────────────────────────────────────────
+  const handleSave = async () => {
+    try {
+      await Promise.all([
+        fetch('/api/admin/settings/shop-profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nom, email, telephone: tel, adresse, ville, pays }),
+        }),
+        fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            devise_devise:        devise,
+            devise_separateur:    separateur,
+            devise_symbole_pos:   symbolePos,
+            devise_tva:           tva,
+            stock_entrepot_defaut:entrepotDefaut,
+            stock_seuil_alerte:   seuilAlerte,
+            stock_methode_valo:   methodeValo,
+            stock_ref_format:     refFormat,
+            stock_auto_ref:       String(autoRef),
+            notif_email:          String(notifEmail),
+            notif_sms:            String(notifSMS),
+            notif_whatsapp:       String(notifWhatsApp),
+            notif_rupture_stock:  String(notifRuptureStock),
+            notif_nouvel_achat:   String(notifNouvelAchat),
+            notif_reception:      String(notifReception),
+            notif_resume:         notifResume,
+            donnees_export_fmt:   exportFmt,
+            donnees_archive_auto: archiveAuto,
+          }),
+        }),
+      ]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2200);
+      ui.toast('Réglages enregistrés');
+    } catch {
+      ui.toast('Erreur lors de la sauvegarde.');
+    }
   };
 
   const formatPreview =
@@ -337,7 +457,9 @@ export default function ReglagesPage() {
           <div className={styles.grid2}>
             <Field label="Entrepôt par défaut">
               <Sel value={entrepotDefaut} onChange={setEntrepotDefaut}>
-                {MOCK_WAREHOUSES.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                {warehouses.length === 0
+                  ? <option value="">Aucun entrepôt</option>
+                  : warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
               </Sel>
             </Field>
             <Field label="Seuil d'alerte stock global" hint="Nombre d'unités en dessous duquel une alerte est créée.">
@@ -570,6 +692,12 @@ export default function ReglagesPage() {
     ),
   };
 
+  if (loading) return (
+    <div className={styles.spinnerWrap}>
+      <div className={styles.spinner} />Chargement des réglages…
+    </div>
+  );
+
   return (
     <>
       {/* Header */}
@@ -579,7 +707,9 @@ export default function ReglagesPage() {
           <h1 className={styles.title}>
             Réglages <span className={styles.serif}>magasin</span>
           </h1>
-          <p className={styles.subtitle}>Configurez votre magasin, équipe, devise et notifications</p>
+          <p className={styles.subtitle}>
+            {nom ? `${nom} · ` : ''}Configurez votre magasin, équipe, devise et notifications
+          </p>
         </div>
         <div className={styles.headerActions}>
           <button
