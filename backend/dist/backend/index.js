@@ -4587,7 +4587,13 @@ async function listAdminMarques(shopId = 1) {
   const [rows] = await db.execute(`
     SELECT m.id, m.nom, COALESCE(m.description, '') AS description,
            m.logo_url,
-           COUNT(p.id) AS nb_produits
+           COUNT(p.id) AS nb_produits,
+           COALESCE(SUM(p.prix_unitaire * COALESCE(p.stock_magasin, 0)), 0) AS ca_stock,
+           COALESCE(AVG(
+             CASE WHEN p.prix_entrepot IS NOT NULL AND p.prix_unitaire > 0
+                  THEN ROUND((1 - p.prix_entrepot / p.prix_unitaire) * 100)
+                  ELSE NULL END
+           ), 0) AS marge_moy
     FROM marques m
     LEFT JOIN produits p ON p.marque_id = m.id AND p.shop_id = ?
     WHERE m.shop_id = ?
@@ -4599,7 +4605,9 @@ async function listAdminMarques(shopId = 1) {
     nom: String(r.nom),
     description: String(r.description ?? ""),
     logo_url: r.logo_url ? String(r.logo_url) : null,
-    nb_produits: Number(r.nb_produits ?? 0)
+    nb_produits: Number(r.nb_produits ?? 0),
+    ca_stock: Number(r.ca_stock ?? 0),
+    marge_moy: Math.round(Number(r.marge_moy ?? 0))
   }));
 }
 async function createMarque(data, shopId = 1) {

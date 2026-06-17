@@ -207,8 +207,10 @@ export default function MagasinDataLoader({
       if (brandRes.data) setBrands(brandRes.data.map((b: any) => ({
         id: b.id,
         name: b.nom, init: (b.nom?.[0] ?? 'M').toUpperCase(),
-        color: '#3B6A8F', products: b.nb_produits ?? 0, revenue: 0,
-        margin: 0, country: '—', status: 'Actif' as const,
+        color: '#3B6A8F', products: b.nb_produits ?? 0,
+        revenue: b.ca_stock ?? 0,
+        margin: b.marge_moy ?? 0,
+        country: '—', status: 'Actif' as const,
         logo: b.logo_url ?? undefined,
       })));
 
