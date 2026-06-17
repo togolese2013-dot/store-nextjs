@@ -16,7 +16,8 @@ export type IconComponent = (props: IconProps) => React.ReactElement;
 /* ---- Form schema ------------------------------------------ */
 export type FieldType =
   | "text" | "number" | "textarea" | "price" | "seg" | "select"
-  | "tags" | "values" | "color" | "channels" | "toggle" | "image" | "lines";
+  | "tags" | "values" | "color" | "channels" | "toggle" | "image" | "lines"
+  | "variant-options";
 
 export interface FieldSpec {
   k: string;

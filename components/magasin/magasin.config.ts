@@ -44,8 +44,9 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
             { k: "stock",    l: "Stock actuel",        t: "number" },
             { k: "target",   l: "Stock cible",         t: "number" },
             { k: "supplier", l: "Fournisseur",         t: "select",   options: suppliers, full: true },
-            { k: "image",    l: "Visuel produit",      t: "image",    full: true },
-            { k: "desc",     l: "Description",         t: "textarea", ph: "Notes internes, composition…", full: true },
+            { k: "image",           l: "Visuel produit",      t: "image",           full: true },
+            { k: "desc",            l: "Description",         t: "textarea",        ph: "Notes internes, composition…", full: true },
+            { k: "variant_options", l: "Variantes",           t: "variant-options", full: true },
           ],
         },
         category: {
@@ -189,13 +190,18 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
 
     onSubmit: async (kind, mode, values) => {
       if (kind === "product") {
+        const vo = values.variant_options as { selectedOptions?: any[]; combinations?: any[] } | undefined;
+        const hasCombinations = (vo?.combinations?.length ?? 0) > 0;
         const body: Record<string, any> = {
           nom:            values.name,
           reference:      values.sku,
           prix_unitaire:  Number(values.price) || 0,
           prix_entrepot:  values.cost ? Number(values.cost) : undefined,
-          stock_magasin:  Number(values.stock) || 0,
+          stock_magasin:  hasCombinations ? 0 : (Number(values.stock) || 0),
           actif:          values.status === "Brouillon" ? 0 : 1,
+          options_config: vo?.selectedOptions?.length
+            ? JSON.stringify(vo.selectedOptions.map((o: any) => ({ nom: o.nom, valeurs: o.valeurs })))
+            : null,
         };
         if (mode === "edit" && values._raw?.id) {
           await fetch(`/api/admin/products/${values._raw.id}`, {
@@ -204,11 +210,26 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
             body: JSON.stringify(body),
           });
         } else {
-          await fetch("/api/admin/products", {
+          const res  = await fetch("/api/admin/products", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
+          const data = await res.json();
+          if (data.id && hasCombinations) {
+            await Promise.all((vo!.combinations!).map((combo: any) =>
+              fetch(`/api/admin/products/${data.id}/variants`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  nom:   Object.values(combo.combo as Record<string,string>).join(' / '),
+                  options: combo.combo,
+                  prix:  Number(combo.prix)  || 0,
+                  stock: Number(combo.stock) || 0,
+                }),
+              })
+            ));
+          }
         }
         onRefresh?.();
       }
