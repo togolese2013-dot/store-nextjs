@@ -254,7 +254,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
         } else {
           await fetch("/api/admin/variant-groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         }
-        onVariantChange?.();
+        await onVariantChange?.();
       }
       if (kind === "po") {
         const items = (values.lines || []).map((l: any) => ({ nom: l.product, quantite: Number(l.qty) || 1, prix_unitaire: 0 }));
@@ -291,7 +291,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
       }
       if (kind === "variant" && row.id) {
         await fetch(`/api/admin/variant-groups/${row.id}`, { method: "DELETE" });
-        onVariantChange?.();
+        await onVariantChange?.();
       }
     },
 
