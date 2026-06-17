@@ -1018,7 +1018,7 @@ async function ensureVariantGroupsTable() {
       id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       nom        VARCHAR(150) NOT NULL,
       type       VARCHAR(50)  NOT NULL DEFAULT 'Texte',
-      valeurs    JSON         NOT NULL DEFAULT '[]',
+      valeurs    JSON         NULL,
       shop_id    INT UNSIGNED NOT NULL DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);

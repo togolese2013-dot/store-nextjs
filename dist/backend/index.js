@@ -5,8 +5,13 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -30,17 +35,17 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// ../lib/utils.ts
+// lib/utils.ts
 var finalPrice, formatPrice;
 var init_utils = __esm({
-  "../lib/utils.ts"() {
+  "lib/utils.ts"() {
     "use strict";
     finalPrice = (p) => p.remise > 0 ? Math.max(0, p.prix_unitaire - p.remise) : p.prix_unitaire;
     formatPrice = (n) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n) + " FCFA";
   }
 });
 
-// ../lib/db.ts
+// lib/db.ts
 var db_exports = {};
 __export(db_exports, {
   checkReviewsTable: () => checkReviewsTable,
@@ -699,7 +704,7 @@ async function getProductVariants(productId) {
 }
 var import_promise, db, _cols, _hasReviews;
 var init_db = __esm({
-  "../lib/db.ts"() {
+  "lib/db.ts"() {
     "use strict";
     import_promise = __toESM(require("mysql2/promise"));
     init_utils();
@@ -709,7 +714,7 @@ var init_db = __esm({
   }
 });
 
-// ../lib/admin-db.ts
+// lib/admin-db.ts
 var admin_db_exports = {};
 __export(admin_db_exports, {
   accepterLivraison: () => accepterLivraison,
@@ -719,6 +724,8 @@ __export(admin_db_exports, {
   applyOrderDeliveredEffects: () => applyOrderDeliveredEffects,
   applyOrderPaidEffects: () => applyOrderPaidEffects,
   approveReview: () => approveReview,
+  backfillAllShopsEntrepots: () => backfillAllShopsEntrepots,
+  backfillEntrepotPrincipal: () => backfillEntrepotPrincipal,
   cancelPaymentPlan: () => cancelPaymentPlan,
   countAchats: () => countAchats,
   countBoutiqueClients: () => countBoutiqueClients,
@@ -730,6 +737,7 @@ __export(admin_db_exports, {
   createBoutiqueMouvement: () => createBoutiqueMouvement,
   createCategory: () => createCategory,
   createDevis: () => createDevis,
+  createEntrepotPrincipal: () => createEntrepotPrincipal,
   createFacture: () => createFacture,
   createFinanceEntry: () => createFinanceEntry,
   createFournisseur: () => createFournisseur,
@@ -745,6 +753,7 @@ __export(admin_db_exports, {
   createStockSortie: () => createStockSortie,
   createTombolaSession: () => createTombolaSession,
   createUtilisateur: () => createUtilisateur,
+  createVariantGroup: () => createVariantGroup,
   createVenteWithStock: () => createVenteWithStock,
   deleteAchat: () => deleteAchat,
   deleteAdminUser: () => deleteAdminUser,
@@ -766,6 +775,7 @@ __export(admin_db_exports, {
   deleteReview: () => deleteReview,
   deleteTombolaSession: () => deleteTombolaSession,
   deleteUtilisateur: () => deleteUtilisateur,
+  deleteVariantGroup: () => deleteVariantGroup,
   ensureAdminUsersCols: () => ensureAdminUsersCols,
   ensureEntrepotsTable: () => ensureEntrepotsTable,
   ensureIndexes: () => ensureIndexes,
@@ -808,6 +818,7 @@ __export(admin_db_exports, {
   getOrderEvents: () => getOrderEvents,
   getOrdersStats: () => getOrdersStats,
   getPaymentPlanByOrderId: () => getPaymentPlanByOrderId,
+  getPrincipalEntrepot: () => getPrincipalEntrepot,
   getProductEntrepotsForRefs: () => getProductEntrepotsForRefs,
   getProduitsWithStock: () => getProduitsWithStock,
   getRecentBoutiqueMovements: () => getRecentBoutiqueMovements,
@@ -854,6 +865,7 @@ __export(admin_db_exports, {
   listSiteClients: () => listSiteClients,
   listTombolaSessions: () => listTombolaSessions,
   listUtilisateurs: () => listUtilisateurs,
+  listVariantGroups: () => listVariantGroups,
   listWaMessages: () => listWaMessages,
   markMessagesRead: () => markMessagesRead,
   markTombolaNotified: () => markTombolaNotified,
@@ -890,6 +902,7 @@ __export(admin_db_exports, {
   updateTombolaSession: () => updateTombolaSession,
   updateUtilisateur: () => updateUtilisateur,
   updateUtilisateurPassword: () => updateUtilisateurPassword,
+  updateVariantGroup: () => updateVariantGroup,
   upsertClient: () => upsertClient,
   upsertCoupon: () => upsertCoupon,
   upsertDeliveryZone: () => upsertDeliveryZone,
@@ -1642,12 +1655,25 @@ async function ensureEntrepotsTable() {
       await db.execute(`ALTER TABLE produits ADD COLUMN prix_entrepot DECIMAL(10,2) NULL`);
     } catch {
     }
+    try {
+      await db.execute(`ALTER TABLE entrepots ADD COLUMN principal TINYINT(1) NOT NULL DEFAULT 0`);
+    } catch {
+    }
+    try {
+      await db.execute(`ALTER TABLE entrepots ADD COLUMN capacite INT NOT NULL DEFAULT 0`);
+    } catch {
+    }
   });
 }
 async function listEntrepots(shopId = 1) {
   await ensureEntrepotsTable();
   const [rows] = await db.execute(
-    "SELECT id, nom, telephone, adresse, notes, actif FROM entrepots WHERE shop_id = ? ORDER BY nom",
+    `SELECT e.id, e.nom, e.telephone, e.adresse, e.notes, e.actif,
+       COALESCE(e.principal, 0) AS principal,
+       COALESCE(e.capacite, 0) AS capacite,
+       (SELECT COUNT(*) FROM produits p WHERE p.entrepot_id = e.id AND p.actif = 1) AS products_count,
+       (SELECT COALESCE(SUM(p.stock_magasin), 0) FROM produits p WHERE p.entrepot_id = e.id AND p.actif = 1) AS stock_total
+     FROM entrepots e WHERE e.shop_id = ? ORDER BY e.principal DESC, e.nom ASC`,
     [shopId]
   );
   return rows.map((r) => ({
@@ -1656,7 +1682,11 @@ async function listEntrepots(shopId = 1) {
     telephone: r.telephone ?? null,
     adresse: r.adresse ?? null,
     notes: r.notes ?? null,
-    actif: Boolean(r.actif)
+    actif: Boolean(r.actif),
+    principal: Boolean(r.principal),
+    capacite: Number(r.capacite ?? 0),
+    products_count: Number(r.products_count ?? 0),
+    stock_total: Number(r.stock_total ?? 0)
   }));
 }
 async function upsertEntrepot(data, shopId = 1) {
@@ -1676,6 +1706,120 @@ async function upsertEntrepot(data, shopId = 1) {
 }
 async function deleteEntrepot(id, shopId = 1) {
   await db.execute("DELETE FROM entrepots WHERE id = ? AND shop_id = ?", [id, shopId]);
+}
+async function createEntrepotPrincipal(shopId, nomBoutique) {
+  await ensureEntrepotsTable();
+  const [existing] = await db.execute(
+    "SELECT id FROM entrepots WHERE shop_id = ? AND principal = 1 LIMIT 1",
+    [shopId]
+  );
+  if (existing[0]) {
+    return Number(existing[0].id);
+  }
+  const [result] = await db.execute(
+    `INSERT INTO entrepots (nom, principal, actif, shop_id) VALUES (?, 1, 1, ?)`,
+    [`Stock ${nomBoutique}`, shopId]
+  );
+  return result.insertId;
+}
+async function getPrincipalEntrepot(shopId) {
+  await ensureEntrepotsTable();
+  const [rows] = await db.execute(
+    "SELECT id FROM entrepots WHERE shop_id = ? AND principal = 1 LIMIT 1",
+    [shopId]
+  );
+  const row = rows[0];
+  return row ? Number(row.id) : null;
+}
+async function ensureVariantGroupsTable() {
+  return runOnce("variant_groups", async () => {
+    await db.execute(`CREATE TABLE IF NOT EXISTS variant_groups (
+      id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nom        VARCHAR(150) NOT NULL,
+      type       VARCHAR(50)  NOT NULL DEFAULT 'Texte',
+      valeurs    JSON         NULL,
+      shop_id    INT UNSIGNED NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+  });
+}
+async function listVariantGroups(shopId = 1) {
+  await ensureVariantGroupsTable();
+  const [rows] = await db.execute(
+    "SELECT id, nom, type, valeurs FROM variant_groups WHERE shop_id = ? ORDER BY nom ASC",
+    [shopId]
+  );
+  return rows.map((r) => ({
+    id: Number(r.id),
+    nom: r.nom,
+    type: r.type,
+    valeurs: Array.isArray(r.valeurs) ? r.valeurs : typeof r.valeurs === "string" ? JSON.parse(r.valeurs) : []
+  }));
+}
+async function createVariantGroup(data, shopId = 1) {
+  await ensureVariantGroupsTable();
+  const [result] = await db.execute(
+    "INSERT INTO variant_groups (nom, type, valeurs, shop_id) VALUES (?, ?, ?, ?)",
+    [data.nom, data.type, JSON.stringify(data.valeurs), shopId]
+  );
+  return result.insertId;
+}
+async function updateVariantGroup(id, data, shopId = 1) {
+  await ensureVariantGroupsTable();
+  const sets = [];
+  const vals = [];
+  if (data.nom) {
+    sets.push("nom = ?");
+    vals.push(data.nom);
+  }
+  if (data.type) {
+    sets.push("type = ?");
+    vals.push(data.type);
+  }
+  if (data.valeurs) {
+    sets.push("valeurs = ?");
+    vals.push(JSON.stringify(data.valeurs));
+  }
+  if (!sets.length) return;
+  vals.push(id, shopId);
+  await db.execute(`UPDATE variant_groups SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, vals);
+}
+async function deleteVariantGroup(id, shopId = 1) {
+  await ensureVariantGroupsTable();
+  await db.execute("DELETE FROM variant_groups WHERE id = ? AND shop_id = ?", [id, shopId]);
+}
+async function backfillEntrepotPrincipal(shopId, nomBoutique) {
+  const nom = nomBoutique ?? `Boutique ${shopId}`;
+  const entrepotId = await createEntrepotPrincipal(shopId, nom);
+  const [result] = await db.execute(
+    "UPDATE produits SET entrepot_id = ? WHERE shop_id = ? AND entrepot_id IS NULL",
+    [entrepotId, shopId]
+  );
+  return result.affectedRows;
+}
+async function backfillAllShopsEntrepots() {
+  try {
+    const [rows] = await db.execute(
+      `SELECT DISTINCT p.shop_id, s.nom AS shop_nom
+       FROM produits p
+       LEFT JOIN shops s ON s.id = p.shop_id
+       WHERE p.entrepot_id IS NULL`
+    );
+    for (const row of rows) {
+      const shopId = Number(row.shop_id);
+      const shopNom = row.shop_nom ?? `Boutique ${shopId}`;
+      try {
+        const updated = await backfillEntrepotPrincipal(shopId, shopNom);
+        if (updated > 0) {
+          console.log(`[entrepot-backfill] shop ${shopId} (${shopNom}): ${updated} produit(s) assign\xE9(s) \xE0 l'entrep\xF4t principal`);
+        }
+      } catch (e) {
+        console.error(`[entrepot-backfill] shop ${shopId}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[entrepot-backfill] skipped:", e.message);
+  }
 }
 async function getProductEntrepotsForRefs(refs) {
   if (!refs.length) return {};
@@ -3543,7 +3687,8 @@ async function deleteFournisseur(id, shopId = 1) {
 }
 async function listAchats(shopId = 1, limit = 50, offset = 0) {
   const [rows] = await db.query(
-    `SELECT a.*, f.nom AS fournisseur_nom
+    `SELECT a.*, f.nom AS fournisseur_nom,
+       (SELECT COUNT(*) FROM achat_items WHERE achat_id = a.id) AS items_count
      FROM achats a
      LEFT JOIN fournisseurs f ON f.id = a.fournisseur_id
      WHERE a.shop_id = ?
@@ -3606,6 +3751,7 @@ async function createAchat(data, shopId = 1) {
     }
     const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
     let hasTransport = false;
+    let hasDateArrivee = false;
     try {
       await conn.execute(`ALTER TABLE achats ADD COLUMN transport VARCHAR(10) NULL`);
       hasTransport = true;
@@ -3613,6 +3759,15 @@ async function createAchat(data, shopId = 1) {
       const err = e;
       if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
         hasTransport = true;
+      }
+    }
+    try {
+      await conn.execute(`ALTER TABLE achats ADD COLUMN date_arrivee DATE NULL`);
+      hasDateArrivee = true;
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        hasDateArrivee = true;
       }
     }
     const achatCols = ["shop_id", "fournisseur_id", "reference", "date_achat", "statut", "montant_total", "notes"];
@@ -3628,6 +3783,10 @@ async function createAchat(data, shopId = 1) {
     if (hasTransport) {
       achatCols.push("transport");
       achatVals.push(data.transport ?? null);
+    }
+    if (hasDateArrivee) {
+      achatCols.push("date_arrivee");
+      achatVals.push(data.date_arrivee ?? null);
     }
     const [res] = await conn.execute(
       `INSERT INTO achats (${achatCols.join(",")}) VALUES (${achatCols.map(() => "?").join(",")})`,
@@ -3684,6 +3843,10 @@ async function updateAchat(id, data, shopId = 1) {
       sets.push("date_achat = ?");
       vals.push(data.date_achat);
     }
+    if ("date_arrivee" in data) {
+      sets.push("date_arrivee = ?");
+      vals.push(data.date_arrivee ?? null);
+    }
     if ("transport" in data) {
       sets.push("transport = ?");
       vals.push(data.transport ?? null);
@@ -3691,6 +3854,10 @@ async function updateAchat(id, data, shopId = 1) {
     if ("note" in data) {
       sets.push("notes = ?");
       vals.push(data.note ?? null);
+    }
+    if (data.statut) {
+      sets.push("statut = ?");
+      vals.push(data.statut);
     }
     if (data.items) {
       const montant_total = data.items.reduce((s, i) => s + i.quantite * i.prix_unitaire, 0);
@@ -3719,22 +3886,62 @@ async function updateAchat(id, data, shopId = 1) {
     conn.release();
   }
 }
-async function recevoirAchat(id, shopId = 1) {
+async function recevoirAchat(id, shopId = 1, receivedItems, dateRecue) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.execute("SELECT statut FROM achats WHERE id = ? AND shop_id = ?", [id, shopId]);
+    const [rows] = await conn.execute(
+      "SELECT statut FROM achats WHERE id = ? AND shop_id = ?",
+      [id, shopId]
+    );
     if (!rows[0]) throw new Error("Achat introuvable.");
-    if (rows[0].statut !== "en_attente") throw new Error("Cet achat n'est pas en attente.");
-    await conn.execute("UPDATE achats SET statut = 'recu' WHERE id = ? AND shop_id = ?", [id, shopId]);
+    const FINAL = ["recu", "annule"];
+    if (FINAL.includes(rows[0].statut)) throw new Error("Cet achat est d\xE9j\xE0 finalis\xE9.");
     const [items] = await conn.execute(
-      "SELECT produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL",
+      "SELECT id, produit_id, quantite FROM achat_items WHERE achat_id = ? AND produit_id IS NOT NULL",
       [id]
     );
-    if (items.length > 0) {
-      const cases = items.map(() => "WHEN id = ? THEN COALESCE(stock_magasin, 0) + ?").join(" ");
-      const ids = items.map((i) => i.produit_id);
-      const vals = items.flatMap((i) => [i.produit_id, i.quantite]);
+    const orderedItems = items;
+    const qtyMap = /* @__PURE__ */ new Map();
+    if (receivedItems && receivedItems.length > 0) {
+      for (const ri of receivedItems) {
+        if (ri.produit_id != null && ri.qty_recue > 0) {
+          const cur = qtyMap.get(ri.produit_id) ?? 0;
+          qtyMap.set(ri.produit_id, cur + ri.qty_recue);
+        }
+      }
+    } else {
+      for (const oi of orderedItems) {
+        qtyMap.set(Number(oi.produit_id), Number(oi.quantite));
+      }
+    }
+    let isPartial = false;
+    if (receivedItems) {
+      for (const oi of orderedItems) {
+        const ordered = Number(oi.quantite);
+        const received = qtyMap.get(Number(oi.produit_id)) ?? 0;
+        if (received < ordered) {
+          isPartial = true;
+          break;
+        }
+      }
+    }
+    const newStatut = isPartial ? "partiel" : "recu";
+    const sets = ["statut = ?"];
+    const setVals = [newStatut];
+    if (dateRecue) {
+      sets.push("date_arrivee = ?");
+      setVals.push(dateRecue);
+    }
+    setVals.push(id, shopId);
+    await conn.execute(
+      `UPDATE achats SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`,
+      setVals
+    );
+    if (qtyMap.size > 0) {
+      const ids = [...qtyMap.keys()];
+      const cases = ids.map(() => "WHEN id = ? THEN COALESCE(stock_magasin, 0) + ?").join(" ");
+      const vals = ids.flatMap((pid) => [pid, qtyMap.get(pid) ?? 0]);
       await conn.execute(
         `UPDATE produits SET stock_magasin = CASE ${cases} END WHERE id IN (${ids.map(() => "?").join(",")})`,
         [...vals, ...ids]
@@ -4574,7 +4781,7 @@ async function markTombolaNotified(sessionId) {
 }
 var _ensurePromises, _settingsCacheMap, _finCols, _ventesStatsCache;
 var init_admin_db = __esm({
-  "../lib/admin-db.ts"() {
+  "lib/admin-db.ts"() {
     "use strict";
     init_db();
     _ensurePromises = /* @__PURE__ */ new Map();
@@ -4584,7 +4791,7 @@ var init_admin_db = __esm({
   }
 });
 
-// ../lib/shops.ts
+// lib/shops.ts
 var shops_exports = {};
 __export(shops_exports, {
   activateBasicPlan: () => activateBasicPlan,
@@ -4842,14 +5049,14 @@ async function expireShopSubscriptions() {
 }
 var _ensured;
 var init_shops = __esm({
-  "../lib/shops.ts"() {
+  "lib/shops.ts"() {
     "use strict";
     init_db();
     _ensured = false;
   }
 });
 
-// lib/auth.ts
+// backend/lib/auth.ts
 function cookieDomain() {
   if (process.env.NODE_ENV !== "production") return void 0;
   if (process.env.AUTH_COOKIE_DOMAIN) return process.env.AUTH_COOKIE_DOMAIN;
@@ -4910,7 +5117,7 @@ function clearAuthCookie(res) {
 }
 var import_jose, jwtSecret, SECRET, COOKIE_NAME, TTL;
 var init_auth = __esm({
-  "lib/auth.ts"() {
+  "backend/lib/auth.ts"() {
     "use strict";
     import_jose = require("jose");
     init_admin_db();
@@ -4925,7 +5132,7 @@ var init_auth = __esm({
   }
 });
 
-// lib/whatsapp.ts
+// backend/lib/whatsapp.ts
 var whatsapp_exports = {};
 __export(whatsapp_exports, {
   getWaMediaUrl: () => getWaMediaUrl,
@@ -5265,14 +5472,14 @@ async function sendWaDeliveryConfirmation(order) {
 }
 var WA_API;
 var init_whatsapp = __esm({
-  "lib/whatsapp.ts"() {
+  "backend/lib/whatsapp.ts"() {
     "use strict";
     init_admin_db();
     WA_API = "https://graph.facebook.com/v19.0";
   }
 });
 
-// ../lib/plan-configs.ts
+// lib/plan-configs.ts
 var plan_configs_exports = {};
 __export(plan_configs_exports, {
   getAllPlanLimits: () => getAllPlanLimits,
@@ -5469,7 +5676,7 @@ async function updateSaasSettings(settings) {
 }
 var DEFAULTS, DEFAULT_PRICES, DEFAULT_SETTINGS, tableReady, priceColsReady, settingsReady;
 var init_plan_configs = __esm({
-  "../lib/plan-configs.ts"() {
+  "lib/plan-configs.ts"() {
     "use strict";
     init_db();
     DEFAULTS = {
@@ -5493,7 +5700,7 @@ var init_plan_configs = __esm({
   }
 });
 
-// routes/admin/ai.ts
+// backend/routes/admin/ai.ts
 var ai_exports = {};
 __export(ai_exports, {
   default: () => ai_default,
@@ -5607,7 +5814,7 @@ async function runWeeklyReportsForAllShops() {
 }
 var import_express47, router47, ai_default;
 var init_ai = __esm({
-  "routes/admin/ai.ts"() {
+  "backend/routes/admin/ai.ts"() {
     "use strict";
     import_express47 = __toESM(require("express"));
     init_auth();
@@ -5812,7 +6019,7 @@ Question : ${question}`,
   }
 });
 
-// index.ts
+// backend/index.ts
 var index_exports = {};
 __export(index_exports, {
   default: () => index_default
@@ -5826,7 +6033,7 @@ var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
 var import_express_rate_limit = require("express-rate-limit");
 
-// routes/admin/auth.ts
+// backend/routes/admin/auth.ts
 var import_express = __toESM(require("express"));
 var import_bcryptjs = __toESM(require("bcryptjs"));
 init_admin_db();
@@ -5834,7 +6041,7 @@ init_db();
 init_shops();
 init_auth();
 
-// lib/security-log.ts
+// backend/lib/security-log.ts
 init_db();
 async function ensureSecurityLogsTable() {
   await db.execute(`
@@ -5887,7 +6094,7 @@ async function getSecurityLogs(limit = 100, shopId) {
   }
 }
 
-// routes/admin/auth.ts
+// backend/routes/admin/auth.ts
 function getIp(req) {
   return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ?? req.socket?.remoteAddress ?? "unknown";
 }
@@ -6157,18 +6364,18 @@ router.post("/api/admin/auth/refresh", async (req, res) => {
 });
 var auth_default = router;
 
-// routes/admin/products.ts
+// backend/routes/admin/products.ts
 var import_express2 = __toESM(require("express"));
 init_auth();
 
-// lib/admin-events.ts
+// backend/lib/admin-events.ts
 var import_events = require("events");
 var adminEmitter = globalThis.__adminEmitter ?? (globalThis.__adminEmitter = new import_events.EventEmitter().setMaxListeners(200));
 function emitAdminEvent(type, payload) {
   adminEmitter.emit("admin", { type, ts: Date.now(), ...payload ?? {} });
 }
 
-// ../lib/admin-permissions.ts
+// lib/admin-permissions.ts
 function hasPageAccess(role, permissions, module2, pageId) {
   if (role === "super_admin") return true;
   if (!permissions) return false;
@@ -6178,12 +6385,12 @@ function hasPageAccess(role, permissions, module2, pageId) {
   return perm.some((p) => pageId === p || pageId.startsWith(p + "/"));
 }
 
-// routes/admin/products.ts
+// backend/routes/admin/products.ts
 init_db();
 init_admin_db();
 init_shops();
 
-// lib/plan-limits.ts
+// backend/lib/plan-limits.ts
 var PLAN_LIMITS = {
   basic: 20,
   pro: Infinity,
@@ -6197,7 +6404,7 @@ function planLimitLabel(plan) {
   return limit === Infinity ? "illimit\xE9" : String(limit);
 }
 
-// routes/admin/products.ts
+// backend/routes/admin/products.ts
 var router2 = import_express2.default.Router();
 function validateImageUrl(url) {
   if (!url || typeof url !== "string" || url.trim() === "") return null;
@@ -6400,6 +6607,12 @@ router2.post("/api/admin/products", async (req, res) => {
     if (body.entrepot_id != null) {
       columns.push("entrepot_id");
       values.push(Number(body.entrepot_id) || null);
+    } else {
+      const principalId = await getPrincipalEntrepot(shopId).catch(() => null);
+      if (principalId) {
+        columns.push("entrepot_id");
+        values.push(principalId);
+      }
     }
     if (body.prix_entrepot != null) {
       columns.push("prix_entrepot");
@@ -6723,10 +6936,11 @@ router2.delete("/api/admin/products/:id", async (req, res) => {
 });
 var products_default = router2;
 
-// routes/admin/variants.ts
+// backend/routes/admin/variants.ts
 var import_express3 = __toESM(require("express"));
 init_auth();
 init_db();
+init_admin_db();
 var router3 = import_express3.default.Router();
 var _variantsReady = false;
 async function ensureTable() {
@@ -6879,9 +7093,51 @@ router3.delete("/api/admin/products/:productId/variants/:id", async (req, res) =
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
+router3.get("/api/admin/variant-groups", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const groups = await listVariantGroups(session.shop_id ?? 1);
+    res.json({ groups });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.post("/api/admin/variant-groups", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const { nom, type, valeurs } = req.body;
+    if (!nom?.trim()) return res.status(400).json({ error: "Nom obligatoire." });
+    const id = await createVariantGroup({ nom: nom.trim(), type: type ?? "Texte", valeurs: Array.isArray(valeurs) ? valeurs : [] }, session.shop_id ?? 1);
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.patch("/api/admin/variant-groups/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    await updateVariantGroup(Number(req.params.id), req.body, session.shop_id ?? 1);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router3.delete("/api/admin/variant-groups/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    await deleteVariantGroup(Number(req.params.id), session.shop_id ?? 1);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 var variants_default = router3;
 
-// routes/admin/stock.ts
+// backend/routes/admin/stock.ts
 var import_express4 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -6986,7 +7242,7 @@ router4.post("/api/admin/stock/ajustement", async (req, res) => {
 });
 var stock_default = router4;
 
-// routes/admin/stock-boutique.ts
+// backend/routes/admin/stock-boutique.ts
 var import_express5 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -7084,7 +7340,7 @@ router5.get("/api/admin/stock-boutique/entrees", async (req, res) => {
 });
 var stock_boutique_default = router5;
 
-// routes/admin/ventes.ts
+// backend/routes/admin/ventes.ts
 var import_express6 = __toESM(require("express"));
 init_db();
 init_auth();
@@ -7266,7 +7522,7 @@ router6.get("/api/admin/ventes/livraisons", async (req, res) => {
 });
 var ventes_default = router6;
 
-// routes/admin/livraisons.ts
+// backend/routes/admin/livraisons.ts
 var import_express7 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -7349,7 +7605,7 @@ router7.delete("/api/admin/livreurs/:id", async (req, res) => {
 });
 var livraisons_default = router7;
 
-// routes/admin/finance.ts
+// backend/routes/admin/finance.ts
 var import_express8 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -7473,7 +7729,7 @@ router8.delete("/api/admin/finance", async (req, res) => {
 });
 var finance_default = router8;
 
-// routes/admin/clients.ts
+// backend/routes/admin/clients.ts
 var import_express9 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -7545,7 +7801,7 @@ router9.delete("/api/admin/clients/:id", async (req, res) => {
 });
 var clients_default = router9;
 
-// routes/admin/orders.ts
+// backend/routes/admin/orders.ts
 var import_express10 = __toESM(require("express"));
 init_auth();
 init_whatsapp();
@@ -7736,7 +7992,7 @@ router10.delete("/api/admin/orders/:id", async (req, res) => {
 });
 var orders_default = router10;
 
-// routes/admin/upload.ts
+// backend/routes/admin/upload.ts
 var import_express11 = __toESM(require("express"));
 init_auth();
 var import_cloudinary = require("cloudinary");
@@ -7796,13 +8052,14 @@ router11.post("/api/admin/upload", async (req, res) => {
 });
 var upload_default = router11;
 
-// routes/admin/settings.ts
+// backend/routes/admin/settings.ts
 var import_express12 = __toESM(require("express"));
 init_auth();
 init_admin_db();
 init_shops();
+var import_bcryptjs2 = __toESM(require("bcryptjs"));
 
-// lib/vercel-domains.ts
+// backend/lib/vercel-domains.ts
 var TOKEN = process.env.VERCEL_TOKEN;
 var PROJECT_ID = process.env.VERCEL_PROJECT_ID;
 var TEAM_ID = process.env.VERCEL_TEAM_ID;
@@ -7864,7 +8121,7 @@ async function checkVercelDomain(domain) {
   }
 }
 
-// routes/admin/settings.ts
+// backend/routes/admin/settings.ts
 var router12 = import_express12.default.Router();
 router12.get("/api/admin/settings", async (req, res) => {
   const session = await getSession(req);
@@ -7958,9 +8215,73 @@ router12.delete("/api/admin/settings/domain", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
+router12.get("/api/admin/settings/shop-profile", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const [shop, settings] = await Promise.all([getShopById(shopId), getSettings(shopId)]);
+    res.json({
+      nom: shop?.nom ?? "",
+      email: shop?.email ?? "",
+      telephone: settings["shop_telephone"] ?? "",
+      adresse: settings["shop_adresse"] ?? "",
+      ville: settings["shop_ville"] ?? "",
+      pays: settings["shop_pays"] ?? "Togo"
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.patch("/api/admin/settings/shop-profile", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const shopId = session.shop_id ?? 1;
+    const { nom, email, telephone, adresse, ville, pays } = req.body;
+    if (nom || email) await updateShop(shopId, { ...nom ? { nom } : {}, ...email ? { email } : {} });
+    await setSettings({ shop_telephone: telephone ?? "", shop_adresse: adresse ?? "", shop_ville: ville ?? "", shop_pays: pays ?? "Togo" }, shopId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.get("/api/admin/settings/team", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const users = await listAdminUsers(session.shop_id ?? 1);
+    res.json({ users: users.filter((u) => u.actif) });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router12.post("/api/admin/settings/team", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
+  }
+  try {
+    const { nom, email, role } = req.body;
+    if (!email?.trim() || !email.includes("@")) return res.status(400).json({ error: "Email invalide." });
+    const shopId = session.shop_id ?? 1;
+    const username = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 20) + "_" + Math.floor(Math.random() * 1e3);
+    const tempPassword = Math.random().toString(36).slice(2, 10) + "Aa1!";
+    const password_hash = await import_bcryptjs2.default.hash(tempPassword, 10);
+    const dbRole = role === "Admin" ? "admin" : role === "G\xE9rant" ? "manager" : "staff";
+    await createAdminUser({ nom: nom?.trim() || email.split("@")[0], username, email: email.trim(), role: dbRole, password_hash, shop_id: shopId });
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 var settings_default = router12;
 
-// routes/admin/fournisseurs.ts
+// backend/routes/admin/fournisseurs.ts
 var import_express13 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -8013,10 +8334,10 @@ router13.post("/api/admin/achats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { fournisseur_id, reference, date_achat, statut, note, transport, items } = req.body;
+    const { fournisseur_id, reference, date_achat, date_arrivee, statut, note, transport, items } = req.body;
     if (!date_achat) return res.status(400).json({ error: "La date est obligatoire." });
     if (!items?.length) return res.status(400).json({ error: "Au moins un article est requis." });
-    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference: reference || void 0, date_achat, statut: statut ?? "en_attente", note: note ?? null, transport: transport ?? null, items }, session.shop_id ?? 1);
+    const id = await createAchat({ fournisseur_id: fournisseur_id ?? null, reference: reference || void 0, date_achat, date_arrivee: date_arrivee ?? null, statut: statut ?? "en_attente", note: note ?? null, transport: transport ?? null, items }, session.shop_id ?? 1);
     emitAdminEvent("achat");
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -8037,7 +8358,7 @@ router13.patch("/api/admin/achats/:id", async (req, res) => {
     const id = Number(req.params.id);
     const shopId = session.shop_id ?? 1;
     if (req.body.action === "recevoir") {
-      await recevoirAchat(id, shopId);
+      await recevoirAchat(id, shopId, req.body.received_items, req.body.date_recue ?? null);
     } else {
       await updateAchat(id, req.body, shopId);
     }
@@ -8058,7 +8379,7 @@ router13.delete("/api/admin/achats/:id", async (req, res) => {
 });
 var fournisseurs_default = router13;
 
-// routes/admin/categories.ts
+// backend/routes/admin/categories.ts
 var import_express14 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -8119,7 +8440,7 @@ router14.delete("/api/admin/marques/:id", async (req, res) => {
 });
 var categories_default = router14;
 
-// routes/admin/boutique-clients.ts
+// backend/routes/admin/boutique-clients.ts
 var import_express15 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -8198,7 +8519,7 @@ router15.delete("/api/admin/boutique-clients/:id", async (req, res) => {
 });
 var boutique_clients_default = router15;
 
-// routes/admin/newsletter.ts
+// backend/routes/admin/newsletter.ts
 var import_express16 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -8227,7 +8548,7 @@ router16.delete("/api/admin/newsletter", async (req, res) => {
 });
 var newsletter_default = router16;
 
-// routes/admin/schema.ts
+// backend/routes/admin/schema.ts
 var import_express17 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -8279,7 +8600,7 @@ router17.post("/api/admin/schema/migrate", async (req, res) => {
 });
 var schema_default = router17;
 
-// routes/admin/events.ts
+// backend/routes/admin/events.ts
 var import_express18 = __toESM(require("express"));
 init_auth();
 var router18 = import_express18.default.Router();
@@ -8339,9 +8660,9 @@ router18.get("/api/admin/events", async (req, res) => res.redirect(307, "/api/ad
 router18.get("/api/admin/orders/sse", async (req, res) => res.redirect(307, "/api/admin/sse"));
 var events_default = router18;
 
-// routes/admin/users.ts
+// backend/routes/admin/users.ts
 var import_express19 = __toESM(require("express"));
-var import_bcryptjs2 = __toESM(require("bcryptjs"));
+var import_bcryptjs3 = __toESM(require("bcryptjs"));
 init_db();
 init_auth();
 init_admin_db();
@@ -8398,7 +8719,7 @@ router19.post("/api/admin/users", async (req, res) => {
         }
       }
     }
-    const hash = await import_bcryptjs2.default.hash(password, 12);
+    const hash = await import_bcryptjs3.default.hash(password, 12);
     await createAdminUser({
       nom,
       username: username.trim().toLowerCase(),
@@ -8424,7 +8745,7 @@ router19.patch("/api/admin/users/:id", async (req, res) => {
   try {
     const { password, permissions, ...rest } = req.body;
     if (password) {
-      const hash = await import_bcryptjs2.default.hash(String(password), 12);
+      const hash = await import_bcryptjs3.default.hash(String(password), 12);
       await updateAdminPassword(targetId, hash);
     }
     if (isSuperAdmin) {
@@ -8498,7 +8819,7 @@ router19.post("/api/admin/team", async (req, res) => {
     const { nom, poste, email, telephone, numero_plaque, username, motDePasse } = req.body;
     if (!nom || !poste || !motDePasse) return res.status(400).json({ error: "Champs manquants." });
     if (poste === "Livreur" && !telephone) return res.status(400).json({ error: "Le t\xE9l\xE9phone est obligatoire pour un livreur." });
-    const hash = await import_bcryptjs2.default.hash(motDePasse, 12);
+    const hash = await import_bcryptjs3.default.hash(motDePasse, 12);
     const id = await createUtilisateur({ nom, poste, email, telephone, numero_plaque: numero_plaque || void 0, username: username?.trim().toLowerCase() || void 0, motDePasse: hash, mustChangePassword: true });
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -8518,7 +8839,7 @@ router19.patch("/api/admin/team/:id", async (req, res) => {
     if (rest.numero_plaque !== void 0) data.numero_plaque = rest.numero_plaque ? String(rest.numero_plaque) : void 0;
     if (rest.poste !== void 0) data.poste = String(rest.poste);
     if (rest.actif !== void 0) data.actif = Number(rest.actif);
-    if (motDePasse) data.motDePasse = await import_bcryptjs2.default.hash(String(motDePasse), 12);
+    if (motDePasse) data.motDePasse = await import_bcryptjs3.default.hash(String(motDePasse), 12);
     await updateUtilisateur(Number(req.params.id), data);
     res.json({ ok: true });
   } catch (err) {
@@ -8564,7 +8885,7 @@ router19.put("/api/admin/team/:id/permissions", async (req, res) => {
 });
 var users_default = router19;
 
-// routes/admin/reviews.ts
+// backend/routes/admin/reviews.ts
 var import_express20 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -8587,7 +8908,7 @@ router20.post("/api/admin/reviews", async (req, res) => {
 });
 var reviews_default = router20;
 
-// routes/admin/payment-plans.ts
+// backend/routes/admin/payment-plans.ts
 var import_express21 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -8681,7 +9002,7 @@ router21.delete("/api/admin/payment-plans/:id", async (req, res) => {
 });
 var payment_plans_default = router21;
 
-// routes/admin/verifications.ts
+// backend/routes/admin/verifications.ts
 var import_express22 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -8737,7 +9058,7 @@ router22.patch("/api/admin/verifications/:id", async (req, res) => {
 });
 var verifications_default = router22;
 
-// routes/admin/commerciaux.ts
+// backend/routes/admin/commerciaux.ts
 var import_express23 = __toESM(require("express"));
 init_db();
 init_auth();
@@ -8909,7 +9230,7 @@ router23.put("/api/admin/commerciaux/:id/produits", async (req, res) => {
 });
 var commerciaux_default = router23;
 
-// routes/livreur.ts
+// backend/routes/livreur.ts
 var import_express24 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -9258,7 +9579,7 @@ router24.patch("/api/livreur/orders/:id/fail", async (req, res) => {
 });
 var livreur_default = router24;
 
-// routes/public.ts
+// backend/routes/public.ts
 var import_express25 = __toESM(require("express"));
 init_db();
 init_admin_db();
@@ -9657,13 +9978,13 @@ router25.get("/api/resolve-domain", async (req, res) => {
 });
 var public_default = router25;
 
-// routes/account.ts
+// backend/routes/account.ts
 var import_express26 = __toESM(require("express"));
-var import_bcryptjs3 = __toESM(require("bcryptjs"));
+var import_bcryptjs4 = __toESM(require("bcryptjs"));
 init_db();
 init_admin_db();
 
-// lib/client-auth.ts
+// backend/lib/client-auth.ts
 var import_jose2 = require("jose");
 var SECRET2 = new TextEncoder().encode(
   process.env.JWT_SECRET || "togolese-shop-secret-change-in-production-2024"
@@ -9699,7 +10020,7 @@ function clearClientCookie(res) {
   res.clearCookie(CLIENT_COOKIE, { path: "/" });
 }
 
-// routes/account.ts
+// backend/routes/account.ts
 var router26 = import_express26.default.Router();
 var tableReady2 = false;
 async function ensureTable3() {
@@ -9754,7 +10075,7 @@ router26.post("/api/account/register", async (req, res) => {
     if (existing) {
       return res.status(409).json({ error: "Ce compte existe d\xE9j\xE0. Connectez-vous." });
     }
-    const hash = await import_bcryptjs3.default.hash(password.trim(), 12);
+    const hash = await import_bcryptjs4.default.hash(password.trim(), 12);
     const field = isEmail(identifier) ? "email" : "telephone";
     const pool2 = db;
     const [result] = await pool2.execute(
@@ -9787,7 +10108,7 @@ router26.post("/api/account/login", async (req, res) => {
     if (!user || !user.password_hash) {
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
-    const ok = await import_bcryptjs3.default.compare(password.trim(), user.password_hash);
+    const ok = await import_bcryptjs4.default.compare(password.trim(), user.password_hash);
     if (!ok) {
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
@@ -10140,7 +10461,7 @@ router26.delete("/api/account/addresses/:id", async (req, res) => {
 });
 var account_default = router26;
 
-// routes/orders.ts
+// backend/routes/orders.ts
 var import_express27 = __toESM(require("express"));
 init_admin_db();
 init_whatsapp();
@@ -10350,7 +10671,7 @@ router27.post("/api/orders", async (req, res) => {
 });
 var orders_default2 = router27;
 
-// routes/mobile-money.ts
+// backend/routes/mobile-money.ts
 var import_express28 = __toESM(require("express"));
 init_db();
 init_admin_db();
@@ -10546,10 +10867,10 @@ router28.post("/api/webhooks/fedapay", async (req, res) => {
 });
 var mobile_money_default = router28;
 
-// index.ts
+// backend/index.ts
 init_admin_db();
 
-// routes/admin/security-logs.ts
+// backend/routes/admin/security-logs.ts
 var import_express29 = __toESM(require("express"));
 init_auth();
 var router29 = import_express29.default.Router();
@@ -10566,7 +10887,7 @@ router29.get("/api/admin/security-logs", async (req, res) => {
 });
 var security_logs_default = router29;
 
-// routes/admin/rapports.ts
+// backend/routes/admin/rapports.ts
 var import_express30 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -10922,7 +11243,7 @@ router30.get("/api/admin/rapports", async (req, res) => {
 });
 var rapports_default = router30;
 
-// routes/admin/tendances.ts
+// backend/routes/admin/tendances.ts
 var import_express31 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -11122,7 +11443,7 @@ router31.get("/api/admin/tendances", async (req, res) => {
 });
 var tendances_default = router31;
 
-// routes/admin/performance-produits.ts
+// backend/routes/admin/performance-produits.ts
 var import_express32 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -11250,7 +11571,7 @@ router32.get("/api/admin/performance-produits", async (req, res) => {
 });
 var performance_produits_default = router32;
 
-// routes/admin/whatsapp-inbox.ts
+// backend/routes/admin/whatsapp-inbox.ts
 var import_express33 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -11498,7 +11819,7 @@ router33.delete("/api/admin/whatsapp/threads/:phone", async (req, res) => {
 });
 var whatsapp_inbox_default = router33;
 
-// routes/whatsapp-webhook.ts
+// backend/routes/whatsapp-webhook.ts
 var import_express34 = __toESM(require("express"));
 init_db();
 var router34 = import_express34.default.Router();
@@ -11562,7 +11883,7 @@ router34.post("/api/webhooks/whatsapp", async (req, res) => {
 });
 var whatsapp_webhook_default = router34;
 
-// routes/analytics.ts
+// backend/routes/analytics.ts
 var import_express35 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -11870,7 +12191,7 @@ router35.get("/api/admin/analytics", async (req, res) => {
 });
 var analytics_default = router35;
 
-// routes/referrals.ts
+// backend/routes/referrals.ts
 var import_express36 = __toESM(require("express"));
 init_db();
 var router36 = import_express36.default.Router();
@@ -11968,7 +12289,7 @@ router36.get("/api/referrals/validate", async (req, res) => {
 });
 var referrals_default = router36;
 
-// routes/admin/delivery-zones.ts
+// backend/routes/admin/delivery-zones.ts
 var import_express37 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -12046,7 +12367,7 @@ router37.delete("/api/admin/delivery-zones/:id", async (req, res) => {
 });
 var delivery_zones_default = router37;
 
-// routes/admin/coupons.ts
+// backend/routes/admin/coupons.ts
 var import_express38 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -12126,7 +12447,7 @@ router38.post("/api/admin/coupons", async (req, res) => {
 });
 var coupons_default = router38;
 
-// routes/admin/social.ts
+// backend/routes/admin/social.ts
 var import_express39 = __toESM(require("express"));
 init_auth();
 var router39 = import_express39.default.Router();
@@ -12241,7 +12562,7 @@ router39.post("/api/admin/social/publish", async (req, res) => {
 });
 var social_default = router39;
 
-// routes/admin/whatsapp-campagne.ts
+// backend/routes/admin/whatsapp-campagne.ts
 var import_express40 = __toESM(require("express"));
 init_auth();
 init_db();
@@ -12350,9 +12671,9 @@ router40.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
 });
 var whatsapp_campagne_default = router40;
 
-// routes/admin/livreur-inscriptions.ts
+// backend/routes/admin/livreur-inscriptions.ts
 var import_express41 = __toESM(require("express"));
-var import_bcryptjs4 = __toESM(require("bcryptjs"));
+var import_bcryptjs5 = __toESM(require("bcryptjs"));
 var import_cloudinary2 = require("cloudinary");
 init_auth();
 init_admin_db();
@@ -12423,7 +12744,7 @@ router41.post("/api/livreur/inscription", async (req, res) => {
     } catch {
       return res.status(400).json({ error: "Impossible d'envoyer la photo. V\xE9rifiez le format (JPEG, PNG, max 10 Mo)." });
     }
-    const hash = await import_bcryptjs4.default.hash(password, 12);
+    const hash = await import_bcryptjs5.default.hash(password, 12);
     const id = await createLivreurInscription({
       nom: nom.trim(),
       telephone: telephone.trim(),
@@ -12493,7 +12814,7 @@ router41.post("/api/admin/livreur-inscriptions/:id/reject", async (req, res) => 
 });
 var livreur_inscriptions_default = router41;
 
-// routes/admin/entrepots.ts
+// backend/routes/admin/entrepots.ts
 var import_express42 = __toESM(require("express"));
 init_auth();
 init_admin_db();
@@ -12554,7 +12875,7 @@ router42.delete("/api/admin/entrepots/:id", async (req, res) => {
 });
 var entrepots_default = router42;
 
-// routes/admin/tombola.ts
+// backend/routes/admin/tombola.ts
 var import_express43 = __toESM(require("express"));
 init_auth();
 init_whatsapp();
@@ -12660,13 +12981,13 @@ router43.delete("/api/admin/tombola/:id", async (req, res) => {
 });
 var tombola_default = router43;
 
-// routes/admin/onboarding.ts
+// backend/routes/admin/onboarding.ts
 var import_express44 = __toESM(require("express"));
-var import_bcryptjs5 = __toESM(require("bcryptjs"));
+var import_bcryptjs6 = __toESM(require("bcryptjs"));
 init_admin_db();
 init_shops();
 
-// lib/mailer.ts
+// backend/lib/mailer.ts
 var import_resend = require("resend");
 var RESEND_API_KEY = process.env.RESEND_API_KEY;
 var FROM_ADDRESS = process.env.RESEND_FROM || "onboarding@resend.dev";
@@ -12697,7 +13018,7 @@ async function sendMail(opts) {
   }
 }
 
-// lib/email-templates.ts
+// backend/lib/email-templates.ts
 var BRAND_COLOR = "#6366f1";
 function base(title, body) {
   return `<!DOCTYPE html>
@@ -12786,7 +13107,7 @@ Pour toute aide : support@togolese.tg`;
   return { subject: `\u{1F389} Votre boutique ${shopNom} est pr\xEAte \u2014 ShopSaaS`, html, text };
 }
 
-// routes/admin/onboarding.ts
+// backend/routes/admin/onboarding.ts
 var router44 = import_express44.default.Router();
 var SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
 router44.post("/api/admin/onboarding", async (req, res) => {
@@ -12826,7 +13147,7 @@ router44.post("/api/admin/onboarding", async (req, res) => {
     if (plan === "basic" || plan === "free") {
       await activateBasicPlan(shopId);
     }
-    const password_hash = await import_bcryptjs5.default.hash(admin_password, 12);
+    const password_hash = await import_bcryptjs6.default.hash(admin_password, 12);
     await createAdminUser({
       nom: admin_nom.trim(),
       username: admin_username.trim().toLowerCase(),
@@ -12835,6 +13156,9 @@ router44.post("/api/admin/onboarding", async (req, res) => {
       password_hash,
       shop_id: shopId
     });
+    createEntrepotPrincipal(shopId, shop_nom.trim()).catch(
+      (e) => console.error("[onboarding] createEntrepotPrincipal failed:", e)
+    );
     const siteBase = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const adminUrl = `${siteBase}/admin`;
     const loginUrl = `${siteBase}/admin/login`;
@@ -12870,7 +13194,7 @@ router44.get("/api/admin/onboarding/check-slug", async (req, res) => {
 });
 var onboarding_default = router44;
 
-// routes/admin/saas-dashboard.ts
+// backend/routes/admin/saas-dashboard.ts
 var import_express45 = __toESM(require("express"));
 init_auth();
 init_shops();
@@ -13155,12 +13479,12 @@ router45.put("/api/admin/saas/plans", async (req, res) => {
 });
 var saas_dashboard_default = router45;
 
-// routes/admin/billing.ts
+// backend/routes/admin/billing.ts
 var import_express46 = __toESM(require("express"));
 init_auth();
 init_shops();
 
-// lib/cinetpay.ts
+// backend/lib/cinetpay.ts
 var PLAN_PRICES = {
   basic: 0,
   pro: 9900,
@@ -13175,7 +13499,7 @@ async function getPlanPrice2(plan) {
   }
 }
 
-// routes/admin/billing.ts
+// backend/routes/admin/billing.ts
 var router46 = import_express46.default.Router();
 var MERCHANT_NUMBERS = {
   moov: process.env.MERCHANT_MOOV ?? "98165380",
@@ -13248,11 +13572,11 @@ router46.post("/api/admin/billing/initiate", async (req, res) => {
 });
 var billing_default = router46;
 
-// index.ts
+// backend/index.ts
 init_ai();
 init_shops();
 
-// lib/review-notifier.ts
+// backend/lib/review-notifier.ts
 init_db();
 init_whatsapp();
 var SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
@@ -13334,7 +13658,7 @@ function startReviewNotifier() {
   }).catch((e) => console.error("[review-notifier] startup error:", e));
 }
 
-// index.ts
+// backend/index.ts
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
@@ -13547,6 +13871,7 @@ app.listen(PORT, async () => {
   recoverMixByYasEntries();
   recoverCouponFinanceEntries();
   startReviewNotifier();
+  backfillAllShopsEntrepots().catch((e) => console.error("[startup] backfillAllShopsEntrepots:", e));
   expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e));
   setInterval(() => expireShopSubscriptions().catch((e) => console.error("[billing] expireShopSubscriptions:", e)), 6 * 60 * 60 * 1e3);
   (async () => {
