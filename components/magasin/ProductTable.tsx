@@ -20,6 +20,7 @@ interface ProductTableProps {
   pageSize?: number;
   onPageChange?: (p: number) => void;
   formatPrice?: (cents: number) => string;
+  view?: 'table' | 'grid';
 }
 
 const defaultFormatPrice = (n: number) =>
@@ -125,10 +126,63 @@ export default function ProductTable({
   pageSize = 20,
   onPageChange,
   formatPrice = defaultFormatPrice,
+  view = 'table',
 }: ProductTableProps) {
   const allSelected = products.length > 0 && selected.size === products.length;
   const realTotal = totalCount ?? products.length;
   const totalPages = Math.ceil(realTotal / pageSize);
+
+  if (view === 'grid') {
+    return (
+      <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, padding: '4px 0' }}>
+          {products.length === 0 ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--muted-2)', fontSize: 13 }}>
+              Aucun produit
+            </div>
+          ) : products.map(p => {
+            const pct = p.target > 0 ? p.stock / p.target : 1;
+            const color = stockColor(pct);
+            return (
+              <div key={p.sku} onClick={() => onToggle(p.sku)}
+                style={{
+                  background: selected.has(p.sku) ? 'rgba(201,96,30,.06)' : 'var(--surface)',
+                  border: `1px solid ${selected.has(p.sku) ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: 12, overflow: 'hidden', cursor: 'pointer',
+                  transition: 'border-color .15s',
+                }}>
+                <div style={{ aspectRatio: '4/3', background: p.imageUrl ? 'none' : p.swatch, overflow: 'hidden', position: 'relative' }}>
+                  {p.imageUrl
+                    ? <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700, color: '#fff', opacity: .7 }}>{p.initial}</div>
+                  }
+                  <span style={{
+                    position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 600,
+                    padding: '2px 7px', borderRadius: 99, background: 'rgba(0,0,0,.55)', color: '#fff',
+                  }}>{p.status}</span>
+                </div>
+                <div style={{ padding: '10px 12px 12px' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg)', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-2)', marginBottom: 8 }}>{p.sku}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg)' }}>{formatPrice(p.price)}</span>
+                    <span style={{ fontSize: 11, color, fontWeight: 600 }}>{p.stock} u.</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {totalPages > 1 && (
+          <div className={styles.pagination}>
+            <button className={styles.pgBtn} disabled={page <= 1} onClick={() => onPageChange?.(page - 1)}>←</button>
+            <span className={styles.pgInfo}>{page} / {totalPages}</span>
+            <button className={styles.pgBtn} disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)}>→</button>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <>

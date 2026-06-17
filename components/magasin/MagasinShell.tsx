@@ -239,7 +239,7 @@ export default function MagasinShell({
         )}
         {activePage === 'products'     && (
           <ProductsContent
-            products={products} kpis={kpis} tabs={tabs}
+            products={products} categories={categories} brands={brands} kpis={kpis} tabs={tabs}
             onCreateProduct={onCreateProduct}
             onDelete={onDelete} onArchive={onArchive}
             totalCount={totalCount} page={page} pageSize={pageSize}
@@ -264,6 +264,8 @@ export default function MagasinShell({
 /* ─── ProductsContent ───────────────────────────────────────────── */
 interface ProductsContentProps {
   products:       Product[];
+  categories:     Category[];
+  brands:         Brand[];
   kpis:           KpiCard[];
   tabs:           TabSpec[];
   onCreateProduct?: () => void;
@@ -277,24 +279,35 @@ interface ProductsContentProps {
 }
 
 function ProductsContent({
-  products, kpis, tabs,
+  products, categories, brands, kpis, tabs,
   onCreateProduct, onDelete, onArchive,
   totalCount, page, pageSize, onPageChange, onExport,
 }: ProductsContentProps) {
   const ui = useUI();
-  const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? 'all');
-  const [view, setView]           = useState<'table' | 'grid'>('table');
-  const [selected, setSelected]   = useState<Set<string>>(new Set());
+  const [activeTab,   setActiveTab]   = useState<string>(tabs[0]?.id ?? 'all');
+  const [view,        setView]        = useState<'table' | 'grid'>('table');
+  const [selected,    setSelected]    = useState<Set<string>>(new Set());
+  const [catFilter,   setCatFilter]   = useState<string>('');
+  const [brandFilter, setBrandFilter] = useState<string>('');
+  const [stockFilter, setStockFilter] = useState<string>('');
 
   const visible = useMemo(() => {
+    let list = products;
+    // Tab filter
     switch (activeTab) {
-      case 'active':   return products.filter(p => p.status === 'Actif');
-      case 'draft':    return products.filter(p => p.status === 'Brouillon');
-      case 'low':      return products.filter(p => p.target > 0 && p.stock / p.target < 0.4);
-      case 'archived': return products.filter(p => p.status === 'Archivé');
-      default:         return products;
+      case 'active':   list = list.filter(p => p.status === 'Actif'); break;
+      case 'draft':    list = list.filter(p => p.status === 'Brouillon'); break;
+      case 'low':      list = list.filter(p => p.target > 0 && p.stock / p.target < 0.4); break;
+      case 'archived': list = list.filter(p => p.status === 'Archivé'); break;
     }
-  }, [activeTab, products]);
+    // Dropdown filters
+    if (catFilter)   list = list.filter(p => p.cat === catFilter);
+    if (brandFilter) list = list.filter(p => p.brand === brandFilter);
+    if (stockFilter === 'rupture') list = list.filter(p => p.stock === 0);
+    if (stockFilter === 'bas')     list = list.filter(p => p.stock > 0 && p.target > 0 && p.stock / p.target < 0.4);
+    if (stockFilter === 'ok')      list = list.filter(p => p.stock > 0 && !(p.target > 0 && p.stock / p.target < 0.4));
+    return list;
+  }, [activeTab, products, catFilter, brandFilter, stockFilter]);
 
   const toggle = (sku: string) =>
     setSelected(prev => { const n = new Set(prev); n.has(sku) ? n.delete(sku) : n.add(sku); return n; });
@@ -342,11 +355,35 @@ function ProductsContent({
       </div>
 
       <div className={styles.toolbar}>
-        <button type="button" className={styles.chip}><FilterIcon size={12} /> Filtres</button>
-        <button type="button" className={styles.chip}>Catégorie : Tous <ChevDownIcon size={10} /></button>
-        <button type="button" className={styles.chip}>Marque : Tous <ChevDownIcon size={10} /></button>
-        <button type="button" className={styles.chip}>Stock <ChevDownIcon size={10} /></button>
-        <button type="button" className={`${styles.chip} ${styles.add}`}>+ Ajouter un filtre</button>
+        <button type="button" className={styles.chip} onClick={() => { setCatFilter(''); setBrandFilter(''); setStockFilter(''); }}>
+          <FilterIcon size={12} /> Filtres{(catFilter || brandFilter || stockFilter) ? ' ×' : ''}
+        </button>
+        <button type="button" className={`${styles.chip} ${catFilter ? styles.active : ''}`}
+          onClick={e => ui.menu(e, [
+            { label: 'Toutes les catégories', onClick: () => setCatFilter('') },
+            ...categories.map(c => ({ label: c.name, onClick: () => setCatFilter(catFilter === c.name ? '' : c.name) })),
+          ])}>
+          Catégorie : {catFilter || 'Tous'} <ChevDownIcon size={10} />
+        </button>
+        <button type="button" className={`${styles.chip} ${brandFilter ? styles.active : ''}`}
+          onClick={e => ui.menu(e, [
+            { label: 'Toutes les marques', onClick: () => setBrandFilter('') },
+            ...brands.map(b => ({ label: b.name, onClick: () => setBrandFilter(brandFilter === b.name ? '' : b.name) })),
+          ])}>
+          Marque : {brandFilter || 'Tous'} <ChevDownIcon size={10} />
+        </button>
+        <button type="button" className={`${styles.chip} ${stockFilter ? styles.active : ''}`}
+          onClick={e => ui.menu(e, [
+            { label: 'Tous les niveaux', onClick: () => setStockFilter('') },
+            { label: 'En stock', onClick: () => setStockFilter('ok') },
+            { label: 'Stock bas', onClick: () => setStockFilter('bas') },
+            { label: 'Rupture', onClick: () => setStockFilter('rupture') },
+          ])}>
+          Stock{stockFilter ? ` : ${stockFilter === 'ok' ? 'En stock' : stockFilter === 'bas' ? 'Stock bas' : 'Rupture'}` : ''} <ChevDownIcon size={10} />
+        </button>
+        <button type="button" className={`${styles.chip} ${styles.add}`} onClick={() => { setCatFilter(''); setBrandFilter(''); setStockFilter(''); }}>
+          {(catFilter || brandFilter || stockFilter) ? '× Réinitialiser' : '+ Ajouter un filtre'}
+        </button>
         <div className={styles.viewSwitch}>
           <button type="button" className={view === 'table' ? styles.on : ''} onClick={() => setView('table')}>Tableau</button>
           <button type="button" className={view === 'grid'  ? styles.on : ''} onClick={() => setView('grid')}>Grille</button>
@@ -355,6 +392,7 @@ function ProductsContent({
 
       <ProductTable
         products={visible}
+        view={view}
         selected={selected}
         onToggle={toggle}
         onToggleAll={toggleAll}
