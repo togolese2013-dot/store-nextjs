@@ -109,12 +109,17 @@ export default function BrandsPage({ brands = SAMPLE_BRANDS }: BrandsPageProps) 
                 const mColor = b.margin > 55 ? 'var(--ok)' : b.margin > 40 ? 'var(--accent)' : 'var(--muted)';
                 const statusClass = b.status === 'Actif' ? styles.actif : styles.brouillon;
                 return (
-                  <tr key={b.name}>
+                  <tr key={b.id ?? b.name}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div className={styles.thumb} style={{ background: b.color, fontSize: 11 }}>
-                          {b.init}
-                        </div>
+                        {b.logo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={b.logo} alt={b.name} style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'contain', border: '1px solid var(--border)', background: '#fff' }} />
+                        ) : (
+                          <div className={styles.thumb} style={{ background: b.color, fontSize: 11 }}>
+                            {b.init}
+                          </div>
+                        )}
                         <div className={styles.productName}>{b.name}</div>
                       </div>
                     </td>

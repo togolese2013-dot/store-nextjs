@@ -4346,6 +4346,8 @@ async function ensureMarquesTable() {
     if (Number((cols as mysql.RowDataPacket[])[0]?.cnt ?? 0) === 0) {
       await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`).catch(() => {});
     }
+    await db.execute(`ALTER TABLE marques ADD COLUMN logo_url TEXT NULL`).catch(() => {});
+    await db.execute(`ALTER TABLE marques ADD COLUMN shop_id INT NULL`).catch(() => {});
   });
 }
 
@@ -4353,6 +4355,7 @@ export async function listAdminMarques(shopId = 1): Promise<AdminMarque[]> {
   await ensureMarquesTable();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT m.id, m.nom, COALESCE(m.description, '') AS description,
+           m.logo_url,
            COUNT(p.id) AS nb_produits
     FROM marques m
     LEFT JOIN produits p ON p.marque_id = m.id AND p.shop_id = ?
@@ -4364,23 +4367,24 @@ export async function listAdminMarques(shopId = 1): Promise<AdminMarque[]> {
     id:          Number(r.id),
     nom:         String(r.nom),
     description: String(r.description ?? ""),
+    logo_url:    r.logo_url ? String(r.logo_url) : null,
     nb_produits: Number(r.nb_produits ?? 0),
   }));
 }
 
-export async function createMarque(data: { nom: string; description: string }, shopId = 1) {
+export async function createMarque(data: { nom: string; description: string; logo_url?: string | null }, shopId = 1) {
   await ensureMarquesTable();
   const [res] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO marques (nom, description, shop_id) VALUES (?, ?, ?)`,
-    [data.nom, data.description || null, shopId]
+    `INSERT INTO marques (nom, description, logo_url, shop_id) VALUES (?, ?, ?, ?)`,
+    [data.nom, data.description || null, data.logo_url || null, shopId]
   );
   return res.insertId;
 }
 
-export async function updateMarque(id: number, data: { nom: string; description: string }, shopId = 1) {
+export async function updateMarque(id: number, data: { nom: string; description: string; logo_url?: string | null }, shopId = 1) {
   await db.execute(
-    `UPDATE marques SET nom = ?, description = ? WHERE id = ? AND shop_id = ?`,
-    [data.nom, data.description || null, id, shopId]
+    `UPDATE marques SET nom = ?, description = ?, logo_url = ? WHERE id = ? AND shop_id = ?`,
+    [data.nom, data.description || null, data.logo_url ?? null, id, shopId]
   );
 }
 

@@ -155,9 +155,9 @@ function defaultsFor(schema: EntitySchema): Record<string, any> {
 
 function mapIncoming(kind: string, data: any): Record<string, any> {
   if (!data) return {};
-  if (kind === "product")   return { name: data.name, sku: data.sku, status: data.status, cat: data.cat, brand: data.brand, price: data.price, cost: data.cost, stock: data.stock, target: data.target, variants: [] };
+  if (kind === "product")   return { name: data.name, sku: data.sku, status: data.status, cat: data.cat, brand: data.brand, price: data.price, cost: data.cost, stock: data.stock, target: data.target, image: data.imageUrl ?? '', variants: [] };
   if (kind === "supplier")  return { name: data.name, country: data.country, status: data.status, delay: data.delay, notes: "" };
-  if (kind === "brand")     return { name: data.name, country: data.country, status: data.status };
+  if (kind === "brand")     return { name: data.name, country: data.country, status: data.status, logo: data.logo };
   if (kind === "category")  return { name: data.name, subcats: data.subcats, color: data.color };
   if (kind === "variant")   return { name: data.name, type: data.type, values: data.values };
   if (kind === "warehouse") return { name: data.name, location: data.location, capacity: data.capacity, color: data.color };
@@ -214,7 +214,7 @@ export function SchemaForm({ kind, mode, data, onClose, toast }: SchemaFormProps
             </span>
           </div>
         );
-      case "image":  return <ImageDrop />;
+      case "image":  return <ImageDrop value={val} onChange={(v) => set(f.k, v)} />;
       case "lines":  return <Lines value={val ?? []} onChange={(v: OrderLine[]) => set(f.k, v)} productOptions={productOptions} />;
       case "variant-options": {
         const vGroups = (db.VARIANT_GROUPS ?? []) as { id: number; nom: string; valeurs: string[] }[];

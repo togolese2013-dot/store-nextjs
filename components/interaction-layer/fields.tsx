@@ -151,13 +151,98 @@ export function Toggle({ value, onChange }: ToggleProps) {
   );
 }
 
-/* ---- Drag-and-drop image upload placeholder --------------- */
-export function ImageDrop({ label }: { label?: string }) {
+/* ---- Drag-and-drop image upload (functional) -------------- */
+interface ImageDropProps {
+  value?: string;
+  onChange?: (url: string) => void;
+  label?: string;
+}
+export function ImageDrop({ value, onChange, label }: ImageDropProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError]     = React.useState('');
+
+  async function upload(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setError('Fichier non supporté. JPEG, PNG, WebP uniquement.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      const reader = new FileReader();
+      const data: string = await new Promise((resolve, reject) => {
+        reader.onload  = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res  = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: { data, type: file.type, name: file.name } }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.errors?.length) {
+        setError(json.errors?.[0] ?? json.error ?? 'Erreur upload');
+        return;
+      }
+      onChange?.(json.urls?.[0] ?? '');
+    } catch {
+      setError('Erreur réseau. Réessayez.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) upload(file);
+    e.target.value = '';
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) upload(file);
+  }
+
+  if (value) {
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={value} alt="Logo" style={{ maxHeight: 80, maxWidth: 200, borderRadius: 8, border: '1px solid var(--border)', objectFit: 'contain', display: 'block' }} />
+        <button
+          type="button"
+          onClick={() => onChange?.('')}
+          style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: 'var(--danger,#c0392b)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >×</button>
+      </div>
+    );
+  }
+
   return (
-    <div className="ux-drop">
-      <Icons.upload size={20} />
-      <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink-2)" }}>Glissez une image ou cliquez</div>
-      <div style={{ fontSize: 11 }}>{label ?? "PNG, JPG · 2 Mo max · 1:1 recommandé"}</div>
+    <div>
+      <button
+        type="button"
+        className="ux-drop"
+        onClick={() => inputRef.current?.click()}
+        onDragOver={e => e.preventDefault()}
+        onDrop={onDrop}
+        disabled={loading}
+        style={{ width: '100%', cursor: 'pointer' }}
+      >
+        {loading ? (
+          <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Upload en cours…</div>
+        ) : (
+          <>
+            <Icons.upload size={20} />
+            <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink-2)" }}>Cliquez ou glissez une image</div>
+            <div style={{ fontSize: 11 }}>{label ?? "PNG, JPG · 10 Mo max"}</div>
+          </>
+        )}
+      </button>
+      {error && <div style={{ color: 'var(--danger,#c0392b)', fontSize: 12, marginTop: 4 }}>{error}</div>}
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={onFileChange} />
     </div>
   );
 }

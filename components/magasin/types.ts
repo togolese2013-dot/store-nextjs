@@ -88,6 +88,7 @@ export interface Category {
 }
 
 export interface Brand {
+  id?: number;
   name: string;
   /** 2-letter initials shown in the thumbnail */
   init: string;
@@ -100,6 +101,8 @@ export interface Brand {
   margin: number;
   country: string;
   status: 'Actif' | 'Inactif';
+  /** Logo URL from Cloudinary */
+  logo?: string;
 }
 
 export interface Variant {

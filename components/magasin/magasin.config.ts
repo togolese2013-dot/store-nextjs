@@ -192,6 +192,10 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
       if (kind === "product") {
         const vo = values.variant_options as { selectedOptions?: any[]; combinations?: any[] } | undefined;
         const hasCombinations = (vo?.combinations?.length ?? 0) > 0;
+
+        const brandObj = (_data.BRANDS ?? []).find((b: any) => (b.name ?? b.nom) === values.brand);
+        const catObj   = (_data.CATEGORIES ?? []).find((c: any) => (c.name ?? c.nom) === values.cat);
+
         const body: Record<string, any> = {
           nom:            values.name,
           reference:      values.sku,
@@ -199,6 +203,9 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
           prix_entrepot:  values.cost ? Number(values.cost) : undefined,
           stock_magasin:  hasCombinations ? 0 : (Number(values.stock) || 0),
           actif:          values.status === "Brouillon" ? 0 : 1,
+          marque_id:      brandObj?.id ? Number(brandObj.id) : undefined,
+          categorie_id:   catObj?.id   ? Number(catObj.id)   : undefined,
+          image_url:      values.image || undefined,
           options_config: vo?.selectedOptions?.length
             ? JSON.stringify(vo.selectedOptions.map((o: any) => ({ nom: o.nom, valeurs: o.valeurs })))
             : null,
@@ -232,6 +239,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
           }
         }
         onRefresh?.();
+        onRefreshMeta?.();
       }
       if (kind === "category") {
         const body = { nom: values.name, description: values.desc || '', color: values.color || null };
@@ -243,7 +251,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
         onRefreshMeta?.();
       }
       if (kind === "brand") {
-        const body = { nom: values.name, description: values.desc || '' };
+        const body = { nom: values.name, description: values.desc || '', logo_url: values.logo || null };
         if (mode === "edit" && values._raw?.id) {
           await fetch(`/api/admin/marques/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         } else {

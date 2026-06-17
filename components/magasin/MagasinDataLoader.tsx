@@ -205,8 +205,11 @@ export default function MagasinDataLoader({
         products: c.product_count ?? 0, revenue: 0, subcats: 0,
       })));
       if (brandRes.data) setBrands(brandRes.data.map((b: any) => ({
+        id: b.id,
         name: b.nom, init: (b.nom?.[0] ?? 'M').toUpperCase(),
-        color: '#3B6A8F', products: b.product_count ?? 0, revenue: 0,
+        color: '#3B6A8F', products: b.nb_produits ?? 0, revenue: 0,
+        margin: 0, country: '—', status: 'Actif' as const,
+        logo: b.logo_url ?? undefined,
       })));
 
       const [suppRes, whRes, achatRes, vgRes] = await Promise.all([
