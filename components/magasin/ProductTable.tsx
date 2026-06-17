@@ -3,6 +3,7 @@
  */
 'use client';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import type { Product } from './types';
 import { MoreIcon, ChevDownIcon } from './icons';
 import styles from './Magasin.module.css';
@@ -47,6 +48,7 @@ function RowMenuUI({ product, onDelete, onArchive }: {
   onArchive?: (p: Product) => void;
 }) {
   const ui = useUI();
+  const router = useRouter();
   return (
     <button
       type="button"
@@ -55,8 +57,8 @@ function RowMenuUI({ product, onDelete, onArchive }: {
       onClick={(e) => {
         e.stopPropagation();
         ui.menu(e, [
-          { label: 'Voir les détails', icon: 'eye',     onClick: () => ui.openDetail('product', product) },
-          { label: 'Modifier',         icon: 'edit',    onClick: () => ui.openForm('product', 'edit', product) },
+          { label: 'Voir les détails', icon: 'eye',  onClick: () => ui.openDetail('product', product) },
+          { label: 'Modifier',         icon: 'edit', onClick: () => router.push(`/admin/products/${product.id}`) },
           { sep: true },
           { label: product.status === 'Archivé' ? 'Réactiver' : 'Archiver', icon: 'archive',
             onClick: () => ui.confirmArchive('le produit', product.name, {

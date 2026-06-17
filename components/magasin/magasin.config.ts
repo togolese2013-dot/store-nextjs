@@ -162,7 +162,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
     ],
 
     paletteActions: (ui) => [
-      { l: "Créer un produit",           ic: "plus",     run: () => ui.openForm("product") },
+      { l: "Créer un produit",           ic: "plus",     run: () => { window.location.href = "/admin/products/new"; } },
       { l: "Créer un bon d'achat",       ic: "plus",     run: () => ui.openForm("po") },
       { l: "Nouvel ajustement de stock", ic: "adj",      run: () => ui.openForm("adjustment") },
       { l: "Exporter le catalogue",      ic: "download", run: () => ui.openExport("Produits") },
