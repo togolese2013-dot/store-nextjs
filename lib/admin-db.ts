@@ -1806,6 +1806,9 @@ export interface AdminCategory {
   nom:         string;
   description: string;
   nb_produits: number;
+  ca_stock:    number;
+  marge_moy:   number;
+  color?:      string | null;
 }
 
 export async function listAdminCategories(shopId = 1): Promise<AdminCategory[]> {
@@ -4336,6 +4339,9 @@ export interface AdminMarque {
   nom:         string;
   description: string;
   nb_produits: number;
+  ca_stock:    number;
+  marge_moy:   number;
+  logo_url:    string | null;
 }
 
 async function ensureMarquesTable() {
