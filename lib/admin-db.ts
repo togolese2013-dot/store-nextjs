@@ -8,6 +8,50 @@ function runOnce(key: string, fn: () => Promise<void>): Promise<void> {
   return _ensurePromises.get(key)!;
 }
 
+// ─── Product Options Config ───────────────────────────────────────────────────
+
+export interface OptionConfig {
+  nom: string;
+  valeurs: string[];
+}
+
+export async function ensureProductOptionsCol(): Promise<void> {
+  return runOnce("product_options_col", async () => {
+    try {
+      await db.execute("ALTER TABLE produits ADD COLUMN options_config JSON NULL");
+    } catch (e: unknown) {
+      const err = e as { code?: string };
+      if (err.code !== "ER_DUP_FIELDNAME") throw e;
+    }
+  });
+}
+
+export async function getProductOptionsConfig(productId: number): Promise<OptionConfig[] | null> {
+  await ensureProductOptionsCol();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT options_config FROM produits WHERE id = ? LIMIT 1",
+    [productId]
+  );
+  const row = rows[0];
+  if (!row || row.options_config == null) return null;
+  try {
+    const val = typeof row.options_config === "string"
+      ? JSON.parse(row.options_config)
+      : row.options_config;
+    return Array.isArray(val) ? (val as OptionConfig[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateProductOptionsConfig(productId: number, config: OptionConfig[]): Promise<void> {
+  await ensureProductOptionsCol();
+  await db.execute(
+    "UPDATE produits SET options_config = ? WHERE id = ?",
+    [JSON.stringify(config), productId]
+  );
+}
+
 // ─── Stock Operations ─────────────────────────────────────────────────────────
 
 export interface ProduitStock {

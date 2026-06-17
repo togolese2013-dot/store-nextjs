@@ -492,6 +492,7 @@ export async function getProductBySlug(slugOrRef: string, shopId = 1, storefront
        ${cols.images_json     ? "p.images_json"                             : "NULL"} AS images_json,
        ${cols.marque_id       ? "p.marque_id"                               : "NULL"} AS marque_id,
        ${cols.marque_id       ? "m.nom"                                     : "NULL"} AS marque_nom,
+       p.options_config,
        ${orderCol}                                                                      AS sort_col,
        c.nom AS categorie_nom
      FROM produits p
@@ -541,6 +542,9 @@ export async function getProductBySlug(slugOrRef: string, shopId = 1, storefront
     date_creation:  (r.sort_col ?? "") as string,
     marque_id:      r.marque_id ? Number(r.marque_id) : null,
     marque_nom:     (r.marque_nom ?? null) as string | null,
+    options_config: (r.options_config != null
+      ? (typeof r.options_config === "string" ? r.options_config : JSON.stringify(r.options_config))
+      : null) as string | null,
   };
 }
 

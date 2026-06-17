@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/utils";
-import { Loader2, Save, Plus, Trash2, ImagePlus, Package, Warehouse } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, ImagePlus, Warehouse, X } from "lucide-react";
 import { clsx } from "clsx";
 import VariantsManager from "./VariantsManager";
 
@@ -39,13 +39,260 @@ interface ProductData {
   images:             string[];
   entrepot_id:        number | null;
   prix_entrepot:      number | "";
-  canal_vente:        'tous' | 'boutique' | 'en_ligne';
+  prod_condition:     'neuf' | 'occasion' | 'reconditionne';
 }
 
 interface EntrepotItem {
   id: number;
   nom: string;
   telephone: string | null;
+}
+
+interface VariantGroup {
+  id: number;
+  nom: string;
+  type: string;
+  valeurs: string[] | null;
+}
+
+interface SelectedOption {
+  nom: string;
+  valeurs: string[];
+  allValeurs: string[];
+}
+
+interface CombinationRow {
+  key: string;
+  combo: Record<string, string>;
+  prix: string;
+  stock: string;
+  sku: string;
+}
+
+function generateCombinations(options: { nom: string; valeurs: string[] }[]): Record<string, string>[] {
+  if (!options.length) return [];
+  return options.reduce<Record<string, string>[]>((acc, opt) => {
+    if (!acc.length) return opt.valeurs.map(v => ({ [opt.nom]: v }));
+    return acc.flatMap(existing => opt.valeurs.map(v => ({ ...existing, [opt.nom]: v })));
+  }, []);
+}
+
+function buildCombinationRows(options: SelectedOption[], prev: CombinationRow[]): CombinationRow[] {
+  const combos = generateCombinations(options.map(o => ({ nom: o.nom, valeurs: o.valeurs })));
+  const prevMap = new Map(prev.map(r => [r.key, r]));
+  return combos.map(combo => {
+    const key = Object.entries(combo).map(([k, v]) => `${k}:${v}`).sort().join("|");
+    const existing = prevMap.get(key);
+    return existing ?? { key, combo, prix: "", stock: "", sku: "" };
+  });
+}
+
+// ── VariantOptionsBuilder ─────────────────────────────────────────────────────
+interface VariantOptionsBuilderProps {
+  variantGroups: VariantGroup[];
+  selectedOptions: SelectedOption[];
+  onOptionsChange: (opts: SelectedOption[]) => void;
+  combinationRows: CombinationRow[];
+  onCombinationChange: (rows: CombinationRow[]) => void;
+}
+
+function VariantOptionsBuilder({
+  variantGroups, selectedOptions, onOptionsChange, combinationRows, onCombinationChange,
+}: VariantOptionsBuilderProps) {
+  const [bulkPrix,  setBulkPrix]  = useState("");
+  const [bulkStock, setBulkStock] = useState("");
+
+  function addOption(group: VariantGroup) {
+    if (selectedOptions.find(o => o.nom === group.nom)) return;
+    const allValeurs = group.valeurs ?? [];
+    const next = [...selectedOptions, { nom: group.nom, valeurs: [...allValeurs], allValeurs }];
+    onOptionsChange(next);
+    onCombinationChange(buildCombinationRows(next, combinationRows));
+  }
+
+  function addCustomOption(nom: string, valeursStr: string) {
+    if (!nom.trim()) return;
+    const allValeurs = valeursStr.split(",").map(v => v.trim()).filter(Boolean);
+    const next = [...selectedOptions, { nom: nom.trim(), valeurs: allValeurs, allValeurs }];
+    onOptionsChange(next);
+    onCombinationChange(buildCombinationRows(next, combinationRows));
+  }
+
+  function removeOption(nom: string) {
+    const next = selectedOptions.filter(o => o.nom !== nom);
+    onOptionsChange(next);
+    onCombinationChange(buildCombinationRows(next, combinationRows));
+  }
+
+  function toggleValeur(optNom: string, valeur: string) {
+    const next = selectedOptions.map(o => {
+      if (o.nom !== optNom) return o;
+      const has = o.valeurs.includes(valeur);
+      return { ...o, valeurs: has ? o.valeurs.filter(v => v !== valeur) : [...o.valeurs, valeur] };
+    });
+    onOptionsChange(next);
+    onCombinationChange(buildCombinationRows(next, combinationRows));
+  }
+
+  function updateCombo(key: string, field: keyof CombinationRow, value: string) {
+    onCombinationChange(combinationRows.map(r => r.key === key ? { ...r, [field]: value } : r));
+  }
+
+  function applyBulkPrix() {
+    if (!bulkPrix) return;
+    onCombinationChange(combinationRows.map(r => ({ ...r, prix: bulkPrix })));
+  }
+
+  function applyBulkStock() {
+    if (!bulkStock) return;
+    onCombinationChange(combinationRows.map(r => ({ ...r, stock: bulkStock })));
+  }
+
+  const availableGroups = variantGroups.filter(g => !selectedOptions.find(o => o.nom === g.nom));
+
+  const [showCustom, setShowCustom] = useState(false);
+  const [customNom, setCustomNom] = useState("");
+  const [customValeurs, setCustomValeurs] = useState("");
+
+  return (
+    <div className="space-y-4">
+      {/* Options ajoutées */}
+      {selectedOptions.map(opt => (
+        <div key={opt.nom} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-slate-800">{opt.nom}</span>
+            <button type="button" onClick={() => removeOption(opt.nom)}
+              className="p-1 text-slate-400 hover:text-red-500 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {opt.allValeurs.map(v => (
+              <button
+                key={v} type="button"
+                onClick={() => toggleValeur(opt.nom, v)}
+                className={clsx(
+                  "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                  opt.valeurs.includes(v)
+                    ? "bg-brand-900 border-brand-900 text-white"
+                    : "bg-white border-slate-300 text-slate-400"
+                )}
+              >{v}</button>
+            ))}
+            {opt.allValeurs.length === 0 && (
+              <span className="text-xs text-slate-400 italic">Aucune valeur définie dans le groupe</span>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* Sélecteur d'option */}
+      <div className="space-y-2">
+        {availableGroups.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {availableGroups.map(g => (
+              <button key={g.id} type="button" onClick={() => addOption(g)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-slate-300 text-slate-600 text-xs font-semibold hover:border-brand-400 hover:text-brand-700 transition-colors">
+                <Plus className="w-3 h-3" /> {g.nom}
+              </button>
+            ))}
+          </div>
+        )}
+        <button type="button" onClick={() => setShowCustom(s => !s)}
+          className="flex items-center gap-1 text-xs text-slate-400 hover:text-brand-600 transition-colors">
+          <Plus className="w-3 h-3" /> Option personnalisée
+        </button>
+        {showCustom && (
+          <div className="flex gap-2 flex-wrap">
+            <input type="text" value={customNom} onChange={e => setCustomNom(e.target.value)}
+              placeholder="Nom (ex: Matière)" className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none w-32" />
+            <input type="text" value={customValeurs} onChange={e => setCustomValeurs(e.target.value)}
+              placeholder="Valeurs séparées par virgule" className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none flex-1 min-w-0" />
+            <button type="button" onClick={() => { addCustomOption(customNom, customValeurs); setCustomNom(""); setCustomValeurs(""); setShowCustom(false); }}
+              className="px-3 py-1.5 text-xs rounded-lg bg-brand-900 text-white font-bold hover:bg-brand-800">
+              Ajouter
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Tableau des combinaisons */}
+      {selectedOptions.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+            Combinaisons ({combinationRows.length})
+          </p>
+          {combinationRows.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">Sélectionnez au moins une valeur par option.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-bold text-slate-600">Combinaison</th>
+                    <th className="px-3 py-2 text-left font-bold text-slate-600">
+                      <div className="flex items-center gap-1">
+                        Prix (FCFA)
+                        <div className="flex items-center gap-0.5">
+                          <input type="number" value={bulkPrix} onChange={e => setBulkPrix(e.target.value)}
+                            placeholder="Tous" className="w-16 px-1 py-0.5 text-xs rounded border border-slate-300 outline-none focus:border-brand-500" />
+                          <button type="button" onClick={applyBulkPrix} className="px-1 py-0.5 text-[10px] rounded bg-slate-200 hover:bg-slate-300 font-semibold">✓</button>
+                        </div>
+                      </div>
+                    </th>
+                    <th className="px-3 py-2 text-left font-bold text-slate-600">
+                      <div className="flex items-center gap-1">
+                        Stock
+                        <div className="flex items-center gap-0.5">
+                          <input type="number" value={bulkStock} onChange={e => setBulkStock(e.target.value)}
+                            placeholder="Tous" className="w-16 px-1 py-0.5 text-xs rounded border border-slate-300 outline-none focus:border-brand-500" />
+                          <button type="button" onClick={applyBulkStock} className="px-1 py-0.5 text-[10px] rounded bg-slate-200 hover:bg-slate-300 font-semibold">✓</button>
+                        </div>
+                      </div>
+                    </th>
+                    <th className="px-3 py-2 text-left font-bold text-slate-600">SKU</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {combinationRows.map(row => (
+                    <tr key={row.key} className="border-b border-slate-100 last:border-0">
+                      <td className="px-3 py-2 text-slate-700 font-medium">
+                        {Object.values(row.combo).join(" / ")}
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="number" min="0" value={row.prix}
+                          onChange={e => updateCombo(row.key, "prix", e.target.value)}
+                          placeholder="0"
+                          className="w-24 px-2 py-1 rounded-lg border border-slate-200 focus:border-brand-500 outline-none" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="number" min="0" value={row.stock}
+                          onChange={e => updateCombo(row.key, "stock", e.target.value)}
+                          placeholder="0"
+                          className="w-16 px-2 py-1 rounded-lg border border-slate-200 focus:border-brand-500 outline-none" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="text" value={row.sku}
+                          onChange={e => updateCombo(row.key, "sku", e.target.value)}
+                          placeholder="SKU"
+                          className="w-28 px-2 py-1 rounded-lg border border-slate-200 focus:border-brand-500 outline-none" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedOptions.length === 0 && (
+        <div className="px-4 py-3 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+          Ajoutez une option ci-dessus pour générer les combinaisons
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface PendingVariant {
@@ -102,19 +349,26 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
     image_url:          initial?.image_url          ?? "",
     entrepot_id:        (initial as Record<string, unknown>)?.entrepot_id as number | null ?? null,
     prix_entrepot:      (initial as Record<string, unknown>)?.prix_entrepot as number | "" ?? "",
-    canal_vente:        ((initial as Record<string, unknown>)?.canal_vente as 'tous' | 'boutique' | 'en_ligne') ?? 'tous',
+    prod_condition:     ((initial as Record<string, unknown>)?.prod_condition as 'neuf' | 'occasion' | 'reconditionne') ?? 'neuf',
     ...initial,
     images:             secondaryImages,
   });
 
-  // Always fetch the latest slug from API on mount (bypasses all Next.js/Vercel caching)
+  // Always fetch latest product data from API on mount (bypasses all Next.js/Vercel caching)
   useEffect(() => {
     if (!isEdit || !initial?.id) return;
     fetch(`/api/admin/products/${initial.id}`)
       .then(r => r.json())
       .then(d => {
-        const slug = ((d.product?.slug ?? "") as string);
-        if (slug) { setForm(f => ({ ...f, slug })); setSlugEdited(true); }
+        const p = d.product ?? {};
+        const slug = ((p.slug ?? "") as string);
+        if (slug) { setSlugEdited(true); }
+        const condition = (p.prod_condition as 'neuf' | 'occasion' | 'reconditionne') || 'neuf';
+        setForm(f => ({
+          ...f,
+          ...(slug ? { slug } : {}),
+          prod_condition: condition,
+        }));
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,12 +382,20 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
   const [schema,      setSchema]      = useState({ hasRemise: true, hasNeuf: true, hasImagesJson: true });
   const [entrepots,   setEntrepots]   = useState<EntrepotItem[]>([]);
 
-  // Pending variants (creation mode only — in edit mode VariantsManager handles it live)
+  // Pending variants (creation mode only — legacy single-variant mode)
   const [variants,          setVariants]          = useState<PendingVariant[]>([]);
   const [editVariantsCount, setEditVariantsCount] = useState(0);
   const variantRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const hasVariants = isEdit ? editVariantsCount > 0 : variants.length > 0;
+  // Multi-axis variant builder (creation mode only)
+  const [variantGroups,    setVariantGroups]    = useState<VariantGroup[]>([]);
+  const [selectedOptions,  setSelectedOptions]  = useState<SelectedOption[]>([]);
+  const [combinationRows,  setCombinationRows]  = useState<CombinationRow[]>([]);
+  const useMultiAxis = !isEdit; // only in creation mode
+
+  const hasVariants = isEdit
+    ? editVariantsCount > 0
+    : combinationRows.length > 0 || variants.length > 0;
 
   useEffect(() => {
     fetch("/api/admin/schema/columns")
@@ -148,6 +410,24 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       .then(d => { if (d?.entrepots) setEntrepots(d.entrepots.filter((e: EntrepotItem & { actif: boolean }) => e.actif)); })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (isEdit) return; // only needed in creation mode
+    fetch("/api/admin/variant-groups")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const groups: VariantGroup[] = (d?.groups ?? []).map((g: Record<string, unknown>) => ({
+          id:      Number(g.id),
+          nom:     g.nom as string,
+          type:    g.type as string,
+          valeurs: Array.isArray(g.valeurs) ? g.valeurs as string[]
+                   : typeof g.valeurs === "string" ? JSON.parse(g.valeurs)
+                   : [],
+        }));
+        setVariantGroups(groups);
+      })
+      .catch(() => {});
+  }, [isEdit]);
 
   function set(field: keyof ProductData, value: unknown) {
     setForm(f => {
@@ -292,13 +572,36 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
       if (form.images.length > 0) payload.images = form.images;
       payload.entrepot_id   = form.entrepot_id ?? null;
       payload.prix_entrepot = form.entrepot_id && form.prix_entrepot !== "" ? Number(form.prix_entrepot) : null;
-      payload.canal_vente   = form.canal_vente;
+      payload.prod_condition = form.prod_condition;
+      // Include options_config when using multi-axis builder (creation mode)
+      if (!isEdit && selectedOptions.length > 0) {
+        payload.options_config = JSON.stringify(
+          selectedOptions.map(o => ({ nom: o.nom, valeurs: o.valeurs }))
+        );
+      }
       const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erreur"); return; }
 
-      // Save pending variants after product creation
-      if (!isEdit && data.id && variants.length > 0) {
+      // Save multi-axis combinations after product creation
+      if (!isEdit && data.id && combinationRows.length > 0) {
+        await Promise.all(combinationRows.map(row =>
+          fetch(`/api/admin/products/${data.id}/variants`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              nom:          Object.values(row.combo).join(" / "),
+              options:      row.combo,
+              prix:         Number(row.prix) || 0,
+              stock:        Number(row.stock) || 0,
+              reference_sku: row.sku || null,
+            }),
+          })
+        ));
+      }
+
+      // Save legacy pending variants after product creation (if no multi-axis)
+      if (!isEdit && data.id && variants.length > 0 && combinationRows.length === 0) {
         await Promise.all(variants.map(v => {
           const opts = parseOptions(v.rawOptions);
           if (v.imageUrl) opts["image_url"] = v.imageUrl;
@@ -536,28 +839,26 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                 <Toggle checked={form.actif} onChange={v => set("actif", v)} label="Produit actif (visible)" color="green" />
               </div>
 
-              {/* Canal de vente */}
-              <div>
-                <label className={labelCls}>Canal de vente</label>
-                <div className="flex gap-2 flex-wrap">
+              {/* Condition produit */}
+              <div className="pt-1">
+                <label className="block text-xs font-semibold text-slate-600 mb-2">État du produit</label>
+                <div className="flex gap-3 flex-wrap">
                   {([
-                    { value: 'tous',     label: 'Partout',            desc: 'Boutique + Site' },
-                    { value: 'boutique', label: 'Boutique uniquement', desc: 'Admin seulement' },
-                    { value: 'en_ligne', label: 'En ligne uniquement', desc: 'Site client seul' },
+                    { value: 'neuf',          label: 'Neuf',          color: 'bg-emerald-50 border-emerald-300 text-emerald-700' },
+                    { value: 'occasion',      label: 'Occasion',      color: 'bg-amber-50 border-amber-300 text-amber-700' },
+                    { value: 'reconditionne', label: 'Reconditionné', color: 'bg-blue-50 border-blue-300 text-blue-700' },
                   ] as const).map(opt => (
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => set("canal_vente", opt.value)}
-                      className="px-3 py-2 rounded-xl border text-sm font-medium transition-all text-left"
-                      style={{
-                        borderColor: form.canal_vente === opt.value ? '#C9601E' : '#e2e8f0',
-                        background:  form.canal_vente === opt.value ? '#FFF4EE' : '#fff',
-                        color:       form.canal_vente === opt.value ? '#C9601E' : '#64748b',
-                      }}
+                      onClick={() => set('prod_condition', opt.value)}
+                      className={`px-4 py-1.5 rounded-full border text-xs font-semibold transition-all ${
+                        form.prod_condition === opt.value
+                          ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
+                      }`}
                     >
-                      <div className="font-semibold">{opt.label}</div>
-                      <div className="text-xs opacity-70">{opt.desc}</div>
+                      {opt.label}
                     </button>
                   ))}
                 </div>
@@ -593,61 +894,19 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
 
             {/* Variantes */}
             <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Variantes</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Taille, couleur, modèle…</p>
-                </div>
-                {!isEdit && (
-                  <button type="button" onClick={() => setVariants(vs => [...vs, newVariant()])}
-                    className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs font-semibold hover:border-brand-400 hover:text-brand-600 transition-colors">
-                    <Plus className="w-3 h-3" /> Ajouter
-                  </button>
-                )}
+              <div>
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Variantes</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Taille, couleur, modèle… (multi-axe style Shopify)</p>
               </div>
 
-              {!isEdit && (
-                <div className="space-y-2">
-                  {variants.length === 0 && (
-                    <div className="px-4 py-3 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                      Aucune variante configurée
-                    </div>
-                  )}
-                  {variants.map(v => (
-                    <div key={v._key} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <label className="shrink-0 cursor-pointer">
-                          <div className="w-10 h-10 rounded-lg border border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center hover:border-brand-400 transition-colors">
-                            {v.imageUrl ? <img src={v.imageUrl} alt="" className="w-full h-full object-cover" />
-                              : v.uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                              : <ImagePlus className="w-3.5 h-3.5 text-slate-300" />}
-                          </div>
-                          <input type="file" accept="image/*" className="sr-only"
-                            ref={el => { variantRefs.current[v._key] = el; }}
-                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadVariantImage(v._key, f); e.target.value = ""; }} />
-                        </label>
-                        <input value={v.nom}
-                          onChange={e => updateVariant(v._key, { nom: e.target.value })}
-                          placeholder="Ex: Rouge XL"
-                          className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white" />
-                        <button type="button" onClick={() => setVariants(vs => vs.filter(x => x._key !== v._key))}
-                          className="shrink-0 p-1 text-slate-400 hover:text-red-500 transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="flex gap-2 pl-12">
-                        <input type="number" min="0" value={v.prix}
-                          onChange={e => updateVariant(v._key, { prix: e.target.value ? Number(e.target.value) : "" })}
-                          placeholder="Prix FCFA"
-                          className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white" />
-                        <input type="number" min="0" value={v.stock}
-                          onChange={e => updateVariant(v._key, { stock: e.target.value ? Number(e.target.value) : "" })}
-                          placeholder="Qté"
-                          className="w-24 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none bg-white" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              {useMultiAxis && (
+                <VariantOptionsBuilder
+                  variantGroups={variantGroups}
+                  selectedOptions={selectedOptions}
+                  onOptionsChange={setSelectedOptions}
+                  combinationRows={combinationRows}
+                  onCombinationChange={setCombinationRows}
+                />
               )}
               {isEdit && initial?.id && <VariantsManager productId={initial.id} onCountChange={setEditVariantsCount} />}
             </section>

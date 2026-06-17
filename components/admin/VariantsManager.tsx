@@ -1,7 +1,124 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronUp, ImagePlus } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronUp, ImagePlus, X, RefreshCw } from "lucide-react";
+
+// ── Types pour multi-axe ──────────────────────────────────────────────────────
+
+interface VariantGroup {
+  id: number;
+  nom: string;
+  valeurs: string[];
+}
+
+interface SelectedOption {
+  nom: string;
+  valeurs: string[];
+  allValeurs: string[];
+}
+
+function generateCombinations(options: { nom: string; valeurs: string[] }[]): Record<string, string>[] {
+  if (!options.length) return [];
+  return options.reduce<Record<string, string>[]>((acc, opt) => {
+    if (!acc.length) return opt.valeurs.map(v => ({ [opt.nom]: v }));
+    return acc.flatMap(existing => opt.valeurs.map(v => ({ ...existing, [opt.nom]: v })));
+  }, []);
+}
+
+// ── OptionsEditor ─────────────────────────────────────────────────────────────
+interface OptionsEditorProps {
+  productId: number;
+  currentOptions: SelectedOption[];
+  variantGroups: VariantGroup[];
+  onOptionsChange: (opts: SelectedOption[]) => void;
+}
+
+function OptionsEditor({ productId, currentOptions, variantGroups, onOptionsChange }: OptionsEditorProps) {
+  const [showCustom,    setShowCustom]    = useState(false);
+  const [customNom,     setCustomNom]     = useState("");
+  const [customValeurs, setCustomValeurs] = useState("");
+
+  function addGroup(group: VariantGroup) {
+    if (currentOptions.find(o => o.nom === group.nom)) return;
+    onOptionsChange([...currentOptions, { nom: group.nom, valeurs: [...group.valeurs], allValeurs: group.valeurs }]);
+  }
+
+  function removeOption(nom: string) {
+    onOptionsChange(currentOptions.filter(o => o.nom !== nom));
+  }
+
+  function toggleValeur(optNom: string, valeur: string) {
+    onOptionsChange(currentOptions.map(o => {
+      if (o.nom !== optNom) return o;
+      const has = o.valeurs.includes(valeur);
+      return { ...o, valeurs: has ? o.valeurs.filter(v => v !== valeur) : [...o.valeurs, valeur] };
+    }));
+  }
+
+  function addCustom() {
+    if (!customNom.trim()) return;
+    const allValeurs = customValeurs.split(",").map(v => v.trim()).filter(Boolean);
+    onOptionsChange([...currentOptions, { nom: customNom.trim(), valeurs: allValeurs, allValeurs }]);
+    setCustomNom(""); setCustomValeurs(""); setShowCustom(false);
+  }
+
+  const available = variantGroups.filter(g => !currentOptions.find(o => o.nom === g.nom));
+
+  return (
+    <div className="space-y-3">
+      {currentOptions.map(opt => (
+        <div key={opt.nom} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-slate-800">{opt.nom}</span>
+            <button type="button" onClick={() => removeOption(opt.nom)}
+              className="p-1 text-slate-400 hover:text-red-500 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {opt.allValeurs.map(v => (
+              <button key={v} type="button" onClick={() => toggleValeur(opt.nom, v)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                  opt.valeurs.includes(v)
+                    ? "bg-brand-900 border-brand-900 text-white"
+                    : "bg-white border-slate-300 text-slate-400"
+                }`}>{v}</button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="space-y-2">
+        {available.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {available.map(g => (
+              <button key={g.id} type="button" onClick={() => addGroup(g)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-slate-300 text-slate-600 text-xs font-semibold hover:border-brand-400 hover:text-brand-700 transition-colors">
+                <Plus className="w-3 h-3" /> {g.nom}
+              </button>
+            ))}
+          </div>
+        )}
+        <button type="button" onClick={() => setShowCustom(s => !s)}
+          className="flex items-center gap-1 text-xs text-slate-400 hover:text-brand-600 transition-colors">
+          <Plus className="w-3 h-3" /> Option personnalisée
+        </button>
+        {showCustom && (
+          <div className="flex gap-2 flex-wrap">
+            <input type="text" value={customNom} onChange={e => setCustomNom(e.target.value)}
+              placeholder="Nom" className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none w-28" />
+            <input type="text" value={customValeurs} onChange={e => setCustomValeurs(e.target.value)}
+              placeholder="Valeurs séparées par virgule"
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:border-brand-500 outline-none flex-1 min-w-0" />
+            <button type="button" onClick={addCustom}
+              className="px-3 py-1.5 text-xs rounded-lg bg-brand-900 text-white font-bold hover:bg-brand-800">
+              Ajouter
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export interface Variant {
   id:             number;
@@ -290,17 +407,53 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   const [msg,         setMsg]         = useState("");
   const savingNewRef = useRef(false);
 
+  // Multi-axis options state
+  const [variantGroups,   setVariantGroups]   = useState<VariantGroup[]>([]);
+  const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
+  const [creatingMissing, setCreatingMissing] = useState(false);
+
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin/products/${productId}/variants`);
-      if (res.ok) {
-        const data = await res.json();
+      const [varRes, prodRes, groupsRes] = await Promise.all([
+        fetch(`/api/admin/products/${productId}/variants`),
+        fetch(`/api/admin/products/${productId}`),
+        fetch("/api/admin/variant-groups"),
+      ]);
+      if (varRes.ok) {
+        const data = await varRes.json();
         const arr: Variant[] = Array.isArray(data) ? data : (data.variants ?? []);
         setVariants(arr);
         onCountChange?.(arr.length);
       } else {
-        const data = await res.json().catch(() => ({}));
-        setMsg(`Erreur chargement : ${data.error ?? res.status}`);
+        const data = await varRes.json().catch(() => ({}));
+        setMsg(`Erreur chargement : ${data.error ?? varRes.status}`);
+      }
+      // Load product options_config
+      if (prodRes.ok) {
+        const prodData = await prodRes.json();
+        const rawConfig = prodData.product?.options_config;
+        if (rawConfig) {
+          try {
+            const parsed: { nom: string; valeurs: string[] }[] = typeof rawConfig === "string"
+              ? JSON.parse(rawConfig)
+              : rawConfig;
+            if (Array.isArray(parsed)) {
+              setSelectedOptions(parsed.map(o => ({ nom: o.nom, valeurs: o.valeurs, allValeurs: o.valeurs })));
+            }
+          } catch { /* ignore */ }
+        }
+      }
+      // Load variant groups for selector
+      if (groupsRes.ok) {
+        const gData = await groupsRes.json();
+        const groups: VariantGroup[] = (gData?.groups ?? []).map((g: Record<string, unknown>) => ({
+          id:      Number(g.id),
+          nom:     g.nom as string,
+          valeurs: Array.isArray(g.valeurs) ? g.valeurs as string[]
+                   : typeof g.valeurs === "string" ? JSON.parse(g.valeurs as string)
+                   : [],
+        }));
+        setVariantGroups(groups);
       }
     } catch {
       setMsg("Erreur réseau — impossible de charger les variantes.");
@@ -310,6 +463,66 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   }, [productId, onCountChange]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function saveOptionsAndCreateMissing() {
+    if (!selectedOptions.length) return;
+    setCreatingMissing(true);
+    setMsg("");
+    try {
+      // Save options_config on product
+      await fetch(`/api/admin/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          options_config: JSON.stringify(
+            selectedOptions.map(o => ({ nom: o.nom, valeurs: o.valeurs }))
+          ),
+        }),
+      });
+
+      // Compute all expected combinations
+      const combos = generateCombinations(selectedOptions.map(o => ({ nom: o.nom, valeurs: o.valeurs })));
+
+      // Find existing variant keys
+      const existingKeys = new Set(
+        variants.map(v => {
+          const opts = v.options ?? {};
+          return Object.entries(opts).map(([k, val]) => `${k}:${val}`).sort().join("|");
+        })
+      );
+
+      // Create missing variants
+      const missing = combos.filter(combo => {
+        const key = Object.entries(combo).map(([k, v]) => `${k}:${v}`).sort().join("|");
+        return !existingKeys.has(key);
+      });
+
+      if (missing.length > 0) {
+        await Promise.all(missing.map(combo =>
+          fetch(`/api/admin/products/${productId}/variants`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nom:    Object.values(combo).join(" / "),
+              options: combo,
+              prix:   0,
+              stock:  0,
+            }),
+          })
+        ));
+        setMsg(`${missing.length} variante(s) créée(s) avec succès.`);
+      } else {
+        setMsg("Toutes les variantes existent déjà.");
+      }
+
+      await load();
+    } catch {
+      setMsg("Erreur lors de la création des variantes.");
+    } finally {
+      setCreatingMissing(false);
+      setTimeout(() => setMsg(""), 4000);
+    }
+  }
 
   async function handleSave(v: Variant) {
     await fetch(`/api/admin/products/${productId}/variants/${v.id}`, {
@@ -388,15 +601,38 @@ export default function VariantsManager({ productId, onCountChange }: Props) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {msg && (
         <div className={`px-4 py-2 rounded-xl border text-sm font-semibold ${
           msg.startsWith("Erreur") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
         }`}>{msg}</div>
       )}
 
+      {/* ── Section Options multi-axe ── */}
+      <div className="space-y-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Options de variante</h4>
+        <p className="text-xs text-slate-400">
+          Configurez les axes (Taille, Couleur…) puis générez les combinaisons manquantes.
+        </p>
+        <OptionsEditor
+          productId={productId}
+          currentOptions={selectedOptions}
+          variantGroups={variantGroups}
+          onOptionsChange={setSelectedOptions}
+        />
+        {selectedOptions.length > 0 && (
+          <div className="pt-2">
+            <button type="button" onClick={saveOptionsAndCreateMissing} disabled={creatingMissing}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-900 text-white text-xs font-bold hover:bg-brand-800 disabled:opacity-60 transition-colors">
+              {creatingMissing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {creatingMissing ? "Création…" : "Sauvegarder options & créer variantes manquantes"}
+            </button>
+          </div>
+        )}
+      </div>
+
       <p className="text-xs text-slate-500">
-        Définissez des variantes (taille, couleur…). Chaque variante a son propre prix et stock.
+        Variantes individuelles — chaque variante a son propre prix et stock.
       </p>
 
       {/* Existing variants */}

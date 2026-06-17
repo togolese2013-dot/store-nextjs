@@ -471,4 +471,35 @@ router.get("/api/resolve-domain", async (req, res) => {
   }
 });
 
+// GET /api/public/products/:id/variants — variantes publiques (sans auth)
+router.get("/api/public/products/:id/variants", async (req, res) => {
+  try {
+    const productId = Number(req.params.id);
+    if (!productId || isNaN(productId)) return res.json([]);
+    const pool = db as import("mysql2/promise").Pool;
+    const [rows] = await pool.execute<import("mysql2/promise").RowDataPacket[]>(
+      `SELECT id, produit_id, nom, options, prix, remise, stock, stock_boutique, reference_sku, image_url
+       FROM product_variants WHERE produit_id = ? ORDER BY id ASC`,
+      [productId]
+    );
+    const variants = rows.map((v) => ({
+      id:             Number(v.id),
+      produit_id:     Number(v.produit_id),
+      nom:            v.nom as string,
+      options:        v.options
+        ? (typeof v.options === "string" ? JSON.parse(v.options) : v.options)
+        : {},
+      prix:           Number(v.prix ?? 0),
+      remise:         Number(v.remise ?? 0),
+      stock:          Number(v.stock ?? 0),
+      stock_boutique: Number(v.stock_boutique ?? 0),
+      reference_sku:  (v.reference_sku ?? null) as string | null,
+      image_url:      (v.image_url ?? null) as string | null,
+    }));
+    res.json(variants);
+  } catch {
+    res.json([]);
+  }
+});
+
 export default router;

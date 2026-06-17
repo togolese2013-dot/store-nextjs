@@ -28,6 +28,7 @@ export interface Product {
   variants_stock?: number | null; // sum of variant.stock when product has variants
   prod_condition?: 'neuf' | 'occasion' | 'reconditionne' | null;
   canal_vente?: 'tous' | 'boutique' | 'en_ligne' | null;
+  options_config?: string | null;
 }
 
 export interface Category {

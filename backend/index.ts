@@ -13,7 +13,8 @@ import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 
 import adminAuthRoutes      from "./routes/admin/auth";
 import adminProductsRoutes  from "./routes/admin/products";
-import adminVariantsRoutes  from "./routes/admin/variants";
+import adminVariantsRoutes       from "./routes/admin/variants";
+import adminVariantGroupsRoutes  from "./routes/admin/variant-groups";
 import adminStockRoutes     from "./routes/admin/stock";
 import adminStockBoutiqueRoutes from "./routes/admin/stock-boutique";
 import adminVentesRoutes    from "./routes/admin/ventes";
@@ -164,6 +165,7 @@ app.use(cookieParser());
 app.use(adminAuthRoutes);
 app.use(adminProductsRoutes);
 app.use(adminVariantsRoutes);
+app.use(adminVariantGroupsRoutes);
 app.use(adminStockRoutes);
 app.use(adminStockBoutiqueRoutes);
 app.use(adminVentesRoutes);

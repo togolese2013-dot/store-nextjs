@@ -147,7 +147,7 @@ export default async function ProductPage({ params }: PageProps) {
   };
 
   const variants: Variant[] = await apiGet<Variant[]>(
-    `/api/admin/products/${product.id}/variants`, { noAuth: true }
+    `/api/public/products/${product.id}/variants`
   ).catch(() => []);
   const hasVariants = variants.length > 0;
 
