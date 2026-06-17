@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import type { PageId } from './MagasinShell';
 import MagasinShell from './MagasinShell';
 import type { Product as MagasinProduct, KpiCard, TabSpec, Variant } from './types';
@@ -143,7 +143,6 @@ export default function MagasinDataLoader({
   userRole,
   shopName,
 }: Props) {
-  const router       = useRouter();
   const searchParams = useSearchParams();
   const defaultPage  = (searchParams.get('page') as PageId | null) ?? 'overview';
 

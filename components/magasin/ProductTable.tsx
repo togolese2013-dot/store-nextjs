@@ -13,7 +13,6 @@ interface ProductTableProps {
   selected: Set<string>;
   onToggle: (sku: string) => void;
   onToggleAll: () => void;
-  onEdit?: (id: number) => void;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
   totalCount?: number;
@@ -42,9 +41,8 @@ function stockColor(pct: number): string {
 }
 
 /* ── Row menu (interaction-layer) ── */
-function RowMenuUI({ product, onEdit, onDelete, onArchive }: {
+function RowMenuUI({ product, onDelete, onArchive }: {
   product: Product;
-  onEdit?: (id: number) => void;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
 }) {
@@ -58,7 +56,7 @@ function RowMenuUI({ product, onEdit, onDelete, onArchive }: {
         e.stopPropagation();
         ui.menu(e, [
           { label: 'Voir les détails', icon: 'eye',  onClick: () => ui.openDetail('product', product) },
-          { label: 'Modifier',         icon: 'edit', onClick: () => product.id && onEdit?.(product.id) },
+          { label: 'Modifier',         icon: 'edit', onClick: () => ui.openForm('product', 'edit', product) },
           { sep: true },
           { label: product.status === 'Archivé' ? 'Réactiver' : 'Archiver', icon: 'archive',
             onClick: () => ui.confirmArchive('le produit', product.name, {
@@ -121,7 +119,6 @@ export default function ProductTable({
   selected,
   onToggle,
   onToggleAll,
-  onEdit,
   onDelete,
   onArchive,
   totalCount,
@@ -267,7 +264,7 @@ export default function ProductTable({
                     <td className={styles.priceCell}>{formatPrice(p.price)}</td>
                     <td className={styles.marginCell}>{p.margin > 0 ? `${p.margin}%` : '—'}</td>
                     <td className={styles.actionsCell}>
-                      <RowMenuUI product={p} onEdit={onEdit} onDelete={onDelete} onArchive={onArchive} />
+                      <RowMenuUI product={p} onDelete={onDelete} onArchive={onArchive} />
                     </td>
                   </tr>
                 );

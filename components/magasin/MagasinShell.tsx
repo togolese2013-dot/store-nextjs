@@ -26,7 +26,6 @@ import AjustementsPage from './AjustementsPage';
 import MouvementsPage from './MouvementsPage';
 import AlertesPage from './AlertesPage';
 import ReglagesPage from './ReglagesPage';
-import ProductForm from '@/components/admin/ProductForm';
 import {
   SearchIcon, BellIcon, ChevLeftIcon,
   DownloadIcon, UploadIcon, SparklesIcon, PlusIcon,
@@ -174,20 +173,11 @@ export default function MagasinShell({
   shopName = 'Ma boutique',
 }: MagasinShellProps) {
   const ui = useUI();
-  const [activePage,    setActivePage]    = useState<PageId>(defaultPage);
-  const [productDrawer, setProductDrawer] = useState<{ open: boolean; productId?: number }>({ open: false });
+  const [activePage, setActivePage] = useState<PageId>(defaultPage);
 
   function navigate(p: PageId) {
     setActivePage(p);
     onActivePageChange?.(p);
-  }
-
-  function openProductForm(productId?: number) {
-    setProductDrawer({ open: true, productId });
-  }
-
-  function closeProductForm() {
-    setProductDrawer({ open: false });
   }
 
   const navId = PAGE_TO_NAV[activePage];
@@ -246,13 +236,12 @@ export default function MagasinShell({
         {/* Page routing */}
         {activePage === 'overview'     && (
           <OverviewPage products={products} categories={categories} kpis={kpis}
-            onCreateProduct={() => openProductForm()} />
+            onCreateProduct={() => ui.openForm('product')} />
         )}
         {activePage === 'products'     && (
           <ProductsContent
             products={products} categories={categories} brands={brands} kpis={kpis} tabs={tabs}
-            onCreateProduct={() => openProductForm()}
-            onEditProduct={(id) => openProductForm(id)}
+            onCreateProduct={() => ui.openForm('product')}
             onDelete={onDelete} onArchive={onArchive}
             totalCount={totalCount} page={page} pageSize={pageSize}
             onPageChange={onPageChange} onExport={onExport}
@@ -269,32 +258,6 @@ export default function MagasinShell({
         {activePage === 'alertes'      && <AlertesPage alerts={alerts} />}
         {activePage === 'reglages'     && <ReglagesPage />}
       </main>
-
-      {/* ── Product Form Drawer ── */}
-      {productDrawer.open && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, background: 'rgba(20,17,14,.45)', zIndex: 50 }}
-            onClick={closeProductForm}
-          />
-          <div style={{
-            position: 'fixed', top: 0, right: 0, height: '100vh',
-            width: 'min(680px, 96vw)',
-            background: 'var(--bg, #fff)',
-            boxShadow: '-24px 0 60px rgba(20,17,14,.18)',
-            zIndex: 51, overflowY: 'auto',
-            animation: 'ux-slide .28s cubic-bezier(.32,.72,0,1)',
-          }}>
-            <ProductForm
-              key={productDrawer.productId ?? 'new'}
-              categories={categories.map(c => ({ id: Number(c.id), nom: c.name, description: null }))}
-              initial={productDrawer.productId ? { id: productDrawer.productId } : undefined}
-              onBack={closeProductForm}
-              onSuccess={() => { closeProductForm(); onActivePageChange?.(activePage); }}
-            />
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -307,7 +270,6 @@ interface ProductsContentProps {
   kpis:             KpiCard[];
   tabs:             TabSpec[];
   onCreateProduct?: () => void;
-  onEditProduct?:   (id: number) => void;
   onDelete?:        (p: Product) => void;
   onArchive?:       (p: Product) => void;
   totalCount?:    number;
@@ -319,7 +281,7 @@ interface ProductsContentProps {
 
 function ProductsContent({
   products, categories, brands, kpis, tabs,
-  onCreateProduct, onEditProduct, onDelete, onArchive,
+  onCreateProduct, onDelete, onArchive,
   totalCount, page, pageSize, onPageChange, onExport,
 }: ProductsContentProps) {
   const ui = useUI();
@@ -435,7 +397,6 @@ function ProductsContent({
         selected={selected}
         onToggle={toggle}
         onToggleAll={toggleAll}
-        onEdit={onEditProduct}
         onDelete={onDelete}
         onArchive={onArchive}
         totalCount={totalCount}
