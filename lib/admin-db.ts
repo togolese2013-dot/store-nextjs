@@ -1812,7 +1812,13 @@ export async function listAdminCategories(shopId = 1): Promise<AdminCategory[]> 
   try { await db.execute("ALTER TABLE categories ADD COLUMN color VARCHAR(20) NULL"); } catch { /* exists */ }
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
-            c.color, COUNT(p.id) AS nb_produits
+            c.color, COUNT(p.id) AS nb_produits,
+            COALESCE(SUM(p.prix_unitaire * COALESCE(p.stock_magasin, 0)), 0) AS ca_stock,
+            COALESCE(AVG(
+              CASE WHEN p.prix_entrepot IS NOT NULL AND p.prix_unitaire > 0
+                   THEN ROUND((1 - p.prix_entrepot / p.prix_unitaire) * 100)
+                   ELSE NULL END
+            ), 0) AS marge_moy
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
      WHERE c.shop_id = ?
@@ -1820,7 +1826,12 @@ export async function listAdminCategories(shopId = 1): Promise<AdminCategory[]> 
      ORDER BY c.nom ASC`,
     [shopId]
   );
-  return rows.map(r => ({ ...r, nb_produits: Number(r.nb_produits) })) as AdminCategory[];
+  return rows.map(r => ({
+    ...r,
+    nb_produits: Number(r.nb_produits),
+    ca_stock:    Number(r.ca_stock ?? 0),
+    marge_moy:   Math.round(Number(r.marge_moy ?? 0)),
+  })) as AdminCategory[];
 }
 
 export async function createCategory(nom: string, description: string, shopId = 1, color?: string) {

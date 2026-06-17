@@ -202,7 +202,7 @@ export default function MagasinDataLoader({
       ]);
       if (catRes.data) setCategories(catRes.data.map((c: any) => ({
         id: String(c.id), name: c.nom, color: c.color ?? '#C9601E',
-        products: c.product_count ?? 0, revenue: 0, subcats: 0,
+        products: c.nb_produits ?? 0, revenue: c.ca_stock ?? 0, subcats: 0,
       })));
       if (brandRes.data) setBrands(brandRes.data.map((b: any) => ({
         id: b.id,
