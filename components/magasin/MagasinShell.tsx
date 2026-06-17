@@ -40,40 +40,36 @@ export type PageId =
   | 'overview' | 'products' | 'categories' | 'brands' | 'variantes'
   | 'fournisseurs' | 'achats' | 'entrepots'
   | 'ajustements' | 'mouvements' | 'alertes'
-  | 'reglages' | 'new-product' | 'edit-product';
+  | 'reglages';
 
 const PAGE_LABELS: Record<PageId, string> = {
-  overview:       "Vue d'ensemble",
-  products:       'Produits',
-  categories:     'Catégories',
-  brands:         'Marques',
-  variantes:      'Variantes',
-  fournisseurs:   'Fournisseurs',
-  achats:         'Achats',
-  entrepots:      'Entrepôts',
-  ajustements:    'Ajustements',
-  mouvements:     'Mouvements',
-  alertes:        'Alertes stock',
-  reglages:       'Réglages',
-  'new-product':  'Nouveau produit',
-  'edit-product': 'Modifier le produit',
+  overview:     "Vue d'ensemble",
+  products:     'Produits',
+  categories:   'Catégories',
+  brands:       'Marques',
+  variantes:    'Variantes',
+  fournisseurs: 'Fournisseurs',
+  achats:       'Achats',
+  entrepots:    'Entrepôts',
+  ajustements:  'Ajustements',
+  mouvements:   'Mouvements',
+  alertes:      'Alertes stock',
+  reglages:     'Réglages',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
-  overview:       'Rechercher…',
-  products:       'Rechercher un produit, SKU, marque…',
-  categories:     'Rechercher une catégorie…',
-  brands:         'Rechercher une marque, pays…',
-  variantes:      'Rechercher un groupe de variantes…',
-  fournisseurs:   'Rechercher un fournisseur, pays…',
-  achats:         'Rechercher une référence, fournisseur…',
-  entrepots:      'Rechercher un entrepôt, ville…',
-  ajustements:    'Rechercher un produit, SKU…',
-  mouvements:     'Rechercher un produit, type…',
-  alertes:        'Rechercher une règle, produit…',
-  reglages:       'Rechercher dans les réglages…',
-  'new-product':  '',
-  'edit-product': '',
+  overview:     'Rechercher…',
+  products:     'Rechercher un produit, SKU, marque…',
+  categories:   'Rechercher une catégorie…',
+  brands:       'Rechercher une marque, pays…',
+  variantes:    'Rechercher un groupe de variantes…',
+  fournisseurs: 'Rechercher un fournisseur, pays…',
+  achats:       'Rechercher une référence, fournisseur…',
+  entrepots:    'Rechercher un entrepôt, ville…',
+  ajustements:  'Rechercher un produit, SKU…',
+  mouvements:   'Rechercher un produit, type…',
+  alertes:      'Rechercher une règle, produit…',
+  reglages:     'Rechercher dans les réglages…',
 };
 
 const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
@@ -93,20 +89,18 @@ const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
 
 /** Reverse map — PageId → nav item id (for Sidebar activeId prop) */
 const PAGE_TO_NAV: Record<PageId, string> = {
-  overview:        'overview',
-  products:        'products',
-  categories:      'categories',
-  brands:          'brands',
-  variantes:       'variants',
-  fournisseurs:    'suppliers',
-  achats:          'achats',
-  entrepots:       'warehouses',
-  ajustements:     'adjustments',
-  mouvements:      'movements',
-  alertes:         'alerts',
-  reglages:        'settings',
-  'new-product':   'products',
-  'edit-product':  'products',
+  overview:     'overview',
+  products:     'products',
+  categories:   'categories',
+  brands:       'brands',
+  variantes:    'variants',
+  fournisseurs: 'suppliers',
+  achats:       'achats',
+  entrepots:    'warehouses',
+  ajustements:  'adjustments',
+  mouvements:   'movements',
+  alertes:      'alerts',
+  reglages:     'settings',
 };
 
 /* ─── Props ─────────────────────────────────────────────────────── */
@@ -181,11 +175,19 @@ export default function MagasinShell({
 }: MagasinShellProps) {
   const ui = useUI();
   const [activePage,    setActivePage]    = useState<PageId>(defaultPage);
-  const [editProductId, setEditProductId] = useState<number | null>(null);
+  const [productDrawer, setProductDrawer] = useState<{ open: boolean; productId?: number }>({ open: false });
 
   function navigate(p: PageId) {
     setActivePage(p);
-    if (p !== 'new-product' && p !== 'edit-product') onActivePageChange?.(p);
+    onActivePageChange?.(p);
+  }
+
+  function openProductForm(productId?: number) {
+    setProductDrawer({ open: true, productId });
+  }
+
+  function closeProductForm() {
+    setProductDrawer({ open: false });
   }
 
   const navId = PAGE_TO_NAV[activePage];
@@ -242,34 +244,15 @@ export default function MagasinShell({
         </header>
 
         {/* Page routing */}
-        {activePage === 'new-product' && (
-          <div style={{ padding: '0 0 40px' }}>
-            <ProductForm
-              categories={categories.map(c => ({ id: Number(c.id), nom: c.name, description: null }))}
-              onBack={() => navigate('products')}
-              onSuccess={() => navigate('products')}
-            />
-          </div>
-        )}
-        {activePage === 'edit-product' && editProductId && (
-          <div style={{ padding: '0 0 40px' }}>
-            <ProductForm
-              categories={categories.map(c => ({ id: Number(c.id), nom: c.name, description: null }))}
-              initial={{ id: editProductId }}
-              onBack={() => navigate('products')}
-              onSuccess={() => navigate('products')}
-            />
-          </div>
-        )}
         {activePage === 'overview'     && (
           <OverviewPage products={products} categories={categories} kpis={kpis}
-            onCreateProduct={() => navigate('new-product')} />
+            onCreateProduct={() => openProductForm()} />
         )}
         {activePage === 'products'     && (
           <ProductsContent
             products={products} categories={categories} brands={brands} kpis={kpis} tabs={tabs}
-            onCreateProduct={() => navigate('new-product')}
-            onEditProduct={(id) => { setEditProductId(id); navigate('edit-product'); }}
+            onCreateProduct={() => openProductForm()}
+            onEditProduct={(id) => openProductForm(id)}
             onDelete={onDelete} onArchive={onArchive}
             totalCount={totalCount} page={page} pageSize={pageSize}
             onPageChange={onPageChange} onExport={onExport}
@@ -286,6 +269,32 @@ export default function MagasinShell({
         {activePage === 'alertes'      && <AlertesPage alerts={alerts} />}
         {activePage === 'reglages'     && <ReglagesPage />}
       </main>
+
+      {/* ── Product Form Drawer ── */}
+      {productDrawer.open && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(20,17,14,.45)', zIndex: 50 }}
+            onClick={closeProductForm}
+          />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, height: '100vh',
+            width: 'min(680px, 96vw)',
+            background: 'var(--bg, #fff)',
+            boxShadow: '-24px 0 60px rgba(20,17,14,.18)',
+            zIndex: 51, overflowY: 'auto',
+            animation: 'ux-slide .28s cubic-bezier(.32,.72,0,1)',
+          }}>
+            <ProductForm
+              key={productDrawer.productId ?? 'new'}
+              categories={categories.map(c => ({ id: Number(c.id), nom: c.name, description: null }))}
+              initial={productDrawer.productId ? { id: productDrawer.productId } : undefined}
+              onBack={closeProductForm}
+              onSuccess={() => { closeProductForm(); onActivePageChange?.(activePage); }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
