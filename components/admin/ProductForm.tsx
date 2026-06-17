@@ -818,10 +818,23 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
-                    <label className={labelCls}>Prix (FCFA) *</label>
+                    <label className={labelCls}>Prix de vente (FCFA) *</label>
                     <input type="number" min="0" value={form.prix_unitaire}
                       onChange={e => set("prix_unitaire", e.target.value ? Number(e.target.value) : "")}
                       placeholder="25000" required className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>
+                      Prix d'achat (FCFA)
+                      {form.prix_entrepot !== "" && form.prix_unitaire !== "" && Number(form.prix_unitaire) > 0 && (
+                        <span className="ml-2 text-emerald-600 font-bold normal-case tracking-normal">
+                          → Marge {Math.round((1 - Number(form.prix_entrepot) / Number(form.prix_unitaire)) * 100)}%
+                        </span>
+                      )}
+                    </label>
+                    <input type="number" min="0" value={form.prix_entrepot}
+                      onChange={e => set("prix_entrepot", e.target.value ? Number(e.target.value) : "")}
+                      placeholder="0" className={inputCls} />
                   </div>
                   {schema.hasRemise && (
                     <div>
@@ -885,11 +898,31 @@ export default function ProductForm({ categories, marques = [], initial, onSucce
                       placeholder="0" className={inputCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>Seuil minimum</label>
+                    <label className={labelCls}>Stock cible</label>
                     <input type="number" min="0" value={form.stock_minimum}
                       onChange={e => set("stock_minimum", e.target.value ? Number(e.target.value) : "")}
                       placeholder="5" className={inputCls} />
                   </div>
+                </div>
+              </section>
+            )}
+
+            {/* Fournisseur */}
+            {entrepots.length > 0 && (
+              <section className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Fournisseur</h3>
+                <div>
+                  <label className={labelCls}>Fournisseur / Entrepôt source</label>
+                  <select
+                    value={form.entrepot_id ?? ""}
+                    onChange={e => set("entrepot_id", e.target.value ? Number(e.target.value) : null)}
+                    className={inputCls}
+                  >
+                    <option value="">— Aucun (stock propre) —</option>
+                    {entrepots.map(e => (
+                      <option key={e.id} value={e.id}>{e.nom}{e.telephone ? ` · ${e.telephone}` : ""}</option>
+                    ))}
+                  </select>
                 </div>
               </section>
             )}
