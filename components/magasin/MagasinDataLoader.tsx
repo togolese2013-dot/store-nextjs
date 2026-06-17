@@ -356,7 +356,6 @@ function MagasinShellWithUI({
   fetchProducts, currentSearchQuery, currentPage,
 }: ShellWithUIProps) {
   const ui = useUI();
-  const router = useRouter();
 
   function handleExport() {
     const qs = new URLSearchParams();
@@ -380,7 +379,7 @@ function MagasinShellWithUI({
       onSearch={onSearch}
       onExport={handleExport}
       onSwitchWorkspace={onSwitchWorkspace}
-      onCreateProduct={onCreateProduct ?? (() => router.push('/admin/products/new'))}
+      onCreateProduct={onCreateProduct}
       onActivePageChange={(p) => { window.history.replaceState(null, '', `/admin/magasin?page=${p}`); }}
       onDelete={(p) => ui.confirmDelete('le produit', p.name, {
         onConfirm: () => ui.config.onDeleteRow?.('product', p),

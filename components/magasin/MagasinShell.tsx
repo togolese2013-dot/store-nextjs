@@ -26,6 +26,7 @@ import AjustementsPage from './AjustementsPage';
 import MouvementsPage from './MouvementsPage';
 import AlertesPage from './AlertesPage';
 import ReglagesPage from './ReglagesPage';
+import ProductForm from '@/components/admin/ProductForm';
 import {
   SearchIcon, BellIcon, ChevLeftIcon,
   DownloadIcon, UploadIcon, SparklesIcon, PlusIcon,
@@ -39,36 +40,40 @@ export type PageId =
   | 'overview' | 'products' | 'categories' | 'brands' | 'variantes'
   | 'fournisseurs' | 'achats' | 'entrepots'
   | 'ajustements' | 'mouvements' | 'alertes'
-  | 'reglages';
+  | 'reglages' | 'new-product' | 'edit-product';
 
 const PAGE_LABELS: Record<PageId, string> = {
-  overview:     "Vue d'ensemble",
-  products:     'Produits',
-  categories:   'Catégories',
-  brands:       'Marques',
-  variantes:    'Variantes',
-  fournisseurs: 'Fournisseurs',
-  achats:       'Achats',
-  entrepots:    'Entrepôts',
-  ajustements:  'Ajustements',
-  mouvements:   'Mouvements',
-  alertes:      'Alertes stock',
-  reglages:     'Réglages',
+  overview:       "Vue d'ensemble",
+  products:       'Produits',
+  categories:     'Catégories',
+  brands:         'Marques',
+  variantes:      'Variantes',
+  fournisseurs:   'Fournisseurs',
+  achats:         'Achats',
+  entrepots:      'Entrepôts',
+  ajustements:    'Ajustements',
+  mouvements:     'Mouvements',
+  alertes:        'Alertes stock',
+  reglages:       'Réglages',
+  'new-product':  'Nouveau produit',
+  'edit-product': 'Modifier le produit',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
-  overview:     'Rechercher…',
-  products:     'Rechercher un produit, SKU, marque…',
-  categories:   'Rechercher une catégorie…',
-  brands:       'Rechercher une marque, pays…',
-  variantes:    'Rechercher un groupe de variantes…',
-  fournisseurs: 'Rechercher un fournisseur, pays…',
-  achats:       'Rechercher une référence, fournisseur…',
-  entrepots:    'Rechercher un entrepôt, ville…',
-  ajustements:  'Rechercher un produit, SKU…',
-  mouvements:   'Rechercher un produit, type…',
-  alertes:      'Rechercher une règle, produit…',
-  reglages:     'Rechercher dans les réglages…',
+  overview:       'Rechercher…',
+  products:       'Rechercher un produit, SKU, marque…',
+  categories:     'Rechercher une catégorie…',
+  brands:         'Rechercher une marque, pays…',
+  variantes:      'Rechercher un groupe de variantes…',
+  fournisseurs:   'Rechercher un fournisseur, pays…',
+  achats:         'Rechercher une référence, fournisseur…',
+  entrepots:      'Rechercher un entrepôt, ville…',
+  ajustements:    'Rechercher un produit, SKU…',
+  mouvements:     'Rechercher un produit, type…',
+  alertes:        'Rechercher une règle, produit…',
+  reglages:       'Rechercher dans les réglages…',
+  'new-product':  '',
+  'edit-product': '',
 };
 
 const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
@@ -88,18 +93,20 @@ const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
 
 /** Reverse map — PageId → nav item id (for Sidebar activeId prop) */
 const PAGE_TO_NAV: Record<PageId, string> = {
-  overview:     'overview',
-  products:     'products',
-  categories:   'categories',
-  brands:       'brands',
-  variantes:    'variants',
-  fournisseurs: 'suppliers',
-  achats:       'achats',
-  entrepots:    'warehouses',
-  ajustements:  'adjustments',
-  mouvements:   'movements',
-  alertes:      'alerts',
-  reglages:     'settings',
+  overview:        'overview',
+  products:        'products',
+  categories:      'categories',
+  brands:          'brands',
+  variantes:       'variants',
+  fournisseurs:    'suppliers',
+  achats:          'achats',
+  entrepots:       'warehouses',
+  ajustements:     'adjustments',
+  mouvements:      'movements',
+  alertes:         'alerts',
+  reglages:        'settings',
+  'new-product':   'products',
+  'edit-product':  'products',
 };
 
 /* ─── Props ─────────────────────────────────────────────────────── */
@@ -173,11 +180,12 @@ export default function MagasinShell({
   shopName = 'Ma boutique',
 }: MagasinShellProps) {
   const ui = useUI();
-  const [activePage, setActivePage] = useState<PageId>(defaultPage);
+  const [activePage,    setActivePage]    = useState<PageId>(defaultPage);
+  const [editProductId, setEditProductId] = useState<number | null>(null);
 
   function navigate(p: PageId) {
     setActivePage(p);
-    onActivePageChange?.(p);
+    if (p !== 'new-product' && p !== 'edit-product') onActivePageChange?.(p);
   }
 
   const navId = PAGE_TO_NAV[activePage];
@@ -234,13 +242,34 @@ export default function MagasinShell({
         </header>
 
         {/* Page routing */}
+        {activePage === 'new-product' && (
+          <div style={{ padding: '0 0 40px' }}>
+            <ProductForm
+              categories={categories.map(c => ({ id: Number(c.id), nom: c.name, description: null }))}
+              onBack={() => navigate('products')}
+              onSuccess={() => navigate('products')}
+            />
+          </div>
+        )}
+        {activePage === 'edit-product' && editProductId && (
+          <div style={{ padding: '0 0 40px' }}>
+            <ProductForm
+              categories={categories.map(c => ({ id: Number(c.id), nom: c.name, description: null }))}
+              initial={{ id: editProductId }}
+              onBack={() => navigate('products')}
+              onSuccess={() => navigate('products')}
+            />
+          </div>
+        )}
         {activePage === 'overview'     && (
-          <OverviewPage products={products} categories={categories} kpis={kpis} onCreateProduct={onCreateProduct} />
+          <OverviewPage products={products} categories={categories} kpis={kpis}
+            onCreateProduct={() => navigate('new-product')} />
         )}
         {activePage === 'products'     && (
           <ProductsContent
             products={products} categories={categories} brands={brands} kpis={kpis} tabs={tabs}
-            onCreateProduct={onCreateProduct}
+            onCreateProduct={() => navigate('new-product')}
+            onEditProduct={(id) => { setEditProductId(id); navigate('edit-product'); }}
             onDelete={onDelete} onArchive={onArchive}
             totalCount={totalCount} page={page} pageSize={pageSize}
             onPageChange={onPageChange} onExport={onExport}
@@ -263,14 +292,15 @@ export default function MagasinShell({
 
 /* ─── ProductsContent ───────────────────────────────────────────── */
 interface ProductsContentProps {
-  products:       Product[];
-  categories:     Category[];
-  brands:         Brand[];
-  kpis:           KpiCard[];
-  tabs:           TabSpec[];
+  products:         Product[];
+  categories:       Category[];
+  brands:           Brand[];
+  kpis:             KpiCard[];
+  tabs:             TabSpec[];
   onCreateProduct?: () => void;
-  onDelete?:      (p: Product) => void;
-  onArchive?:     (p: Product) => void;
+  onEditProduct?:   (id: number) => void;
+  onDelete?:        (p: Product) => void;
+  onArchive?:       (p: Product) => void;
   totalCount?:    number;
   page?:          number;
   pageSize?:      number;
@@ -280,7 +310,7 @@ interface ProductsContentProps {
 
 function ProductsContent({
   products, categories, brands, kpis, tabs,
-  onCreateProduct, onDelete, onArchive,
+  onCreateProduct, onEditProduct, onDelete, onArchive,
   totalCount, page, pageSize, onPageChange, onExport,
 }: ProductsContentProps) {
   const ui = useUI();
@@ -396,6 +426,7 @@ function ProductsContent({
         selected={selected}
         onToggle={toggle}
         onToggleAll={toggleAll}
+        onEdit={onEditProduct}
         onDelete={onDelete}
         onArchive={onArchive}
         totalCount={totalCount}

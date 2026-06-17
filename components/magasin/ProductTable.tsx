@@ -3,7 +3,6 @@
  */
 'use client';
 import React from 'react';
-import { useRouter } from 'next/navigation';
 import type { Product } from './types';
 import { MoreIcon, ChevDownIcon } from './icons';
 import styles from './Magasin.module.css';
@@ -14,6 +13,7 @@ interface ProductTableProps {
   selected: Set<string>;
   onToggle: (sku: string) => void;
   onToggleAll: () => void;
+  onEdit?: (id: number) => void;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
   totalCount?: number;
@@ -42,13 +42,13 @@ function stockColor(pct: number): string {
 }
 
 /* ── Row menu (interaction-layer) ── */
-function RowMenuUI({ product, onDelete, onArchive }: {
+function RowMenuUI({ product, onEdit, onDelete, onArchive }: {
   product: Product;
+  onEdit?: (id: number) => void;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
 }) {
   const ui = useUI();
-  const router = useRouter();
   return (
     <button
       type="button"
@@ -58,7 +58,7 @@ function RowMenuUI({ product, onDelete, onArchive }: {
         e.stopPropagation();
         ui.menu(e, [
           { label: 'Voir les détails', icon: 'eye',  onClick: () => ui.openDetail('product', product) },
-          { label: 'Modifier',         icon: 'edit', onClick: () => router.push(`/admin/products/${product.id}`) },
+          { label: 'Modifier',         icon: 'edit', onClick: () => product.id && onEdit?.(product.id) },
           { sep: true },
           { label: product.status === 'Archivé' ? 'Réactiver' : 'Archiver', icon: 'archive',
             onClick: () => ui.confirmArchive('le produit', product.name, {
@@ -121,6 +121,7 @@ export default function ProductTable({
   selected,
   onToggle,
   onToggleAll,
+  onEdit,
   onDelete,
   onArchive,
   totalCount,
@@ -266,7 +267,7 @@ export default function ProductTable({
                     <td className={styles.priceCell}>{formatPrice(p.price)}</td>
                     <td className={styles.marginCell}>{p.margin > 0 ? `${p.margin}%` : '—'}</td>
                     <td className={styles.actionsCell}>
-                      <RowMenuUI product={p} onDelete={onDelete} onArchive={onArchive} />
+                      <RowMenuUI product={p} onEdit={onEdit} onDelete={onDelete} onArchive={onArchive} />
                     </td>
                   </tr>
                 );
