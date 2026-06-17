@@ -286,7 +286,7 @@ export default function MagasinDataLoader({
       PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands, SUPPLIERS: suppliers, WAREHOUSES: warehouses,
       VARIANT_GROUPS: variants.map(v => ({ id: Number(v.id), nom: v.name, valeurs: v.values })),
     });
-  }, [allProducts, categories, brands, suppliers, warehouses]);
+  }, [allProducts, categories, brands, suppliers, warehouses, variants]);
 
   /* ── Build config (stable ref — onRefresh triggers re-fetch) ── */
   const config = useMemo(() => createMagasinConfig({
