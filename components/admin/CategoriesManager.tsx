@@ -52,7 +52,7 @@ export default function CategoriesManager({ initialCategories, initialMarques = 
         const res  = await fetch("/api/admin/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: form.nom.trim(), description: form.description.trim() }) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        setList(l => [...l, { id: data.id, nom: form.nom.trim(), description: form.description.trim(), nb_produits: 0 }].sort((a, b) => a.nom.localeCompare(b.nom)));
+        setList(l => [...l, { id: data.id, nom: form.nom.trim(), description: form.description.trim(), nb_produits: 0, ca_stock: 0, marge_moy: 0 }].sort((a, b) => a.nom.localeCompare(b.nom)));
       } else if (editing) {
         const res  = await fetch(`/api/admin/categories/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: form.nom.trim(), description: form.description.trim() }) });
         const data = await res.json();
@@ -86,7 +86,7 @@ export default function CategoriesManager({ initialCategories, initialMarques = 
         const res  = await fetch("/api/admin/marques", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: marqueForm.nom.trim(), description: marqueForm.description.trim() }) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        setMarques(l => [...l, { id: data.id, nom: marqueForm.nom.trim(), description: marqueForm.description.trim(), nb_produits: 0 }].sort((a, b) => a.nom.localeCompare(b.nom)));
+        setMarques(l => [...l, { id: data.id, nom: marqueForm.nom.trim(), description: marqueForm.description.trim(), nb_produits: 0, ca_stock: 0, marge_moy: 0, logo_url: null }].sort((a, b) => a.nom.localeCompare(b.nom)));
       } else if (editingMarque) {
         const res  = await fetch(`/api/admin/marques/${editingMarque.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: marqueForm.nom.trim(), description: marqueForm.description.trim() }) });
         const data = await res.json();
