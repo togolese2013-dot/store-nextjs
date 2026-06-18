@@ -2092,37 +2092,13 @@ async function ensureBoutiqueStockPopulated(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
-  // If empty, seed from produits.stock_boutique (or 0 for all products)
-  const [[cnt]] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT COUNT(*) AS n FROM boutique_stock"
-  );
-  if (Number((cnt as mysql.RowDataPacket).n ?? 0) === 0) {
-    // Try with stock_boutique column first, fall back to 0
-    await db.execute(`
-      INSERT INTO boutique_stock (produit_id, quantite)
-      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
-      FROM produits
-      ON DUPLICATE KEY UPDATE quantite = VALUES(quantite)
-    `).catch(() =>
-      db.execute(`
-        INSERT INTO boutique_stock (produit_id, quantite)
-        SELECT id, 0 FROM produits
-        ON DUPLICATE KEY UPDATE quantite = quantite
-      `)
-    );
-  } else {
-    // Ensure any new products added since last seeding are included
-    await db.execute(`
-      INSERT IGNORE INTO boutique_stock (produit_id, quantite)
-      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
-      FROM produits
-    `).catch(() =>
-      db.execute(`
-        INSERT IGNORE INTO boutique_stock (produit_id, quantite)
-        SELECT id, 0 FROM produits
-      `)
-    );
-  }
+  // Seed only products with stock_boutique > 0 — never auto-insert zero-stock rows
+  await db.execute(`
+    INSERT IGNORE INTO boutique_stock (produit_id, quantite)
+    SELECT id, GREATEST(1, COALESCE(stock_boutique, 0))
+    FROM produits
+    WHERE COALESCE(stock_boutique, 0) > 0
+  `).catch(() => { /* stock_boutique column may not exist yet — skip */ });
   }); // end runOnce
 }
 

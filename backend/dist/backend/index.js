@@ -2649,34 +2649,13 @@ async function ensureBoutiqueStockPopulated() {
       UNIQUE KEY uq_produit (produit_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
-    const [[cnt]] = await db.execute(
-      "SELECT COUNT(*) AS n FROM boutique_stock"
-    );
-    if (Number(cnt.n ?? 0) === 0) {
-      await db.execute(`
-      INSERT INTO boutique_stock (produit_id, quantite)
-      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
-      FROM produits
-      ON DUPLICATE KEY UPDATE quantite = VALUES(quantite)
-    `).catch(
-        () => db.execute(`
-        INSERT INTO boutique_stock (produit_id, quantite)
-        SELECT id, 0 FROM produits
-        ON DUPLICATE KEY UPDATE quantite = quantite
-      `)
-      );
-    } else {
-      await db.execute(`
-      INSERT IGNORE INTO boutique_stock (produit_id, quantite)
-      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
-      FROM produits
-    `).catch(
-        () => db.execute(`
-        INSERT IGNORE INTO boutique_stock (produit_id, quantite)
-        SELECT id, 0 FROM produits
-      `)
-      );
-    }
+    await db.execute(`
+    INSERT IGNORE INTO boutique_stock (produit_id, quantite)
+    SELECT id, GREATEST(1, COALESCE(stock_boutique, 0))
+    FROM produits
+    WHERE COALESCE(stock_boutique, 0) > 0
+  `).catch(() => {
+    });
   });
 }
 async function getStockBoutiqueStats(shopId = 1) {
