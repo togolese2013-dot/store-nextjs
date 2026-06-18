@@ -3330,36 +3330,70 @@ export async function getLivraisonsStats(): Promise<{
 // ─── Fournisseurs ─────────────────────────────────────────────────────────────
 
 export interface Fournisseur {
-  id:         number;
-  nom:        string;
-  contact:    string | null;
-  telephone:  string | null;
-  email:      string | null;
-  adresse:    string | null;
-  note:       string | null;
-  created_at: string;
+  id:               number;
+  nom:              string;
+  contact:          string | null;
+  telephone:        string | null;
+  email:            string | null;
+  adresse:          string | null;
+  note:             string | null;
+  pays:             string | null;
+  actif:            number;
+  delai_livraison:  number;
+  created_at:       string;
+  nb_produits?:     number;
+  total_achats?:    number;
+}
+
+async function ensureFournisseurCols() {
+  const alters = [
+    "ALTER TABLE fournisseurs ADD COLUMN pays VARCHAR(100) NULL",
+    "ALTER TABLE fournisseurs ADD COLUMN actif TINYINT(1) NOT NULL DEFAULT 1",
+    "ALTER TABLE fournisseurs ADD COLUMN delai_livraison INT NOT NULL DEFAULT 0",
+  ];
+  for (const sql of alters) {
+    await db.execute(sql).catch(() => {});
+  }
 }
 
 export async function listFournisseurs(shopId = 1): Promise<Fournisseur[]> {
+  await ensureFournisseurCols();
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs WHERE shop_id = ? ORDER BY nom LIMIT 500",
-    [shopId]
+    `SELECT f.id, f.nom, f.contact, f.telephone, f.email, f.adresse, f.note, f.created_at,
+            COALESCE(f.pays, '') AS pays,
+            COALESCE(f.actif, 1) AS actif,
+            COALESCE(f.delai_livraison, 0) AS delai_livraison,
+            COUNT(DISTINCT a.id) AS nb_produits,
+            COALESCE(SUM(a.montant_total), 0) AS total_achats
+     FROM fournisseurs f
+     LEFT JOIN achats a ON a.fournisseur_id = f.id AND a.shop_id = ?
+     WHERE f.shop_id = ?
+     GROUP BY f.id
+     ORDER BY f.nom LIMIT 500`,
+    [shopId, shopId]
   );
-  return rows as Fournisseur[];
+  return rows.map(r => ({
+    ...r,
+    actif:           Number(r.actif),
+    delai_livraison: Number(r.delai_livraison),
+    nb_produits:     Number(r.nb_produits ?? 0),
+    total_achats:    Number(r.total_achats ?? 0),
+  })) as Fournisseur[];
 }
 
 export async function createFournisseur(data: Omit<Fournisseur, "id" | "created_at">, shopId = 1): Promise<number> {
+  await ensureFournisseurCols();
   const [result] = await db.execute<mysql.ResultSetHeader>(
-    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, shop_id) VALUES (?,?,?,?,?,?,?)`,
-    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, shopId]
+    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, pays, actif, delai_livraison, shop_id) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, data.pays ?? null, data.actif ?? 1, data.delai_livraison ?? 0, shopId]
   );
   return result.insertId;
 }
 
 export async function updateFournisseur(id: number, data: Partial<Omit<Fournisseur, "id" | "created_at">>, shopId = 1) {
   await db.execute(
-    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=? AND shop_id=?`,
-    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id, shopId]
+    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=?, pays=?, actif=?, delai_livraison=? WHERE id=? AND shop_id=?`,
+    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, data.pays ?? null, data.actif ?? 1, data.delai_livraison ?? 0, id, shopId]
   );
 }
 

@@ -260,7 +260,15 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
         onRefreshMeta?.();
       }
       if (kind === "supplier") {
-        const body = { nom: values.name, email: values.email || null, telephone: values.phone || null, note: values.notes || null };
+        const body = {
+          nom:             values.name,
+          email:           values.email || null,
+          telephone:       values.phone || null,
+          note:            values.notes || null,
+          pays:            values.country || null,
+          actif:           values.status === 'Inactif' ? 0 : 1,
+          delai_livraison: Number(values.delay) || 0,
+        };
         if (mode === "edit" && values._raw?.id) {
           await fetch(`/api/admin/fournisseurs/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         } else {

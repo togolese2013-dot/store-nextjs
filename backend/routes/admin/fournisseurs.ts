@@ -21,9 +21,9 @@ router.post("/api/admin/fournisseurs", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const { nom, contact, telephone, email, adresse, note } = req.body;
+    const { nom, contact, telephone, email, adresse, note, pays, actif, delai_livraison } = req.body;
     if (!nom?.trim()) return res.status(400).json({ error: "Le nom est obligatoire." });
-    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note }, session.shop_id ?? 1);
+    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note, pays: pays ?? null, actif: actif ?? 1, delai_livraison: Number(delai_livraison) || 0 }, session.shop_id ?? 1);
     res.status(201).json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });

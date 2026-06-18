@@ -3705,24 +3705,53 @@ async function getLivraisonsStats() {
     livre: Number(r.livre ?? 0)
   };
 }
+async function ensureFournisseurCols() {
+  const alters = [
+    "ALTER TABLE fournisseurs ADD COLUMN pays VARCHAR(100) NULL",
+    "ALTER TABLE fournisseurs ADD COLUMN actif TINYINT(1) NOT NULL DEFAULT 1",
+    "ALTER TABLE fournisseurs ADD COLUMN delai_livraison INT NOT NULL DEFAULT 0"
+  ];
+  for (const sql of alters) {
+    await db.execute(sql).catch(() => {
+    });
+  }
+}
 async function listFournisseurs(shopId = 1) {
+  await ensureFournisseurCols();
   const [rows] = await db.query(
-    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs WHERE shop_id = ? ORDER BY nom LIMIT 500",
-    [shopId]
+    `SELECT f.id, f.nom, f.contact, f.telephone, f.email, f.adresse, f.note, f.created_at,
+            COALESCE(f.pays, '') AS pays,
+            COALESCE(f.actif, 1) AS actif,
+            COALESCE(f.delai_livraison, 0) AS delai_livraison,
+            COUNT(DISTINCT a.id) AS nb_produits,
+            COALESCE(SUM(a.montant_total), 0) AS total_achats
+     FROM fournisseurs f
+     LEFT JOIN achats a ON a.fournisseur_id = f.id AND a.shop_id = ?
+     WHERE f.shop_id = ?
+     GROUP BY f.id
+     ORDER BY f.nom LIMIT 500`,
+    [shopId, shopId]
   );
-  return rows;
+  return rows.map((r) => ({
+    ...r,
+    actif: Number(r.actif),
+    delai_livraison: Number(r.delai_livraison),
+    nb_produits: Number(r.nb_produits ?? 0),
+    total_achats: Number(r.total_achats ?? 0)
+  }));
 }
 async function createFournisseur(data, shopId = 1) {
+  await ensureFournisseurCols();
   const [result] = await db.execute(
-    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, shop_id) VALUES (?,?,?,?,?,?,?)`,
-    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, shopId]
+    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, pays, actif, delai_livraison, shop_id) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, data.pays ?? null, data.actif ?? 1, data.delai_livraison ?? 0, shopId]
   );
   return result.insertId;
 }
 async function updateFournisseur(id, data, shopId = 1) {
   await db.execute(
-    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=? AND shop_id=?`,
-    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id, shopId]
+    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=?, pays=?, actif=?, delai_livraison=? WHERE id=? AND shop_id=?`,
+    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, data.pays ?? null, data.actif ?? 1, data.delai_livraison ?? 0, id, shopId]
   );
 }
 async function deleteFournisseur(id, shopId = 1) {
@@ -8471,9 +8500,9 @@ router14.post("/api/admin/fournisseurs", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { nom, contact, telephone, email, adresse, note } = req.body;
+    const { nom, contact, telephone, email, adresse, note, pays, actif, delai_livraison } = req.body;
     if (!nom?.trim()) return res.status(400).json({ error: "Le nom est obligatoire." });
-    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note }, session.shop_id ?? 1);
+    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note, pays: pays ?? null, actif: actif ?? 1, delai_livraison: Number(delai_livraison) || 0 }, session.shop_id ?? 1);
     res.status(201).json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });

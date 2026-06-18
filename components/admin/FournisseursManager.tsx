@@ -11,6 +11,7 @@ interface Props {
 
 const empty: Omit<Fournisseur, "id" | "created_at"> = {
   nom: "", contact: "", telephone: "", email: "", adresse: "", note: "",
+  pays: null, actif: 1, delai_livraison: 0,
 };
 
 const inputCls = "w-full px-3 py-2 text-sm bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 transition-colors";
@@ -33,7 +34,7 @@ export default function FournisseursManager({ initial }: Props) {
   }
 
   function openEdit(f: Fournisseur) {
-    setForm({ nom: f.nom, contact: f.contact ?? "", telephone: f.telephone ?? "", email: f.email ?? "", adresse: f.adresse ?? "", note: f.note ?? "" });
+    setForm({ nom: f.nom, contact: f.contact ?? "", telephone: f.telephone ?? "", email: f.email ?? "", adresse: f.adresse ?? "", note: f.note ?? "", pays: f.pays ?? null, actif: f.actif ?? 1, delai_livraison: f.delai_livraison ?? 0 });
     setEditing(f);
     setError("");
     setModal("edit");

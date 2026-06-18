@@ -156,7 +156,7 @@ function defaultsFor(schema: EntitySchema): Record<string, any> {
 function mapIncoming(kind: string, data: any): Record<string, any> {
   if (!data) return {};
   if (kind === "product")   return { name: data.name, sku: data.sku, status: data.status, cat: data.cat === '—' ? '' : (data.cat ?? ''), brand: data.brand === '—' ? '' : (data.brand ?? ''), price: data.price, cost: data.cost, stock: data.stock, target: data.target, image: data.imageUrl ?? '', variants: [] };
-  if (kind === "supplier")  return { name: data.name, country: data.country, status: data.status, delay: data.delay, notes: "" };
+  if (kind === "supplier")  return { name: data.name, country: data.country === '—' ? '' : (data.country ?? ''), status: data.status ?? 'Actif', delay: data.delay ?? 0, notes: "" };
   if (kind === "brand")     return { name: data.name, country: data.country, status: data.status, logo: data.logo };
   if (kind === "category")  return { name: data.name, subcats: data.subcats, color: data.color };
   if (kind === "variant")   return { name: data.name, type: data.type, values: data.values };

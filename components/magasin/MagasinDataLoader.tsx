@@ -229,8 +229,12 @@ export default function MagasinDataLoader({
       })));
       if (suppRes.fournisseurs) setSuppliers(suppRes.fournisseurs.map((f: any) => ({
         id: f.id, name: f.nom, init: (f.nom?.[0] ?? 'F').toUpperCase(),
-        color: '#C9601E', country: f.pays ?? '', products: 0, total: 0,
-        delay: f.delai_livraison ?? 0, status: f.actif ? 'Actif' : 'Inactif',
+        color: '#C9601E',
+        country:  f.pays || '—',
+        products: f.nb_produits  ?? 0,
+        total:    f.total_achats ?? 0,
+        delay:    f.delai_livraison ?? 0,
+        status:   f.actif === 0 ? 'Inactif' : 'Actif',
       })));
       const WH_COLORS = ['#3B6A8F','#2D6A4F','#5C4A88','#C9601E','#7A2C3A','#D4A437'];
       if (whRes.entrepots) setWarehouses(whRes.entrepots.map((e: any, i: number) => ({
