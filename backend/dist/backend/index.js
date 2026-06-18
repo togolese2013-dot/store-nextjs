@@ -3718,27 +3718,46 @@ async function ensureFournisseurCols() {
 }
 async function listFournisseurs(shopId = 1) {
   await ensureFournisseurCols();
-  const [rows] = await db.query(
-    `SELECT f.id, f.nom, f.contact, f.telephone, f.email, f.adresse, f.note, f.created_at,
-            COALESCE(f.pays, '') AS pays,
-            COALESCE(f.actif, 1) AS actif,
-            COALESCE(f.delai_livraison, 0) AS delai_livraison,
-            COUNT(DISTINCT a.id) AS nb_produits,
-            COALESCE(SUM(a.montant_total), 0) AS total_achats
-     FROM fournisseurs f
-     LEFT JOIN achats a ON a.fournisseur_id = f.id AND a.shop_id = ?
-     WHERE f.shop_id = ?
-     GROUP BY f.id
-     ORDER BY f.nom LIMIT 500`,
-    [shopId, shopId]
-  );
-  return rows.map((r) => ({
-    ...r,
-    actif: Number(r.actif),
-    delai_livraison: Number(r.delai_livraison),
-    nb_produits: Number(r.nb_produits ?? 0),
-    total_achats: Number(r.total_achats ?? 0)
-  }));
+  try {
+    const [rows] = await db.query(
+      `SELECT f.id, f.nom, f.contact, f.telephone, f.email, f.adresse, f.note, f.created_at,
+              COALESCE(f.pays, '') AS pays,
+              COALESCE(f.actif, 1) AS actif,
+              COALESCE(f.delai_livraison, 0) AS delai_livraison,
+              COUNT(DISTINCT a.id) AS nb_produits,
+              COALESCE(SUM(a.montant_total), 0) AS total_achats
+       FROM fournisseurs f
+       LEFT JOIN achats a ON a.fournisseur_id = f.id AND a.shop_id = ?
+       WHERE f.shop_id = ?
+       GROUP BY f.id
+       ORDER BY f.nom LIMIT 500`,
+      [shopId, shopId]
+    );
+    return rows.map((r) => ({
+      ...r,
+      actif: Number(r.actif),
+      delai_livraison: Number(r.delai_livraison),
+      nb_produits: Number(r.nb_produits ?? 0),
+      total_achats: Number(r.total_achats ?? 0)
+    }));
+  } catch {
+    const [rows] = await db.query(
+      `SELECT f.id, f.nom, f.contact, f.telephone, f.email, f.adresse, f.note, f.created_at,
+              COALESCE(f.pays, '') AS pays,
+              COALESCE(f.actif, 1) AS actif,
+              COALESCE(f.delai_livraison, 0) AS delai_livraison,
+              0 AS nb_produits, 0 AS total_achats
+       FROM fournisseurs f WHERE f.shop_id = ? ORDER BY f.nom LIMIT 500`,
+      [shopId]
+    );
+    return rows.map((r) => ({
+      ...r,
+      actif: Number(r.actif),
+      delai_livraison: Number(r.delai_livraison),
+      nb_produits: 0,
+      total_achats: 0
+    }));
+  }
 }
 async function createFournisseur(data, shopId = 1) {
   await ensureFournisseurCols();
