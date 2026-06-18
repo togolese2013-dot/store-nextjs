@@ -2146,8 +2146,8 @@ export async function getStockBoutiqueList(opts: {
   if (filter === "faible")     p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
   if (filter === "epuise")     p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL AND bs.produit_id IS NOT NULL");
   if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
-  // "all" and others: only show products explicitly in boutique_stock (quantite > 0), never auto-show entrepot products
-  if (filter !== "disponible") p1Conds.push("(bs.produit_id IS NOT NULL AND COALESCE(bs.quantite,0)>0)");
+  // "all" and others: only show products explicitly in boutique_stock (quantite > 0), exclude external products
+  if (filter !== "disponible") p1Conds.push("(bs.produit_id IS NOT NULL AND COALESCE(bs.quantite,0)>0 AND p.entrepot_id IS NULL)");
 
   const [rows1] = await db.query<mysql.RowDataPacket[]>(
     `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
