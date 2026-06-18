@@ -73,10 +73,23 @@ export default function AlertesPage({ alerts: initialAlerts = SAMPLE_ALERTS, onT
     ? "Aucune règle d'alerte configurée"
     : `${activeCount} règle${activeCount > 1 ? 's' : ''} active${activeCount > 1 ? 's' : ''} · ${triggeredCount} déclenchée${triggeredCount > 1 ? 's' : ''} ce mois${channels.length ? ` · ${channels.join(', ')}` : ''}`;
 
-  const handleToggle = (i: number) => {
-    const next = alerts.map((a, j) => j === i ? { ...a, active: !a.active } : a);
-    setAlerts(next);
-    onToggle?.(i, next[i].active);
+  const handleToggle = async (i: number) => {
+    const alert = alerts[i];
+    const newActive = !alert.active;
+    // Optimistic UI update
+    setAlerts(prev => prev.map((a, j) => j === i ? { ...a, active: newActive } : a));
+    onToggle?.(i, newActive);
+    // Persist to DB if alert has an id
+    if (alert.id) {
+      await fetch(`/api/admin/stock-alerts/${alert.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: newActive ? 1 : 0 }),
+      }).catch(() => {
+        // Revert on error
+        setAlerts(prev => prev.map((a, j) => j === i ? { ...a, active: !newActive } : a));
+      });
+    }
   };
 
   const loadForecast = useCallback(async () => {

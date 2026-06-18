@@ -63,6 +63,7 @@ import adminOnboardingRoutes from "./routes/admin/onboarding";
 import adminSaasDashboardRoutes from "./routes/admin/saas-dashboard";
 import adminBillingRoutes       from "./routes/admin/billing";
 import adminAiRoutes            from "./routes/admin/ai";
+import adminStockAlertsRoutes   from "./routes/admin/stock-alerts";
 import { expireShopSubscriptions } from "@/lib/shops";
 import { startReviewNotifier } from "./lib/review-notifier";
 
@@ -210,6 +211,7 @@ app.use(adminOnboardingRoutes);
 app.use(adminSaasDashboardRoutes);
 app.use(adminBillingRoutes);
 app.use(adminAiRoutes);
+app.use(adminStockAlertsRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);

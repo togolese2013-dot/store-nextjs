@@ -193,6 +193,7 @@ export interface StockMovement {
 export type AlertChannel = 'Email' | 'SMS' | 'WhatsApp';
 
 export interface StockAlert {
+  id?: number;
   name: string;
   target: string;
   targetType: 'Produit' | 'Catégorie';

@@ -746,6 +746,7 @@ __export(admin_db_exports, {
   createPaymentPlan: () => createPaymentPlan,
   createReview: () => createReview,
   createStockAjustement: () => createStockAjustement,
+  createStockAlert: () => createStockAlert,
   createStockEntree: () => createStockEntree,
   createStockSortie: () => createStockSortie,
   createTombolaSession: () => createTombolaSession,
@@ -770,6 +771,7 @@ __export(admin_db_exports, {
   deleteNewsletterSubscriber: () => deleteNewsletterSubscriber,
   deleteOrder: () => deleteOrder,
   deleteReview: () => deleteReview,
+  deleteStockAlert: () => deleteStockAlert,
   deleteTombolaSession: () => deleteTombolaSession,
   deleteUtilisateur: () => deleteUtilisateur,
   deleteVariantGroup: () => deleteVariantGroup,
@@ -862,6 +864,7 @@ __export(admin_db_exports, {
   listReferrals: () => listReferrals,
   listReviews: () => listReviews,
   listSiteClients: () => listSiteClients,
+  listStockAlerts: () => listStockAlerts,
   listTombolaSessions: () => listTombolaSessions,
   listUtilisateurs: () => listUtilisateurs,
   listVariantGroups: () => listVariantGroups,
@@ -899,6 +902,7 @@ __export(admin_db_exports, {
   updateOrderStatus: () => updateOrderStatus,
   updateProductOptionsConfig: () => updateProductOptionsConfig,
   updateProductStock: () => updateProductStock,
+  updateStockAlert: () => updateStockAlert,
   updateTombolaSession: () => updateTombolaSession,
   updateUtilisateur: () => updateUtilisateur,
   updateUtilisateurPassword: () => updateUtilisateurPassword,
@@ -4686,6 +4690,113 @@ async function updateMarque(id, data, shopId = 1) {
 async function deleteMarque(id, shopId = 1) {
   await db.execute(`DELETE FROM marques WHERE id = ? AND shop_id = ?`, [id, shopId]);
 }
+async function ensureStockAlertsTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS stock_alerts (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      shop_id     INT NOT NULL,
+      nom         VARCHAR(255) NOT NULL,
+      target_type ENUM('Produit','Cat\xE9gorie') NOT NULL DEFAULT 'Produit',
+      target      VARCHAR(255) NOT NULL,
+      threshold   INT NOT NULL DEFAULT 5,
+      channels    JSON NOT NULL,
+      active      TINYINT(1) NOT NULL DEFAULT 1,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).catch(() => {
+  });
+}
+async function listStockAlerts(shopId = 1) {
+  await ensureStockAlertsTable();
+  const [rows] = await db.execute(
+    `SELECT * FROM stock_alerts WHERE shop_id = ? ORDER BY created_at DESC`,
+    [shopId]
+  );
+  const alerts = rows.map((r) => ({
+    id: Number(r.id),
+    nom: String(r.nom),
+    target_type: r.target_type,
+    target: String(r.target),
+    threshold: Number(r.threshold),
+    channels: (() => {
+      try {
+        return JSON.parse(r.channels);
+      } catch {
+        return [];
+      }
+    })(),
+    active: Number(r.active),
+    triggered: false,
+    shop_id: shopId
+  }));
+  const active = alerts.filter((a) => a.active);
+  if (active.length > 0) {
+    for (const alert of active) {
+      try {
+        let cnt = 0;
+        if (alert.target_type === "Produit") {
+          const [[row]] = await db.execute(
+            `SELECT COUNT(*) AS cnt FROM produits WHERE nom = ? AND shop_id = ? AND COALESCE(stock_magasin,0) <= ? AND actif = 1`,
+            [alert.target, shopId, alert.threshold]
+          );
+          cnt = Number(row?.cnt ?? 0);
+        } else {
+          const [[row]] = await db.execute(
+            `SELECT COUNT(*) AS cnt FROM produits p
+             JOIN categories c ON c.id = p.categorie_id
+             WHERE c.nom = ? AND p.shop_id = ? AND COALESCE(p.stock_magasin,0) <= ? AND p.actif = 1`,
+            [alert.target, shopId, alert.threshold]
+          );
+          cnt = Number(row?.cnt ?? 0);
+        }
+        alert.triggered = cnt > 0;
+      } catch {
+      }
+    }
+  }
+  return alerts;
+}
+async function createStockAlert(data, shopId = 1) {
+  await ensureStockAlertsTable();
+  const [res] = await db.execute(
+    `INSERT INTO stock_alerts (shop_id, nom, target_type, target, threshold, channels, active) VALUES (?,?,?,?,?,?,?)`,
+    [shopId, data.nom, data.target_type, data.target, data.threshold, JSON.stringify(data.channels), data.active ?? 1]
+  );
+  return res.insertId;
+}
+async function updateStockAlert(id, data, shopId = 1) {
+  const sets = [];
+  const vals = [];
+  if (data.nom !== void 0) {
+    sets.push("nom = ?");
+    vals.push(data.nom);
+  }
+  if (data.target_type !== void 0) {
+    sets.push("target_type = ?");
+    vals.push(data.target_type);
+  }
+  if (data.target !== void 0) {
+    sets.push("target = ?");
+    vals.push(data.target);
+  }
+  if (data.threshold !== void 0) {
+    sets.push("threshold = ?");
+    vals.push(data.threshold);
+  }
+  if (data.channels !== void 0) {
+    sets.push("channels = ?");
+    vals.push(JSON.stringify(data.channels));
+  }
+  if (data.active !== void 0) {
+    sets.push("active = ?");
+    vals.push(data.active);
+  }
+  if (!sets.length) return;
+  await db.execute(`UPDATE stock_alerts SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, [...vals, id, shopId]);
+}
+async function deleteStockAlert(id, shopId = 1) {
+  await db.execute(`DELETE FROM stock_alerts WHERE id = ? AND shop_id = ?`, [id, shopId]);
+}
 async function ensureTokenVersionCols() {
   const alters = [
     "ALTER TABLE admin_users ADD COLUMN token_version INT NOT NULL DEFAULT 0",
@@ -6132,7 +6243,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express49 = __toESM(require("express"));
+var import_express50 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -13824,6 +13935,66 @@ var billing_default = router47;
 
 // index.ts
 init_ai();
+
+// routes/admin/stock-alerts.ts
+var import_express49 = __toESM(require("express"));
+init_auth();
+init_admin_db();
+var router49 = import_express49.default.Router();
+router49.get("/api/admin/stock-alerts", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const alerts = await listStockAlerts(session.shop_id ?? 1);
+  res.json({ alerts });
+});
+router49.post("/api/admin/stock-alerts", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const { nom, target_type, target, threshold, channels, active } = req.body;
+    if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
+    if (!target?.trim()) return res.status(400).json({ error: "Cible requise." });
+    const id = await createStockAlert({
+      nom,
+      target_type: target_type ?? "Produit",
+      target,
+      threshold: Number(threshold) || 5,
+      channels: Array.isArray(channels) ? channels : [],
+      active: active ? 1 : 0,
+      shop_id: session.shop_id ?? 1
+    }, session.shop_id ?? 1);
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router49.patch("/api/admin/stock-alerts/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const data = {};
+    const b = req.body;
+    if (b.nom !== void 0) data.nom = b.nom;
+    if (b.target_type !== void 0) data.target_type = b.target_type;
+    if (b.target !== void 0) data.target = b.target;
+    if (b.threshold !== void 0) data.threshold = Number(b.threshold);
+    if (b.channels !== void 0) data.channels = Array.isArray(b.channels) ? b.channels : [];
+    if (b.active !== void 0) data.active = b.active ? 1 : 0;
+    await updateStockAlert(Number(req.params.id), data, session.shop_id ?? 1);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router49.delete("/api/admin/stock-alerts/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  await deleteStockAlert(Number(req.params.id), session.shop_id ?? 1);
+  res.json({ ok: true });
+});
+var stock_alerts_default = router49;
+
+// index.ts
 init_shops();
 
 // lib/review-notifier.ts
@@ -13913,7 +14084,7 @@ function startReviewNotifier() {
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express49.default)();
+var app = (0, import_express50.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -13988,8 +14159,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express49.default.json({ limit: "5mb" }));
-app.use(import_express49.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express50.default.json({ limit: "5mb" }));
+app.use(import_express50.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -14039,6 +14210,7 @@ app.use(onboarding_default);
 app.use(saas_dashboard_default);
 app.use(billing_default);
 app.use(ai_default);
+app.use(stock_alerts_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {

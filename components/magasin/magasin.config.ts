@@ -9,6 +9,7 @@ interface MagasinConfigOpts {
   onRefreshMeta?: () => void;
   onVariantChange?: () => void;
   onAdjustmentChange?: () => void;
+  onAlertChange?: () => void;
 }
 
 /* Shared live-data store — updated by setMagasinData() from the DataLoader */
@@ -18,7 +19,7 @@ export function setMagasinData(d: Record<string, any>) {
   _data = { ..._data, ...d };
 }
 
-export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange, onAdjustmentChange }: MagasinConfigOpts = {}): AppConfig {
+export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange, onAdjustmentChange, onAlertChange }: MagasinConfigOpts = {}): AppConfig {
   return {
     name: "Magasin",
     data: () => _data,
@@ -300,6 +301,22 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
         await fetch("/api/admin/achats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         onRefreshMeta?.();
       }
+      if (kind === "alert") {
+        const body = {
+          nom:         values.name,
+          target_type: values.targetType || 'Produit',
+          target:      values.target,
+          threshold:   Number(values.threshold) || 5,
+          channels:    Array.isArray(values.channels) ? values.channels : [],
+          active:      values.active ? 1 : 0,
+        };
+        if (mode === "edit" && values._raw?.id) {
+          await fetch(`/api/admin/stock-alerts/${values._raw.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        } else {
+          await fetch("/api/admin/stock-alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        }
+        onAlertChange?.();
+      }
       if (kind === "adjustment") {
         const productObj = (_data.PRODUCTS ?? []).find((p: any) => (p.name ?? p.nom) === values.product);
         if (!productObj?.id) throw new Error("Produit introuvable.");
@@ -346,6 +363,10 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
       if (kind === "variant" && row.id) {
         await fetch(`/api/admin/variant-groups/${row.id}`, { method: "DELETE" });
         await onVariantChange?.();
+      }
+      if (kind === "alert" && row.id) {
+        await fetch(`/api/admin/stock-alerts/${row.id}`, { method: "DELETE" });
+        onAlertChange?.();
       }
     },
 

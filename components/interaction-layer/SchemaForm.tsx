@@ -161,7 +161,7 @@ function mapIncoming(kind: string, data: any): Record<string, any> {
   if (kind === "category")  return { name: data.name, subcats: data.subcats, color: data.color };
   if (kind === "variant")   return { name: data.name, type: data.type, values: data.values };
   if (kind === "warehouse") return { name: data.name, location: data.location, capacity: data.capacity, color: data.color };
-  if (kind === "alert")     return { name: data.name, targetType: data.targetType, target: data.target, threshold: data.threshold, channels: data.channels, active: data.active };
+  if (kind === "alert")     return { name: data.name, targetType: data.targetType ?? 'Produit', target: data.target ?? '', threshold: data.threshold ?? 5, channels: data.channels ?? [], active: data.active ?? false };
   return { ...data };
 }
 

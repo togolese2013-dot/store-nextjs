@@ -4473,6 +4473,109 @@ export async function deleteMarque(id: number, shopId = 1) {
   await db.execute(`DELETE FROM marques WHERE id = ? AND shop_id = ?`, [id, shopId]);
 }
 
+/* ─── Stock Alerts ───────────────────────────────────────────────────────── */
+
+export interface StockAlertRule {
+  id:          number;
+  nom:         string;
+  target_type: 'Produit' | 'Catégorie';
+  target:      string;
+  threshold:   number;
+  channels:    string[];   // ['Email','SMS','WhatsApp']
+  active:      number;
+  triggered:   boolean;
+  shop_id:     number;
+}
+
+async function ensureStockAlertsTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS stock_alerts (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      shop_id     INT NOT NULL,
+      nom         VARCHAR(255) NOT NULL,
+      target_type ENUM('Produit','Catégorie') NOT NULL DEFAULT 'Produit',
+      target      VARCHAR(255) NOT NULL,
+      threshold   INT NOT NULL DEFAULT 5,
+      channels    JSON NOT NULL,
+      active      TINYINT(1) NOT NULL DEFAULT 1,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).catch(() => {});
+}
+
+export async function listStockAlerts(shopId = 1): Promise<StockAlertRule[]> {
+  await ensureStockAlertsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT * FROM stock_alerts WHERE shop_id = ? ORDER BY created_at DESC`,
+    [shopId]
+  );
+  // Compute triggered: stock <= threshold for matching products
+  const alerts = (rows as mysql.RowDataPacket[]).map(r => ({
+    id:          Number(r.id),
+    nom:         String(r.nom),
+    target_type: r.target_type as 'Produit' | 'Catégorie',
+    target:      String(r.target),
+    threshold:   Number(r.threshold),
+    channels:    (() => { try { return JSON.parse(r.channels); } catch { return []; } })(),
+    active:      Number(r.active),
+    triggered:   false,
+    shop_id:     shopId,
+  }));
+
+  // Batch check triggered for active alerts only
+  const active = alerts.filter(a => a.active);
+  if (active.length > 0) {
+    for (const alert of active) {
+      try {
+        let cnt = 0;
+        if (alert.target_type === 'Produit') {
+          const [[row]] = await db.execute<mysql.RowDataPacket[]>(
+            `SELECT COUNT(*) AS cnt FROM produits WHERE nom = ? AND shop_id = ? AND COALESCE(stock_magasin,0) <= ? AND actif = 1`,
+            [alert.target, shopId, alert.threshold]
+          );
+          cnt = Number(row?.cnt ?? 0);
+        } else {
+          const [[row]] = await db.execute<mysql.RowDataPacket[]>(
+            `SELECT COUNT(*) AS cnt FROM produits p
+             JOIN categories c ON c.id = p.categorie_id
+             WHERE c.nom = ? AND p.shop_id = ? AND COALESCE(p.stock_magasin,0) <= ? AND p.actif = 1`,
+            [alert.target, shopId, alert.threshold]
+          );
+          cnt = Number(row?.cnt ?? 0);
+        }
+        alert.triggered = cnt > 0;
+      } catch { /* ignore */ }
+    }
+  }
+  return alerts;
+}
+
+export async function createStockAlert(data: Omit<StockAlertRule, 'id' | 'triggered'>, shopId = 1) {
+  await ensureStockAlertsTable();
+  const [res] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO stock_alerts (shop_id, nom, target_type, target, threshold, channels, active) VALUES (?,?,?,?,?,?,?)`,
+    [shopId, data.nom, data.target_type, data.target, data.threshold, JSON.stringify(data.channels), data.active ?? 1]
+  );
+  return res.insertId;
+}
+
+export async function updateStockAlert(id: number, data: Partial<Omit<StockAlertRule, 'id' | 'triggered'>>, shopId = 1) {
+  const sets: string[] = [];
+  const vals: (string | number | null)[] = [];
+  if (data.nom         !== undefined) { sets.push('nom = ?');         vals.push(data.nom); }
+  if (data.target_type !== undefined) { sets.push('target_type = ?'); vals.push(data.target_type); }
+  if (data.target      !== undefined) { sets.push('target = ?');      vals.push(data.target); }
+  if (data.threshold   !== undefined) { sets.push('threshold = ?');   vals.push(data.threshold); }
+  if (data.channels    !== undefined) { sets.push('channels = ?');    vals.push(JSON.stringify(data.channels)); }
+  if (data.active      !== undefined) { sets.push('active = ?');      vals.push(data.active); }
+  if (!sets.length) return;
+  await db.execute(`UPDATE stock_alerts SET ${sets.join(', ')} WHERE id = ? AND shop_id = ?`, [...vals, id, shopId]);
+}
+
+export async function deleteStockAlert(id: number, shopId = 1) {
+  await db.execute(`DELETE FROM stock_alerts WHERE id = ? AND shop_id = ?`, [id, shopId]);
+}
+
 /* ─── Token version — JWT revocation ─── */
 export async function ensureTokenVersionCols() {
   const alters = [

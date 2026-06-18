@@ -158,6 +158,7 @@ export default function MagasinDataLoader({
   const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
   const [variants,    setVariants]    = useState<Variant[]>([]);
   const [adjustments, setAdjustments] = useState<import('./types').StockAdjustment[]>([]);
+  const [alerts,      setAlerts]      = useState<import('./types').StockAlert[]>([]);
 
   /* UI state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -177,6 +178,23 @@ export default function MagasinDataLoader({
         setTotalCount(Number(r.total ?? mapped.length));
         setTabs(buildTabs(mapped));
       }
+    } catch { /* keep current */ }
+  }, []);
+
+  /* ── Fetch stock alerts ── */
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/stock-alerts').then(r => r.json());
+      if (r.alerts) setAlerts(r.alerts.map((a: any) => ({
+        id:         a.id,
+        name:       a.nom,
+        target:     a.target,
+        targetType: a.target_type as 'Produit' | 'Catégorie',
+        threshold:  Number(a.threshold),
+        channels:   Array.isArray(a.channels) ? a.channels : [],
+        active:     Boolean(a.active),
+        triggered:  Boolean(a.triggered),
+      })));
     } catch { /* keep current */ }
   }, []);
 
@@ -291,7 +309,7 @@ export default function MagasinDataLoader({
   }, []);
 
   /* ── Initial load ── */
-  useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); fetchAdjustments(); }, [fetchProducts, fetchMeta, fetchVariants, fetchAdjustments]);
+  useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); fetchAdjustments(); fetchAlerts(); }, [fetchProducts, fetchMeta, fetchVariants, fetchAdjustments, fetchAlerts]);
 
   /* ── Debounced search ── */
   function handleSearch(q: string) {
@@ -321,6 +339,7 @@ export default function MagasinDataLoader({
     onRefreshMeta: () => fetchMeta(),
     onVariantChange: () => fetchVariants(),
     onAdjustmentChange: () => fetchAdjustments(),
+    onAlertChange: () => fetchAlerts(),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []); // intentionally stable — fetchProducts/searchQuery/page accessed via closure at call time
 
@@ -336,6 +355,7 @@ export default function MagasinDataLoader({
         orders={orders}
         variants={variants}
         adjustments={adjustments}
+        alerts={alerts}
         kpis={kpis}
         tabs={tabs}
         searchQuery={searchQuery}
@@ -368,6 +388,7 @@ interface ShellWithUIProps extends Props {
   orders: import('./types').PurchaseOrder[];
   variants: Variant[];
   adjustments: import('./types').StockAdjustment[];
+  alerts: import('./types').StockAlert[];
   kpis: KpiCard[];
   tabs: TabSpec[];
   searchQuery: string;
@@ -382,7 +403,7 @@ interface ShellWithUIProps extends Props {
 }
 
 function MagasinShellWithUI({
-  products, categories, brands, suppliers, warehouses, orders, variants, adjustments, kpis, tabs, searchQuery, onSearch,
+  products, categories, brands, suppliers, warehouses, orders, variants, adjustments, alerts, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
   fetchProducts, currentSearchQuery, currentPage,
@@ -406,6 +427,7 @@ function MagasinShellWithUI({
       orders={orders}
       variants={variants}
       adjustments={adjustments}
+      alerts={alerts}
       kpis={kpis}
       tabs={tabs}
       searchQuery={searchQuery}
