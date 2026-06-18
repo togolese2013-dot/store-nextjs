@@ -6,7 +6,7 @@
 'use client';
 import React, { useState } from 'react';
 import type { BoutiqueStock } from './types';
-import { SAMPLE_STOCK, STOCK_KPIS } from './sample-data';
+import { SAMPLE_STOCK } from './sample-data';
 import Sparkline from './Sparkline';
 import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
 import styles from './Boutique.module.css';
@@ -17,7 +17,14 @@ export interface StockPageProps {
 }
 
 export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: StockPageProps) {
-  const low = stock.filter(p => p.boutique < p.seuil);
+  const low      = stock.filter(p => p.boutique < p.seuil);
+  const okCount  = stock.filter(p => p.boutique >= p.seuil).length;
+
+  const STOCK_KPIS: import('./types').KpiItem[] = [
+    { label: 'Références en boutique', value: String(stock.length), sub: 'du catalogue',                    sparkColor: '#3B6A8F' },
+    { label: 'Alertes stock',          value: String(low.length),   sub: '< seuil de réapprovisionnement', sparkColor: '#C9601E' },
+    { label: 'Références OK',          value: String(okCount),      sub: 'stock au-dessus du seuil',       sparkColor: '#2D6A4F' },
+  ];
 
   return (
     <>
