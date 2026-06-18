@@ -8,6 +8,7 @@ interface MagasinConfigOpts {
   onRefresh?: () => void;
   onRefreshMeta?: () => void;
   onVariantChange?: () => void;
+  onAdjustmentChange?: () => void;
 }
 
 /* Shared live-data store — updated by setMagasinData() from the DataLoader */
@@ -17,7 +18,7 @@ export function setMagasinData(d: Record<string, any>) {
   _data = { ..._data, ...d };
 }
 
-export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange }: MagasinConfigOpts = {}): AppConfig {
+export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange, onAdjustmentChange }: MagasinConfigOpts = {}): AppConfig {
   return {
     name: "Magasin",
     data: () => _data,
@@ -298,6 +299,22 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
         const body = { date_achat: values.date || new Date().toISOString().slice(0,10), items: items.length ? items : [{ nom: 'Article', quantite: 1, prix_unitaire: 0 }], note: values.notes || null };
         await fetch("/api/admin/achats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         onRefreshMeta?.();
+      }
+      if (kind === "adjustment") {
+        const productObj = (_data.PRODUCTS ?? []).find((p: any) => (p.name ?? p.nom) === values.product);
+        if (!productObj?.id) throw new Error("Produit introuvable.");
+        const qty = Number(values.qty) || 0;
+        if (qty === 0) throw new Error("Quantité requise.");
+        // Sortie = négatif, Entrée/Transfert = positif
+        const quantite = values.type === "Sortie" ? -Math.abs(qty) : Math.abs(qty);
+        const motif = [values.reason, values.note].filter(Boolean).join(" — ") || "Ajustement manuel";
+        await fetch("/api/admin/stock/ajustement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ produit_id: productObj.id, quantite, motif }),
+        });
+        onRefresh?.();
+        onAdjustmentChange?.();
       }
     },
 

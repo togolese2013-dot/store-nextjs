@@ -157,6 +157,7 @@ export default function MagasinDataLoader({
   const [warehouses,  setWarehouses]  = useState<import('./types').Warehouse[]>([]);
   const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
   const [variants,    setVariants]    = useState<Variant[]>([]);
+  const [adjustments, setAdjustments] = useState<import('./types').StockAdjustment[]>([]);
 
   /* UI state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,6 +176,23 @@ export default function MagasinDataLoader({
         setAllProducts(mapped);
         setTotalCount(Number(r.total ?? mapped.length));
         setTabs(buildTabs(mapped));
+      }
+    } catch { /* keep current */ }
+  }, []);
+
+  /* ── Fetch adjustments ── */
+  const fetchAdjustments = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/stock/mouvements?type=ajustement&limit=50').then(r => r.json());
+      if (r.items) {
+        setAdjustments(r.items.map((m: any) => ({
+          date:    m.created_at ? new Date(m.created_at).toLocaleDateString('fr-FR') : '—',
+          product: m.nom_produit ?? '—',
+          sku:     m.reference  ?? '',
+          delta:   Number(m.quantite ?? 0),
+          reason:  m.note ?? '—',
+          author:  m.user_id ? `#${m.user_id}` : '—',
+        })));
       }
     } catch { /* keep current */ }
   }, []);
@@ -273,7 +291,7 @@ export default function MagasinDataLoader({
   }, []);
 
   /* ── Initial load ── */
-  useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); }, [fetchProducts, fetchMeta, fetchVariants]);
+  useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); fetchAdjustments(); }, [fetchProducts, fetchMeta, fetchVariants, fetchAdjustments]);
 
   /* ── Debounced search ── */
   function handleSearch(q: string) {
@@ -302,6 +320,7 @@ export default function MagasinDataLoader({
     onRefresh: () => fetchProducts(searchQuery, page),
     onRefreshMeta: () => fetchMeta(),
     onVariantChange: () => fetchVariants(),
+    onAdjustmentChange: () => fetchAdjustments(),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []); // intentionally stable — fetchProducts/searchQuery/page accessed via closure at call time
 
@@ -316,6 +335,7 @@ export default function MagasinDataLoader({
         warehouses={warehouses}
         orders={orders}
         variants={variants}
+        adjustments={adjustments}
         kpis={kpis}
         tabs={tabs}
         searchQuery={searchQuery}
@@ -347,6 +367,7 @@ interface ShellWithUIProps extends Props {
   warehouses: import('./types').Warehouse[];
   orders: import('./types').PurchaseOrder[];
   variants: Variant[];
+  adjustments: import('./types').StockAdjustment[];
   kpis: KpiCard[];
   tabs: TabSpec[];
   searchQuery: string;
@@ -361,7 +382,7 @@ interface ShellWithUIProps extends Props {
 }
 
 function MagasinShellWithUI({
-  products, categories, brands, suppliers, warehouses, orders, variants, kpis, tabs, searchQuery, onSearch,
+  products, categories, brands, suppliers, warehouses, orders, variants, adjustments, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
   fetchProducts, currentSearchQuery, currentPage,
@@ -384,6 +405,7 @@ function MagasinShellWithUI({
       warehouses={warehouses}
       orders={orders}
       variants={variants}
+      adjustments={adjustments}
       kpis={kpis}
       tabs={tabs}
       searchQuery={searchQuery}
