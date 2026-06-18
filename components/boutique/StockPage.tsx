@@ -116,7 +116,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: S
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>{low.length} alerte{low.length > 1 ? 's' : ''} · 8 références</span>
+          <span>{low.length} alerte{low.length > 1 ? 's' : ''} · {stock.length} référence{stock.length > 1 ? 's' : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>
