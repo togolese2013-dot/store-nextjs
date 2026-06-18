@@ -4,11 +4,11 @@
  * Mount via BoutiqueShell (page id: 'stock') or standalone.
  */
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { BoutiqueStock } from './types';
 import { SAMPLE_STOCK, STOCK_KPIS } from './sample-data';
 import Sparkline from './Sparkline';
-import { PlusIcon, MoreIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
+import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
 import styles from './Boutique.module.css';
 
 export interface StockPageProps {
@@ -17,15 +17,7 @@ export interface StockPageProps {
 }
 
 export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: StockPageProps) {
-  const [openMenuSku, setOpenMenuSku] = useState<string | null>(null);
   const low = stock.filter(p => p.boutique < p.seuil);
-
-  useEffect(() => {
-    if (!openMenuSku) return;
-    const h = () => setOpenMenuSku(null);
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [openMenuSku]);
 
   return (
     <>
@@ -108,22 +100,14 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: S
                       }
                     </td>
                     <td className={styles.actionsCell}>
-                      {isLow
-                        ? <button type="button" className={`${styles.btn} ${styles.sm}`} style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => onRequestTransfer?.(p.sku)}>Transférer</button>
-                        : <div style={{ position: 'relative' }}>
-                          <button type="button" className={styles.rowMenu} onClick={e => { e.stopPropagation(); setOpenMenuSku(openMenuSku === p.sku ? null : p.sku); }}>
-                            <MoreIcon size={16} />
-                          </button>
-                          {openMenuSku === p.sku && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 20px rgba(20,17,14,.12)', minWidth: 160, padding: '4px 0' }}>
-                              <button type="button" onClick={() => { setOpenMenuSku(null); onRequestTransfer?.(p.sku); }}
-                                style={{ display: 'flex', width: '100%', padding: '8px 14px', fontSize: 13, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--ink)' }}>
-                                Transférer vers boutique
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      }
+                      <button
+                        type="button"
+                        className={`${styles.btn} ${styles.sm}`}
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                        onClick={() => onRequestTransfer?.(p.sku)}
+                      >
+                        Transférer
+                      </button>
                     </td>
                   </tr>
                 );
