@@ -2144,9 +2144,10 @@ export async function getStockBoutiqueList(opts: {
   const p1Params: (string | number | null)[] = [];
   if (searchLike) { p1Conds.push("(p.nom LIKE ? OR p.reference LIKE ?)"); p1Params.push(searchLike, searchLike); }
   if (filter === "faible")     p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
-  if (filter === "epuise")     p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL");
+  if (filter === "epuise")     p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL AND bs.produit_id IS NOT NULL");
   if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
-  p1Conds.push("(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)");
+  // "all" and others: only show products explicitly in boutique_stock (quantite > 0), never auto-show entrepot products
+  if (filter !== "disponible") p1Conds.push("(bs.produit_id IS NOT NULL AND COALESCE(bs.quantite,0)>0)");
 
   const [rows1] = await db.query<mysql.RowDataPacket[]>(
     `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
@@ -2168,9 +2169,10 @@ export async function getStockBoutiqueList(opts: {
   const p2Params: (string | number | null)[] = [];
   if (searchLike) { p2Conds.push("(p.nom LIKE ? OR pv.nom LIKE ? OR p.reference LIKE ?)"); p2Params.push(searchLike, searchLike, searchLike); }
   if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");
-  if (filter === "epuise")     p2Conds.push("pv.stock_boutique = 0");
+  if (filter === "epuise")     p2Conds.push("pv.stock_boutique = 0 AND EXISTS (SELECT 1 FROM boutique_stock WHERE produit_id = p.id)");
   if (filter === "faible")     p2Conds.push("pv.stock_boutique > 0 AND pv.stock_boutique <= 5");
-  // "all" → no extra condition
+  // "all" → only variants explicitly transferred (stock_boutique > 0)
+  if (filter === "all" || !filter) p2Conds.push("pv.stock_boutique > 0");
 
   let rows2: mysql.RowDataPacket[] = [];
   try {

@@ -2692,9 +2692,9 @@ async function getStockBoutiqueList(opts) {
     p1Params.push(searchLike, searchLike);
   }
   if (filter === "faible") p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
-  if (filter === "epuise") p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL");
+  if (filter === "epuise") p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL AND bs.produit_id IS NOT NULL");
   if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
-  p1Conds.push("(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)");
+  if (filter !== "disponible") p1Conds.push("(bs.produit_id IS NOT NULL AND COALESCE(bs.quantite,0)>0)");
   const [rows1] = await db.query(
     `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
             NULL AS variant_id, NULL AS variant_nom,
@@ -2716,8 +2716,9 @@ async function getStockBoutiqueList(opts) {
     p2Params.push(searchLike, searchLike, searchLike);
   }
   if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");
-  if (filter === "epuise") p2Conds.push("pv.stock_boutique = 0");
+  if (filter === "epuise") p2Conds.push("pv.stock_boutique = 0 AND EXISTS (SELECT 1 FROM boutique_stock WHERE produit_id = p.id)");
   if (filter === "faible") p2Conds.push("pv.stock_boutique > 0 AND pv.stock_boutique <= 5");
+  if (filter === "all" || !filter) p2Conds.push("pv.stock_boutique > 0");
   let rows2 = [];
   try {
     [rows2] = await db.query(
