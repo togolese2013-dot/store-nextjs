@@ -2694,14 +2694,17 @@ async function getStockBoutiqueList(opts) {
   if (filter === "faible") p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
   if (filter === "epuise") p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL AND bs.produit_id IS NOT NULL");
   if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
-  if (filter !== "disponible") p1Conds.push("(bs.produit_id IS NOT NULL AND COALESCE(bs.quantite,0)>0 AND p.entrepot_id IS NULL)");
+  if (filter !== "disponible") p1Conds.push("(bs.produit_id IS NOT NULL AND COALESCE(bs.quantite,0)>0)");
   const [rows1] = await db.query(
     `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
             NULL AS variant_id, NULL AS variant_nom,
             p.nom, p.reference,
             ${imageCol} AS image_url, ${remiseCol} AS remise, p.prix_unitaire,
             COALESCE(c.nom,'') AS categorie_nom,
-            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite,0) END AS quantite,
+            CASE
+              WHEN p.entrepot_id IS NOT NULL AND bs.produit_id IS NULL THEN 999
+              ELSE COALESCE(bs.quantite,0)
+            END AS quantite,
             COALESCE(bs.seuil_alerte,5) AS seuil_alerte
      FROM produits p
      LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
