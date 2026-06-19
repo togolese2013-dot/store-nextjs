@@ -215,16 +215,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
                         : <span className={styles.tag} style={{ background: 'var(--ok-bg)', color: 'var(--ok)' }}>OK</span>
                       }
                     </td>
-                    <td className={styles.actionsCell}>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.sm}`}
-                        style={{ padding: '4px 8px', fontSize: 11 }}
-                        onClick={() => openTransfert(p.produit_id)}
-                      >
-                        Transférer
-                      </button>
-                    </td>
+                    <td />
                   </tr>
                 );
               })}
