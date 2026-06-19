@@ -110,13 +110,14 @@ function mapFacture(f: ApiFacture): Sale {
 
 function mapStockItem(item: ApiStockItem, idx: number): BoutiqueStock {
   return {
-    sku:      item.reference || `PRD-${item.produit_id}`,
-    name:     item.nom,
-    cat:      item.categorie_nom || '—',
-    boutique: Number(item.quantite),
-    seuil:    Number(item.seuil_alerte) || 5,
-    swatch:   SWATCHES[hashStr(item.nom ?? String(idx)) % SWATCHES.length],
-    init:     (item.nom?.[0] ?? 'P').toUpperCase(),
+    produit_id: Number(item.produit_id),
+    sku:        item.reference || `PRD-${item.produit_id}`,
+    name:       item.nom,
+    cat:        item.categorie_nom || '—',
+    boutique:   Number(item.quantite),
+    seuil:      Number(item.seuil_alerte) || 5,
+    swatch:     SWATCHES[hashStr(item.nom ?? String(idx)) % SWATCHES.length],
+    init:       (item.nom?.[0] ?? 'P').toUpperCase(),
   };
 }
 
@@ -198,14 +199,15 @@ export default function BoutiqueDataLoader({
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  function fetchStock() {
     fetch('/api/admin/stock-boutique')
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d.items)) setStock((d.items as ApiStockItem[]).map(mapStockItem));
       })
       .catch(() => {});
-  }, []);
+  }
+  useEffect(() => { fetchStock(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch('/api/admin/finance?limit=50')
@@ -234,6 +236,7 @@ export default function BoutiqueDataLoader({
       onSwitchWorkspace={onSwitchWorkspace}
       onNewSale={onNewSale}
       onRequestTransfer={onRequestTransfer}
+      onRefreshStock={fetchStock}
       userName={userName}
       userRole={userRole}
       shopName={shopName}

@@ -18,6 +18,7 @@ export interface Sale {
 }
 
 export interface BoutiqueStock {
+  produit_id: number;
   sku: string;
   name: string;
   cat: string;

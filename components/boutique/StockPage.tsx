@@ -14,9 +14,30 @@ import styles from './Boutique.module.css';
 export interface StockPageProps {
   stock?: BoutiqueStock[];
   onRequestTransfer?: (sku: string) => void;
+  onRefresh?: () => void;
 }
 
-export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: StockPageProps) {
+/* ── Modal state types ── */
+type ModalType = null | 'transfert' | 'ajustement';
+
+interface MagasinProduct { id: number; nom: string; reference: string; stock_magasin: number }
+
+const OVERLAY: React.CSSProperties = {
+  position: 'fixed', inset: 0, zIndex: 999,
+  background: 'rgba(0,0,0,.45)', display: 'flex',
+  alignItems: 'center', justifyContent: 'center', padding: 16,
+};
+const PANEL: React.CSSProperties = {
+  background: 'var(--surface)', borderRadius: 16,
+  padding: 28, width: '100%', maxWidth: 420,
+  boxShadow: '0 20px 48px rgba(20,17,14,.18)',
+  display: 'flex', flexDirection: 'column', gap: 16,
+};
+const FIELD: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
+const LABEL: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em' };
+const ROW: React.CSSProperties = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 };
+
+export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPageProps) {
   const low      = stock.filter(p => p.boutique < p.seuil);
   const okCount  = stock.filter(p => p.boutique >= p.seuil).length;
 
@@ -25,6 +46,86 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: S
     { label: 'Alertes stock',          value: String(low.length),   sub: '< seuil de réapprovisionnement', sparkColor: '#C9601E' },
     { label: 'Références OK',          value: String(okCount),      sub: 'stock au-dessus du seuil',       sparkColor: '#2D6A4F' },
   ];
+
+  /* ── Modal state ── */
+  const [modal,        setModal]       = useState<ModalType>(null);
+  const [saving,       setSaving]      = useState(false);
+  const [error,        setError]       = useState('');
+
+  /* transfert form */
+  const [tProduitId,   setTProduitId]  = useState<number | ''>('');
+  const [tProduits,    setTProduits]   = useState<MagasinProduct[]>([]);
+  const [tQty,         setTQty]        = useState('1');
+  const [tLoading,     setTLoading]    = useState(false);
+
+  /* ajustement form */
+  const [aProduitId,   setAProduitId]  = useState<number | ''>('');
+  const [aType,        setAType]       = useState<'entree' | 'retrait'>('entree');
+  const [aQty,         setAQty]        = useState('1');
+  const [aMotif,       setAMotif]      = useState('');
+
+  /* ── Open modals ── */
+  function openTransfert(preId?: number) {
+    setError(''); setTQty('1'); setTProduitId(preId ?? '');
+    setTProduits([]); setModal('transfert');
+    setTLoading(true);
+    fetch('/api/admin/products?limit=500')
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.products)) {
+          setTProduits(d.products.map((p: any) => ({
+            id:           Number(p.id),
+            nom:          String(p.nom),
+            reference:    String(p.reference ?? ''),
+            stock_magasin: Number(p.stock_magasin ?? 0),
+          })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setTLoading(false));
+  }
+
+  function openAjustement() {
+    setError(''); setAQty('1'); setAType('entree'); setAMotif('');
+    setAProduitId(stock.length > 0 ? stock[0].produit_id : '');
+    setModal('ajustement');
+  }
+
+  function closeModal() { setModal(null); setError(''); }
+
+  /* ── Submit transfert ── */
+  async function submitTransfert() {
+    if (!tProduitId || !tQty || Number(tQty) <= 0) { setError('Produit et quantité requis.'); return; }
+    setSaving(true); setError('');
+    try {
+      const res = await fetch('/api/admin/stock/sortie', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ produit_id: tProduitId, quantite: Number(tQty), motif: 'Transfert vers boutique' }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? 'Erreur serveur.'); return; }
+      closeModal();
+      onRefresh?.();
+    } catch { setError('Erreur réseau.'); }
+    finally { setSaving(false); }
+  }
+
+  /* ── Submit ajustement ── */
+  async function submitAjustement() {
+    if (!aProduitId || !aQty || Number(aQty) <= 0) { setError('Produit et quantité requis.'); return; }
+    setSaving(true); setError('');
+    try {
+      const res = await fetch('/api/admin/stock-boutique/mouvement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ produit_id: aProduitId, type: aType, quantite: Number(aQty), motif: aMotif || undefined }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? 'Erreur serveur.'); return; }
+      closeModal();
+      onRefresh?.();
+    } catch { setError('Erreur réseau.'); }
+    finally { setSaving(false); }
+  }
 
   return (
     <>
@@ -35,8 +136,10 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: S
           <p className={styles.subtitle}>Stock physique de la boutique · distinct de l&apos;entrepôt Magasin</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><ArrowRightIcon size={14} /> Demander transfert</button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={styles.btn} onClick={() => openTransfert()}>
+            <ArrowRightIcon size={14} /> Demander transfert
+          </button>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={openAjustement}>
             <PlusIcon size={14} /> Ajustement manuel
           </button>
         </div>
@@ -75,12 +178,18 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: S
               </tr>
             </thead>
             <tbody>
-              {stock.map(p => {
+              {stock.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
+                    Aucun produit en stock boutique. Utilisez &quot;Demander transfert&quot; pour en ajouter.
+                  </td>
+                </tr>
+              ) : stock.map(p => {
                 const isLow = p.boutique < p.seuil;
-                const ratio = Math.min(1, p.boutique / p.seuil);
+                const ratio = p.seuil > 0 ? Math.min(1, p.boutique / p.seuil) : 1;
                 const barColor = isLow ? 'var(--danger)' : ratio < 0.8 ? 'var(--warn)' : 'var(--ok)';
                 return (
-                  <tr key={p.sku}>
+                  <tr key={p.produit_id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 32, height: 32, borderRadius: 7, background: p.swatch, color: 'white', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{p.init}</div>
@@ -111,7 +220,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: S
                         type="button"
                         className={`${styles.btn} ${styles.sm}`}
                         style={{ padding: '4px 8px', fontSize: 11 }}
-                        onClick={() => onRequestTransfer?.(p.sku)}
+                        onClick={() => openTransfert(p.produit_id)}
                       >
                         Transférer
                       </button>
@@ -131,6 +240,156 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRequestTransfer }: S
           </div>
         </div>
       </div>
+
+      {/* ── Modal Transfert Magasin → Boutique ── */}
+      {modal === 'transfert' && (
+        <div style={OVERLAY} onClick={closeModal}>
+          <div style={PANEL} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div className={styles.eyebrow}>Stock boutique</div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: 0 }}>
+                  Transfert <span className={styles.serif}>Magasin → Boutique</span>
+                </h3>
+              </div>
+              <button type="button" onClick={closeModal} style={{ border: 0, background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted)', lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={FIELD}>
+              <label style={LABEL}>Produit (stock magasin)</label>
+              {tLoading ? (
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '10px 0' }}>Chargement…</div>
+              ) : (
+                <select
+                  className={styles.input ?? ''}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--border)', fontSize: 13, background: 'var(--bg-2,#f9f9f7)' }}
+                  value={tProduitId}
+                  onChange={e => setTProduitId(Number(e.target.value))}
+                >
+                  <option value="">— Sélectionner un produit —</option>
+                  {tProduits.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.nom} ({p.reference}) · Stock magasin : {p.stock_magasin}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div style={FIELD}>
+              <label style={LABEL}>Quantité à transférer</label>
+              <input
+                type="number" min={1} value={tQty}
+                onChange={e => setTQty(e.target.value)}
+                style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--border)', fontSize: 13, fontFamily: 'Geist Mono, monospace', background: 'var(--bg-2,#f9f9f7)', width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {error && <div style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 8 }}>{error}</div>}
+
+            <div style={ROW}>
+              <button type="button" className={styles.btn} onClick={closeModal} disabled={saving}>Annuler</button>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.primary}`}
+                onClick={submitTransfert}
+                disabled={saving || !tProduitId || Number(tQty) <= 0}
+              >
+                {saving ? 'En cours…' : 'Transférer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Ajustement Manuel ── */}
+      {modal === 'ajustement' && (
+        <div style={OVERLAY} onClick={closeModal}>
+          <div style={PANEL} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div className={styles.eyebrow}>Stock boutique</div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: 0 }}>
+                  Ajustement <span className={styles.serif}>manuel</span>
+                </h3>
+              </div>
+              <button type="button" onClick={closeModal} style={{ border: 0, background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted)', lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={FIELD}>
+              <label style={LABEL}>Produit</label>
+              {stock.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '8px 0' }}>Aucun produit en stock boutique.</div>
+              ) : (
+                <select
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--border)', fontSize: 13, background: 'var(--bg-2,#f9f9f7)' }}
+                  value={aProduitId}
+                  onChange={e => setAProduitId(Number(e.target.value))}
+                >
+                  {stock.map(p => (
+                    <option key={p.produit_id} value={p.produit_id}>
+                      {p.name} · Stock actuel : {p.boutique}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div style={FIELD}>
+              <label style={LABEL}>Type</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['entree', 'retrait'] as const).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setAType(t)}
+                    style={{
+                      flex: 1, padding: '9px 0', borderRadius: 9, border: `1.5px solid ${aType === t ? 'var(--accent)' : 'var(--border)'}`,
+                      background: aType === t ? 'var(--accent-bg)' : 'var(--bg-2,#f9f9f7)',
+                      color: aType === t ? 'var(--accent)' : 'var(--muted)',
+                      fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    {t === 'entree' ? '+ Entrée' : '− Retrait'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={FIELD}>
+              <label style={LABEL}>Quantité</label>
+              <input
+                type="number" min={1} value={aQty}
+                onChange={e => setAQty(e.target.value)}
+                style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--border)', fontSize: 13, fontFamily: 'Geist Mono, monospace', background: 'var(--bg-2,#f9f9f7)', width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={FIELD}>
+              <label style={LABEL}>Motif (optionnel)</label>
+              <input
+                type="text" value={aMotif} placeholder="Casse, correction inventaire…"
+                onChange={e => setAMotif(e.target.value)}
+                style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--border)', fontSize: 13, background: 'var(--bg-2,#f9f9f7)', width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {error && <div style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 8 }}>{error}</div>}
+
+            <div style={ROW}>
+              <button type="button" className={styles.btn} onClick={closeModal} disabled={saving}>Annuler</button>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.primary}`}
+                onClick={submitAjustement}
+                disabled={saving || !aProduitId || Number(aQty) <= 0 || stock.length === 0}
+              >
+                {saving ? 'En cours…' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
