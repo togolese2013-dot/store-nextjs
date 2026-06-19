@@ -310,49 +310,6 @@ export default function EntrepotsPage(_props: EntrepotsPageProps) {
         </>
       )}
 
-      {/* Upgrade modal */}
-      {showUpgrade && (
-        <div className={styles.upgradeOverlay} onMouseDown={() => setShowUpgrade(false)}>
-          <div className={styles.upgradeCard} onMouseDown={e => e.stopPropagation()}>
-            <div className={styles.upgradeCardHead}>
-              <div className={styles.upgradeCardIcon}>
-                <LockIcon size={22} />
-              </div>
-              <div>
-                <p className={styles.upgradeCardTitle}>Limite atteinte</p>
-                <p className={styles.upgradeCardSub}>
-                  Votre plan <strong>Basic</strong> inclut 1 entrepôt.
-                  Passez en Pro pour créer des entrepôts illimités et gérer plusieurs sites de stockage.
-                </p>
-              </div>
-            </div>
-
-            <div className={styles.upgradePlans}>
-              <div className={styles.upgradePlan}>
-                <div className={styles.upgradePlanName}>Basic · Actuel</div>
-                <div className={styles.upgradePlanFeature}>🏭 1 entrepôt</div>
-                <div className={styles.upgradePlanFeature}>📦 20 produits</div>
-                <div className={styles.upgradePlanPrice}>Gratuit</div>
-              </div>
-              <div className={`${styles.upgradePlan} ${styles.upgradePlanPro}`}>
-                <div className={styles.upgradePlanName}>Pro · Recommandé</div>
-                <div className={styles.upgradePlanFeature}>🏭 Entrepôts illimités</div>
-                <div className={styles.upgradePlanFeature}>📦 Produits illimités</div>
-                <div className={styles.upgradePlanPrice}>9 900 F / mois</div>
-              </div>
-            </div>
-
-            <div className={styles.upgradeActions}>
-              <button className={styles.upgradeActionsBtn} onClick={() => setShowUpgrade(false)}>
-                Annuler
-              </button>
-              <a href="/admin/billing" className={`${styles.upgradeActionsBtn} ${styles.upgradeActionsPrimary}`}>
-                Voir les plans →
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
