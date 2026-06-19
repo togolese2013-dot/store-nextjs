@@ -7,6 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Warehouse } from './types';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, MoreIcon, MapPinIcon } from './icons';
@@ -14,6 +15,7 @@ import styles from './Magasin.module.css';
 import { useUI } from '@/components/interaction-layer';
 import EntrepotProduitsDrawer from './EntrepotProduitsDrawer';
 import MouvementDrawer from './MouvementDrawer';
+import EntrepotLimiteModal from './EntrepotLimiteModal';
 
 const WH_COLORS = ['#3B6A8F','#2D6A4F','#5C4A88','#C9601E','#7A2C3A','#D4A437'];
 
@@ -52,7 +54,8 @@ export interface EntrepotsPageProps {
 const MAX_ENTREPOTS: Record<string, number> = { basic: 1, free: 1 };
 
 export default function EntrepotsPage(_props: EntrepotsPageProps) {
-  const ui = useUI();
+  const ui     = useUI();
+  const router = useRouter();
 
   const [list,           setList]           = useState<Warehouse[]>([]);
   const [loading,        setLoading]        = useState(true);
@@ -162,22 +165,14 @@ export default function EntrepotsPage(_props: EntrepotsPageProps) {
         ))}
       </div>
 
-      {/* Plan lock banner */}
-      {isLocked && (
-        <div className={styles.lockBanner}>
-          <div className={styles.lockBannerIcon}>
-            <LockIcon size={18} />
-          </div>
-          <div className={styles.lockBannerText}>
-            <div className={styles.lockBannerTitle}>Limite du plan Basic atteinte</div>
-            <div className={styles.lockBannerSub}>
-              Votre plan Basic inclut 1 entrepôt. Passez en Pro pour créer des entrepôts illimités.
-            </div>
-          </div>
-          <a href="/admin/billing" className={styles.lockBannerCta}>
-            Passer en Pro →
-          </a>
-        </div>
+      {/* Plan limit modal */}
+      {showUpgrade && (
+        <EntrepotLimiteModal
+          currentPlan={plan ?? 'Basic'}
+          includedWarehouses={maxWh || 1}
+          onClose={() => setShowUpgrade(false)}
+          onUpgrade={() => { setShowUpgrade(false); router.push('/admin/billing'); }}
+        />
       )}
 
       {/* Principal banner */}
