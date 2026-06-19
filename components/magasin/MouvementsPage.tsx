@@ -10,6 +10,7 @@ import Sparkline from './Sparkline';
 import { DownloadIcon, FilterIcon, ArrowRightIcon, TrendIcon } from './icons';
 import MouvementDrawer from './MouvementDrawer';
 import { injectKeyframes } from './drawerUtils';
+import { useStoreMovements } from './TransferBanner';
 import styles from './Magasin.module.css';
 
 // ── API types ─────────────────────────────────────────────────────────────────
@@ -78,6 +79,8 @@ export interface MouvementsPageProps {
 
 export default function MouvementsPage(_props: MouvementsPageProps) {
   injectKeyframes();
+
+  const autoMovements = useStoreMovements();
 
   const [items,        setItems]        = useState<ApiMouvement[]>([]);
   const [counts,       setCounts]       = useState<ApiCounts>({ total: 0, entrees: 0, sorties: 0, ajustements: 0 });
@@ -272,7 +275,30 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 ? (
+                {/* Auto-generated movements from approved transfer requests — shown first */}
+                {autoMovements.map((m, i) => (
+                  <tr key={`auto-${m.reqId ?? i}`} style={{ background: 'var(--accent-bg)' }}>
+                    <td style={{ color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{m.date}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <div style={{ fontWeight: 500, fontSize: 13 }}>{m.product}</div>
+                        <span className={styles.tag} style={{ background: 'var(--accent-bg)', color: 'var(--accent)', fontSize: 10.5, padding: '1px 6px' }}>auto</span>
+                      </div>
+                      <div style={{ fontFamily: 'Geist Mono,monospace', fontSize: 11, color: 'var(--muted-2)' }}>{m.sku}{m.reqId ? ` · ${m.reqId}` : ''}</div>
+                    </td>
+                    <td>
+                      <span className={styles.tag} style={TYPE_STYLE['Sortie']}>Sortie</span>
+                    </td>
+                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>
+                      {m.qty}
+                    </td>
+                    <td style={{ color: 'var(--muted)', fontSize: 12.5 }}>{m.from}</td>
+                    <td style={{ color: 'var(--muted-2)' }}><ArrowRightIcon size={12} /></td>
+                    <td style={{ color: 'var(--muted)', fontSize: 12.5 }}>{m.to}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 12.5, color: 'var(--muted)' }}>—</td>
+                  </tr>
+                ))}
+                {items.length === 0 && autoMovements.length === 0 ? (
                   <tr>
                     <td colSpan={8} style={{ textAlign: 'center', padding: '32px', color: 'var(--muted-2)', fontSize: 13 }}>
                       Aucun mouvement enregistré

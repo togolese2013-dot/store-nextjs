@@ -32,6 +32,7 @@ import {
   FilterIcon, ChevDownIcon,
 } from './icons';
 import { useUI } from '@/components/interaction-layer';
+import { TransferBanner, PendingBadge } from './TransferBanner';
 import styles from './Magasin.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
@@ -229,9 +230,26 @@ export default function MagasinShell({
           </div>
           <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={(e) => ui.notifications(e)}>
             <BellIcon size={16} />
-            <span className={styles.pip} />
+            <PendingBadge pipClass={styles.pip} />
           </button>
         </header>
+
+        <TransferBanner
+          onApproved={r => ui.toast(`Transfert ${r.id} approuvé · mouvement créé (−${r.qty} ${r.product})`)}
+          onRejected={r => ui.toast(`Demande ${r.id} refusée`)}
+          confirmReject={r =>
+            new Promise(resolve => {
+              ui.confirm({
+                tone: 'danger',
+                title: 'Refuser la demande ?',
+                sub: `La demande ${r.id} (${r.qty} × ${r.product}) sera refusée. Aucun mouvement ne sera créé.`,
+                confirmLabel: 'Refuser',
+                onConfirm: () => resolve(true),
+              });
+              // Promise stays pending if user clicks "Annuler" — correct behavior
+            })
+          }
+        />
 
         {/* Page routing */}
         {activePage === 'overview'     && (
