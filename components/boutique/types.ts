@@ -28,6 +28,7 @@ export interface BoutiqueStock {
   seuil: number;
   swatch: string;
   init: string;
+  prix: number;
 }
 
 export type CashMovementType = 'Vente' | 'Sortie' | 'Ouverture';

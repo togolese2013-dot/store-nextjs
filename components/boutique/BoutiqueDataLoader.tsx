@@ -66,6 +66,7 @@ interface ApiStockItem {
   categorie_nom: string;
   quantite: number;
   seuil_alerte: number;
+  prix_unitaire: number;
 }
 
 interface ApiFinanceEntry {
@@ -118,6 +119,7 @@ function mapStockItem(item: ApiStockItem, idx: number): BoutiqueStock {
     seuil:      Number(item.seuil_alerte) || 5,
     swatch:     SWATCHES[hashStr(item.nom ?? String(idx)) % SWATCHES.length],
     init:       (item.nom?.[0] ?? 'P').toUpperCase(),
+    prix:       Number(item.prix_unitaire ?? 0),
   };
 }
 

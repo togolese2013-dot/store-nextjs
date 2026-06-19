@@ -172,7 +172,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
                 <th>Produit</th>
                 <th>Catégorie</th>
                 <th>Stock boutique</th>
-                <th>Seuil</th>
+                <th style={{ textAlign: 'right' }}>Prix unit.</th>
                 <th>Statut</th>
                 <th />
               </tr>
@@ -208,7 +208,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
                         <div style={{ width: `${ratio * 100}%`, background: barColor }} />
                       </div>
                     </td>
-                    <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 13, color: 'var(--muted)' }}>{p.seuil}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{p.prix.toLocaleString('fr-FR')} F</td>
                     <td>
                       {isLow
                         ? <span className={styles.tag} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertTriangleIcon size={11} />Stock bas</span>
