@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import BoutiqueShell from './BoutiqueShell';
+import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
 
 const SWATCHES = [
@@ -195,7 +196,7 @@ export default function BoutiqueDataLoader({
     ventes_jour_count: 0, ventes_jour_montant: 0, ca_total: 0, factures_payees: 0,
   });
 
-  useEffect(() => {
+  const fetchFactures = useCallback(() => {
     fetch('/api/admin/ventes/factures?limit=50')
       .then(r => r.json())
       .then(d => {
@@ -209,6 +210,13 @@ export default function BoutiqueDataLoader({
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => { fetchFactures(); }, [fetchFactures]);
+
+  const { subscribe } = useAdminSSE();
+  useEffect(() => subscribe((e) => {
+    if (e.type === 'vente') fetchFactures();
+  }), [subscribe, fetchFactures]);
 
   function fetchStock() {
     fetch('/api/admin/stock-boutique')
