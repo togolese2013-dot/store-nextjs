@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { TransferStore, type TransferRequest } from '@/lib/transferStore';
-import './transfer-modal.css';
 
 export interface TransferProduct {
   name: string;

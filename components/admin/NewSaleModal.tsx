@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BoutiqueStockItem } from '@/lib/admin-db';
 import { formatPrice } from '@/lib/utils';
-import './sale-modal.css';
 
 interface VenteItem {
   produit_id:    number;
