@@ -4,6 +4,8 @@ import { getAdminSession } from "@/lib/auth";
 import AdminShell from "@/components/admin/AdminShell";
 import type { AdminPermissions } from "@/lib/admin-permissions";
 import { getShopById, isShopAccessAllowed } from "@/lib/shops";
+import "@/components/admin/sale-modal.css";
+import "@/components/admin/transfer-modal.css";
 
 export const metadata = {
   title: { template: "%s — Admin", default: "Admin — Togolese Shop" },
