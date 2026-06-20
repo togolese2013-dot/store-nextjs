@@ -68,6 +68,60 @@ textarea.sm-in{resize:vertical;min-height:74px;line-height:1.5}
 .sm-total-sub{border-top:0;padding-top:0;margin-top:0}
 .sm-total-sub .sm-total-v{color:var(--accent,#C9601E)}
 
+/* — recherche produit POS — */
+.sm-search-wrap{position:relative;margin-bottom:10px}
+.sm-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted,#6B635B);pointer-events:none;display:grid;place-items:center}
+.sm-search-in{padding-left:34px !important}
+.sm-drop{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface,#fff);border:1px solid var(--border,#E8E1D4);border-radius:12px;box-shadow:0 8px 32px rgba(20,17,14,.12);z-index:10;max-height:220px;overflow-y:auto}
+.sm-drop-item{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;transition:background .12s}
+.sm-drop-item:hover{background:var(--accent-bg,#FBE9D6)}
+.sm-drop-item.disabled{opacity:.4;cursor:not-allowed}
+.sm-drop-empty{padding:12px 16px;font-size:12.5px;color:var(--muted,#6B635B);text-align:center}
+
+/* — panier — */
+.sm-empty{display:flex;flex-direction:column;align-items:center;padding:24px 0 16px;color:var(--muted-2,#8A8278);gap:6px;font-size:12.5px;margin-top:4px}
+.sm-cart{display:flex;flex-direction:column;border:1px solid var(--border,#E8E1D4);border-radius:10px;overflow:hidden;margin-top:4px}
+.sm-cart-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid var(--border,#E8E1D4);background:var(--surface,#fff)}
+.sm-cart-item:last-child{border-bottom:0}
+.sm-cart-info{flex:1;min-width:0}
+.sm-cart-name{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sm-cart-var{font-size:10px;color:#7C3AED;font-weight:600}
+.sm-cart-ref{font-size:10.5px;color:var(--muted-2,#8A8278);font-family:monospace}
+.sm-qty-ctrl{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.sm-qty-btn{width:24px;height:24px;border-radius:6px;border:1px solid var(--border,#E8E1D4);background:var(--bg,#FBF7F1);cursor:pointer;display:grid;place-items:center;font-size:14px;line-height:1;transition:background .12s}
+.sm-qty-btn:hover{background:var(--border,#E8E1D4)}
+.sm-qty-btn:disabled{opacity:.3;cursor:not-allowed}
+.sm-qty-input{width:36px;text-align:center;font-size:13px;font-weight:600;border:1px solid var(--border,#E8E1D4);border-radius:6px;padding:3px 2px;background:var(--surface,#fff);color:var(--ink,#14110E)}
+.sm-qty-input:focus{outline:0;border-color:var(--accent,#C9601E)}
+.sm-cart-price{font-size:12px;color:var(--muted,#6B635B);font-family:monospace;flex-shrink:0;white-space:nowrap}
+.sm-cart-total{font-size:13px;font-weight:600;font-family:monospace;color:var(--accent,#C9601E);flex-shrink:0;white-space:nowrap;min-width:72px;text-align:right}
+.sm-cart-rm{width:24px;height:24px;border:0;background:transparent;cursor:pointer;color:var(--muted-2,#8A8278);display:grid;place-items:center;border-radius:6px;flex-shrink:0;transition:background .12s,color .12s}
+.sm-cart-rm:hover{background:#FEF2F2;color:#DC2626}
+.sm-totals{padding:10px 12px;background:var(--bg-2,#F4EFE6);border:1px solid var(--border,#E8E1D4);border-radius:10px;display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.sm-tot-row{display:flex;justify-content:space-between;align-items:center;font-size:12.5px}
+.sm-tot-label{color:var(--muted,#6B635B);font-weight:500}
+.sm-tot-val{font-family:monospace;font-weight:600;color:var(--ink,#14110E)}
+.sm-tot-main .sm-tot-val{font-size:15px;color:var(--accent,#C9601E)}
+.sm-tot-disc .sm-tot-val{color:#16A34A}
+
+/* — client autocomplete — */
+.sm-sugg-drop{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface,#fff);border:1px solid var(--border,#E8E1D4);border-radius:12px;box-shadow:0 8px 32px rgba(20,17,14,.12);z-index:20;overflow:hidden}
+.sm-sugg-item{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;transition:background .12s;font-size:12.5px}
+.sm-sugg-item:hover{background:var(--accent-bg,#FBE9D6)}
+.sm-sugg-create{border-top:1px solid var(--border,#E8E1D4);color:var(--accent,#C9601E)}
+.sm-sugg-create:hover{background:#FEF3EB}
+
+/* — badges client — */
+.sm-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:3px 8px;border-radius:99px;margin-top:5px}
+.sm-badge-ok{background:#DCFCE7;color:#15803D}
+.sm-badge-new{background:#FEF9C3;color:#A16207}
+
+/* — téléphone avec indicatif — */
+.sm-tel-wrap{display:flex;gap:8px;margin-top:8px}
+.sm-indicatif-wrap{flex-shrink:0;width:160px}
+.sm-indicatif{font-size:12px !important}
+.sm-numero{flex:1}
+
 /* — error — */
 .sm-err{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:9px;font-size:12.5px;background:#FEF2F2;border:1px solid #FECACA;color:#DC2626}
 

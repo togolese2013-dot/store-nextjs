@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BoutiqueStockItem } from '@/lib/admin-db';
 
 const sk = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -12,9 +12,9 @@ const CloseIcon = ({ size = 16 }: { size?: number }) => (
 const ChevronIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" {...sk}><path d="m6 9 6 6 6-6" /></svg>
 );
-const PlusIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+const SearchIcon = ({ size = 15 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...sk}>
+    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
   </svg>
 );
 const CheckIcon = ({ size = 15 }: { size?: number }) => (
@@ -26,6 +26,24 @@ const LoaderIcon = ({ size = 15 }: { size?: number }) => (
     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
   </svg>
 );
+const CartIcon = ({ size = 30 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...{ ...sk, strokeWidth: 1 }}>
+    <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+  </svg>
+);
+const UserCheckIcon = ({ size = 13 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...sk}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+    <polyline points="16 11 18 13 22 9" />
+  </svg>
+);
+const UserPlusIcon = ({ size = 13 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...sk}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+    <line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" />
+  </svg>
+);
 
 const MODES_PAIEMENT = [
   { value: 'especes',           label: 'Espèces' },
@@ -34,11 +52,44 @@ const MODES_PAIEMENT = [
   { value: 'virement_bancaire', label: 'Virement bancaire' },
 ];
 
+const INDICATIFS = [
+  { code: '+228', pays: 'Togo' },
+  { code: '+225', pays: "Côte d'Ivoire" },
+  { code: '+221', pays: 'Sénégal' },
+  { code: '+233', pays: 'Ghana' },
+  { code: '+237', pays: 'Cameroun' },
+  { code: '+229', pays: 'Bénin' },
+  { code: '+226', pays: 'Burkina Faso' },
+  { code: '+223', pays: 'Mali' },
+  { code: '+227', pays: 'Niger' },
+  { code: '+234', pays: 'Nigeria' },
+  { code: '+241', pays: 'Gabon' },
+  { code: '+33',  pays: 'France' },
+];
+
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
-interface SaleLine {
-  item_key: string;
-  qty: string | number;
+const norm = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+type ClientMode = 'anon' | 'existing' | 'new';
+
+interface Suggestion {
+  id: number;
+  nom: string;
+  telephone: string | null;
+}
+
+interface CartItem {
+  item_key:      string;
+  produit_id:    number;
+  nom:           string;
+  reference:     string;
+  variant_id?:   number;
+  variant_nom?:  string;
+  prix_unitaire: number;
+  stock_dispo:   number;
+  qty:           number;
 }
 
 export interface NewSaleModalProps {
@@ -48,25 +99,45 @@ export interface NewSaleModalProps {
 }
 
 export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModalProps) {
+  /* ── Stock ── */
   const [stock,        setStock]        = useState<BoutiqueStockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(false);
-  const [lines,        setLines]        = useState<SaleLine[]>([{ item_key: '', qty: 1 }]);
-  const [client,       setClient]       = useState('');
-  const [payment,      setPayment]      = useState('especes');
-  const [discount,     setDiscount]     = useState('');
-  const [note,         setNote]         = useState('');
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState('');
 
+  /* ── Panier ── */
+  const [items,      setItems]      = useState<CartItem[]>([]);
+  const [prodSearch, setProdSearch] = useState('');
+  const [showDrop,   setShowDrop]   = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  /* ── Client ── */
+  const [clientNom,        setClientNom]        = useState('');
+  const [clientMode,       setClientMode]        = useState<ClientMode>('anon');
+  const [clientIndicatif,  setClientIndicatif]   = useState('+228');
+  const [clientNumero,     setClientNumero]      = useState('');
+  const [suggestions,      setSuggestions]       = useState<Suggestion[]>([]);
+  const [showSugg,         setShowSugg]          = useState(false);
+  const [loadingSugg,      setLoadingSugg]       = useState(false);
+  const clientWrapRef = useRef<HTMLDivElement>(null);
+
+  /* ── Paiement / autres ── */
+  const [payment,        setPayment]        = useState('especes');
+  const [statutPaiement, setStatutPaiement] = useState<'paye_total'|'acompte'|'non_paye'>('paye_total');
+  const [montantAcompte, setMontantAcompte] = useState('');
+  const [discount,       setDiscount]       = useState('');
+  const [note,           setNote]           = useState('');
+  const [saving,         setSaving]         = useState(false);
+  const [error,          setError]          = useState('');
+
+  /* ── Reset on open ── */
   useEffect(() => {
     if (!open) return;
-    setLines([{ item_key: '', qty: 1 }]);
-    setClient('');
-    setPayment('especes');
-    setDiscount('');
-    setNote('');
-    setSaving(false);
-    setError('');
+    setItems([]); setProdSearch(''); setShowDrop(false);
+    setClientNom(''); setClientMode('anon');
+    setClientIndicatif('+228'); setClientNumero('');
+    setSuggestions([]); setShowSugg(false);
+    setPayment('especes'); setStatutPaiement('paye_total'); setMontantAcompte('');
+    setDiscount(''); setNote('');
+    setSaving(false); setError('');
     setLoadingStock(true);
     fetch('/api/admin/stock-boutique?limit=500&filter=disponible')
       .then(r => r.json())
@@ -74,6 +145,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
       .finally(() => setLoadingStock(false));
   }, [open]);
 
+  /* ── Esc ── */
   useEffect(() => {
     if (!open) return;
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -81,69 +153,157 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
     return () => window.removeEventListener('keydown', fn);
   }, [open, onClose]);
 
-  const stockMap = useMemo(() => {
-    const m = new Map<string, BoutiqueStockItem>();
-    stock.forEach(p => m.set(`${p.produit_id}_v${p.variant_id ?? 0}`, p));
-    return m;
-  }, [stock]);
+  /* ── Close dropdowns on outside click ── */
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node))
+        setShowDrop(false);
+      if (clientWrapRef.current && !clientWrapRef.current.contains(e.target as Node))
+        setShowSugg(false);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, []);
 
-  const options = useMemo(() =>
-    stock.map(p => ({
-      key:      `${p.produit_id}_v${p.variant_id ?? 0}`,
-      label:    [
-        p.nom + (p.variant_nom ? ` — ${p.variant_nom}` : ''),
-        `${p.quantite} en stock`,
-        `${fmt(p.prix_unitaire)} FCFA`,
-      ].join('  ·  '),
-      disabled: p.quantite === 0,
-    })),
-  [stock]);
+  /* ── Produits filtrés ── */
+  const filtered = useMemo(() => {
+    if (!prodSearch.trim()) return stock.slice(0, 40);
+    const q = norm(prodSearch);
+    return stock.filter(p =>
+      norm(p.nom).includes(q) || norm(p.reference).includes(q)
+    ).slice(0, 30);
+  }, [stock, prodSearch]);
 
-  const grand  = lines.reduce((s, l) => {
-    const p = stockMap.get(l.item_key);
-    return s + (p ? p.prix_unitaire * (parseInt(String(l.qty), 10) || 0) : 0);
-  }, 0);
-  const remise = parseInt(discount, 10) || 0;
-  const net    = Math.max(0, grand - remise);
+  /* ── Totaux ── */
+  const sousTotal = items.reduce((s, i) => s + i.prix_unitaire * i.qty, 0);
+  const remise    = parseInt(discount, 10) || 0;
+  const total     = Math.max(0, sousTotal - remise);
 
   if (!open) return null;
 
-  const setLine    = (i: number, key: keyof SaleLine, val: SaleLine[keyof SaleLine]) =>
-    setLines(prev => prev.map((l, j) => j === i ? { ...l, [key]: val } : l));
-  const addLine    = () => setLines(prev => [...prev, { item_key: '', qty: 1 }]);
-  const removeLine = (i: number) => setLines(prev => prev.filter((_, j) => j !== i));
+  /* ── Panier helpers ── */
+  function addProduct(p: BoutiqueStockItem) {
+    const key = `${p.produit_id}_v${p.variant_id ?? 0}`;
+    setItems(prev => {
+      const ex = prev.find(i => i.item_key === key);
+      if (ex) {
+        if (ex.qty >= p.quantite) return prev;
+        return prev.map(i => i.item_key === key ? { ...i, qty: i.qty + 1 } : i);
+      }
+      if (p.quantite === 0) return prev;
+      return [...prev, {
+        item_key: key, produit_id: p.produit_id,
+        nom: p.nom, reference: p.reference,
+        variant_id: p.variant_id, variant_nom: p.variant_nom,
+        prix_unitaire: p.prix_unitaire, stock_dispo: p.quantite, qty: 1,
+      }];
+    });
+    setProdSearch(''); setShowDrop(false);
+  }
 
+  function removeItem(key: string) { setItems(p => p.filter(i => i.item_key !== key)); }
+
+  function changeQty(key: string, delta: number) {
+    setItems(p => p.map(i => {
+      if (i.item_key !== key) return i;
+      const next = Math.max(1, Math.min(i.stock_dispo, i.qty + delta));
+      return { ...i, qty: next };
+    }));
+  }
+
+  function setQtyDirect(key: string, val: string) {
+    const n = parseInt(val, 10);
+    if (isNaN(n) || n < 1) return;
+    setItems(p => p.map(i =>
+      i.item_key !== key ? i : { ...i, qty: Math.min(i.stock_dispo, n) }
+    ));
+  }
+
+  /* ── Client autocomplete ── */
+  async function handleNomChange(val: string) {
+    setClientNom(val);
+    setClientMode('anon');
+    setClientNumero('');
+    if (val.trim().length < 2) { setSuggestions([]); setShowSugg(false); return; }
+    setLoadingSugg(true);
+    try {
+      const res  = await fetch(`/api/admin/boutique-clients?q=${encodeURIComponent(val)}&page=1`);
+      const data = await res.json();
+      const list = ((data.data ?? []) as Suggestion[]).slice(0, 5);
+      setSuggestions(list);
+      setShowSugg(true);
+      if (list.length === 0) setClientMode('new');
+    } catch { setSuggestions([]); setClientMode('new'); }
+    finally { setLoadingSugg(false); }
+  }
+
+  function selectExisting(c: Suggestion) {
+    setClientNom(c.nom);
+    setClientMode('existing');
+    if (c.telephone) {
+      const match = c.telephone.match(/^(\+\d{1,4})\s*(.+)$/);
+      if (match) { setClientIndicatif(match[1]); setClientNumero(match[2].trim()); }
+      else setClientNumero(c.telephone);
+    }
+    setSuggestions([]); setShowSugg(false);
+  }
+
+  function selectNew() {
+    setClientMode('new');
+    setSuggestions([]); setShowSugg(false);
+  }
+
+  /* ── Submit ── */
   async function submit() {
     if (saving) return;
-    const validLines = lines.filter(l => l.item_key);
-    if (validLines.length === 0) { setError('Ajoutez au moins un article.'); return; }
-    setSaving(true);
-    setError('');
+    if (items.length === 0) { setError('Ajoutez au moins un article.'); return; }
+    if (clientMode === 'new' && !clientNumero.trim()) {
+      setError('Le numéro de téléphone est requis pour enregistrer un nouveau client.');
+      return;
+    }
+    if (statutPaiement === 'acompte' && (!montantAcompte || Number(montantAcompte) <= 0)) {
+      setError("Saisissez le montant de l'acompte.");
+      return;
+    }
+    setSaving(true); setError('');
 
-    const items = validLines.map(l => {
-      const p   = stockMap.get(l.item_key)!;
-      const qty = parseInt(String(l.qty), 10) || 1;
-      return {
-        produit_id: p.produit_id,
-        nom:        p.nom,
-        reference:  p.reference,
-        qty,
-        prix:       p.prix_unitaire,
-        total:      p.prix_unitaire * qty,
-        ...(p.variant_id ? { variant_id: p.variant_id } : {}),
-      };
-    });
+    let clientNomFinal = clientNom.trim() || 'Client anonyme';
+    let clientTelFinal: string | undefined;
+
+    if (clientMode === 'new' && clientNom.trim()) {
+      const tel  = `${clientIndicatif} ${clientNumero.trim()}`;
+      const cRes = await fetch('/api/admin/boutique-clients', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ nom: clientNom.trim(), telephone: tel }),
+      });
+      const cData = await cRes.json();
+      if (!cRes.ok) { setError(cData.error ?? 'Erreur création client.'); setSaving(false); return; }
+      clientTelFinal = tel;
+    } else if (clientMode === 'existing' && clientNumero.trim()) {
+      clientTelFinal = `${clientIndicatif} ${clientNumero.trim()}`;
+    }
 
     const payload = {
-      client_nom:      client.trim() || 'Client anonyme',
+      client_nom:      clientNomFinal,
+      ...(clientTelFinal ? { client_tel: clientTelFinal } : {}),
       avec_livraison:  false,
       mode_paiement:   payment,
-      statut_paiement: 'paye_total',
-      sous_total:      grand,
+      statut_paiement: statutPaiement,
+      ...(statutPaiement === 'acompte' ? { montant_acompte: Number(montantAcompte) } : {}),
+      sous_total:      sousTotal,
       ...(remise > 0 ? { remise } : {}),
-      total:           net || grand,
+      total:           total || sousTotal,
       ...(note.trim() ? { note: note.trim() } : {}),
-      items,
+      items: items.map(i => ({
+        produit_id: i.produit_id,
+        nom:        i.nom,
+        reference:  i.reference,
+        qty:        i.qty,
+        prix:       i.prix_unitaire,
+        total:      i.prix_unitaire * i.qty,
+        ...(i.variant_id ? { variant_id: i.variant_id } : {}),
+      })),
     };
 
     const res  = await fetch('/api/admin/ventes/factures', {
@@ -157,8 +317,9 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
     else setError(data.error ?? "Erreur lors de l'enregistrement.");
   }
 
-  const canSubmit = lines.some(l => l.item_key) && !saving;
+  const canSubmit = items.length > 0 && !saving;
 
+  /* ─────────── RENDER ─────────── */
   return (
     <>
       <div className="sm-backdrop" onMouseDown={onClose} />
@@ -173,19 +334,87 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
         </div>
 
         <div className="sm-body">
-          <div className="sm-grid2">
 
-            <div className="sm-field sm-full">
-              <label className="sm-label">Client</label>
+          {/* ═══ CLIENT ═══ */}
+          <div className="sm-field sm-full" style={{ position: 'relative' }} ref={clientWrapRef}>
+            <label className="sm-label">Client</label>
+            <div style={{ position: 'relative' }}>
               <input
                 className="sm-in"
                 type="text"
-                value={client}
-                onChange={e => setClient(e.target.value)}
-                placeholder="Client anonyme"
+                value={clientNom}
+                onChange={e => handleNomChange(e.target.value)}
+                onFocus={() => suggestions.length > 0 && setShowSugg(true)}
+                placeholder="Nom du client (vide = anonyme)"
+                autoComplete="off"
               />
+              {loadingSugg && (
+                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
+                  <LoaderIcon size={13} />
+                </span>
+              )}
+              {showSugg && (
+                <div className="sm-sugg-drop">
+                  {suggestions.map(c => (
+                    <div key={c.id} className="sm-sugg-item" onMouseDown={() => selectExisting(c)}>
+                      <UserCheckIcon />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>{c.nom}</div>
+                        {c.telephone && <div style={{ fontSize: 11, color: '#8A8278' }}>{c.telephone}</div>}
+                      </div>
+                    </div>
+                  ))}
+                  {clientNom.trim().length >= 2 && (
+                    <div className="sm-sugg-item sm-sugg-create" onMouseDown={selectNew}>
+                      <UserPlusIcon />
+                      <div>
+                        <span style={{ fontSize: 12.5, fontWeight: 600 }}>Créer &ldquo;{clientNom.trim()}&rdquo;</span>
+                        <span style={{ fontSize: 11, color: '#8A8278', marginLeft: 6 }}>nouveau client</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
+            {clientMode === 'existing' && (
+              <div className="sm-badge sm-badge-ok"><UserCheckIcon /> Client enregistré</div>
+            )}
+            {clientMode === 'new' && clientNom.trim() && (
+              <div className="sm-badge sm-badge-new"><UserPlusIcon /> Nouveau client — sera enregistré</div>
+            )}
+
+            {(clientMode === 'existing' || clientMode === 'new') && (
+              <div className="sm-tel-wrap">
+                <div className="sm-select-wrap sm-indicatif-wrap">
+                  <select
+                    className="sm-in sm-indicatif"
+                    value={clientIndicatif}
+                    onChange={e => setClientIndicatif(e.target.value)}
+                    disabled={clientMode === 'existing'}
+                  >
+                    {INDICATIFS.map(i => (
+                      <option key={i.code} value={i.code}>{i.code} {i.pays}</option>
+                    ))}
+                  </select>
+                  <span className="sm-caret"><ChevronIcon /></span>
+                </div>
+                <input
+                  className="sm-in sm-numero"
+                  type="tel"
+                  value={clientNumero}
+                  onChange={e => setClientNumero(e.target.value)}
+                  placeholder="90 00 00 00"
+                  disabled={clientMode === 'existing'}
+                  required={clientMode === 'new'}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* ═══ PAIEMENT ═══ */}
+          <div className="sm-grid2">
+            {/* Ligne 1 : mode + statut */}
             <div className="sm-field">
               <label className="sm-label">Mode de paiement</label>
               <div className="sm-select-wrap">
@@ -196,6 +425,20 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
               </div>
             </div>
 
+            <div className="sm-field">
+              <label className="sm-label">Statut de paiement</label>
+              <div className="sm-select-wrap">
+                <select className="sm-in" value={statutPaiement}
+                  onChange={e => { setStatutPaiement(e.target.value as typeof statutPaiement); setMontantAcompte(''); }}>
+                  <option value="paye_total">Payé en totalité</option>
+                  <option value="acompte">Acompte</option>
+                  <option value="non_paye">Non payé</option>
+                </select>
+                <span className="sm-caret"><ChevronIcon /></span>
+              </div>
+            </div>
+
+            {/* Ligne 2 : remise + montant acompte (conditionnel) */}
             <div className="sm-field">
               <label className="sm-label">Remise</label>
               <div className="sm-price-wrap">
@@ -210,74 +453,169 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
                 <span className="sm-suffix">FCFA</span>
               </div>
             </div>
+
+            {statutPaiement === 'acompte' && (
+              <div className="sm-field">
+                <label className="sm-label">Montant acompte <span style={{ color: '#C9601E' }}>*</span></label>
+                <div className="sm-price-wrap">
+                  <input
+                    className="sm-in mono"
+                    type="number"
+                    min={1}
+                    value={montantAcompte}
+                    onChange={e => setMontantAcompte(e.target.value)}
+                    placeholder="0"
+                    style={{ borderColor: '#FCD34D' }}
+                  />
+                  <span className="sm-suffix">FCFA</span>
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* ═══ ARTICLES ═══ */}
           <div className="sm-field sm-full">
             <label className="sm-label">Articles vendus</label>
-            <div className="sm-lines">
-              {lines.map((l, i) => {
-                const p         = stockMap.get(l.item_key);
-                const unit      = p ? p.prix_unitaire : 0;
-                const lineTotal = unit * (parseInt(String(l.qty), 10) || 0);
-                return (
-                  <div className="sm-line" key={i}>
-                    <div className="sm-line-top">
-                      <div className="sm-select-wrap" style={{ flex: 1, minWidth: 0 }}>
-                        <select
-                          className="sm-in"
-                          value={l.item_key}
-                          disabled={loadingStock}
-                          onChange={e => { setLine(i, 'item_key', e.target.value); setLine(i, 'qty', 1); }}
-                        >
-                          <option value="" disabled>
-                            {loadingStock ? 'Chargement…' : 'Produit…'}
-                          </option>
-                          {options.map(o => (
-                            <option key={o.key} value={o.key} disabled={o.disabled}>{o.label}</option>
-                          ))}
-                        </select>
-                        <span className="sm-caret"><ChevronIcon /></span>
-                      </div>
-                      <button type="button" className="sm-x sm-line-x" onClick={() => removeLine(i)} aria-label="Retirer">
-                        <CloseIcon size={14} />
-                      </button>
-                    </div>
-                    <div className="sm-line-bot">
-                      <div className="sm-qty">
-                        <span className="sm-qty-l">Qté</span>
-                        <input
-                          className="sm-in mono"
-                          type="number"
-                          min={1}
-                          max={p?.quantite}
-                          value={l.qty}
-                          onChange={e => setLine(i, 'qty', e.target.value)}
-                        />
-                      </div>
-                      <span className="sm-unit">× {unit ? fmt(unit) : '—'} FCFA</span>
-                      <span className="sm-line-total">{lineTotal ? fmt(lineTotal) + ' FCFA' : '—'}</span>
-                    </div>
-                  </div>
-                );
-              })}
 
-              <button type="button" className="sm-add" onClick={addLine}>
-                <PlusIcon size={13} /> Ajouter une ligne
-              </button>
+            {/* Recherche produit */}
+            <div className="sm-search-wrap" ref={searchRef}>
+              <span className="sm-search-icon"><SearchIcon /></span>
+              <input
+                className="sm-in sm-search-in"
+                type="text"
+                placeholder={loadingStock ? 'Chargement du stock…' : 'Rechercher un produit…'}
+                value={prodSearch}
+                disabled={loadingStock}
+                onChange={e => { setProdSearch(e.target.value); setShowDrop(true); }}
+                onFocus={() => setShowDrop(true)}
+              />
+              {loadingStock && (
+                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
+                  <LoaderIcon />
+                </span>
+              )}
 
-              <div className="sm-total">
-                <span className="sm-total-l">Total des achats</span>
-                <span className="sm-total-v">{fmt(grand)} FCFA</span>
-              </div>
-              {remise > 0 && (
-                <div className="sm-total sm-total-sub">
-                  <span className="sm-total-l">Net à payer (après remise)</span>
-                  <span className="sm-total-v">{fmt(net)} FCFA</span>
+              {showDrop && filtered.length > 0 && (
+                <div className="sm-drop">
+                  {filtered.map(p => {
+                    const key     = `${p.produit_id}_v${p.variant_id ?? 0}`;
+                    const inCart  = items.find(i => i.item_key === key);
+                    const full    = inCart && inCart.qty >= p.quantite;
+                    return (
+                      <div
+                        key={key}
+                        className={`sm-drop-item${p.quantite === 0 || full ? ' disabled' : ''}`}
+                        onMouseDown={() => !full && p.quantite > 0 && addProduct(p)}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.nom}
+                          </div>
+                          {p.variant_nom && (
+                            <div style={{ fontSize: 10, color: '#7C3AED', fontWeight: 600 }}>{p.variant_nom}</div>
+                          )}
+                          <div style={{ fontSize: 10.5, color: '#8A8278', fontFamily: 'monospace' }}>{p.reference}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#C9601E' }}>{fmt(p.prix_unitaire)} FCFA</div>
+                          <div style={{
+                            fontSize: 10, fontWeight: 600,
+                            color: p.quantite === 0 ? '#DC2626' : p.quantite <= 3 ? '#D97706' : '#16A34A',
+                          }}>
+                            {p.quantite === 0 ? 'Épuisé' : full ? 'Déjà max' : `${p.quantite} en stock`}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {showDrop && prodSearch && filtered.length === 0 && !loadingStock && (
+                <div className="sm-drop">
+                  <div className="sm-drop-empty">Aucun produit correspondant</div>
                 </div>
               )}
             </div>
+
+            {/* Panier vide */}
+            {items.length === 0 && (
+              <div className="sm-empty">
+                <CartIcon />
+                <span>Aucun article — recherchez ci-dessus</span>
+              </div>
+            )}
+
+            {/* Liste panier */}
+            {items.length > 0 && (
+              <>
+                <div className="sm-cart">
+                  {items.map(item => (
+                    <div key={item.item_key} className="sm-cart-item">
+                      <div className="sm-cart-info">
+                        <div className="sm-cart-name">{item.nom}</div>
+                        {item.variant_nom && <div className="sm-cart-var">{item.variant_nom}</div>}
+                        <div className="sm-cart-ref">{item.reference}</div>
+                      </div>
+                      <div className="sm-qty-ctrl">
+                        <button className="sm-qty-btn" type="button" disabled={item.qty <= 1} onClick={() => changeQty(item.item_key, -1)}>−</button>
+                        <input
+                          className="sm-qty-input"
+                          type="number"
+                          min={1}
+                          max={item.stock_dispo}
+                          value={item.qty}
+                          onChange={e => setQtyDirect(item.item_key, e.target.value)}
+                        />
+                        <button className="sm-qty-btn" type="button" disabled={item.qty >= item.stock_dispo} onClick={() => changeQty(item.item_key, +1)}>+</button>
+                      </div>
+                      <div className="sm-cart-price">× {fmt(item.prix_unitaire)}</div>
+                      <div className="sm-cart-total">{fmt(item.prix_unitaire * item.qty)}</div>
+                      <button className="sm-cart-rm" type="button" aria-label="Retirer" onClick={() => removeItem(item.item_key)}>
+                        <CloseIcon size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Totaux */}
+                <div className="sm-totals">
+                  <div className="sm-tot-row">
+                    <span className="sm-tot-label">
+                      {items.reduce((s, i) => s + i.qty, 0)} article{items.reduce((s, i) => s + i.qty, 0) > 1 ? 's' : ''} — Sous-total
+                    </span>
+                    <span className="sm-tot-val">{fmt(sousTotal)} FCFA</span>
+                  </div>
+                  {remise > 0 && (
+                    <div className="sm-tot-row sm-tot-disc">
+                      <span className="sm-tot-label">Remise</span>
+                      <span className="sm-tot-val">− {fmt(remise)} FCFA</span>
+                    </div>
+                  )}
+                  <div className="sm-tot-row sm-tot-main">
+                    <span className="sm-tot-label" style={{ fontWeight: 600, color: '#14110E' }}>Total</span>
+                    <span className="sm-tot-val">{fmt(total || sousTotal)} FCFA</span>
+                  </div>
+                  {statutPaiement === 'acompte' && Number(montantAcompte) > 0 && (
+                    <>
+                      <div className="sm-tot-row" style={{ color: '#D97706' }}>
+                        <span className="sm-tot-label" style={{ color: '#D97706', fontWeight: 600 }}>Acompte versé</span>
+                        <span className="sm-tot-val" style={{ color: '#D97706' }}>{fmt(Number(montantAcompte))} FCFA</span>
+                      </div>
+                      <div className="sm-tot-row" style={{ borderTop: '1px solid #E8E1D4', paddingTop: 6, marginTop: 2 }}>
+                        <span className="sm-tot-label" style={{ color: '#DC2626', fontWeight: 600 }}>Reste à payer</span>
+                        <span className="sm-tot-val" style={{ color: '#DC2626' }}>
+                          {fmt(Math.max(0, (total || sousTotal) - Number(montantAcompte)))} FCFA
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
+          {/* ═══ NOTE ═══ */}
           <div className="sm-field sm-full">
             <label className="sm-label">Note</label>
             <textarea
