@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import BoutiqueShell from './BoutiqueShell';
-import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient } from './types';
+import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
 
 const SWATCHES = [
   '#3B6A8F', '#2D6A4F', '#7A2C3A', '#D4A437', '#B8501A',
@@ -187,16 +187,25 @@ export default function BoutiqueDataLoader({
   userRole,
   shopName,
 }: Props) {
-  const [sales,     setSales]     = useState<Sale[]>([]);
-  const [stock,     setStock]     = useState<BoutiqueStock[]>([]);
-  const [movements, setMovements] = useState<CashMovement[]>([]);
-  const [clients,   setClients]   = useState<BoutiqueClient[]>([]);
+  const [sales,         setSales]         = useState<Sale[]>([]);
+  const [stock,         setStock]         = useState<BoutiqueStock[]>([]);
+  const [movements,     setMovements]     = useState<CashMovement[]>([]);
+  const [clients,       setClients]       = useState<BoutiqueClient[]>([]);
+  const [overviewStats, setOverviewStats] = useState<OverviewStats>({
+    ventes_jour_count: 0, ventes_jour_montant: 0, ca_total: 0, factures_payees: 0,
+  });
 
   useEffect(() => {
     fetch('/api/admin/ventes/factures?limit=50')
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d.items)) setSales((d.items as ApiFacture[]).map(mapFacture));
+        if (d.stats) setOverviewStats({
+          ventes_jour_count:   Number(d.stats.ventes_jour_count   ?? 0),
+          ventes_jour_montant: Number(d.stats.ventes_jour_montant ?? 0),
+          ca_total:            Number(d.stats.ca_total            ?? 0),
+          factures_payees:     Number(d.stats.factures_payees     ?? 0),
+        });
       })
       .catch(() => {});
   }, []);
@@ -235,6 +244,7 @@ export default function BoutiqueDataLoader({
       stock={stock}
       movements={movements}
       clients={clients}
+      overviewStats={overviewStats}
       onSwitchWorkspace={onSwitchWorkspace}
       onNewSale={onNewSale}
       onRequestTransfer={onRequestTransfer}

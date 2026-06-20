@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient } from './types';
+import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
 import {
   SAMPLE_SALES, SAMPLE_STOCK, SAMPLE_CASH, SAMPLE_CLIENTS,
 } from './sample-data';
@@ -46,6 +46,7 @@ export interface BoutiqueShellProps {
   stock?: BoutiqueStock[];
   movements?: CashMovement[];
   clients?: BoutiqueClient[];
+  overviewStats?: OverviewStats;
   onSwitchWorkspace?: () => void;
   onNewSale?: () => void;
   onRequestTransfer?: (sku: string) => void;
@@ -61,6 +62,7 @@ export default function BoutiqueShell({
   stock       = SAMPLE_STOCK,
   movements   = SAMPLE_CASH,
   clients     = SAMPLE_CLIENTS,
+  overviewStats,
   onSwitchWorkspace,
   onNewSale,
   onRequestTransfer,
@@ -115,7 +117,7 @@ export default function BoutiqueShell({
         </header>
 
         {/* Page routing */}
-        {page === 'overview' && <OverviewPage sales={sales} onNewSale={onNewSale} />}
+        {page === 'overview' && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} />}
         {page === 'ventes'   && <VentesPage sales={sales} onNewSale={onNewSale} />}
         {page === 'stock'    && <StockPage stock={stock} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
         {page === 'finance'  && <FinancePage movements={movements} />}

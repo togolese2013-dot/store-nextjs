@@ -3,9 +3,9 @@
  * Mount via BoutiqueShell (page id: 'overview') or standalone.
  */
 import React from 'react';
-import type { Sale } from './types';
+import type { Sale, OverviewStats, KpiItem } from './types';
 import {
-  SAMPLE_SALES, SAMPLE_STOCK, OVERVIEW_KPIS,
+  SAMPLE_SALES, SAMPLE_STOCK,
   PAYMENT_STYLE, PAY_BREAKDOWN, TOP_PRODUCTS_TODAY,
 } from './sample-data';
 import Sparkline from './Sparkline';
@@ -14,13 +14,37 @@ import styles from './Boutique.module.css';
 
 interface OverviewPageProps {
   sales?: Sale[];
+  overviewStats?: OverviewStats;
   onNewSale?: () => void;
 }
 
-export default function OverviewPage({ sales = SAMPLE_SALES, onNewSale }: OverviewPageProps) {
+export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNewSale }: OverviewPageProps) {
   const lowStock = SAMPLE_STOCK.filter(p => p.boutique < p.seuil);
-  const totalCA = sales.reduce((s, i) => s + i.amount, 0);
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const jourCount   = overviewStats?.ventes_jour_count   ?? 0;
+  const jourMontant = overviewStats?.ventes_jour_montant ?? 0;
+  const panierMoyen = jourCount > 0 ? Math.round(jourMontant / jourCount) : 0;
+  const clientsServis = sales.filter(s => s.client !== '—').length;
+
+  const KPIS: KpiItem[] = [
+    {
+      label: 'CA du jour', unit: 'F', sub: 'vs hier même heure', sparkColor: '#C9601E',
+      value: jourMontant.toLocaleString('fr-FR'),
+    },
+    {
+      label: 'Ventes du jour', sub: 'vs hier', sparkColor: '#3B6A8F',
+      value: String(jourCount),
+    },
+    {
+      label: 'Clients servis', sub: "aujourd'hui", sparkColor: '#5C4A88',
+      value: String(clientsServis),
+    },
+    {
+      label: 'Panier moyen', unit: 'F', sub: 'ce jour', sparkColor: '#2D6A4F',
+      value: panierMoyen > 0 ? panierMoyen.toLocaleString('fr-FR') : '—',
+    },
+  ];
 
   return (
     <>
@@ -28,7 +52,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, onNewSale }: Overvi
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Aperçu</div>
           <h1 className={styles.title}>Caisse du <span className={styles.serif}>jour</span></h1>
-          <p className={styles.subtitle}>{today} · {sales.length} vente{sales.length !== 1 ? 's' : ''} · {totalCA.toLocaleString('fr-FR')} F encaissés</p>
+          <p className={styles.subtitle}>{today} · {jourCount} vente{jourCount !== 1 ? 's' : ''} · {jourMontant.toLocaleString('fr-FR')} F encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><PrinterIcon size={14} /> Rapport journée</button>
@@ -40,7 +64,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, onNewSale }: Overvi
 
       {/* KPIs */}
       <div className={styles.kpis}>
-        {OVERVIEW_KPIS.map(k => (
+        {KPIS.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
               <div className={styles.kpiLabel}>{k.label}</div>

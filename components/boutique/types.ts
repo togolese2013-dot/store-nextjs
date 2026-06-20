@@ -80,3 +80,10 @@ export interface NavGroup {
   section: string | null;
   items: NavItem[];
 }
+
+export interface OverviewStats {
+  ventes_jour_count: number;
+  ventes_jour_montant: number;
+  ca_total: number;
+  factures_payees: number;
+}
