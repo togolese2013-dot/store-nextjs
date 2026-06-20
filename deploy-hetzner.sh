@@ -7,30 +7,29 @@ set -e
 
 HOST="root@178.105.157.67"
 APP_DIR="/opt/afrisika"
-COMPOSE_FILE="docker-compose.prod.yml"
 BRANCH="saas"
 
 echo ""
-echo "🚀  Deploy → Hetzner (afrisika.com)"
+echo "Deploy → Hetzner (afrisika.com)"
 echo "────────────────────────────────────"
 
-# 1. Push local saas branch first
-echo "▸ git push origin $BRANCH..."
+# 1. Push local branch
+echo "> git push origin $BRANCH..."
 git push origin "$BRANCH"
 
-# 2. SSH: pull + rebuild
-echo "▸ SSH → $HOST"
+# 2. SSH: pull + build + copy static + restart
+echo "> SSH → $HOST"
 ssh "$HOST" bash -s <<EOF
   set -e
   cd "$APP_DIR"
-  echo "  pulling $BRANCH..."
   git pull origin "$BRANCH"
-  echo "  rebuilding containers..."
-  docker compose -f "$COMPOSE_FILE" down
-  docker compose -f "$COMPOSE_FILE" up -d --build
-  echo "  done."
+  npm run build
+  cp -r .next/static .next/standalone/.next/static
+  cp -rf public .next/standalone/public
+  pm2 restart afrisika
+  echo "done."
 EOF
 
 echo ""
-echo "✅  Deployed! → https://afrisika.com"
+echo "Deployed! → https://afrisika.com"
 echo ""
