@@ -92,10 +92,20 @@ interface CartItem {
   qty:           number;
 }
 
+export interface SaleConfirmPayload {
+  client:   string;
+  payment:  string;
+  discount: number;
+  note:     string;
+  lines:    { product: string; qty: number | string }[];
+  total:    number;
+  net:      number;
+}
+
 export interface NewSaleModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmitted?: () => void;
+  onSubmitted?: (payload?: SaleConfirmPayload) => void;
 }
 
 export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModalProps) {
@@ -313,7 +323,18 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
     });
     const data = await res.json();
     setSaving(false);
-    if (res.ok) { onClose(); onSubmitted?.(); }
+    if (res.ok) {
+      onClose();
+      onSubmitted?.({
+        client:   clientNomFinal || 'Client anonyme',
+        payment:  payment,
+        discount: remise,
+        note:     note.trim(),
+        lines:    items.map(i => ({ product: i.nom, qty: i.qty })),
+        total:    total || sousTotal,
+        net:      (total || sousTotal) - remise,
+      });
+    }
     else setError(data.error ?? "Erreur lors de l'enregistrement.");
   }
 

@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import BoutiqueDataLoader from '@/components/boutique/BoutiqueDataLoader';
-import NewSaleModal from '@/components/admin/NewSaleModal';
+import NewSaleModal, { type SaleConfirmPayload } from '@/components/admin/NewSaleModal';
+import { SaleConfirmation } from '@/components/boutique/SaleConfirmation';
 
 interface Props {
   shopName: string;
@@ -12,7 +13,13 @@ interface Props {
 
 export default function BoutiquePageClient({ shopName, userName, userRole }: Props) {
   const router = useRouter();
-  const [saleOpen, setSaleOpen] = useState(false);
+  const [saleOpen,  setSaleOpen]  = useState(false);
+  const [lastSale,  setLastSale]  = useState<SaleConfirmPayload | null>(null);
+
+  const handleSubmitted = useCallback((payload?: SaleConfirmPayload) => {
+    if (payload) setLastSale(payload);
+  }, []);
+
   return (
     <>
       <BoutiqueDataLoader
@@ -26,6 +33,11 @@ export default function BoutiquePageClient({ shopName, userName, userRole }: Pro
       <NewSaleModal
         open={saleOpen}
         onClose={() => setSaleOpen(false)}
+        onSubmitted={handleSubmitted}
+      />
+      <SaleConfirmation
+        sale={lastSale}
+        onDismiss={() => setLastSale(null)}
       />
     </>
   );
