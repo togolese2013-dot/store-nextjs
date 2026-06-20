@@ -25,7 +25,7 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
     const shopId = session.shop_id ?? 1;
     const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
       listFactures({ search, statut, limit, offset, shopId }),
-      getVentesStats(),
+      getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
       getStockBoutiqueStats(shopId).catch(() => null),
     ]);

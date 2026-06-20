@@ -3197,10 +3197,10 @@ type VentesStatsResult = {
   commandes_livrees_jour: number; commandes_livrees_jour_count: number;
   depenses_jour: number; rentrees_jour: number; solde_jour: number;
 };
-let _ventesStatsCache: { data: VentesStatsResult; expiresAt: number } | null = null;
-export function invalidateVentesStats() { _ventesStatsCache = null; }
+const _ventesStatsCacheMap = new Map<number, { data: VentesStatsResult; expiresAt: number }>();
+export function invalidateVentesStats() { _ventesStatsCacheMap.clear(); }
 
-export async function getVentesStats(): Promise<{
+export async function getVentesStats(shopId = 1): Promise<{
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
@@ -3210,15 +3210,17 @@ export async function getVentesStats(): Promise<{
   solde_jour: number;
 }> {
   const now = Date.now();
-  if (_ventesStatsCache && _ventesStatsCache.expiresAt > now) return _ventesStatsCache.data;
+  const cached = _ventesStatsCacheMap.get(shopId);
+  if (cached && cached.expiresAt > now) return cached.data;
 
   // LEFT JOIN replaces the correlated EXISTS — one join scanned once instead of one subquery per row
   const SITE_JOIN = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
   const SITE_COND = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
   const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE ${SITE_COND}`),
-    db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
+      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE f.shop_id = ? AND ${SITE_COND}`, [shopId]),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM livraisons_ventes lv JOIN factures f ON f.id = lv.facture_id WHERE f.shop_id = ?`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(
         CASE
@@ -3226,9 +3228,9 @@ export async function getVentesStats(): Promise<{
           WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
           ELSE 0
         END
-      ), 0) AS total FROM factures f ${SITE_JOIN} WHERE f.statut != 'annule' AND ${SITE_COND}`),
+      ), 0) AS total FROM factures f ${SITE_JOIN} WHERE f.shop_id = ? AND f.statut != 'annule' AND ${SITE_COND}`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE f.statut = 'paye' AND ${SITE_COND}`),
+      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE f.shop_id = ? AND f.statut = 'paye' AND ${SITE_COND}`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COUNT(*) AS cnt,
               COALESCE(SUM(
@@ -3240,8 +3242,8 @@ export async function getVentesStats(): Promise<{
               ), 0) AS montant
        FROM factures f
        LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
-       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
-         AND (lv.id IS NULL OR lv.statut = 'livre')`),
+       WHERE f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
+         AND (lv.id IS NULL OR lv.statut = 'livre')`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
@@ -3259,13 +3261,13 @@ export async function getVentesStats(): Promise<{
               ELSE 0 END
        ), 0) AS solde
        FROM finance_entries
-       WHERE DATE(date_entree) = CURDATE() AND type != 'transfert'`
+       WHERE shop_id = ? AND DATE(date_entree) = CURDATE() AND type != 'transfert'`, [shopId]
     );
     const [[dj]] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'depense' AND DATE(date_entree) = CURDATE()`
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'depense' AND DATE(date_entree) = CURDATE()`, [shopId]
     );
     const [[rj]] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'rentree' AND DATE(date_entree) = CURDATE()`
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'rentree' AND DATE(date_entree) = CURDATE()`, [shopId]
     );
     solde_jour    = Number((sj as mysql.RowDataPacket)?.solde   ?? 0);
     depenses_jour = Number((dj as mysql.RowDataPacket)?.montant ?? 0);
@@ -3285,7 +3287,7 @@ export async function getVentesStats(): Promise<{
     rentrees_jour,
     solde_jour,
   };
-  _ventesStatsCache = { data: result, expiresAt: Date.now() + 60_000 };
+  _ventesStatsCacheMap.set(shopId, { data: result, expiresAt: Date.now() + 60_000 });
   return result;
 }
 

@@ -10,6 +10,7 @@ import { SAMPLE_STOCK } from './sample-data';
 import Sparkline from './Sparkline';
 import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
 import styles from './Boutique.module.css';
+import TransferRequestModal from '@/components/admin/TransferRequestModal';
 
 export interface StockPageProps {
   stock?: BoutiqueStock[];
@@ -18,9 +19,7 @@ export interface StockPageProps {
 }
 
 /* ── Modal state types ── */
-type ModalType = null | 'transfert' | 'ajustement';
-
-interface MagasinProduct { id: number; nom: string; reference: string; stock_magasin: number }
+type ModalType = null | 'ajustement';
 
 const OVERLAY: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 999,
@@ -52,11 +51,8 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
   const [saving,       setSaving]      = useState(false);
   const [error,        setError]       = useState('');
 
-  /* transfert form */
-  const [tProduitId,   setTProduitId]  = useState<number | ''>('');
-  const [tProduits,    setTProduits]   = useState<MagasinProduct[]>([]);
-  const [tQty,         setTQty]        = useState('1');
-  const [tLoading,     setTLoading]    = useState(false);
+  /* ── Transfer drawer ── */
+  const [xferOpen,     setXferOpen]    = useState(false);
 
   /* ajustement form */
   const [aProduitId,   setAProduitId]  = useState<number | ''>('');
@@ -65,26 +61,6 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
   const [aMotif,       setAMotif]      = useState('');
 
   /* ── Open modals ── */
-  function openTransfert(preId?: number) {
-    setError(''); setTQty('1'); setTProduitId(preId ?? '');
-    setTProduits([]); setModal('transfert');
-    setTLoading(true);
-    fetch('/api/admin/products?limit=500')
-      .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d.products)) {
-          setTProduits(d.products.map((p: any) => ({
-            id:           Number(p.id),
-            nom:          String(p.nom),
-            reference:    String(p.reference ?? ''),
-            stock_magasin: Number(p.stock_magasin ?? 0),
-          })));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setTLoading(false));
-  }
-
   function openAjustement() {
     setError(''); setAQty('1'); setAType('entree'); setAMotif('');
     setAProduitId(stock.length > 0 ? stock[0].produit_id : '');
@@ -92,23 +68,6 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
   }
 
   function closeModal() { setModal(null); setError(''); }
-
-  /* ── Submit transfert ── */
-  async function submitTransfert() {
-    if (!tProduitId || !tQty || Number(tQty) <= 0) { setError('Produit et quantité requis.'); return; }
-    setSaving(true); setError('');
-    try {
-      const res = await fetch('/api/admin/stock/sortie', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ produit_id: tProduitId, quantite: Number(tQty), motif: 'Transfert vers boutique' }),
-      });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? 'Erreur serveur.'); return; }
-      closeModal();
-      onRefresh?.();
-    } catch { setError('Erreur réseau.'); }
-    finally { setSaving(false); }
-  }
 
   /* ── Submit ajustement ── */
   async function submitAjustement() {
@@ -136,7 +95,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
           <p className={styles.subtitle}>Stock physique de la boutique · distinct de l&apos;entrepôt Magasin</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn} onClick={() => openTransfert()}>
+          <button type="button" className={styles.btn} onClick={() => setXferOpen(true)}>
             <ArrowRightIcon size={14} /> Demander transfert
           </button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={openAjustement}>
@@ -232,66 +191,13 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
         </div>
       </div>
 
-      {/* ── Modal Transfert Magasin → Boutique ── */}
-      {modal === 'transfert' && (
-        <div style={OVERLAY} onClick={closeModal}>
-          <div style={PANEL} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div className={styles.eyebrow}>Stock boutique</div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: 0 }}>
-                  Transfert <span className={styles.serif}>Magasin → Boutique</span>
-                </h3>
-              </div>
-              <button type="button" onClick={closeModal} style={{ border: 0, background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted)', lineHeight: 1 }}>✕</button>
-            </div>
-
-            <div style={FIELD}>
-              <label style={LABEL}>Produit (stock magasin)</label>
-              {tLoading ? (
-                <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '10px 0' }}>Chargement…</div>
-              ) : (
-                <select
-                  className={styles.input ?? ''}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--border)', fontSize: 13, background: 'var(--bg-2,#f9f9f7)' }}
-                  value={tProduitId}
-                  onChange={e => setTProduitId(Number(e.target.value))}
-                >
-                  <option value="">— Sélectionner un produit —</option>
-                  {tProduits.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.nom} ({p.reference}) · Stock magasin : {p.stock_magasin}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div style={FIELD}>
-              <label style={LABEL}>Quantité à transférer</label>
-              <input
-                type="number" min={1} value={tQty}
-                onChange={e => setTQty(e.target.value)}
-                style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--border)', fontSize: 13, fontFamily: 'Geist Mono, monospace', background: 'var(--bg-2,#f9f9f7)', width: '100%', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            {error && <div style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 8 }}>{error}</div>}
-
-            <div style={ROW}>
-              <button type="button" className={styles.btn} onClick={closeModal} disabled={saving}>Annuler</button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.primary}`}
-                onClick={submitTransfert}
-                disabled={saving || !tProduitId || Number(tQty) <= 0}
-              >
-                {saving ? 'En cours…' : 'Transférer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Drawer demande de transfert ── */}
+      <TransferRequestModal
+        open={xferOpen}
+        products={stock.map(p => ({ name: p.name, sku: p.sku }))}
+        onClose={() => setXferOpen(false)}
+        onSubmitted={() => { setXferOpen(false); onRefresh?.(); }}
+      />
 
       {/* ── Modal Ajustement Manuel ── */}
       {modal === 'ajustement' && (

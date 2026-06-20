@@ -139,6 +139,8 @@ export default function VentesManager({
     setLoading(false);
   }, []);
 
+  useEffect(() => { fetchTab(); }, [fetchTab]);
+
   const { subscribe } = useAdminSSE();
   useEffect(() => {
     return subscribe((e) => {
