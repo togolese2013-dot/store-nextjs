@@ -1,0 +1,147 @@
+/* ════════════════════════════════════════════════════
+   TransferConfirmation.css
+   Toast de confirmation de transfert.
+   Préfixe `tc-` — aucune collision possible.
+   ════════════════════════════════════════════════════ */
+
+.tc-root {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 200;
+
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 14px 14px 14px 14px;
+  border-radius: 14px;
+
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #E8E1D4);
+  box-shadow: 0 8px 32px rgba(20, 17, 14, .13), 0 2px 8px rgba(20, 17, 14, .06);
+
+  font-family: "Geist", system-ui, sans-serif;
+  color: var(--ink, #14110E);
+  overflow: hidden;
+
+  animation: tc-in .28s cubic-bezier(.32, .72, 0, 1);
+}
+
+@keyframes tc-in {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── icône ── */
+.tc-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--ok-bg, #DDEBE2);
+  color: var(--ok, #2D6A4F);
+}
+
+/* ── contenu ── */
+.tc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tc-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--ink, #14110E);
+}
+
+.tc-detail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.tc-id {
+  font-family: "Geist Mono", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--bg-2, #F4EFE6);
+  color: var(--muted, #6B635B);
+}
+
+.tc-prod {
+  font-size: 12.5px;
+  color: var(--ink-2, #2A2522);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.tc-qty {
+  font-family: "Geist Mono", monospace;
+  font-size: 12px;
+  color: var(--muted, #6B635B);
+}
+
+.tc-sep {
+  color: var(--border-strong, #D6CCBA);
+  font-size: 12px;
+}
+
+.tc-flow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--muted, #6B635B);
+}
+
+/* ── bouton fermer ── */
+.tc-close {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted, #6B635B);
+  transition: background .15s, color .15s;
+}
+
+.tc-close:hover {
+  background: rgba(20, 17, 14, .06);
+  color: var(--ink, #14110E);
+}
+
+/* ── barre de progression (auto-dismiss) ── */
+.tc-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--ok, #2D6A4F);
+  transform-origin: left;
+  animation: tc-shrink linear forwards;
+  opacity: .45;
+}
+
+@keyframes tc-shrink {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}

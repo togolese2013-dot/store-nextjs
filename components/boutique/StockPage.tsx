@@ -6,11 +6,13 @@
 'use client';
 import React, { useState } from 'react';
 import type { BoutiqueStock } from './types';
+import type { TransferRequest } from '@/lib/transferStore';
 import { SAMPLE_STOCK } from './sample-data';
 import Sparkline from './Sparkline';
 import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
 import styles from './Boutique.module.css';
 import TransferRequestModal from '@/components/admin/TransferRequestModal';
+import { TransferConfirmation } from './TransferConfirmation';
 
 export interface StockPageProps {
   stock?: BoutiqueStock[];
@@ -53,6 +55,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
 
   /* ── Transfer drawer ── */
   const [xferOpen,     setXferOpen]    = useState(false);
+  const [lastTransfer, setLastTransfer] = useState<TransferRequest | null>(null);
 
   /* ajustement form */
   const [aProduitId,   setAProduitId]  = useState<number | ''>('');
@@ -196,7 +199,12 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
         open={xferOpen}
         products={stock.map(p => ({ name: p.name, sku: p.sku }))}
         onClose={() => setXferOpen(false)}
-        onSubmitted={() => { setXferOpen(false); onRefresh?.(); }}
+        onSubmitted={(rec) => { setXferOpen(false); setLastTransfer(rec); onRefresh?.(); }}
+      />
+
+      <TransferConfirmation
+        record={lastTransfer}
+        onDismiss={() => setLastTransfer(null)}
       />
 
       {/* ── Modal Ajustement Manuel ── */}
