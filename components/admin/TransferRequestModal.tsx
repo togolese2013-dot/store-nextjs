@@ -4,6 +4,7 @@ import { TransferStore, type TransferRequest } from '@/lib/transferStore';
 export interface TransferProduct {
   name: string;
   sku: string;
+  stock_magasin?: number;
 }
 
 export interface TransferRequestModalProps {
@@ -51,17 +52,41 @@ const emptyState = (defaultProduct?: string): FormState => ({
   note: '',
 });
 
+interface MagasinProduct {
+  id: number;
+  nom: string;
+  reference: string;
+  stock_magasin: number;
+}
+
 export default function TransferRequestModal({
   open,
-  products = [],
   defaultProduct,
   onClose,
   onSubmitted,
 }: TransferRequestModalProps) {
-  const [form, setForm] = useState<FormState>(() => emptyState(defaultProduct));
+  const [form,          setForm]          = useState<FormState>(() => emptyState(defaultProduct));
+  const [magasinProds,  setMagasinProds]  = useState<MagasinProduct[]>([]);
+  const [loadingProds,  setLoadingProds]  = useState(false);
 
   useEffect(() => {
-    if (open) setForm(emptyState(defaultProduct));
+    if (!open) return;
+    setForm(emptyState(defaultProduct));
+    setLoadingProds(true);
+    fetch('/api/admin/products?limit=500')
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.products)) {
+          setMagasinProds(d.products.map((p: any) => ({
+            id:            Number(p.id),
+            nom:           String(p.nom),
+            reference:     String(p.reference ?? ''),
+            stock_magasin: Number(p.stock_magasin ?? 0),
+          })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProds(false));
   }, [open, defaultProduct]);
 
   useEffect(() => {
@@ -77,10 +102,10 @@ export default function TransferRequestModal({
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = () => {
-    const prod = products.find((p) => p.name === form.product);
+    const prod = magasinProds.find(p => p.nom === form.product);
     const record = TransferStore.request({
       product: form.product || 'Produit',
-      sku: prod ? prod.sku : '—',
+      sku: prod ? prod.reference : '—',
       qty: form.qty,
       from: 'Magasin',
       note: form.note,
@@ -116,21 +141,29 @@ export default function TransferRequestModal({
 
           <div className="tr-grid">
             <div className="tr-field tr-full">
-              <label className="tr-label">Produit</label>
+              <label className="tr-label">Produit (stock magasin)</label>
               <div className="tr-select-wrap">
-                <select
-                  className="tr-in"
-                  value={form.product}
-                  onChange={(e) => set('product', e.target.value)}
-                >
-                  <option value="" disabled>Sélectionner…</option>
-                  {products.map((p) => (
-                    <option key={p.sku} value={p.name}>{p.name}</option>
-                  ))}
-                </select>
-                <span className="tr-select-caret">
-                  <ChevronDown size={14} />
-                </span>
+                {loadingProds ? (
+                  <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '10px 0' }}>Chargement…</div>
+                ) : (
+                  <>
+                    <select
+                      className="tr-in"
+                      value={form.product}
+                      onChange={(e) => set('product', e.target.value)}
+                    >
+                      <option value="" disabled>Sélectionner un produit…</option>
+                      {magasinProds.map((p) => (
+                        <option key={p.id} value={p.nom}>
+                          {p.nom} ({p.reference}) · Stock : {p.stock_magasin}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="tr-select-caret">
+                      <ChevronDown size={14} />
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -162,7 +195,7 @@ export default function TransferRequestModal({
           <button className="tr-btn" onClick={onClose}>
             Annuler
           </button>
-          <button className="tr-btn tr-pri" onClick={submit} disabled={!form.product}>
+          <button className="tr-btn tr-pri" onClick={submit} disabled={!form.product || loadingProds}>
             Demander le transfert
           </button>
         </div>
