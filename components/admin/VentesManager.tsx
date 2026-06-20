@@ -6,15 +6,16 @@ import {
   TrendingUp, TrendingDown, Truck, Plus, Search,
   Eye, Trash2, Printer, Loader2, ChevronLeft, ChevronRight,
   X, Check, AlertTriangle, Pencil, PackageCheck,
-  CreditCard, Banknote, Smartphone, Building2, Package,
-  ShoppingCart, Minus, MapPin, UserCheck,
   Warehouse, DollarSign,
+  CreditCard, Banknote, Smartphone, Building2,
+  ShoppingCart, Package,
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
-import type { Facture, Livraison, BoutiqueStockItem } from "@/lib/admin-db";
+import type { Facture, Livraison } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
 import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
 import { useAdminSSE } from "@/components/admin/useAdminSSE";
+import NewSaleModal from "@/components/admin/NewSaleModal";
 
 /* ─── Types ─── */
 
@@ -39,48 +40,6 @@ interface Props {
   canDelete?:        boolean;
 }
 
-interface VenteItem {
-  produit_id:    number;
-  nom:           string;
-  reference:     string;
-  prix_unitaire: number;
-  stock_dispo:   number;
-  qty:           number;
-  item_key:      string;
-  variant_id?:   number;
-  variant_nom?:  string;
-}
-
-interface NewVenteModal {
-  clientNom:        string;
-  clientTel:        string;
-  avecLivraison:    boolean;
-  adresseLivraison: string;
-  contactLivraison: string;
-  lienLocalisation: string;
-  modePaiement:     string;
-  statutPaiement:   string;
-  montantAcompte:   string;
-  remiseGlobale:    string;
-  note:             string;
-  saving:           boolean;
-  error:            string;
-}
-
-/* ─── Constants ─── */
-const MODES_PAIEMENT = [
-  { value: "especes",           label: "Espèces",          icon: Banknote },
-  { value: "mix_by_yas",        label: "Mix by Yas",       icon: CreditCard },
-  { value: "moov_money",        label: "Moov Money",       icon: Smartphone },
-  { value: "virement_bancaire", label: "Virement bancaire",icon: Building2 },
-];
-
-const STATUTS_PAIEMENT = [
-  { value: "paye_total", label: "Payé en totalité", color: "border-emerald-400 bg-emerald-50 text-emerald-700" },
-  { value: "acompte",    label: "Acompte",          color: "border-amber-400 bg-amber-50 text-amber-700" },
-  { value: "non_paye",   label: "Non payé",         color: "border-red-400 bg-red-50 text-red-700" },
-];
-
 const FACTURE_STATUTS: { value: Facture["statut"]; label: string; color: string }[] = [
   { value: "brouillon", label: "Brouillon", color: "bg-slate-100 text-slate-600" },
   { value: "valide",    label: "Validé",    color: "bg-blue-100 text-blue-700" },
@@ -95,33 +54,6 @@ const LIVRAISON_STATUTS: { value: Livraison["statut"]; label: string; color: str
   { value: "livre",      label: "Livré",      color: "bg-emerald-100 text-emerald-700" },
   { value: "echoue",     label: "Échoué",     color: "bg-red-100 text-red-700" },
 ];
-
-/* ─── Map preview ─── */
-function MapPreview({ url }: { url: string }) {
-  if (!url.trim()) return null;
-  const match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (match) {
-    const lat = parseFloat(match[1]);
-    const lng = parseFloat(match[2]);
-    const d   = 0.005;
-    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${lng-d},${lat-d},${lng+d},${lat+d}&layer=mapnik&marker=${lat},${lng}`;
-    return (
-      <div className="mt-2 rounded-xl overflow-hidden border border-indigo-200">
-        <iframe src={src} className="w-full h-44" style={{ border: 0 }} loading="lazy" title="Localisation" />
-      </div>
-    );
-  }
-  if (url.startsWith("http")) {
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer"
-        className="mt-2 flex items-center gap-2 px-3 py-2 bg-white border border-indigo-200 rounded-xl text-indigo-600 text-sm font-semibold hover:bg-indigo-50 transition-colors">
-        <MapPin className="w-4 h-4 shrink-0" />
-        Voir la localisation sur la carte
-      </a>
-    );
-  }
-  return null;
-}
 
 /* ─── Helpers ─── */
 function statutBadge(statut: string, list: { value: string; label: string; color: string }[]) {
@@ -150,21 +82,18 @@ function getStatutDisplay(f: Facture): { label: string; color: string } {
 
 const LIMIT = 50;
 
-const emptyModal = (): NewVenteModal => ({
-  clientNom:        "",
-  clientTel:        "",
-  avecLivraison:    false,
-  adresseLivraison: "",
-  contactLivraison: "",
-  lienLocalisation: "",
-  modePaiement:     "especes",
-  statutPaiement:   "paye_total",
-  montantAcompte:   "",
-  remiseGlobale:    "",
-  note:             "",
-  saving:           false,
-  error:            "",
-});
+const MODES_PAIEMENT = [
+  { value: "especes",           label: "Espèces",          icon: Banknote },
+  { value: "mix_by_yas",        label: "Mix by Yas",       icon: CreditCard },
+  { value: "moov_money",        label: "Moov Money",       icon: Smartphone },
+  { value: "virement_bancaire", label: "Virement bancaire",icon: Building2 },
+];
+
+const STATUTS_PAIEMENT = [
+  { value: "paye_total", label: "Payé en totalité", color: "border-emerald-400 bg-emerald-50 text-emerald-700" },
+  { value: "acompte",    label: "Acompte",          color: "border-amber-400 bg-amber-50 text-amber-700" },
+  { value: "non_paye",   label: "Non payé",         color: "border-red-400 bg-red-50 text-red-700" },
+];
 
 /* ══════════════════════════════════════════════════════════════════
    COMPONENT
@@ -185,8 +114,8 @@ export default function VentesManager({
   const [loading,    setLoading]    = useState(false);
   const [flash,      setFlash]      = useState("");
 
-  /* ── Modal état ── */
-  const [modal,      setModal]      = useState<NewVenteModal | null>(null);
+  /* ── NewSaleModal ── */
+  const [saleOpen, setSaleOpen] = useState(false);
 
   /* ── Modal Modifier ── */
   type EditState = { facture: Facture; statut: string; statut_paiement: string; mode_paiement: string; saving: boolean; error: string };
@@ -195,150 +124,7 @@ export default function VentesManager({
 
   const router = useRouter();
 
-  /* ── Client autocomplete ── */
-  const [clientSuggestions, setClientSuggestions] = useState<{id:number;nom:string;telephone:string|null}[]>([]);
-  const [showSuggestions,   setShowSuggestions]   = useState(false);
-  const [isNewClient,       setIsNewClient]       = useState(false);
-  const clientRef = useRef<HTMLDivElement>(null);
-
-  /* ── Panier (articles de la vente) ── */
-  const [items,          setItems]          = useState<VenteItem[]>([]);
-  const [boutiqueStock,  setBoutiqueStock]  = useState<BoutiqueStockItem[]>([]);
-  const [loadingStock,   setLoadingStock]   = useState(false);
-  const [prodSearch,     setProdSearch]     = useState("");
-  const [showDropdown,   setShowDropdown]   = useState(false);
-  const searchRef    = useRef<HTMLDivElement>(null);
-  const submittingRef = useRef(false);
-
-  /* ── Totaux calculés ── */
-  const sousTotal   = items.reduce((s, i) => s + i.prix_unitaire * i.qty, 0);
-  const remise      = modal ? (Number(modal.remiseGlobale) || 0) : 0;
-  const totalVente  = Math.max(0, sousTotal - remise);
-  const acompte     = modal ? Number(modal.montantAcompte) || 0 : 0;
-  const resteAPayer = Math.max(0, totalVente - acompte);
-
   function showFlash(msg: string) { setFlash(msg); setTimeout(() => setFlash(""), 3500); }
-
-  /* ── Fermer dropdown si clic extérieur ── */
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  /* ── Charger le stock boutique quand le modal s'ouvre ── */
-  async function openModal() {
-    setItems([]);
-    setProdSearch("");
-    setShowDropdown(false);
-    setModal(emptyModal());
-    setLoadingStock(true);
-    try {
-      const res  = await fetch("/api/admin/stock-boutique?limit=500&filter=disponible");
-      const data = await res.json();
-      if (res.ok) setBoutiqueStock(data.items ?? []);
-    } finally {
-      setLoadingStock(false);
-    }
-  }
-
-  function closeModal() {
-    setModal(null);
-    setItems([]);
-    setBoutiqueStock([]);
-    setProdSearch("");
-    setClientSuggestions([]);
-    setShowSuggestions(false);
-    setIsNewClient(false);
-  }
-
-  /* ── Client autocomplete handlers ── */
-  async function handleClientNomChange(val: string) {
-    setModal(m => m ? { ...m, clientNom: val, clientTel: "" } : m);
-    setIsNewClient(false);
-    if (val.trim().length < 2) {
-      setClientSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-    try {
-      const res  = await fetch(`/api/admin/boutique-clients?q=${encodeURIComponent(val)}&page=1`);
-      const data = await res.json();
-      const list = (data.data ?? []).slice(0, 6) as {id:number;nom:string;telephone:string|null}[];
-      setClientSuggestions(list);
-      setShowSuggestions(list.length > 0);
-    } catch { setClientSuggestions([]); }
-    setIsNewClient(true);
-  }
-
-  function selectClient(c: {id:number;nom:string;telephone:string|null}) {
-    setModal(m => m ? { ...m, clientNom: c.nom, clientTel: c.telephone ?? "" } : m);
-    setClientSuggestions([]);
-    setShowSuggestions(false);
-    setIsNewClient(false);
-  }
-
-  /* ── Produits filtrés pour le dropdown ── */
-  const filteredProducts = boutiqueStock.filter(p => {
-    if (!prodSearch.trim()) return true;
-    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    const q = normalize(prodSearch);
-    return normalize(p.nom).includes(q) || normalize(p.reference).includes(q);
-  });
-
-  /* ── Ajouter un produit au panier ── */
-  function addProduct(p: BoutiqueStockItem) {
-    setItems(prev => {
-      const key = `${p.produit_id}_v${p.variant_id ?? 0}`;
-      const existing = prev.find(i => i.item_key === key);
-      if (existing) {
-        // Increase qty if within stock
-        if (existing.qty < p.quantite) {
-          return prev.map(i => i.item_key === key ? { ...i, qty: i.qty + 1 } : i);
-        }
-        return prev; // already at max
-      }
-      if (p.quantite === 0) return prev; // no stock
-      return [...prev, {
-        produit_id:    p.produit_id,
-        nom:           p.nom,
-        reference:     p.reference,
-        prix_unitaire: p.prix_unitaire,
-        stock_dispo:   p.quantite,
-        qty:           1,
-        item_key:      key,
-        variant_id:    p.variant_id,
-        variant_nom:   p.variant_nom,
-      }];
-    });
-    setProdSearch("");
-    setShowDropdown(false);
-  }
-
-  function removeItem(item_key: string) {
-    setItems(prev => prev.filter(i => i.item_key !== item_key));
-  }
-
-  function changeQty(item_key: string, delta: number) {
-    setItems(prev => prev.map(i => {
-      if (i.item_key !== item_key) return i;
-      const newQty = Math.max(1, Math.min(i.stock_dispo, i.qty + delta));
-      return { ...i, qty: newQty };
-    }));
-  }
-
-  function setQtyDirect(item_key: string, val: string) {
-    const n = parseInt(val, 10);
-    if (isNaN(n)) return;
-    setItems(prev => prev.map(i => {
-      if (i.item_key !== item_key) return i;
-      return { ...i, qty: Math.max(1, Math.min(i.stock_dispo, n)) };
-    }));
-  }
 
   /* ── Fetch tableau ── */
   const fetchTab = useCallback(async (q = "", off = 0) => {
@@ -368,69 +154,6 @@ export default function VentesManager({
     if (!confirm("Supprimer cet élément ?")) return;
     const res = await fetch(`/api/admin/ventes/factures/${id}`, { method: "DELETE" });
     if (res.ok) { showFlash("Supprimé ✓"); fetchTab(search, offset); }
-  }
-
-  /* ── Créer la vente ── */
-  async function submitVente() {
-    if (!modal) return;
-    if (submittingRef.current) return;
-    submittingRef.current = true;
-    if (!modal.clientNom.trim()) {
-      setModal(m => m ? { ...m, error: "Le nom du client est requis." } : m);
-      return;
-    }
-    if (items.length === 0) {
-      setModal(m => m ? { ...m, error: "Ajoutez au moins un article." } : m);
-      return;
-    }
-    if (modal.statutPaiement === "acompte" && (!modal.montantAcompte || Number(modal.montantAcompte) <= 0)) {
-      setModal(m => m ? { ...m, error: "Saisissez le montant de l'acompte." } : m);
-      return;
-    }
-
-    setModal(m => m ? { ...m, saving: true, error: "" } : m);
-
-    const payload = {
-      client_nom:        modal.clientNom,
-      client_tel:        modal.clientTel || undefined,
-      avec_livraison:    modal.avecLivraison,
-      adresse_livraison: modal.avecLivraison ? modal.adresseLivraison || undefined : undefined,
-      contact_livraison: modal.avecLivraison ? modal.contactLivraison || undefined : undefined,
-      lien_localisation: modal.avecLivraison ? modal.lienLocalisation || undefined : undefined,
-      mode_paiement:     modal.modePaiement,
-      statut_paiement:   modal.statutPaiement,
-      montant_acompte:   modal.statutPaiement === "acompte" ? Number(modal.montantAcompte) : undefined,
-      sous_total:        sousTotal,
-      remise:            remise > 0 ? remise : undefined,
-      total:             totalVente,
-      note:              modal.note || undefined,
-      items: items.map(i => ({
-        produit_id: i.produit_id,
-        nom:        i.nom,
-        reference:  i.reference,
-        qty:        i.qty,
-        prix:       i.prix_unitaire,
-        total:      i.prix_unitaire * i.qty,
-        ...(i.variant_id ? { variant_id: i.variant_id } : {}),
-      })),
-    };
-
-    const res  = await fetch("/api/admin/ventes/factures", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(payload),
-    });
-    const data = await res.json();
-
-    if (res.ok) {
-      submittingRef.current = false;
-      closeModal();
-      showFlash("Vente enregistrée ✓");
-      fetchTab(search, offset);
-    } else {
-      submittingRef.current = false;
-      setModal(m => m ? { ...m, saving: false, error: data.error ?? "Erreur" } : m);
-    }
   }
 
   function handlePrint(f: Facture) { setPrintFacture(f); }
@@ -517,7 +240,7 @@ export default function VentesManager({
         onRefresh={() => fetchTab(search, offset)}
         refreshLoading={loading}
         ctaLabel="Nouvelle vente"
-        onCtaClick={canCreate ? openModal : undefined}
+        onCtaClick={canCreate ? () => setSaleOpen(true) : undefined}
       />
 
       {/* KPI Dashboard */}
@@ -780,428 +503,13 @@ export default function VentesManager({
         )}
       </div>
 
-      {/* ════════════════════════════════════
-          MODAL NOUVELLE VENTE
-      ════════════════════════════════════ */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-6xl flex flex-col" style={{ maxHeight: "92vh" }}>
+      {/* ── NewSaleModal drawer ── */}
+      <NewSaleModal
+        open={saleOpen}
+        onClose={() => setSaleOpen(false)}
+        onSubmitted={() => { showFlash("Vente enregistrée ✓"); fetchTab(search, offset); }}
+      />
 
-            {/* ── En-tête ── */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-2xl bg-amber-50 flex items-center justify-center">
-                  <ShoppingCart className="w-4.5 h-4.5 text-amber-700" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-lg leading-none">Nouvelle vente</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Référence générée automatiquement</p>
-                </div>
-              </div>
-              <button onClick={closeModal} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* ── Corps 2 colonnes ── */}
-            <div className="flex-1 flex flex-col md:grid md:grid-cols-[3fr_2fr] min-h-0 overflow-hidden">
-
-              {/* ── Colonne gauche : Articles ── */}
-              <div className="overflow-y-auto px-6 py-5 space-y-4 border-r border-slate-100">
-
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Articles</p>
-
-                {/* Recherche produit */}
-                <div className="relative" ref={searchRef}>
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder={loadingStock ? "Chargement du stock…" : "Ajouter un produit…"}
-                    value={prodSearch}
-                    disabled={loadingStock}
-                    onChange={e => { setProdSearch(e.target.value); setShowDropdown(true); }}
-                    onFocus={() => setShowDropdown(true)}
-                    style={{ fontSize: '16px' }}
-                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all disabled:opacity-50"
-                  />
-                  {loadingStock && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />}
-
-                  {showDropdown && filteredProducts.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-10 max-h-52 overflow-y-auto">
-                      {filteredProducts.map(p => (
-                        <button
-                          key={`${p.produit_id}_v${p.variant_id ?? 0}`}
-                          type="button"
-                          disabled={p.quantite === 0}
-                          onClick={() => addProduct(p)}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors ${p.quantite === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                            <Package className="w-4 h-4 text-slate-400" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-slate-800 break-words">{p.nom}</p>
-                            {p.variant_nom && (
-                              <p className="text-[10px] text-violet-600 font-semibold">{p.variant_nom}</p>
-                            )}
-                            <p className="text-xs text-slate-400 font-mono">{p.reference}</p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-bold text-amber-700">{formatPrice(p.prix_unitaire)}</p>
-                            <p className={`text-[10px] font-semibold ${p.quantite === 0 ? "text-red-500" : p.quantite <= 3 ? "text-amber-500" : "text-emerald-600"}`}>
-                              {p.quantite === 0 ? "Épuisé" : `${p.quantite} en stock`}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {showDropdown && prodSearch && filteredProducts.length === 0 && !loadingStock && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-10 px-4 py-3 text-sm text-slate-400 text-center">
-                      Aucun produit en stock correspondant
-                    </div>
-                  )}
-                </div>
-
-                {/* Panier vide */}
-                {items.length === 0 && (
-                  <div className="flex flex-col items-center py-12 text-slate-300 gap-2">
-                    <ShoppingCart className="w-10 h-10" strokeWidth={1} />
-                    <p className="text-sm font-semibold">Aucun article ajouté</p>
-                  </div>
-                )}
-
-                {/* Liste articles */}
-                {items.length > 0 && (
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                    {/* Header — desktop only */}
-                    <div className="hidden md:grid grid-cols-[minmax(0,1fr)_108px_128px_128px] gap-2 px-4 py-2 pr-8 bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      <span>Produit</span>
-                      <span className="text-center">Qté</span>
-                      <span className="text-center">Prix unit.</span>
-                      <span className="text-center">Total</span>
-                    </div>
-                    {items.map(item => (
-                      <div key={item.item_key} className="border-t border-slate-100 hover:bg-slate-50/60">
-                        {/* Desktop row */}
-                        <div className="hidden md:grid relative grid-cols-[minmax(0,1fr)_108px_128px_128px] gap-2 items-center px-4 py-3 pr-8">
-                          <button type="button" onClick={() => removeItem(item.item_key)}
-                            className="absolute top-1.5 right-2 p-0.5 rounded-full bg-white border border-slate-200 shadow-sm text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
-                            <X className="w-3 h-3" />
-                          </button>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
-                            {item.variant_nom && (
-                              <p className="text-[10px] text-violet-500 font-semibold">{item.variant_nom}</p>
-                            )}
-                            <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
-                          </div>
-                          <div className="flex items-center gap-1 justify-center">
-                            <button type="button" onClick={() => changeQty(item.item_key, -1)} disabled={item.qty <= 1}
-                              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
-                              <Minus className="w-3 h-3" />
-                            </button>
-                            <input type="number" min={1} max={item.stock_dispo} value={item.qty}
-                              onChange={e => setQtyDirect(item.item_key, e.target.value)}
-                              style={{ fontSize: '16px' }}
-                              className="w-10 text-center font-bold border border-slate-200 rounded-lg py-0.5 outline-none focus:border-amber-400" />
-                            <button type="button" onClick={() => changeQty(item.item_key, +1)} disabled={item.qty >= item.stock_dispo}
-                              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-sm text-slate-600 text-center tabular-nums">
-                            {formatPrice(item.prix_unitaire)}
-                          </div>
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-sm font-bold text-amber-700 text-center tabular-nums">
-                            {formatPrice(item.prix_unitaire * item.qty)}
-                          </div>
-                        </div>
-                        {/* Mobile card */}
-                        <div className="md:hidden px-3 py-2.5">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm text-slate-800 break-words">{item.nom}</p>
-                              {item.variant_nom && (
-                                <p className="text-[10px] text-violet-500 font-semibold">{item.variant_nom}</p>
-                              )}
-                              <p className="text-[10px] text-slate-400 font-mono">{item.reference}</p>
-                            </div>
-                            <button type="button" onClick={() => removeItem(item.item_key)}
-                              className="shrink-0 p-1 rounded-full bg-white border border-slate-200 shadow-sm text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1">
-                              <button type="button" onClick={() => changeQty(item.item_key, -1)} disabled={item.qty <= 1}
-                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <input type="number" min={1} max={item.stock_dispo} value={item.qty}
-                                onChange={e => setQtyDirect(item.item_key, e.target.value)}
-                                style={{ fontSize: '16px' }}
-                                className="w-12 text-center font-bold border border-slate-200 rounded-lg py-1 outline-none focus:border-amber-400" />
-                              <button type="button" onClick={() => changeQty(item.item_key, +1)} disabled={item.qty >= item.stock_dispo}
-                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 disabled:opacity-30 transition-colors">
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                              <span>{formatPrice(item.prix_unitaire)} ×</span>
-                              <span className="font-bold text-amber-700 text-sm">{formatPrice(item.prix_unitaire * item.qty)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Totaux panier */}
-                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 space-y-2">
-                      <div className="flex justify-between text-xs text-slate-500">
-                        <span>{items.reduce((s, i) => s + i.qty, 0)} article{items.reduce((s, i) => s + i.qty, 0) > 1 ? "s" : ""} — Sous-total</span>
-                        <span className="font-semibold">{formatPrice(sousTotal)}</span>
-                      </div>
-                      {/* Remise globale */}
-                      <div className="flex justify-between items-center text-xs text-slate-500">
-                        <label className="font-semibold">Remise (FCFA)</label>
-                        <input
-                          type="number" min={0} max={sousTotal}
-                          value={modal.remiseGlobale}
-                          onChange={e => setModal(m => m ? { ...m, remiseGlobale: e.target.value } : m)}
-                          placeholder="0"
-                          style={{ fontSize: '16px' }}
-                          className="w-28 text-right font-semibold border border-slate-200 rounded-lg px-2 py-0.5 bg-white outline-none focus:border-amber-400"
-                        />
-                      </div>
-                      {remise > 0 && (
-                        <div className="flex justify-between text-xs text-emerald-600 font-semibold">
-                          <span>Économie</span><span>− {formatPrice(remise)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-display font-800 text-slate-900 text-sm border-t border-slate-200 pt-1.5">
-                        <span>Total</span>
-                        <span className="text-base">{formatPrice(totalVente)}</span>
-                      </div>
-                      {modal.statutPaiement === "acompte" && acompte > 0 && (
-                        <>
-                          <div className="flex justify-between text-xs text-amber-600 font-semibold">
-                            <span>Acompte</span><span>{formatPrice(acompte)}</span>
-                          </div>
-                          <div className="flex justify-between text-xs font-bold text-red-600 border-t border-slate-200 pt-1">
-                            <span>Reste à payer</span><span>{formatPrice(resteAPayer)}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Colonne droite : Client + Paiement ── */}
-              <div className="overflow-y-auto px-6 py-5 space-y-5 flex flex-col">
-
-                {/* Client */}
-                <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Client</p>
-                  <div className="space-y-3">
-
-                    {/* Nom avec autocomplétion */}
-                    <div ref={clientRef} className="relative">
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Nom *</label>
-                      <input
-                        type="text"
-                        value={modal.clientNom}
-                        onChange={e => handleClientNomChange(e.target.value)}
-                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                        onFocus={() => clientSuggestions.length > 0 && setShowSuggestions(true)}
-                        placeholder="Ex : WADADA"
-                        autoFocus
-                        autoComplete="off"
-                        style={{ fontSize: '16px' }}
-                        className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all"
-                      />
-                      {/* Suggestions dropdown */}
-                      {showSuggestions && (
-                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-                          {clientSuggestions.map(c => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onMouseDown={() => selectClient(c)}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-amber-50 transition-colors text-left"
-                            >
-                              <UserCheck className="w-4 h-4 text-amber-500 shrink-0" />
-                              <div>
-                                <p className="text-sm font-semibold text-slate-800">{c.nom}</p>
-                                {c.telephone && <p className="text-xs text-slate-400">{c.telephone}</p>}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {/* Badge client existant sélectionné */}
-                      {!isNewClient && modal.clientNom && !showSuggestions && (
-                        <p className="mt-1 text-xs text-emerald-600 flex items-center gap-1">
-                          <UserCheck className="w-3 h-3" /> Client enregistré
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Téléphone — affiché seulement pour un nouveau client */}
-                    {isNewClient && modal.clientNom.trim().length >= 2 && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1">
-                          Téléphone <span className="font-normal text-slate-400">(nouveau client)</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={modal.clientTel}
-                          onChange={e => setModal(m => m ? { ...m, clientTel: e.target.value } : m)}
-                          placeholder="+228 90 00 00 00"
-                          style={{ fontSize: '16px' }}
-                          className="w-full px-3 py-2.5 bg-white rounded-xl border border-amber-300 focus:outline-none focus:border-amber-500 transition-all"
-                        />
-                        <p className="mt-1 text-xs text-amber-600">Ce client sera enregistré automatiquement.</p>
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-
-                {/* Livraison */}
-                <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Livraison</p>
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={modal.avecLivraison}
-                      onChange={e => setModal(m => m ? {
-                        ...m,
-                        avecLivraison: e.target.checked,
-                        ...(e.target.checked ? { statutPaiement: "non_paye" } : {}),
-                      } : m)}
-                      className="w-4 h-4 rounded border-slate-300 accent-indigo-600"
-                    />
-                    <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
-                      <Truck className="w-3.5 h-3.5 text-indigo-500" /> Livraison à domicile
-                    </span>
-                  </label>
-
-                  {modal.avecLivraison && (
-                    <div className="mt-3 space-y-2.5 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-                      <div>
-                        <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Adresse de livraison</label>
-                        <input type="text" value={modal.adresseLivraison}
-                          onChange={e => setModal(m => m ? { ...m, adresseLivraison: e.target.value } : m)}
-                          placeholder="Ex : Lomé, Tokoin, rue 123…"
-                          style={{ fontSize: '16px' }}
-                          className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Contact à livrer</label>
-                        <input type="text" value={modal.contactLivraison}
-                          onChange={e => setModal(m => m ? { ...m, contactLivraison: e.target.value } : m)}
-                          placeholder="+228 90 00 00 00"
-                          style={{ fontSize: '16px' }}
-                          className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-1">Lien de localisation</label>
-                        <input type="text" value={modal.lienLocalisation}
-                          onChange={e => setModal(m => m ? { ...m, lienLocalisation: e.target.value } : m)}
-                          placeholder="https://maps.app.goo.gl/..."
-                          style={{ fontSize: '16px' }}
-                          className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 focus:border-indigo-400 outline-none" />
-                        {modal.lienLocalisation && <MapPreview url={modal.lienLocalisation} />}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Mode de paiement */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mode de paiement</label>
-                  <select
-                    value={modal.modePaiement}
-                    onChange={e => setModal(m => m ? { ...m, modePaiement: e.target.value } : m)}
-                    style={{ fontSize: '16px' }}
-                    className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all font-semibold text-slate-700"
-                  >
-                    {MODES_PAIEMENT.map(mode => (
-                      <option key={mode.value} value={mode.value}>{mode.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Statut paiement */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Statut du paiement</label>
-                  <select
-                    value={modal.statutPaiement}
-                    onChange={e => setModal(m => m ? { ...m, statutPaiement: e.target.value } : m)}
-                    style={{ fontSize: '16px' }}
-                    className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all font-semibold text-slate-700"
-                  >
-                    {STATUTS_PAIEMENT.map(s => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-
-                  {modal.statutPaiement === "acompte" && (
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
-                      <label className="block text-xs font-bold text-amber-700">Montant acompte (FCFA) *</label>
-                      <input type="number" min={0} max={totalVente} value={modal.montantAcompte}
-                        onChange={e => setModal(m => m ? { ...m, montantAcompte: e.target.value } : m)}
-                        placeholder="0"
-                        style={{ fontSize: '16px' }}
-                        className="w-full px-3 py-2 bg-white rounded-xl border-2 border-amber-300 focus:border-amber-500 outline-none font-bold" />
-                      {totalVente > 0 && acompte > 0 && (
-                        <div className="flex justify-between text-sm font-semibold text-amber-700">
-                          <span>Reste :</span>
-                          <span className="font-bold">{formatPrice(resteAPayer)}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Note */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Note <span className="font-normal text-slate-400">(optionnel)</span></label>
-                  <textarea rows={2} value={modal.note}
-                    onChange={e => setModal(m => m ? { ...m, note: e.target.value } : m)}
-                    placeholder="Remarques…"
-                    style={{ fontSize: '16px' }}
-                    className="w-full px-3 py-2.5 bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400 transition-all resize-none" />
-                </div>
-
-                {/* Erreur */}
-                {modal.error && (
-                  <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                    <AlertTriangle className="w-4 h-4 shrink-0" /> {modal.error}
-                  </div>
-                )}
-
-                {/* Boutons */}
-                <div className="mt-auto pt-2 flex gap-2">
-                  <button onClick={submitVente}
-                    disabled={modal.saving || !modal.clientNom.trim() || items.length === 0}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 disabled:opacity-50 transition-all">
-                    {modal.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    Enregistrer
-                  </button>
-                  <button onClick={closeModal}
-                    className="px-4 py-3 rounded-2xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
-                    Annuler
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
 
       {/* ════════════════════════════════════

@@ -11,7 +11,7 @@ import type { BoutiqueStockItem, BoutiqueStats, BoutiqueMouvement } from "@/lib/
 import { formatPrice } from "@/lib/utils";
 import PageHeader from "@/components/admin/PageHeader";
 import TabBar     from "@/components/admin/TabBar";
-import { TransferStore } from "@/lib/transferStore";
+import TransferRequestModal from "@/components/admin/TransferRequestModal";
 
 /* ─── Props ─── */
 interface Props {
@@ -91,12 +91,7 @@ export default function StockBoutiqueManager({
   const [modalError,      setModalError]      = useState("");
 
   /* ── Modal demande de transfert ── */
-  const [xferOpen,    setXferOpen]    = useState(false);
-  const [xferProduct, setXferProduct] = useState("");
-  const [xferQty,     setXferQty]     = useState("1");
-  const [xferFrom,    setXferFrom]    = useState("Lomé Central");
-  const [xferNote,    setXferNote]    = useState("");
-  const [xferError,   setXferError]   = useState("");
+  const [xferOpen, setXferOpen] = useState(false);
 
   /* ── Flash ── */
   const [flash, setFlash] = useState("");
@@ -220,24 +215,6 @@ export default function StockBoutiqueManager({
     setModalSaving(false);
   }
 
-  /* ── Submit demande de transfert ── */
-  function submitTransfer() {
-    if (!xferProduct.trim()) { setXferError("Sélectionnez un produit."); return; }
-    const qty = parseInt(xferQty, 10);
-    if (!qty || qty <= 0) { setXferError("La quantité doit être > 0."); return; }
-    const prod = items.find(p => p.nom === xferProduct);
-    const rec = TransferStore.request({
-      product: xferProduct,
-      sku:     prod?.reference ?? '—',
-      qty,
-      from:    xferFrom,
-      note:    xferNote,
-    });
-    setXferOpen(false);
-    setXferProduct(""); setXferQty("1"); setXferFrom("Lomé Central"); setXferNote(""); setXferError("");
-    showFlash(`Demande ${rec.id} envoyée au Magasin · en attente d'approbation`);
-  }
-
   /* ── Helpers UI ── */
   function stockColor(item: BoutiqueStockItem) {
     if (item.quantite === 0)                        return "text-red-600 font-bold";
@@ -330,7 +307,7 @@ export default function StockBoutiqueManager({
       {/* ── Demande de transfert (action secondaire) ── */}
       <div className="flex justify-end">
         <button
-          onClick={() => { setXferProduct(""); setXferQty("1"); setXferFrom("Lomé Central"); setXferNote(""); setXferError(""); setXferOpen(true); }}
+          onClick={() => setXferOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:border-slate-400 hover:bg-slate-50 transition-all"
         >
           <ArrowLeftRight className="w-4 h-4 text-slate-500" />
@@ -637,96 +614,12 @@ export default function StockBoutiqueManager({
       {/* ══════════════════════════════════════
           MODAL DEMANDE DE TRANSFERT
       ══════════════════════════════════════ */}
-      {xferOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setXferOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-blue-50 text-blue-600">
-                  <ArrowLeftRight className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">Demander un transfert</h3>
-                  <p className="text-xs text-slate-400">Envoi au Magasin · en attente d'approbation</p>
-                </div>
-              </div>
-              <button onClick={() => setXferOpen(false)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Produit */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">Produit *</label>
-              <select
-                value={xferProduct}
-                onChange={e => setXferProduct(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:outline-none"
-                style={{ fontSize: 16 }}
-              >
-                <option value="">Sélectionner un produit…</option>
-                {items.map(p => (
-                  <option key={p.produit_id} value={p.nom}>{p.nom} ({p.reference})</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Quantité + Depuis */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">Quantité *</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={xferQty}
-                  onChange={e => setXferQty(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:outline-none"
-                  style={{ fontSize: 16 }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">Depuis l'entrepôt</label>
-                <select
-                  value={xferFrom}
-                  onChange={e => setXferFrom(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:outline-none"
-                  style={{ fontSize: 16 }}
-                >
-                  <option>Lomé Central</option>
-                  <option>Lomé Nord</option>
-                  <option>Kara Entrepôt</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Motif */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">Motif (optionnel)</label>
-              <textarea
-                value={xferNote}
-                onChange={e => setXferNote(e.target.value)}
-                rows={2}
-                placeholder="Ex : stock épuisé, commande cliente urgente…"
-                className="w-full px-3 py-2 text-sm bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-400 focus:outline-none resize-none"
-              />
-            </div>
-
-            {xferError && (
-              <p className="text-xs text-red-600 font-semibold">{xferError}</p>
-            )}
-
-            <div className="flex gap-3 pt-1">
-              <button onClick={() => setXferOpen(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
-                Annuler
-              </button>
-              <button onClick={submitTransfer} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors">
-                Envoyer au Magasin
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TransferRequestModal
+        open={xferOpen}
+        products={items.map(p => ({ name: p.nom, sku: p.reference }))}
+        onClose={() => setXferOpen(false)}
+        onSubmitted={(rec) => showFlash(`Demande ${rec.id} envoyée au Magasin · en attente d'approbation`)}
+      />
 
       {/* ══════════════════════════════════════
           MODAL RETRAIT / ENTRÉE
