@@ -498,32 +498,28 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
               {showDrop && filtered.length > 0 && (
                 <div className="sm-drop">
                   {filtered.map(p => {
-                    const key     = `${p.produit_id}_v${p.variant_id ?? 0}`;
-                    const inCart  = items.find(i => i.item_key === key);
-                    const full    = inCart && inCart.qty >= p.quantite;
+                    const key    = `${p.produit_id}_v${p.variant_id ?? 0}`;
+                    const inCart = items.find(i => i.item_key === key);
+                    const full   = inCart && inCart.qty >= p.quantite;
+                    const stockColor = p.quantite === 0 ? '#DC2626' : p.quantite <= 3 ? '#D97706' : '#16A34A';
+                    const stockLabel = p.quantite === 0 ? 'Épuisé' : full ? 'Déjà max' : `${p.quantite} en stock`;
+                    const label = [p.nom, p.variant_nom].filter(Boolean).join(' · ');
                     return (
                       <div
                         key={key}
                         className={`sm-drop-item${p.quantite === 0 || full ? ' disabled' : ''}`}
                         onMouseDown={() => !full && p.quantite > 0 && addProduct(p)}
+                        style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1, padding: '8px 12px' }}
                       >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {p.nom}
-                          </div>
-                          {p.variant_nom && (
-                            <div style={{ fontSize: 10, color: '#7C3AED', fontWeight: 600 }}>{p.variant_nom}</div>
-                          )}
-                          <div style={{ fontSize: 10.5, color: '#8A8278', fontFamily: 'monospace' }}>{p.reference}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                          {label}
                         </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#C9601E' }}>{fmt(p.prix_unitaire)} FCFA</div>
-                          <div style={{
-                            fontSize: 10, fontWeight: 600,
-                            color: p.quantite === 0 ? '#DC2626' : p.quantite <= 3 ? '#D97706' : '#16A34A',
-                          }}>
-                            {p.quantite === 0 ? 'Épuisé' : full ? 'Déjà max' : `${p.quantite} en stock`}
-                          </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11.5, color: '#6B635B' }}>
+                          <span style={{ fontFamily: 'monospace', color: '#8A8278' }}>{p.reference}</span>
+                          <span>·</span>
+                          <span style={{ color: stockColor, fontWeight: 600 }}>{stockLabel}</span>
+                          <span>·</span>
+                          <span style={{ color: '#C9601E', fontWeight: 700 }}>{fmt(p.prix_unitaire)} FCFA</span>
                         </div>
                       </div>
                     );

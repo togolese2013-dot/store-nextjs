@@ -24,9 +24,10 @@ ssh "$HOST" bash -s <<EOF
   cd "$APP_DIR"
   git pull origin "$BRANCH"
   npm run build
+  mkdir -p .next/standalone/.next
   cp -r .next/static .next/standalone/.next/static
   cp -rf public .next/standalone/public
-  pm2 restart afrisika
+  pm2 startOrRestart ecosystem.config.js --update-env
   echo "done."
 EOF
 
