@@ -509,18 +509,13 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
                         key={key}
                         className={`sm-drop-item${p.quantite === 0 || full ? ' disabled' : ''}`}
                         onMouseDown={() => !full && p.quantite > 0 && addProduct(p)}
-                        style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1, padding: '8px 12px' }}
+                        style={{ gap: 0, padding: '8px 12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                       >
-                        <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                          {label}
-                        </div>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11.5, color: '#6B635B' }}>
-                          <span style={{ fontFamily: 'monospace', color: '#8A8278' }}>{p.reference}</span>
-                          <span>·</span>
-                          <span style={{ color: stockColor, fontWeight: 600 }}>{stockLabel}</span>
-                          <span>·</span>
-                          <span style={{ color: '#C9601E', fontWeight: 700 }}>{fmt(p.prix_unitaire)} FCFA</span>
-                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
+                        <span style={{ fontSize: 12, color: '#8A8278', margin: '0 5px' }}>·</span>
+                        <span style={{ fontSize: 12, color: stockColor, fontWeight: 600 }}>{stockLabel}</span>
+                        <span style={{ fontSize: 12, color: '#8A8278', margin: '0 5px' }}>·</span>
+                        <span style={{ fontSize: 12, color: '#C9601E', fontWeight: 700 }}>{fmt(p.prix_unitaire)} FCFA</span>
                       </div>
                     );
                   })}
