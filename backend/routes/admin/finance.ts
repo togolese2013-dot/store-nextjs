@@ -3,11 +3,23 @@ import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
 import {
   listFinanceEntries, getFinanceStats, createFinanceEntry,
-  updateFinanceEntry, deleteFinanceEntry,
+  updateFinanceEntry, deleteFinanceEntry, getFinanceDashboard,
 } from "@/lib/admin-db";
 import { db } from "@/lib/db";
 
 const router = express.Router();
+
+router.get("/api/admin/finance/dashboard", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const dashboard = await getFinanceDashboard(shopId);
+    res.json(dashboard);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 
 router.get("/api/admin/finance", async (req, res) => {
   const session = await getSession(req);

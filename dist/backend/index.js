@@ -751,6 +751,7 @@ __export(admin_db_exports, {
   createPaymentPlan: () => createPaymentPlan,
   createReview: () => createReview,
   createStockAjustement: () => createStockAjustement,
+  createStockAlert: () => createStockAlert,
   createStockEntree: () => createStockEntree,
   createStockSortie: () => createStockSortie,
   createTombolaSession: () => createTombolaSession,
@@ -775,6 +776,7 @@ __export(admin_db_exports, {
   deleteNewsletterSubscriber: () => deleteNewsletterSubscriber,
   deleteOrder: () => deleteOrder,
   deleteReview: () => deleteReview,
+  deleteStockAlert: () => deleteStockAlert,
   deleteTombolaSession: () => deleteTombolaSession,
   deleteUtilisateur: () => deleteUtilisateur,
   deleteVariantGroup: () => deleteVariantGroup,
@@ -810,6 +812,7 @@ __export(admin_db_exports, {
   getDeliveryZones: () => getDeliveryZones,
   getFactureById: () => getFactureById,
   getFacturePaiements: () => getFacturePaiements,
+  getFinanceDashboard: () => getFinanceDashboard,
   getFinanceStats: () => getFinanceStats,
   getLivraisonsForLivreur: () => getLivraisonsForLivreur,
   getLivraisonsStats: () => getLivraisonsStats,
@@ -867,6 +870,7 @@ __export(admin_db_exports, {
   listReferrals: () => listReferrals,
   listReviews: () => listReviews,
   listSiteClients: () => listSiteClients,
+  listStockAlerts: () => listStockAlerts,
   listTombolaSessions: () => listTombolaSessions,
   listUtilisateurs: () => listUtilisateurs,
   listVariantGroups: () => listVariantGroups,
@@ -904,6 +908,7 @@ __export(admin_db_exports, {
   updateOrderStatus: () => updateOrderStatus,
   updateProductOptionsConfig: () => updateProductOptionsConfig,
   updateProductStock: () => updateProductStock,
+  updateStockAlert: () => updateStockAlert,
   updateTombolaSession: () => updateTombolaSession,
   updateUtilisateur: () => updateUtilisateur,
   updateUtilisateurPassword: () => updateUtilisateurPassword,
@@ -2427,7 +2432,13 @@ async function listAdminCategories(shopId = 1) {
   }
   const [rows] = await db.execute(
     `SELECT c.id, c.nom, COALESCE(c.description,'') AS description,
-            c.color, COUNT(p.id) AS nb_produits
+            c.color, COUNT(p.id) AS nb_produits,
+            COALESCE(SUM(p.prix_unitaire * COALESCE(p.stock_magasin, 0)), 0) AS ca_stock,
+            COALESCE(AVG(
+              CASE WHEN p.prix_entrepot IS NOT NULL AND p.prix_unitaire > 0
+                   THEN ROUND((1 - p.prix_entrepot / p.prix_unitaire) * 100)
+                   ELSE NULL END
+            ), 0) AS marge_moy
      FROM categories c
      LEFT JOIN produits p ON p.categorie_id = c.id AND p.actif = 1
      WHERE c.shop_id = ?
@@ -2435,7 +2446,12 @@ async function listAdminCategories(shopId = 1) {
      ORDER BY c.nom ASC`,
     [shopId]
   );
-  return rows.map((r) => ({ ...r, nb_produits: Number(r.nb_produits) }));
+  return rows.map((r) => ({
+    ...r,
+    nb_produits: Number(r.nb_produits),
+    ca_stock: Number(r.ca_stock ?? 0),
+    marge_moy: Math.round(Number(r.marge_moy ?? 0))
+  }));
 }
 async function createCategory(nom, description, shopId = 1, color) {
   try {
@@ -2639,34 +2655,13 @@ async function ensureBoutiqueStockPopulated() {
       UNIQUE KEY uq_produit (produit_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
-    const [[cnt]] = await db.execute(
-      "SELECT COUNT(*) AS n FROM boutique_stock"
-    );
-    if (Number(cnt.n ?? 0) === 0) {
-      await db.execute(`
-      INSERT INTO boutique_stock (produit_id, quantite)
-      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
-      FROM produits
-      ON DUPLICATE KEY UPDATE quantite = VALUES(quantite)
-    `).catch(
-        () => db.execute(`
-        INSERT INTO boutique_stock (produit_id, quantite)
-        SELECT id, 0 FROM produits
-        ON DUPLICATE KEY UPDATE quantite = quantite
-      `)
-      );
-    } else {
-      await db.execute(`
-      INSERT IGNORE INTO boutique_stock (produit_id, quantite)
-      SELECT id, GREATEST(0, COALESCE(stock_boutique, 0))
-      FROM produits
-    `).catch(
-        () => db.execute(`
-        INSERT IGNORE INTO boutique_stock (produit_id, quantite)
-        SELECT id, 0 FROM produits
-      `)
-      );
-    }
+    await db.execute(`
+    INSERT IGNORE INTO boutique_stock (produit_id, quantite)
+    SELECT id, GREATEST(1, COALESCE(stock_boutique, 0))
+    FROM produits
+    WHERE COALESCE(stock_boutique, 0) > 0
+  `).catch(() => {
+    });
   });
 }
 async function getStockBoutiqueStats(shopId = 1) {
@@ -2703,16 +2698,19 @@ async function getStockBoutiqueList(opts) {
     p1Params.push(searchLike, searchLike);
   }
   if (filter === "faible") p1Conds.push("COALESCE(bs.quantite,0)>0 AND COALESCE(bs.quantite,0)<=COALESCE(bs.seuil_alerte,5) AND p.entrepot_id IS NULL");
-  if (filter === "epuise") p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL");
+  if (filter === "epuise") p1Conds.push("COALESCE(bs.quantite,0)=0 AND p.entrepot_id IS NULL AND bs.produit_id IS NOT NULL");
   if (filter === "disponible") p1Conds.push("(COALESCE(bs.quantite,0)>0 OR p.entrepot_id IS NOT NULL)");
-  p1Conds.push("(bs.produit_id IS NOT NULL OR p.entrepot_id IS NOT NULL)");
+  if (filter !== "disponible") p1Conds.push("(bs.produit_id IS NOT NULL AND COALESCE(bs.quantite,0)>0)");
   const [rows1] = await db.query(
     `SELECT COALESCE(bs.produit_id, p.id) AS produit_id,
             NULL AS variant_id, NULL AS variant_nom,
             p.nom, p.reference,
             ${imageCol} AS image_url, ${remiseCol} AS remise, p.prix_unitaire,
             COALESCE(c.nom,'') AS categorie_nom,
-            CASE WHEN p.entrepot_id IS NOT NULL THEN 999 ELSE COALESCE(bs.quantite,0) END AS quantite,
+            CASE
+              WHEN p.entrepot_id IS NOT NULL AND bs.produit_id IS NULL THEN 999
+              ELSE COALESCE(bs.quantite,0)
+            END AS quantite,
             COALESCE(bs.seuil_alerte,5) AS seuil_alerte
      FROM produits p
      LEFT JOIN boutique_stock bs ON bs.produit_id = p.id
@@ -2727,8 +2725,9 @@ async function getStockBoutiqueList(opts) {
     p2Params.push(searchLike, searchLike, searchLike);
   }
   if (filter === "disponible") p2Conds.push("pv.stock_boutique > 0");
-  if (filter === "epuise") p2Conds.push("pv.stock_boutique = 0");
+  if (filter === "epuise") p2Conds.push("pv.stock_boutique = 0 AND EXISTS (SELECT 1 FROM boutique_stock WHERE produit_id = p.id)");
   if (filter === "faible") p2Conds.push("pv.stock_boutique > 0 AND pv.stock_boutique <= 5");
+  if (filter === "all" || !filter) p2Conds.push("pv.stock_boutique > 0");
   let rows2 = [];
   try {
     [rows2] = await db.query(
@@ -3600,18 +3599,23 @@ async function deleteFinanceEntry(id) {
   await db.execute("DELETE FROM finance_entries WHERE id = ?", [id]);
 }
 function invalidateVentesStats() {
-  _ventesStatsCache = null;
+  _ventesStatsCacheMap.clear();
 }
-async function getVentesStats() {
+async function getVentesStats(shopId = 1) {
   const now = Date.now();
-  if (_ventesStatsCache && _ventesStatsCache.expiresAt > now) return _ventesStatsCache.data;
+  const cached = _ventesStatsCacheMap.get(shopId);
+  if (cached && cached.expiresAt > now) return cached.data;
   const SITE_JOIN2 = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
   const SITE_COND2 = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
   const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
     db.execute(
-      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN2} WHERE ${SITE_COND2}`
+      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN2} WHERE f.shop_id = ? AND ${SITE_COND2}`,
+      [shopId]
     ),
-    db.execute("SELECT COUNT(*) AS cnt FROM livraisons_ventes"),
+    db.execute(
+      `SELECT COUNT(*) AS cnt FROM livraisons_ventes lv JOIN factures f ON f.id = lv.facture_id WHERE f.shop_id = ?`,
+      [shopId]
+    ),
     db.execute(
       `SELECT COALESCE(SUM(
         CASE
@@ -3619,10 +3623,12 @@ async function getVentesStats() {
           WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
           ELSE 0
         END
-      ), 0) AS total FROM factures f ${SITE_JOIN2} WHERE f.statut != 'annule' AND ${SITE_COND2}`
+      ), 0) AS total FROM factures f ${SITE_JOIN2} WHERE f.shop_id = ? AND f.statut != 'annule' AND ${SITE_COND2}`,
+      [shopId]
     ),
     db.execute(
-      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN2} WHERE f.statut = 'paye' AND ${SITE_COND2}`
+      `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN2} WHERE f.shop_id = ? AND f.statut = 'paye' AND ${SITE_COND2}`,
+      [shopId]
     ),
     db.execute(
       `SELECT COUNT(*) AS cnt,
@@ -3635,8 +3641,9 @@ async function getVentesStats() {
               ), 0) AS montant
        FROM factures f
        LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
-       WHERE DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
-         AND (lv.id IS NULL OR lv.statut = 'livre')`
+       WHERE f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
+         AND (lv.id IS NULL OR lv.statut = 'livre')`,
+      [shopId]
     ),
     db.execute(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
@@ -3653,13 +3660,16 @@ async function getVentesStats() {
               ELSE 0 END
        ), 0) AS solde
        FROM finance_entries
-       WHERE DATE(date_entree) = CURDATE() AND type != 'transfert'`
+       WHERE shop_id = ? AND DATE(date_entree) = CURDATE() AND type != 'transfert'`,
+      [shopId]
     );
     const [[dj]] = await db.execute(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'depense' AND DATE(date_entree) = CURDATE()`
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'depense' AND DATE(date_entree) = CURDATE()`,
+      [shopId]
     );
     const [[rj]] = await db.execute(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE type = 'rentree' AND DATE(date_entree) = CURDATE()`
+      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'rentree' AND DATE(date_entree) = CURDATE()`,
+      [shopId]
     );
     solde_jour = Number(sj?.solde ?? 0);
     depenses_jour = Number(dj?.montant ?? 0);
@@ -3679,7 +3689,7 @@ async function getVentesStats() {
     rentrees_jour,
     solde_jour
   };
-  _ventesStatsCache = { data: result, expiresAt: Date.now() + 6e4 };
+  _ventesStatsCacheMap.set(shopId, { data: result, expiresAt: Date.now() + 6e4 });
   return result;
 }
 async function getLivraisonsStats() {
@@ -3699,24 +3709,72 @@ async function getLivraisonsStats() {
     livre: Number(r.livre ?? 0)
   };
 }
+async function ensureFournisseurCols() {
+  const alters = [
+    "ALTER TABLE fournisseurs ADD COLUMN pays VARCHAR(100) NULL",
+    "ALTER TABLE fournisseurs ADD COLUMN actif TINYINT(1) NOT NULL DEFAULT 1",
+    "ALTER TABLE fournisseurs ADD COLUMN delai_livraison INT NOT NULL DEFAULT 0"
+  ];
+  for (const sql of alters) {
+    await db.execute(sql).catch(() => {
+    });
+  }
+}
 async function listFournisseurs(shopId = 1) {
-  const [rows] = await db.query(
-    "SELECT id, nom, contact, telephone, email, adresse, note, created_at FROM fournisseurs WHERE shop_id = ? ORDER BY nom LIMIT 500",
-    [shopId]
-  );
-  return rows;
+  await ensureFournisseurCols();
+  try {
+    const [rows] = await db.query(
+      `SELECT f.id, f.nom, f.contact, f.telephone, f.email, f.adresse, f.note, f.created_at,
+              COALESCE(f.pays, '') AS pays,
+              COALESCE(f.actif, 1) AS actif,
+              COALESCE(f.delai_livraison, 0) AS delai_livraison,
+              COUNT(DISTINCT a.id) AS nb_produits,
+              COALESCE(SUM(a.montant_total), 0) AS total_achats
+       FROM fournisseurs f
+       LEFT JOIN achats a ON a.fournisseur_id = f.id AND a.shop_id = ?
+       WHERE f.shop_id = ?
+       GROUP BY f.id
+       ORDER BY f.nom LIMIT 500`,
+      [shopId, shopId]
+    );
+    return rows.map((r) => ({
+      ...r,
+      actif: Number(r.actif),
+      delai_livraison: Number(r.delai_livraison),
+      nb_produits: Number(r.nb_produits ?? 0),
+      total_achats: Number(r.total_achats ?? 0)
+    }));
+  } catch {
+    const [rows] = await db.query(
+      `SELECT f.id, f.nom, f.contact, f.telephone, f.email, f.adresse, f.note, f.created_at,
+              COALESCE(f.pays, '') AS pays,
+              COALESCE(f.actif, 1) AS actif,
+              COALESCE(f.delai_livraison, 0) AS delai_livraison,
+              0 AS nb_produits, 0 AS total_achats
+       FROM fournisseurs f WHERE f.shop_id = ? ORDER BY f.nom LIMIT 500`,
+      [shopId]
+    );
+    return rows.map((r) => ({
+      ...r,
+      actif: Number(r.actif),
+      delai_livraison: Number(r.delai_livraison),
+      nb_produits: 0,
+      total_achats: 0
+    }));
+  }
 }
 async function createFournisseur(data, shopId = 1) {
+  await ensureFournisseurCols();
   const [result] = await db.execute(
-    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, shop_id) VALUES (?,?,?,?,?,?,?)`,
-    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, shopId]
+    `INSERT INTO fournisseurs (nom, contact, telephone, email, adresse, note, pays, actif, delai_livraison, shop_id) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [data.nom, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, data.pays ?? null, data.actif ?? 1, data.delai_livraison ?? 0, shopId]
   );
   return result.insertId;
 }
 async function updateFournisseur(id, data, shopId = 1) {
   await db.execute(
-    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=? WHERE id=? AND shop_id=?`,
-    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, id, shopId]
+    `UPDATE fournisseurs SET nom=?, contact=?, telephone=?, email=?, adresse=?, note=?, pays=?, actif=?, delai_livraison=? WHERE id=? AND shop_id=?`,
+    [data.nom ?? null, data.contact ?? null, data.telephone ?? null, data.email ?? null, data.adresse ?? null, data.note ?? null, data.pays ?? null, data.actif ?? 1, data.delai_livraison ?? 0, id, shopId]
   );
 }
 async function deleteFournisseur(id, shopId = 1) {
@@ -4581,13 +4639,24 @@ async function ensureMarquesTable() {
       await db.execute(`ALTER TABLE produits ADD COLUMN marque_id INT NULL`).catch(() => {
       });
     }
+    await db.execute(`ALTER TABLE marques ADD COLUMN logo_url TEXT NULL`).catch(() => {
+    });
+    await db.execute(`ALTER TABLE marques ADD COLUMN shop_id INT NULL`).catch(() => {
+    });
   });
 }
 async function listAdminMarques(shopId = 1) {
   await ensureMarquesTable();
   const [rows] = await db.execute(`
     SELECT m.id, m.nom, COALESCE(m.description, '') AS description,
-           COUNT(p.id) AS nb_produits
+           m.logo_url,
+           COUNT(p.id) AS nb_produits,
+           COALESCE(SUM(p.prix_unitaire * COALESCE(p.stock_magasin, 0)), 0) AS ca_stock,
+           COALESCE(AVG(
+             CASE WHEN p.prix_entrepot IS NOT NULL AND p.prix_unitaire > 0
+                  THEN ROUND((1 - p.prix_entrepot / p.prix_unitaire) * 100)
+                  ELSE NULL END
+           ), 0) AS marge_moy
     FROM marques m
     LEFT JOIN produits p ON p.marque_id = m.id AND p.shop_id = ?
     WHERE m.shop_id = ?
@@ -4598,25 +4667,135 @@ async function listAdminMarques(shopId = 1) {
     id: Number(r.id),
     nom: String(r.nom),
     description: String(r.description ?? ""),
-    nb_produits: Number(r.nb_produits ?? 0)
+    logo_url: r.logo_url ? String(r.logo_url) : null,
+    nb_produits: Number(r.nb_produits ?? 0),
+    ca_stock: Number(r.ca_stock ?? 0),
+    marge_moy: Math.round(Number(r.marge_moy ?? 0))
   }));
 }
 async function createMarque(data, shopId = 1) {
   await ensureMarquesTable();
   const [res] = await db.execute(
-    `INSERT INTO marques (nom, description, shop_id) VALUES (?, ?, ?)`,
-    [data.nom, data.description || null, shopId]
+    `INSERT INTO marques (nom, description, logo_url, shop_id) VALUES (?, ?, ?, ?)`,
+    [data.nom, data.description || null, data.logo_url || null, shopId]
   );
   return res.insertId;
 }
 async function updateMarque(id, data, shopId = 1) {
   await db.execute(
-    `UPDATE marques SET nom = ?, description = ? WHERE id = ? AND shop_id = ?`,
-    [data.nom, data.description || null, id, shopId]
+    `UPDATE marques SET nom = ?, description = ?, logo_url = ? WHERE id = ? AND shop_id = ?`,
+    [data.nom, data.description || null, data.logo_url ?? null, id, shopId]
   );
 }
 async function deleteMarque(id, shopId = 1) {
   await db.execute(`DELETE FROM marques WHERE id = ? AND shop_id = ?`, [id, shopId]);
+}
+async function ensureStockAlertsTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS stock_alerts (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      shop_id     INT NOT NULL,
+      nom         VARCHAR(255) NOT NULL,
+      target_type ENUM('Produit','Cat\xE9gorie') NOT NULL DEFAULT 'Produit',
+      target      VARCHAR(255) NOT NULL,
+      threshold   INT NOT NULL DEFAULT 5,
+      channels    JSON NOT NULL,
+      active      TINYINT(1) NOT NULL DEFAULT 1,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).catch(() => {
+  });
+}
+async function listStockAlerts(shopId = 1) {
+  await ensureStockAlertsTable();
+  const [rows] = await db.execute(
+    `SELECT * FROM stock_alerts WHERE shop_id = ? ORDER BY created_at DESC`,
+    [shopId]
+  );
+  const alerts = rows.map((r) => ({
+    id: Number(r.id),
+    nom: String(r.nom),
+    target_type: r.target_type,
+    target: String(r.target),
+    threshold: Number(r.threshold),
+    channels: (() => {
+      try {
+        return JSON.parse(r.channels);
+      } catch {
+        return [];
+      }
+    })(),
+    active: Number(r.active),
+    triggered: false,
+    shop_id: shopId
+  }));
+  const active = alerts.filter((a) => a.active);
+  if (active.length > 0) {
+    for (const alert of active) {
+      try {
+        let cnt = 0;
+        if (alert.target_type === "Produit") {
+          const [[row]] = await db.execute(
+            `SELECT COUNT(*) AS cnt FROM produits WHERE nom = ? AND shop_id = ? AND COALESCE(stock_magasin,0) <= ? AND actif = 1`,
+            [alert.target, shopId, alert.threshold]
+          );
+          cnt = Number(row?.cnt ?? 0);
+        } else {
+          const [[row]] = await db.execute(
+            `SELECT COUNT(*) AS cnt FROM produits p
+             JOIN categories c ON c.id = p.categorie_id
+             WHERE c.nom = ? AND p.shop_id = ? AND COALESCE(p.stock_magasin,0) <= ? AND p.actif = 1`,
+            [alert.target, shopId, alert.threshold]
+          );
+          cnt = Number(row?.cnt ?? 0);
+        }
+        alert.triggered = cnt > 0;
+      } catch {
+      }
+    }
+  }
+  return alerts;
+}
+async function createStockAlert(data, shopId = 1) {
+  await ensureStockAlertsTable();
+  const [res] = await db.execute(
+    `INSERT INTO stock_alerts (shop_id, nom, target_type, target, threshold, channels, active) VALUES (?,?,?,?,?,?,?)`,
+    [shopId, data.nom, data.target_type, data.target, data.threshold, JSON.stringify(data.channels), data.active ?? 1]
+  );
+  return res.insertId;
+}
+async function updateStockAlert(id, data, shopId = 1) {
+  const sets = [];
+  const vals = [];
+  if (data.nom !== void 0) {
+    sets.push("nom = ?");
+    vals.push(data.nom);
+  }
+  if (data.target_type !== void 0) {
+    sets.push("target_type = ?");
+    vals.push(data.target_type);
+  }
+  if (data.target !== void 0) {
+    sets.push("target = ?");
+    vals.push(data.target);
+  }
+  if (data.threshold !== void 0) {
+    sets.push("threshold = ?");
+    vals.push(data.threshold);
+  }
+  if (data.channels !== void 0) {
+    sets.push("channels = ?");
+    vals.push(JSON.stringify(data.channels));
+  }
+  if (data.active !== void 0) {
+    sets.push("active = ?");
+    vals.push(data.active);
+  }
+  if (!sets.length) return;
+  await db.execute(`UPDATE stock_alerts SET ${sets.join(", ")} WHERE id = ? AND shop_id = ?`, [...vals, id, shopId]);
+}
+async function deleteStockAlert(id, shopId = 1) {
+  await db.execute(`DELETE FROM stock_alerts WHERE id = ? AND shop_id = ?`, [id, shopId]);
 }
 async function ensureTokenVersionCols() {
   const alters = [
@@ -4816,7 +4995,71 @@ async function spinTombola(sessionId, winnerFactureId) {
 async function markTombolaNotified(sessionId) {
   await db.execute(`UPDATE tombola_sessions SET notifie = 1 WHERE id = ?`, [sessionId]);
 }
-var _ensurePromises, _settingsCacheMap, _finCols, _ventesStatsCache;
+async function getFinanceDashboard(shopId = 1) {
+  const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+  const [dayRows, hierRows, weekRows, statsRow] = await Promise.all([
+    // Today's entries/exits from finance_entries
+    db.query(
+      `SELECT
+         SUM(CASE WHEN type IN ('vente','caisse','rentree') THEN montant ELSE 0 END) AS entrees,
+         SUM(CASE WHEN type = 'depense'                      THEN montant ELSE 0 END) AS sorties
+       FROM finance_entries
+       WHERE DATE(date_entree) = CURDATE() AND shop_id = ?`,
+      [shopId]
+    ).then(([[r]]) => r),
+    // Yesterday's net
+    db.query(
+      `SELECT
+         SUM(CASE WHEN type IN ('vente','caisse','rentree') THEN montant ELSE 0 END) -
+         SUM(CASE WHEN type = 'depense'                      THEN montant ELSE 0 END) AS benefice
+       FROM finance_entries
+       WHERE DATE(date_entree) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND shop_id = ?`,
+      [shopId]
+    ).then(([[r]]) => r),
+    // Week CA (Mon→Sun of current week) from factures
+    db.query(
+      `SELECT DAYOFWEEK(created_at) AS dow, SUM(total) AS ca
+       FROM factures
+       WHERE shop_id = ?
+         AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)
+         AND statut_paiement IN ('paye_total','acompte')
+       GROUP BY DAYOFWEEK(created_at)`,
+      [shopId]
+    ).then(([rows]) => rows),
+    // Especes balance for solde caisse
+    db.query(
+      `SELECT
+         SUM(CASE WHEN type IN ('caisse','rentree','vente') AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN montant
+                  WHEN type = 'depense' AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN -montant
+                  WHEN type = 'transfert' AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN -montant
+                  ELSE 0 END) AS solde
+       FROM finance_entries
+       WHERE shop_id = ?`,
+      [shopId]
+    ).then(([[r]]) => r)
+  ]);
+  const entrees_jour = Number(dayRows?.entrees ?? 0);
+  const sorties_jour = Number(dayRows?.sorties ?? 0);
+  const benefice_jour = entrees_jour - sorties_jour;
+  const benefice_hier = Number(hierRows?.benefice ?? 0);
+  const solde_caisse = Number(statsRow?.solde ?? 0);
+  const caMap = {};
+  for (const row of weekRows) caMap[Number(row.dow)] = Number(row.ca ?? 0);
+  const todayDow = (/* @__PURE__ */ new Date()).getDay();
+  const mysqlToday = todayDow === 0 ? 1 : todayDow + 1;
+  const WEEK_ORDER = [2, 3, 4, 5, 6, 7, 1];
+  const week = WEEK_ORDER.map((dow) => ({
+    day: DAY_LABELS[dow === 1 ? 0 : dow - 1],
+    ca: caMap[dow] ?? 0,
+    today: dow === mysqlToday
+  }));
+  return {
+    day: { entrees_jour, sorties_jour, benefice_jour, benefice_hier, solde_caisse },
+    week,
+    solde_caisse
+  };
+}
+var _ensurePromises, _settingsCacheMap, _finCols, _ventesStatsCacheMap;
 var init_admin_db = __esm({
   "lib/admin-db.ts"() {
     "use strict";
@@ -4824,7 +5067,7 @@ var init_admin_db = __esm({
     _ensurePromises = /* @__PURE__ */ new Map();
     _settingsCacheMap = /* @__PURE__ */ new Map();
     _finCols = null;
-    _ventesStatsCache = null;
+    _ventesStatsCacheMap = /* @__PURE__ */ new Map();
   }
 });
 
@@ -6064,7 +6307,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express49 = __toESM(require("express"));
+var import_express50 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -7513,7 +7756,7 @@ router7.get("/api/admin/ventes/factures", async (req, res) => {
     const shopId = session.shop_id ?? 1;
     const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
       listFactures({ search, statut, limit, offset, shopId }),
-      getVentesStats(),
+      getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
       getStockBoutiqueStats(shopId).catch(() => null)
     ]);
@@ -7766,6 +8009,17 @@ init_auth();
 init_admin_db();
 init_db();
 var router9 = import_express9.default.Router();
+router9.get("/api/admin/finance/dashboard", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const dashboard = await getFinanceDashboard(shopId);
+    res.json(dashboard);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
 router9.get("/api/admin/finance", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -8451,9 +8705,9 @@ router14.post("/api/admin/fournisseurs", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    const { nom, contact, telephone, email, adresse, note } = req.body;
+    const { nom, contact, telephone, email, adresse, note, pays, actif, delai_livraison } = req.body;
     if (!nom?.trim()) return res.status(400).json({ error: "Le nom est obligatoire." });
-    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note }, session.shop_id ?? 1);
+    const id = await createFournisseur({ nom, contact, telephone, email, adresse, note, pays: pays ?? null, actif: actif ?? 1, delai_livraison: Number(delai_livraison) || 0 }, session.shop_id ?? 1);
     res.status(201).json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -13756,6 +14010,66 @@ var billing_default = router47;
 
 // backend/index.ts
 init_ai();
+
+// backend/routes/admin/stock-alerts.ts
+var import_express49 = __toESM(require("express"));
+init_auth();
+init_admin_db();
+var router49 = import_express49.default.Router();
+router49.get("/api/admin/stock-alerts", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const alerts = await listStockAlerts(session.shop_id ?? 1);
+  res.json({ alerts });
+});
+router49.post("/api/admin/stock-alerts", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const { nom, target_type, target, threshold, channels, active } = req.body;
+    if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
+    if (!target?.trim()) return res.status(400).json({ error: "Cible requise." });
+    const id = await createStockAlert({
+      nom,
+      target_type: target_type ?? "Produit",
+      target,
+      threshold: Number(threshold) || 5,
+      channels: Array.isArray(channels) ? channels : [],
+      active: active ? 1 : 0,
+      shop_id: session.shop_id ?? 1
+    }, session.shop_id ?? 1);
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router49.patch("/api/admin/stock-alerts/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const data = {};
+    const b = req.body;
+    if (b.nom !== void 0) data.nom = b.nom;
+    if (b.target_type !== void 0) data.target_type = b.target_type;
+    if (b.target !== void 0) data.target = b.target;
+    if (b.threshold !== void 0) data.threshold = Number(b.threshold);
+    if (b.channels !== void 0) data.channels = Array.isArray(b.channels) ? b.channels : [];
+    if (b.active !== void 0) data.active = b.active ? 1 : 0;
+    await updateStockAlert(Number(req.params.id), data, session.shop_id ?? 1);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router49.delete("/api/admin/stock-alerts/:id", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  await deleteStockAlert(Number(req.params.id), session.shop_id ?? 1);
+  res.json({ ok: true });
+});
+var stock_alerts_default = router49;
+
+// backend/index.ts
 init_shops();
 
 // backend/lib/review-notifier.ts
@@ -13845,7 +14159,7 @@ function startReviewNotifier() {
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express49.default)();
+var app = (0, import_express50.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -13920,8 +14234,8 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express49.default.json({ limit: "5mb" }));
-app.use(import_express49.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express50.default.json({ limit: "5mb" }));
+app.use(import_express50.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
@@ -13971,6 +14285,7 @@ app.use(onboarding_default);
 app.use(saas_dashboard_default);
 app.use(billing_default);
 app.use(ai_default);
+app.use(stock_alerts_default);
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur d\xE9marr\xE9 sur le port ${PORT}`);
   try {

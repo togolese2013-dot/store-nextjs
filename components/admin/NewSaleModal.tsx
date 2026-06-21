@@ -72,6 +72,13 @@ const fmt = (n: number) => n.toLocaleString('fr-FR');
 const norm = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
+const SWATCH_PALETTE = [
+  '#1F3D6E','#C8962A','#1F1612','#B8501A','#5A3520',
+  '#D4A437','#2D6A4F','#8B4513','#4A5568','#C9601E',
+];
+const swatchFor = (id: number) => SWATCH_PALETTE[id % SWATCH_PALETTE.length];
+const initFor   = (nom: string) => nom.trim().charAt(0).toUpperCase();
+
 type ClientMode = 'anon' | 'existing' | 'new';
 
 interface Suggestion {
@@ -117,7 +124,9 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   const [items,      setItems]      = useState<CartItem[]>([]);
   const [prodSearch, setProdSearch] = useState('');
   const [showDrop,   setShowDrop]   = useState(false);
+  const [activeIdx,  setActiveIdx]  = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Client ── */
   const [clientNom,        setClientNom]        = useState('');
@@ -141,7 +150,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   /* ── Reset on open ── */
   useEffect(() => {
     if (!open) return;
-    setItems([]); setProdSearch(''); setShowDrop(false);
+    setItems([]); setProdSearch(''); setShowDrop(false); setActiveIdx(-1);
     setClientNom(''); setClientMode('anon');
     setClientIndicatif('+228'); setClientNumero('');
     setSuggestions([]); setShowSugg(false);
@@ -208,7 +217,8 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
         prix_unitaire: p.prix_unitaire, stock_dispo: p.quantite, qty: 1,
       }];
     });
-    setProdSearch(''); setShowDrop(false);
+    setProdSearch(''); setShowDrop(false); setActiveIdx(-1);
+    setTimeout(() => searchInputRef.current?.focus(), 0);
   }
 
   function removeItem(key: string) { setItems(p => p.filter(i => i.item_key !== key)); }
@@ -339,6 +349,25 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   }
 
   const canSubmit = items.length > 0 && !saving;
+
+  const dropResults = filtered.slice(0, 7);
+
+  function handleSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showDrop || dropResults.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx(i => Math.min(i + 1, dropResults.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = dropResults[activeIdx] ?? dropResults[0];
+      if (target && target.quantite > 0) addProduct(target);
+    } else if (e.key === 'Escape') {
+      setShowDrop(false); setActiveIdx(-1);
+    }
+  }
 
   /* ─────────── RENDER ─────────── */
   return (
@@ -502,125 +531,238 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
             <div className="sm-search-wrap" ref={searchRef}>
               <span className="sm-search-icon"><SearchIcon /></span>
               <input
+                ref={searchInputRef}
                 className="sm-in sm-search-in"
                 type="text"
                 placeholder={loadingStock ? 'Chargement du stock…' : 'Rechercher un produit…'}
                 value={prodSearch}
                 disabled={loadingStock}
-                onChange={e => { setProdSearch(e.target.value); setShowDrop(true); }}
+                onChange={e => { setProdSearch(e.target.value); setShowDrop(true); setActiveIdx(-1); }}
                 onFocus={() => setShowDrop(true)}
+                onKeyDown={handleSearchKey}
+                autoComplete="off"
               />
-              {loadingStock && (
+              {prodSearch && (
+                <button
+                  type="button"
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#8A8278', display: 'flex' }}
+                  onMouseDown={e => { e.preventDefault(); setProdSearch(''); setShowDrop(false); setActiveIdx(-1); searchInputRef.current?.focus(); }}
+                >
+                  <CloseIcon size={13} />
+                </button>
+              )}
+              {loadingStock && !prodSearch && (
                 <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
                   <LoaderIcon />
                 </span>
               )}
 
-              {showDrop && filtered.length > 0 && (
-                <div className="sm-drop">
-                  {filtered.map(p => {
+              {showDrop && dropResults.length > 0 && (
+                <div className="sm-drop" style={{ borderRadius: 13, boxShadow: '0 8px 28px rgba(20,17,14,.12)' }}>
+                  {dropResults.map((p, idx) => {
                     const key    = `${p.produit_id}_v${p.variant_id ?? 0}`;
                     const inCart = items.find(i => i.item_key === key);
-                    const full   = inCart && inCart.qty >= p.quantite;
-                    const stockColor = p.quantite === 0 ? '#DC2626' : p.quantite <= 3 ? '#D97706' : '#16A34A';
-                    const stockLabel = p.quantite === 0 ? 'Épuisé' : full ? 'Déjà max' : `${p.quantite} en stock`;
+                    const full   = !!(inCart && inCart.qty >= p.quantite);
+                    const disabled = p.quantite === 0 || full;
+                    const lowStock = p.quantite > 0 && p.quantite <= (p.seuil_alerte || 5);
+                    const stockText = p.quantite === 0
+                      ? 'Épuisé'
+                      : full
+                        ? 'Déjà max'
+                        : lowStock
+                          ? `⚠ ${p.quantite} en stock`
+                          : `${p.quantite} en stock`;
+                    const stockColor = p.quantite === 0 || full ? '#8A8278' : lowStock ? '#C9601E' : '#8A8278';
                     const label = [p.nom, p.variant_nom].filter(Boolean).join(' · ');
+                    const isActive = idx === activeIdx;
                     return (
                       <div
                         key={key}
-                        className={`sm-drop-item${p.quantite === 0 || full ? ' disabled' : ''}`}
-                        onMouseDown={() => !full && p.quantite > 0 && addProduct(p)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '7px 12px', width: '100%', boxSizing: 'border-box' }}
+                        className={`sm-drop-item${disabled ? ' disabled' : ''}`}
+                        onMouseDown={() => !disabled && addProduct(p)}
+                        onMouseEnter={() => setActiveIdx(idx)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 11,
+                          padding: '10px 16px',
+                          borderBottom: idx < dropResults.length - 1 ? '1px solid #E8E1D4' : 'none',
+                          background: isActive ? '#F4EFE6' : 'transparent',
+                          cursor: disabled ? 'default' : 'pointer',
+                          opacity: disabled ? 0.55 : 1,
+                        }}
                       >
-                        <span style={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 500, color: '#000' }}>{label}</span>
-                        <span style={{ flexShrink: 0, width: 90, textAlign: 'right', fontSize: 12, fontWeight: 600, color: stockColor, paddingLeft: 8 }}>{stockLabel}</span>
-                        <span style={{ flexShrink: 0, width: 115, textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#000', paddingLeft: 8 }}>{fmt(p.prix_unitaire)} FCFA</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#14110E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {label}
+                          </div>
+                          <div style={{ fontSize: 11, marginTop: 2, display: 'flex', gap: 8 }}>
+                            {p.categorie_nom && <span style={{ color: '#8A8278' }}>{p.categorie_nom}</span>}
+                            <span style={{ color: stockColor, fontWeight: lowStock && p.quantite > 0 ? 500 : 400 }}>{stockText}</span>
+                          </div>
+                        </div>
+                        <span style={{ fontFamily: 'monospace', fontSize: 12.5, fontWeight: 600, color: '#2A2522', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {fmt(p.prix_unitaire)}<span style={{ fontSize: 10, fontWeight: 400, color: '#6B635B', marginLeft: 2 }}>FCFA</span>
+                        </span>
                       </div>
                     );
                   })}
                 </div>
               )}
 
-              {showDrop && prodSearch && filtered.length === 0 && !loadingStock && (
-                <div className="sm-drop">
-                  <div className="sm-drop-empty">Aucun produit correspondant</div>
+              {showDrop && prodSearch && dropResults.length === 0 && !loadingStock && (
+                <div className="sm-drop" style={{ borderRadius: 13 }}>
+                  <div style={{ padding: 16, textAlign: 'center', fontSize: 12.5, color: '#8A8278' }}>
+                    Aucun produit pour &laquo;&nbsp;{prodSearch}&nbsp;&raquo;
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Panier vide */}
             {items.length === 0 && (
-              <div className="sm-empty">
-                <CartIcon />
-                <span>Aucun article — recherchez ci-dessus</span>
+              <div style={{ border: '1.5px dashed #E8E1D4', borderRadius: 11, padding: '20px 16px', textAlign: 'center', fontSize: 12.5, color: '#8A8278', marginTop: 8 }}>
+                Tapez le nom d&rsquo;un produit pour l&rsquo;ajouter
               </div>
             )}
 
             {/* Liste panier */}
             {items.length > 0 && (
               <>
-                <div className="sm-cart">
-                  {items.map(item => (
-                    <div key={item.item_key} className="sm-cart-item">
-                      <div className="sm-cart-info">
-                        <div className="sm-cart-name">{item.nom}</div>
-                        {item.variant_nom && <div className="sm-cart-var">{item.variant_nom}</div>}
-                        <div className="sm-cart-ref">{item.reference}</div>
+                <div className="sm-cart" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {items.map(item => {
+                    const swColor  = swatchFor(item.produit_id);
+                    const initial  = initFor(item.nom);
+                    const lowStock = item.stock_dispo > 0 && item.stock_dispo <= 5;
+                    const metaColor = item.stock_dispo === 0 ? '#9C3A14' : lowStock ? '#C9601E' : '#2D6A4F';
+                    const metaText  = item.stock_dispo === 0
+                      ? `Rupture · ${fmt(item.prix_unitaire)} FCFA / u.`
+                      : `${item.stock_dispo} en stock · ${fmt(item.prix_unitaire)} FCFA / u.`;
+                    return (
+                      <div
+                        key={item.item_key}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '10px 12px',
+                          border: '1px solid #E8E1D4',
+                          borderRadius: 11,
+                          minHeight: 58,
+                          background: '#fff',
+                        }}
+                      >
+                        {/* Avatar */}
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                          background: swColor,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 12, fontWeight: 700, color: '#fff',
+                        }}>
+                          {initial}
+                        </div>
+
+                        {/* Nom + meta */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#14110E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.nom}{item.variant_nom ? ` · ${item.variant_nom}` : ''}
+                          </div>
+                          <div style={{ fontSize: 11, marginTop: 2, color: metaColor, fontWeight: lowStock ? 600 : 400 }}>
+                            {metaText}
+                          </div>
+                        </div>
+
+                        {/* Stepper */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center',
+                          background: '#F4EFE6', border: '1px solid #E8E1D4',
+                          borderRadius: 9, overflow: 'hidden', flexShrink: 0,
+                        }}>
+                          <button
+                            type="button"
+                            disabled={item.qty <= 1}
+                            onClick={() => changeQty(item.item_key, -1)}
+                            style={{ width: 30, height: 32, fontSize: 18, lineHeight: 1, color: '#6B635B', background: 'none', border: 'none', cursor: item.qty <= 1 ? 'default' : 'pointer', opacity: item.qty <= 1 ? 0.4 : 1 }}
+                          >−</button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={item.stock_dispo}
+                            value={item.qty}
+                            onChange={e => setQtyDirect(item.item_key, e.target.value)}
+                            style={{ width: 38, height: 32, textAlign: 'center', fontFamily: 'monospace', fontWeight: 600, fontSize: 13, border: 'none', background: 'none', color: '#14110E' }}
+                          />
+                          <button
+                            type="button"
+                            disabled={item.qty >= item.stock_dispo}
+                            onClick={() => changeQty(item.item_key, +1)}
+                            style={{ width: 30, height: 32, fontSize: 18, lineHeight: 1, color: '#6B635B', background: 'none', border: 'none', cursor: item.qty >= item.stock_dispo ? 'default' : 'pointer', opacity: item.qty >= item.stock_dispo ? 0.4 : 1 }}
+                          >+</button>
+                        </div>
+
+                        {/* Total ligne */}
+                        <div style={{ minWidth: 88, textAlign: 'right', fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: '#14110E', flexShrink: 0 }}>
+                          {fmt(item.prix_unitaire * item.qty)}&nbsp;F
+                        </div>
+
+                        {/* Supprimer */}
+                        <button
+                          type="button"
+                          aria-label="Retirer"
+                          onClick={() => removeItem(item.item_key)}
+                          style={{
+                            width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                            background: 'transparent', border: 'none', cursor: 'pointer',
+                            color: '#6B635B', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#F7DCCB'; (e.currentTarget as HTMLButtonElement).style.color = '#9C3A14'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#6B635B'; }}
+                        >
+                          <CloseIcon size={13} />
+                        </button>
                       </div>
-                      <div className="sm-qty-ctrl">
-                        <button className="sm-qty-btn" type="button" disabled={item.qty <= 1} onClick={() => changeQty(item.item_key, -1)}>−</button>
-                        <input
-                          className="sm-qty-input"
-                          type="number"
-                          min={1}
-                          max={item.stock_dispo}
-                          value={item.qty}
-                          onChange={e => setQtyDirect(item.item_key, e.target.value)}
-                        />
-                        <button className="sm-qty-btn" type="button" disabled={item.qty >= item.stock_dispo} onClick={() => changeQty(item.item_key, +1)}>+</button>
-                      </div>
-                      <div className="sm-cart-price">× {fmt(item.prix_unitaire)}</div>
-                      <div className="sm-cart-total">{fmt(item.prix_unitaire * item.qty)}</div>
-                      <button className="sm-cart-rm" type="button" aria-label="Retirer" onClick={() => removeItem(item.item_key)}>
-                        <CloseIcon size={12} />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                {/* Totaux */}
-                <div className="sm-totals">
-                  <div className="sm-tot-row">
-                    <span className="sm-tot-label">
-                      {items.reduce((s, i) => s + i.qty, 0)} article{items.reduce((s, i) => s + i.qty, 0) > 1 ? 's' : ''} — Sous-total
-                    </span>
-                    <span className="sm-tot-val">{fmt(sousTotal)} FCFA</span>
-                  </div>
-                  {remise > 0 && (
-                    <div className="sm-tot-row sm-tot-disc">
-                      <span className="sm-tot-label">Remise</span>
-                      <span className="sm-tot-val">− {fmt(remise)} FCFA</span>
-                    </div>
-                  )}
-                  <div className="sm-tot-row sm-tot-main">
-                    <span className="sm-tot-label" style={{ fontWeight: 600, color: '#14110E' }}>Total</span>
-                    <span className="sm-tot-val">{fmt(total || sousTotal)} FCFA</span>
-                  </div>
-                  {statutPaiement === 'acompte' && Number(montantAcompte) > 0 && (
-                    <>
-                      <div className="sm-tot-row" style={{ color: '#D97706' }}>
-                        <span className="sm-tot-label" style={{ color: '#D97706', fontWeight: 600 }}>Acompte versé</span>
-                        <span className="sm-tot-val" style={{ color: '#D97706' }}>{fmt(Number(montantAcompte))} FCFA</span>
-                      </div>
-                      <div className="sm-tot-row" style={{ borderTop: '1px solid #E8E1D4', paddingTop: 6, marginTop: 2 }}>
-                        <span className="sm-tot-label" style={{ color: '#DC2626', fontWeight: 600 }}>Reste à payer</span>
-                        <span className="sm-tot-val" style={{ color: '#DC2626' }}>
-                          {fmt(Math.max(0, (total || sousTotal) - Number(montantAcompte)))} FCFA
-                        </span>
-                      </div>
-                    </>
-                  )}
+                {/* Footer articles */}
+                <div style={{ borderTop: '1px solid #E8E1D4', padding: '12px 4px 2px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 4 }}>
+                  <span style={{ fontSize: 12.5, color: '#6B635B' }}>
+                    <span style={{ color: '#C9601E', fontWeight: 600 }}>{items.reduce((s, i) => s + i.qty, 0)}</span>
+                    {' '}article{items.reduce((s, i) => s + i.qty, 0) > 1 ? 's' : ''}
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em' }}>
+                    {fmt(sousTotal)} FCFA
+                  </span>
                 </div>
+
+                {/* Remise / acompte */}
+                {(remise > 0 || statutPaiement === 'acompte') && (
+                  <div className="sm-totals">
+                    {remise > 0 && (
+                      <div className="sm-tot-row sm-tot-disc">
+                        <span className="sm-tot-label">Remise</span>
+                        <span className="sm-tot-val">− {fmt(remise)} FCFA</span>
+                      </div>
+                    )}
+                    {remise > 0 && (
+                      <div className="sm-tot-row sm-tot-main">
+                        <span className="sm-tot-label" style={{ fontWeight: 600, color: '#14110E' }}>Total</span>
+                        <span className="sm-tot-val">{fmt(total)} FCFA</span>
+                      </div>
+                    )}
+                    {statutPaiement === 'acompte' && Number(montantAcompte) > 0 && (
+                      <>
+                        <div className="sm-tot-row" style={{ color: '#D97706' }}>
+                          <span className="sm-tot-label" style={{ color: '#D97706', fontWeight: 600 }}>Acompte versé</span>
+                          <span className="sm-tot-val" style={{ color: '#D97706' }}>{fmt(Number(montantAcompte))} FCFA</span>
+                        </div>
+                        <div className="sm-tot-row" style={{ borderTop: '1px solid #E8E1D4', paddingTop: 6, marginTop: 2 }}>
+                          <span className="sm-tot-label" style={{ color: '#DC2626', fontWeight: 600 }}>Reste à payer</span>
+                          <span className="sm-tot-val" style={{ color: '#DC2626' }}>
+                            {fmt(Math.max(0, (total || sousTotal) - Number(montantAcompte)))} FCFA
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>

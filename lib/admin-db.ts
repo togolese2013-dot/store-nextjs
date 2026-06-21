@@ -4803,3 +4803,101 @@ export async function spinTombola(sessionId: number, winnerFactureId: number): P
 export async function markTombolaNotified(sessionId: number): Promise<void> {
   await db.execute(`UPDATE tombola_sessions SET notifie = 1 WHERE id = ?`, [sessionId]);
 }
+
+/* ─── Finance Dashboard ─────────────────────────────────────────────────── */
+
+export interface FinanceDayStats {
+  entrees_jour:   number;
+  sorties_jour:   number;
+  benefice_jour:  number;
+  benefice_hier:  number;
+  solde_caisse:   number;
+}
+
+export interface FinanceWeekDay {
+  day:   string;
+  ca:    number;
+  today: boolean;
+}
+
+export interface FinanceDashboard {
+  day:          FinanceDayStats;
+  week:         FinanceWeekDay[];
+  solde_caisse: number;
+}
+
+export async function getFinanceDashboard(shopId = 1): Promise<FinanceDashboard> {
+  const DAY_LABELS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+  const [dayRows, hierRows, weekRows, statsRow] = await Promise.all([
+    // Today's entries/exits from finance_entries
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT
+         SUM(CASE WHEN type IN ('vente','caisse','rentree') THEN montant ELSE 0 END) AS entrees,
+         SUM(CASE WHEN type = 'depense'                      THEN montant ELSE 0 END) AS sorties
+       FROM finance_entries
+       WHERE DATE(date_entree) = CURDATE() AND shop_id = ?`,
+      [shopId]
+    ).then(([[r]]) => r as mysql.RowDataPacket),
+
+    // Yesterday's net
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT
+         SUM(CASE WHEN type IN ('vente','caisse','rentree') THEN montant ELSE 0 END) -
+         SUM(CASE WHEN type = 'depense'                      THEN montant ELSE 0 END) AS benefice
+       FROM finance_entries
+       WHERE DATE(date_entree) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND shop_id = ?`,
+      [shopId]
+    ).then(([[r]]) => r as mysql.RowDataPacket),
+
+    // Week CA (Mon→Sun of current week) from factures
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT DAYOFWEEK(created_at) AS dow, SUM(total) AS ca
+       FROM factures
+       WHERE shop_id = ?
+         AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)
+         AND statut_paiement IN ('paye_total','acompte')
+       GROUP BY DAYOFWEEK(created_at)`,
+      [shopId]
+    ).then(([rows]) => rows as mysql.RowDataPacket[]),
+
+    // Especes balance for solde caisse
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT
+         SUM(CASE WHEN type IN ('caisse','rentree','vente') AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN montant
+                  WHEN type = 'depense' AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN -montant
+                  WHEN type = 'transfert' AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN -montant
+                  ELSE 0 END) AS solde
+       FROM finance_entries
+       WHERE shop_id = ?`,
+      [shopId]
+    ).then(([[r]]) => r as mysql.RowDataPacket),
+  ]);
+
+  const entrees_jour  = Number(dayRows?.entrees  ?? 0);
+  const sorties_jour  = Number(dayRows?.sorties  ?? 0);
+  const benefice_jour = entrees_jour - sorties_jour;
+  const benefice_hier = Number(hierRows?.benefice ?? 0);
+  const solde_caisse  = Number(statsRow?.solde   ?? 0);
+
+  // Build week array Mon=1 … Sun=7 (MySQL DAYOFWEEK: 1=Sun, 2=Mon, … 7=Sat)
+  const caMap: Record<number, number> = {};
+  for (const row of weekRows) caMap[Number(row.dow)] = Number(row.ca ?? 0);
+
+  const todayDow = new Date().getDay(); // 0=Sun … 6=Sat → convert to MySQL dow
+  const mysqlToday = todayDow === 0 ? 1 : todayDow + 1; // Sun=1, Mon=2 … Sat=7
+
+  // Week array: Monday first (mysql dow 2) to Sunday (mysql dow 1)
+  const WEEK_ORDER = [2, 3, 4, 5, 6, 7, 1]; // Mon … Sun
+  const week: FinanceWeekDay[] = WEEK_ORDER.map(dow => ({
+    day:   DAY_LABELS[dow === 1 ? 0 : dow - 1],
+    ca:    caMap[dow] ?? 0,
+    today: dow === mysqlToday,
+  }));
+
+  return {
+    day:          { entrees_jour, sorties_jour, benefice_jour, benefice_hier, solde_caisse },
+    week,
+    solde_caisse,
+  };
+}
