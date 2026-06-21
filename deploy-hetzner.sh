@@ -23,7 +23,7 @@ ssh "$HOST" bash -s <<EOF
   set -e
   cd "$APP_DIR"
   git pull origin "$BRANCH"
-  npm run build
+  BACKEND_URL=http://127.0.0.1:3002 npm run build
   mkdir -p .next/standalone/.next
   cp -r .next/static .next/standalone/.next/static
   cp -rf public .next/standalone/public
