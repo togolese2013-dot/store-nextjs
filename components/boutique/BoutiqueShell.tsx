@@ -120,7 +120,7 @@ export default function BoutiqueShell({
         {page === 'overview' && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} />}
         {page === 'ventes'   && <VentesPage sales={sales} onNewSale={onNewSale} />}
         {page === 'stock'    && <StockPage stock={stock} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
-        {page === 'finance'  && <FinancePage movements={movements} />}
+        {page === 'finance'  && <FinancePage />}
         {page === 'clients'  && <ClientsPage clients={clients} />}
       </main>
     </div>
