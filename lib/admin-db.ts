@@ -2987,7 +2987,7 @@ export async function listFinanceEntries(opts: {
 } = {}): Promise<{ items: FinanceEntry[]; total: number }> {
   const { limit = 50, offset = 0, type, search, shopId = 1 } = opts;
   await financeEntrieCols(); // ensure columns exist
-  const conditions: string[] = ["f.type != 'vente'", "f.shop_id = ?"];
+  const conditions: string[] = ["f.shop_id = ?"];
   const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (type)   { conditions.push("f.type = ?");                                                   params.push(type); }
   if (search) { conditions.push("(f.categorie LIKE ? OR f.reference LIKE ?)");                   params.push(`%${search}%`, `%${search}%`); }
