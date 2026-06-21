@@ -11,6 +11,8 @@ export interface Sale {
   init: string;
   color: string;
   time: string;
+  /** ISO datetime string from created_at — used for period filtering */
+  isoDate: string;
   products: number;
   amount: number;
   payment: PaymentMethod;

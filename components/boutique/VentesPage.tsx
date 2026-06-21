@@ -3,26 +3,87 @@
  * Mount via BoutiqueShell (page id: 'ventes') or standalone.
  */
 'use client';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Sale } from './types';
-import { SAMPLE_SALES, VENTES_KPIS, PAYMENT_STYLE } from './sample-data';
-import Sparkline from './Sparkline';
-import { DownloadIcon, PlusIcon, FilterIcon, ChevDownIcon, PrinterIcon, TrendIcon } from './icons';
+import { PAYMENT_STYLE } from './sample-data';
+import { DownloadIcon, PlusIcon, FilterIcon, ChevDownIcon, PrinterIcon } from './icons';
 import styles from './Boutique.module.css';
 
+const fmt = (n: number) => n.toLocaleString('fr-FR');
+
+function isoPrefix(date: Date, unit: 'day' | 'month') {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  if (unit === 'month') return `${y}-${m}`;
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function startOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day; // Monday
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 export interface VentesPageProps {
   sales?: Sale[];
   onNewSale?: () => void;
 }
 
-export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPageProps) {
-  const [period, setPeriod] = useState('today');
-  const totalCA = sales.reduce((s, i) => s + i.amount, 0);
+export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
+  const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
+
+  const now = useMemo(() => new Date(), []);
+  const todayPfx  = isoPrefix(now, 'day');
+  const monthPfx  = isoPrefix(now, 'month');
+  const weekStart = startOfWeek(now);
+
+  const filterSales = (s: Sale) => {
+    const d = new Date(s.isoDate);
+    if (period === 'today') return s.isoDate.startsWith(todayPfx);
+    if (period === 'week')  return d >= weekStart;
+    return s.isoDate.startsWith(monthPfx);
+  };
+
+  const todaySales  = useMemo(() => sales.filter(s => s.isoDate.startsWith(todayPfx)), [sales, todayPfx]);
+  const weekSales   = useMemo(() => sales.filter(s => new Date(s.isoDate) >= weekStart), [sales, weekStart]);
+  const monthSales  = useMemo(() => sales.filter(s => s.isoDate.startsWith(monthPfx)), [sales, monthPfx]);
+  const filtered    = useMemo(() => sales.filter(filterSales), [sales, period, todayPfx, monthPfx, weekStart]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const caJour     = todaySales.reduce((s, i) => s + i.amount, 0);
+  const nbJour     = todaySales.length;
+  const panierMoy  = nbJour > 0 ? Math.round(caJour / nbJour) : null;
+
+  const totalDisplay = filtered.reduce((s, i) => s + i.amount, 0);
+
   const PERIOD_TABS = [
-    { id: 'today', label: "Aujourd'hui",   count: sales.length },
-    { id: 'week',  label: 'Cette semaine', count: sales.length },
-    { id: 'month', label: 'Ce mois',       count: sales.length },
+    { id: 'today' as const, label: "Aujourd'hui",   count: todaySales.length },
+    { id: 'week'  as const, label: 'Cette semaine', count: weekSales.length },
+    { id: 'month' as const, label: 'Ce mois',       count: monthSales.length },
+  ];
+
+  const kpis = [
+    {
+      label: 'CA du jour',
+      value: fmt(caJour),
+      unit: 'F',
+      sub: `${nbJour} vente${nbJour !== 1 ? 's' : ''} aujourd'hui`,
+    },
+    {
+      label: 'Ventes',
+      value: String(filtered.length),
+      unit: null,
+      sub: period === 'today' ? "aujourd'hui" : period === 'week' ? 'cette semaine' : 'ce mois',
+    },
+    {
+      label: 'Panier moyen',
+      value: panierMoy !== null ? fmt(panierMoy) : '—',
+      unit: panierMoy !== null ? 'F' : null,
+      sub: "aujourd'hui",
+    },
   ];
 
   return (
@@ -31,7 +92,7 @@ export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPa
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Ventes</div>
           <h1 className={styles.title}>Registre des <span className={styles.serif}>ventes</span></h1>
-          <p className={styles.subtitle}>{sales.length} vente{sales.length !== 1 ? 's' : ''} · {totalCA.toLocaleString('fr-FR')} F encaissés</p>
+          <p className={styles.subtitle}>{filtered.length} vente{filtered.length !== 1 ? 's' : ''} · {fmt(totalDisplay)} F encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -42,11 +103,10 @@ export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPa
       </div>
 
       <div className={styles.kpis3}>
-        {VENTES_KPIS.map(k => (
+        {kpis.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
               <div className={styles.kpiLabel}>{k.label}</div>
-              {k.delta && <div className={styles.kpiDelta} style={{ color: k.deltaColor }}><TrendIcon size={10} />{k.delta}</div>}
             </div>
             <div className={styles.kpiValueRow}>
               <div className={styles.kpiValue}>{k.value}</div>
@@ -54,7 +114,6 @@ export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPa
             </div>
             <div className={styles.kpiFoot}>
               <div className={styles.kpiSub}>{k.sub}</div>
-              {k.spark && k.sparkColor && <Sparkline data={k.spark} color={k.sparkColor} />}
             </div>
           </div>
         ))}
@@ -94,7 +153,7 @@ export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPa
               </tr>
             </thead>
             <tbody>
-              {sales.map(s => (
+              {filtered.map(s => (
                 <tr key={s.id}>
                   <td><span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12.5, fontWeight: 500 }}>{s.id}</span></td>
                   <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, color: 'var(--muted)' }}>{s.time}</td>
@@ -120,7 +179,7 @@ export default function VentesPage({ sales = SAMPLE_SALES, onNewSale }: VentesPa
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>{sales.length} vente{sales.length !== 1 ? 's' : ''}</span>
+          <span>{filtered.length} vente{filtered.length !== 1 ? 's' : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

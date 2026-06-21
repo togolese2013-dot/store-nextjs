@@ -103,6 +103,7 @@ function mapFacture(f: ApiFacture): Sale {
     init:     isAnon ? '' : initials(name),
     color:    isAnon ? '#8A8278' : SWATCHES[hashStr(name) % SWATCHES.length],
     time:     formatTime(f.created_at),
+    isoDate:  f.created_at,
     products: Array.isArray(parsed) ? parsed.length : 0,
     amount:   Number(f.total),
     payment:  mapPaymentMode(f.mode_paiement),
