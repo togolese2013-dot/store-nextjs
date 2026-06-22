@@ -4882,17 +4882,17 @@ export async function getFinanceDashboard(shopId = 1): Promise<FinanceDashboard>
       [shopId]
     ).then(([[r]]) => r as mysql.RowDataPacket),
 
-    // Wallet balances + today delta by mode_paiement
+    // Wallet balances + today delta by mode_paiement (NULL → especes)
     db.query<mysql.RowDataPacket[]>(
       `SELECT
-         mode_paiement,
+         COALESCE(mode_paiement, 'especes') AS mode_paiement,
          SUM(CASE WHEN type IN ('vente','rentree','caisse') THEN montant ELSE -montant END) AS solde,
          SUM(CASE WHEN DATE(date_entree) = CURDATE() AND type IN ('vente','rentree','caisse') THEN montant
                   WHEN DATE(date_entree) = CURDATE() AND type IN ('depense','transfert')     THEN -montant
                   ELSE 0 END) AS delta_jour
        FROM finance_entries
-       WHERE shop_id = ? AND mode_paiement IS NOT NULL
-       GROUP BY mode_paiement`,
+       WHERE shop_id = ?
+       GROUP BY COALESCE(mode_paiement, 'especes')`,
       [shopId]
     ).then(([rows]) => rows as mysql.RowDataPacket[]),
   ]);
