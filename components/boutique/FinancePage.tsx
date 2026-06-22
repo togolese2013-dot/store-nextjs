@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { DownloadIcon, PlusIcon } from './icons';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import styles from './Boutique.module.css';
+import '@/components/admin/sale-modal.css';
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
@@ -166,6 +167,17 @@ const MODES = [
 
 interface ModalProps { onClose: () => void; onSaved: () => void; }
 
+const ChevronIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+const CloseIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
 function MouvementModal({ onClose, onSaved }: ModalProps) {
   const [type,    setType]    = useState('depense');
   const [mode,    setMode]    = useState('especes');
@@ -190,33 +202,70 @@ function MouvementModal({ onClose, onSaved }: ModalProps) {
     } catch { setErr('Erreur réseau'); setSaving(false); }
   }
 
-  return <ModalShell title="Mouvement de fonds" onClose={onClose}>
-    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <ModalField label="TYPE">
-        <div style={{ display: 'flex', gap: 6 }}>
-          {TYPES_MVMT.map(t => (
-            <button key={t.v} type="button" onClick={() => setType(t.v)}
-              style={{ flex: 1, padding: '7px 8px', borderRadius: 8, border: `1.5px solid ${type === t.v ? 'var(--accent)' : 'var(--border)'}`, background: type === t.v ? '#FBE9D6' : 'transparent', fontSize: 12, fontWeight: type === t.v ? 600 : 400, color: type === t.v ? 'var(--accent)' : 'var(--ink)', cursor: 'pointer' }}>
-              {t.l}
-            </button>
-          ))}
+  return (
+    <>
+      <div className="sm-backdrop" onMouseDown={onClose} />
+      <div className="sm-drawer" role="dialog" aria-modal="true" onMouseDown={e => e.stopPropagation()}>
+        <div className="sm-head">
+          <div>
+            <div className="sm-eyb">Boutique · Finance</div>
+            <div className="sm-title">Mouvement de <span className="sm-serif">fonds</span></div>
+          </div>
+          <button className="sm-x" onClick={onClose} aria-label="Fermer"><CloseIcon /></button>
         </div>
-      </ModalField>
-      <ModalField label="MONTANT (FCFA)">
-        <input type="number" min="1" value={montant} onChange={e => setMontant(e.target.value)} placeholder="Ex: 5000" style={inStyle} />
-      </ModalField>
-      <ModalField label="COMPTE">
-        <select value={mode} onChange={e => setMode(e.target.value)} style={inStyle}>
-          {MODES.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-        </select>
-      </ModalField>
-      <ModalField label="LIBELLÉ (optionnel)">
-        <input type="text" value={label} onChange={e => setLabel(e.target.value)} placeholder="Ex: Achat fournitures" style={inStyle} />
-      </ModalField>
-      {err && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
-      <ModalActions onClose={onClose} saving={saving} label="Enregistrer" />
-    </form>
-  </ModalShell>;
+
+        <form onSubmit={submit} style={{ display: 'contents' }}>
+          <div className="sm-body">
+            <div className="sm-field">
+              <label className="sm-label">Type</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {TYPES_MVMT.map(t => (
+                  <button key={t.v} type="button" onClick={() => setType(t.v)}
+                    style={{ flex: 1, padding: '8px 6px', borderRadius: 9, border: `1.5px solid ${type === t.v ? 'var(--accent)' : 'var(--border)'}`, background: type === t.v ? '#FBE9D6' : 'var(--surface)', fontSize: 12, fontWeight: type === t.v ? 600 : 400, color: type === t.v ? 'var(--accent)' : 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sm-field">
+              <label className="sm-label">Montant</label>
+              <div className="sm-price-wrap">
+                <input className="sm-in mono" type="number" min="1" value={montant}
+                  onChange={e => setMontant(e.target.value)} placeholder="0" />
+                <span className="sm-suffix">FCFA</span>
+              </div>
+            </div>
+
+            <div className="sm-field">
+              <label className="sm-label">Compte</label>
+              <div className="sm-select-wrap">
+                <select className="sm-in" value={mode} onChange={e => setMode(e.target.value)}>
+                  {MODES.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+                </select>
+                <span className="sm-caret"><ChevronIcon /></span>
+              </div>
+            </div>
+
+            <div className="sm-field">
+              <label className="sm-label">Libellé <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optionnel)</span></label>
+              <input className="sm-in" type="text" value={label}
+                onChange={e => setLabel(e.target.value)} placeholder="Ex: Achat fournitures" />
+            </div>
+
+            {err && <div className="sm-err">{err}</div>}
+          </div>
+
+          <div className="sm-foot">
+            <button type="button" className="sm-btn" onClick={onClose}>Annuler</button>
+            <button type="submit" className="sm-btn sm-pri" disabled={saving}>
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </>
+  );
 }
 
 function TransfertModal({ onClose, onSaved }: ModalProps) {
@@ -233,7 +282,6 @@ function TransfertModal({ onClose, onSaved }: ModalProps) {
     if (from === to) { setErr('Comptes identiques'); return; }
     setSaving(true); setErr('');
     try {
-      // Two entries: sortie from + entrée to
       await Promise.all([
         fetch('/api/admin/finance', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'transfert', mode_paiement: from, description: label || `Transfert → ${COMPTE_LABEL[to]}`, montant: Number(montant), date_entree: new Date().toISOString().slice(0, 10) }) }),
@@ -244,62 +292,67 @@ function TransfertModal({ onClose, onSaved }: ModalProps) {
     } catch { setErr('Erreur réseau'); setSaving(false); }
   }
 
-  return <ModalShell title="Transfert entre comptes" onClose={onClose}>
-    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <ModalField label="DE">
-        <select value={from} onChange={e => setFrom(e.target.value)} style={inStyle}>
-          {MODES.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-        </select>
-      </ModalField>
-      <ModalField label="VERS">
-        <select value={to} onChange={e => setTo(e.target.value)} style={inStyle}>
-          {MODES.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
-        </select>
-      </ModalField>
-      <ModalField label="MONTANT (FCFA)">
-        <input type="number" min="1" value={montant} onChange={e => setMontant(e.target.value)} placeholder="Ex: 15000" style={inStyle} />
-      </ModalField>
-      <ModalField label="LIBELLÉ (optionnel)">
-        <input type="text" value={label} onChange={e => setLabel(e.target.value)} placeholder="Ex: Dépôt mobile money" style={inStyle} />
-      </ModalField>
-      {err && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
-      <ModalActions onClose={onClose} saving={saving} label="Transférer" />
-    </form>
-  </ModalShell>;
-}
-
-/* ── Modal primitives ── */
-const inStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: 14, boxSizing: 'border-box' };
-
-function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
-      <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: 14, padding: 28, width: 420, maxWidth: '90vw', boxShadow: '0 8px 40px rgba(0,0,0,.18)' }}>
-        <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700 }}>{title}</h3>
-        {children}
+    <>
+      <div className="sm-backdrop" onMouseDown={onClose} />
+      <div className="sm-drawer" role="dialog" aria-modal="true" onMouseDown={e => e.stopPropagation()}>
+        <div className="sm-head">
+          <div>
+            <div className="sm-eyb">Boutique · Finance</div>
+            <div className="sm-title">Transfert entre <span className="sm-serif">comptes</span></div>
+          </div>
+          <button className="sm-x" onClick={onClose} aria-label="Fermer"><CloseIcon /></button>
+        </div>
+
+        <form onSubmit={submit} style={{ display: 'contents' }}>
+          <div className="sm-body">
+            <div className="sm-field">
+              <label className="sm-label">De</label>
+              <div className="sm-select-wrap">
+                <select className="sm-in" value={from} onChange={e => setFrom(e.target.value)}>
+                  {MODES.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+                </select>
+                <span className="sm-caret"><ChevronIcon /></span>
+              </div>
+            </div>
+
+            <div className="sm-field">
+              <label className="sm-label">Vers</label>
+              <div className="sm-select-wrap">
+                <select className="sm-in" value={to} onChange={e => setTo(e.target.value)}>
+                  {MODES.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
+                </select>
+                <span className="sm-caret"><ChevronIcon /></span>
+              </div>
+            </div>
+
+            <div className="sm-field">
+              <label className="sm-label">Montant</label>
+              <div className="sm-price-wrap">
+                <input className="sm-in mono" type="number" min="1" value={montant}
+                  onChange={e => setMontant(e.target.value)} placeholder="0" />
+                <span className="sm-suffix">FCFA</span>
+              </div>
+            </div>
+
+            <div className="sm-field">
+              <label className="sm-label">Libellé <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optionnel)</span></label>
+              <input className="sm-in" type="text" value={label}
+                onChange={e => setLabel(e.target.value)} placeholder="Ex: Dépôt mobile money" />
+            </div>
+
+            {err && <div className="sm-err">{err}</div>}
+          </div>
+
+          <div className="sm-foot">
+            <button type="button" className="sm-btn" onClick={onClose}>Annuler</button>
+            <button type="submit" className="sm-btn sm-pri" disabled={saving}>
+              {saving ? 'Transfert…' : 'Transférer'}
+            </button>
+          </div>
+        </form>
       </div>
-    </div>
-  );
-}
-
-function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function ModalActions({ onClose, saving, label }: { onClose: () => void; saving: boolean; label: string }) {
-  return (
-    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-      <button type="button" onClick={onClose} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 14 }}>Annuler</button>
-      <button type="submit" disabled={saving} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
-        {saving ? 'Enregistrement…' : label}
-      </button>
-    </div>
+    </>
   );
 }
 
