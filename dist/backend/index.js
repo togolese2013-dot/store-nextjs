@@ -31047,7 +31047,7 @@ async function markTombolaNotified(sessionId) {
 }
 async function getFinanceDashboard(shopId = 1) {
   const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-  const [dayRows, hierRows, weekRows, statsRow] = await Promise.all([
+  const [dayRows, hierRows, weekRows, statsRow, walletRows] = await Promise.all([
     // Today's entries/exits from finance_entries
     db.query(
       `SELECT
@@ -31086,7 +31086,20 @@ async function getFinanceDashboard(shopId = 1) {
        FROM finance_entries
        WHERE shop_id = ?`,
       [shopId]
-    ).then(([[r]]) => r)
+    ).then(([[r]]) => r),
+    // Wallet balances + today delta by mode_paiement
+    db.query(
+      `SELECT
+         mode_paiement,
+         SUM(CASE WHEN type IN ('vente','rentree','caisse') THEN montant ELSE -montant END) AS solde,
+         SUM(CASE WHEN DATE(date_entree) = CURDATE() AND type IN ('vente','rentree','caisse') THEN montant
+                  WHEN DATE(date_entree) = CURDATE() AND type IN ('depense','transfert')     THEN -montant
+                  ELSE 0 END) AS delta_jour
+       FROM finance_entries
+       WHERE shop_id = ? AND mode_paiement IS NOT NULL
+       GROUP BY mode_paiement`,
+      [shopId]
+    ).then(([rows]) => rows)
   ]);
   const entrees_jour = Number(dayRows?.entrees ?? 0);
   const sorties_jour = Number(dayRows?.sorties ?? 0);
@@ -31103,10 +31116,31 @@ async function getFinanceDashboard(shopId = 1) {
     ca: caMap[dow] ?? 0,
     today: dow === mysqlToday
   }));
+  const walletMap = {};
+  for (const r of walletRows) {
+    walletMap[r.mode_paiement] = {
+      solde: Number(r.solde ?? 0),
+      delta: Number(r.delta_jour ?? 0)
+    };
+  }
+  const WALLET_DEFS = [
+    { id: "especes", key: "especes", label: "Esp\xE8ces", dot: "#2D6A4F" },
+    { id: "mixx", key: "mixx_by_yas", label: "Mixx by Yas", dot: "#C9601E" },
+    { id: "moov", key: "moov_money", label: "Moov Money", dot: "#3B6A8F" },
+    { id: "virement", key: "virement_bancaire", label: "Virement bancaire", dot: "#5C4A88" }
+  ];
+  const wallets = WALLET_DEFS.map((w) => ({
+    id: w.id,
+    label: w.label,
+    dot: w.dot,
+    solde: walletMap[w.key]?.solde ?? 0,
+    delta: walletMap[w.key]?.delta ?? 0
+  }));
   return {
     day: { entrees_jour, sorties_jour, benefice_jour, benefice_hier, solde_caisse },
     week: week2,
-    solde_caisse
+    solde_caisse,
+    wallets
   };
 }
 var _ensurePromises, _settingsCacheMap, _finCols, _ventesStatsCacheMap;

@@ -4820,16 +4820,25 @@ export interface FinanceWeekDay {
   today: boolean;
 }
 
+export interface FinanceWallet {
+  id:        'especes' | 'mixx' | 'moov' | 'virement';
+  label:     string;
+  solde:     number;
+  delta:     number; // signed amount moved today
+  dot:       string;
+}
+
 export interface FinanceDashboard {
   day:          FinanceDayStats;
   week:         FinanceWeekDay[];
   solde_caisse: number;
+  wallets:      FinanceWallet[];
 }
 
 export async function getFinanceDashboard(shopId = 1): Promise<FinanceDashboard> {
   const DAY_LABELS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
-  const [dayRows, hierRows, weekRows, statsRow] = await Promise.all([
+  const [dayRows, hierRows, weekRows, statsRow, walletRows] = await Promise.all([
     // Today's entries/exits from finance_entries
     db.query<mysql.RowDataPacket[]>(
       `SELECT
@@ -4872,6 +4881,20 @@ export async function getFinanceDashboard(shopId = 1): Promise<FinanceDashboard>
        WHERE shop_id = ?`,
       [shopId]
     ).then(([[r]]) => r as mysql.RowDataPacket),
+
+    // Wallet balances + today delta by mode_paiement
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT
+         mode_paiement,
+         SUM(CASE WHEN type IN ('vente','rentree','caisse') THEN montant ELSE -montant END) AS solde,
+         SUM(CASE WHEN DATE(date_entree) = CURDATE() AND type IN ('vente','rentree','caisse') THEN montant
+                  WHEN DATE(date_entree) = CURDATE() AND type IN ('depense','transfert')     THEN -montant
+                  ELSE 0 END) AS delta_jour
+       FROM finance_entries
+       WHERE shop_id = ? AND mode_paiement IS NOT NULL
+       GROUP BY mode_paiement`,
+      [shopId]
+    ).then(([rows]) => rows as mysql.RowDataPacket[]),
   ]);
 
   const entrees_jour  = Number(dayRows?.entrees  ?? 0);
@@ -4895,9 +4918,33 @@ export async function getFinanceDashboard(shopId = 1): Promise<FinanceDashboard>
     today: dow === mysqlToday,
   }));
 
+  const walletMap: Record<string, { solde: number; delta: number }> = {};
+  for (const r of walletRows) {
+    walletMap[r.mode_paiement as string] = {
+      solde: Number(r.solde  ?? 0),
+      delta: Number(r.delta_jour ?? 0),
+    };
+  }
+
+  const WALLET_DEFS: { id: FinanceWallet['id']; key: string; label: string; dot: string }[] = [
+    { id: 'especes',  key: 'especes',           label: 'Espèces',           dot: '#2D6A4F' },
+    { id: 'mixx',     key: 'mixx_by_yas',       label: 'Mixx by Yas',       dot: '#C9601E' },
+    { id: 'moov',     key: 'moov_money',        label: 'Moov Money',        dot: '#3B6A8F' },
+    { id: 'virement', key: 'virement_bancaire', label: 'Virement bancaire', dot: '#5C4A88' },
+  ];
+
+  const wallets: FinanceWallet[] = WALLET_DEFS.map(w => ({
+    id:    w.id,
+    label: w.label,
+    dot:   w.dot,
+    solde: walletMap[w.key]?.solde ?? 0,
+    delta: walletMap[w.key]?.delta ?? 0,
+  }));
+
   return {
     day:          { entrees_jour, sorties_jour, benefice_jour, benefice_hier, solde_caisse },
     week,
     solde_caisse,
+    wallets,
   };
 }
