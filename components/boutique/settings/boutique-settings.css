@@ -1,0 +1,408 @@
+/*
+ * boutique-settings.css
+ * Styles for <BoutiqueSettings> — import once at your app's entry point
+ * or in the component itself: import './boutique-settings.css';
+ *
+ * Required fonts (add to your index.html or global CSS):
+ * https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700
+ *   &family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap
+ */
+
+/* ── CSS tokens ──────────────────────────────────────────────────────────────── */
+.bs-root {
+  --bg:            #FBF7F1;
+  --bg-2:          #F4EFE6;
+  --surface:       #fff;
+  --border:        #E8E1D4;
+  --border-strong: #D6CCBA;
+  --ink:           #14110E;
+  --ink-2:         #2A2522;
+  --muted:         #6B635B;
+  --muted-2:       #8A8278;
+  --accent:        #C9601E;
+  --accent-2:      #A34A10;
+  --accent-bg:     #FBE9D6;
+  --danger:        #9C3A14;
+  --danger-bg:     #F7DCCB;
+  --ok:            #2D6A4F;
+  --ok-bg:         #DDEBE2;
+  --blue:          #3B6A8F;
+  --blue-bg:       #E8F0F7;
+  --purple:        #5C4A88;
+  --purple-bg:     #E6E0F0;
+
+  font-family: "Geist", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+  background: var(--bg);
+  color: var(--ink);
+  height: 100%;
+  display: flex;
+}
+
+/* ── App shell ───────────────────────────────────────────────────────────────── */
+.bs-page {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────────── */
+.bs-sidebar {
+  height: 100vh;
+  padding: 18px 14px 14px;
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.bs-ws-sw {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s;
+  font: inherit;
+}
+.bs-ws-sw:hover { border-color: rgba(20,17,14,.18); }
+
+.bs-ws-ic {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.bs-ws-l1 { font-size: 13px; font-weight: 600; letter-spacing: -.01em; line-height: 1.1; }
+.bs-ws-l2 { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.bs-snav {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.bs-nav-h {
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  padding: 0 12px 6px;
+}
+
+.bs-nav-i {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  width: 100%;
+  text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.bs-nav-i:hover { background: rgba(20,17,14,.04); color: var(--ink); }
+.bs-nav-i.act { background: var(--surface); color: var(--ink); font-weight: 500; }
+.bs-nav-i .ic { color: var(--muted); display: grid; place-items: center; }
+.bs-nav-i.act .ic { color: var(--accent); }
+
+.bs-sb-foot {
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  width: 100%;
+}
+
+.bs-usr { display: flex; align-items: center; gap: 10px; }
+.bs-avi {
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  background: var(--ink); color: #fff;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 600;
+}
+.bs-usr-n { font-size: 13px; font-weight: 500; line-height: 1.1; }
+.bs-usr-r { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ── Main column ─────────────────────────────────────────────────────────────── */
+.bs-main-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Topbar ──────────────────────────────────────────────────────────────────── */
+.bs-topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 28px;
+  background: rgba(251,247,241,.92);
+  backdrop-filter: saturate(140%) blur(14px);
+  border-bottom: 1px solid var(--border);
+  z-index: 5;
+}
+
+.bs-crumb { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.bs-crumb .sep { color: var(--border-strong); }
+.bs-crumb .here { color: var(--ink); font-weight: 500; }
+
+.bs-ibtn {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  color: var(--ink);
+  position: relative;
+  transition: background .15s;
+  border: none; background: transparent; cursor: pointer;
+}
+.bs-ibtn:hover { background: rgba(20,17,14,.05); }
+
+.bs-pip {
+  position: absolute; top: 7px; right: 8px;
+  width: 6px; height: 6px;
+  border-radius: 99px;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.bs-srch {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 12px;
+  width: 260px;
+  font-size: 13px; color: var(--muted);
+  cursor: pointer;
+}
+.bs-srch input { flex: 1; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
+.bs-srch input::placeholder { color: var(--muted-2); }
+.bs-k {
+  font-family: "Geist Mono", monospace;
+  font-size: 10.5px;
+  padding: 1px 5px; border-radius: 4px;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--muted-2);
+}
+
+/* ── Settings inner layout ───────────────────────────────────────────────────── */
+.bs-settings-shell {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 196px 1fr;
+  overflow: hidden;
+}
+.bs-settings-leftnav {
+  border-right: 1px solid var(--border);
+  background: var(--bg-2);
+  overflow-y: auto;
+  padding: 16px 10px;
+}
+.bs-settings-content {
+  overflow-y: auto;
+  padding: 28px 32px 60px;
+}
+
+/* ── Settings left nav items ─────────────────────────────────────────────────── */
+.bs-snav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 11px; border-radius: 9px;
+  font-size: 13px; color: var(--ink-2);
+  width: 100%; text-align: left;
+  border: none; cursor: pointer; background: transparent;
+  font-family: inherit;
+  transition: background .15s, color .15s;
+  margin-bottom: 1px;
+}
+.bs-snav-item:hover { background: rgba(20,17,14,.04); }
+.bs-snav-item.act {
+  background: var(--surface);
+  color: var(--ink); font-weight: 500;
+  box-shadow: 0 1px 3px rgba(20,17,14,.06);
+}
+.bs-snav-item .sic { color: var(--muted); display: grid; place-items: center; flex-shrink: 0; }
+.bs-snav-item.act .sic { color: var(--accent); }
+.bs-snav-item.danger-item { color: var(--danger); }
+.bs-snav-item.danger-item .sic { color: var(--danger); }
+.bs-snav-sep { height: 1px; background: var(--border); margin: 8px 2px; }
+
+/* ── Section cards ───────────────────────────────────────────────────────────── */
+.bs-sc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.bs-sc-head {
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; gap: 13px;
+}
+.bs-sc-icon {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: var(--accent-bg); color: var(--accent);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.bs-sc-icon.danger { background: var(--danger-bg); color: var(--danger); }
+.bs-sc-title { font-size: 15px; font-weight: 600; letter-spacing: -.015em; line-height: 1.2; }
+.bs-sc-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.bs-sc-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
+.bs-sc-footer {
+  padding: 12px 22px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+  display: flex; justify-content: flex-end;
+}
+
+/* ── Form primitives ─────────────────────────────────────────────────────────── */
+.bs-in {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 13px; color: var(--ink);
+  transition: border-color .15s, box-shadow .15s;
+  font-family: inherit;
+}
+.bs-in:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+textarea.bs-in { resize: vertical; min-height: 70px; line-height: 1.5; }
+select.bs-in { appearance: none; -webkit-appearance: none; cursor: pointer; }
+input[type="time"].bs-in { width: 130px; }
+.bs-in.mono { font-family: "Geist Mono", monospace; }
+
+.bs-fld { display: flex; flex-direction: column; gap: 7px; }
+.bs-fld-l { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.bs-fld-h { font-size: 11px; color: var(--muted-2); margin-top: 1px; }
+.bs-row2 { display: flex; gap: 14px; }
+.bs-row2 > .bs-fld { flex: 1; }
+
+.bs-seg {
+  display: flex; padding: 3px; gap: 2px;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 9px;
+}
+.bs-seg button {
+  flex: 1; padding: 6px 10px;
+  font-size: 12.5px; font-weight: 500;
+  color: var(--muted); border-radius: 6px;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+  border: none; cursor: pointer; background: transparent;
+  font-family: inherit;
+}
+.bs-seg button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+
+/* ── Toggle row ──────────────────────────────────────────────────────────────── */
+.bs-trow {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+}
+.bs-trow:last-child { border-bottom: none; padding-bottom: 2px; }
+.bs-trow-body { flex: 1; min-width: 0; }
+.bs-trow-label { font-size: 13.5px; font-weight: 500; }
+.bs-trow-desc { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.bs-trow-child { margin-top: 10px; }
+
+/* ── Misc ────────────────────────────────────────────────────────────────────── */
+.bs-eyb {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent); font-weight: 500; margin-bottom: 6px;
+}
+.bs-eyb::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
+
+.bs-t1 { font-size: 28px; font-weight: 500; letter-spacing: -.025em; line-height: 1.05; margin: 0 0 24px; }
+.bs-serif { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; }
+
+.bs-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: 9px;
+  font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  font-family: inherit;
+}
+.bs-btn:hover { border-color: rgba(20,17,14,.18); }
+.bs-btn.pri { background: var(--accent); color: #fff; border-color: var(--accent); }
+.bs-btn.pri:hover { background: var(--accent-2); }
+.bs-btn.sm { padding: 5px 10px; font-size: 12px; }
+.bs-btn.ghost-danger { border-color: var(--danger-bg); background: var(--surface); color: var(--danger); }
+.bs-btn.ghost-danger:hover { background: var(--danger-bg); }
+
+.bs-tag {
+  display: inline-block; padding: 3px 9px; border-radius: 6px;
+  font-size: 12px; font-weight: 500;
+  background: rgba(20,17,14,.06); color: var(--ink-2);
+}
+
+.bs-preview-box {
+  padding: 14px 18px;
+  background: var(--bg-2); border-radius: 11px; border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.bs-channel-btn {
+  padding: 7px 12px; border-radius: 8px;
+  font-size: 12.5px; font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: all .15s;
+  font-family: inherit;
+}
+.bs-channel-btn.on { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-bg); }
+
+.bs-logo-drop {
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px; padding: 22px;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  color: var(--muted); background: var(--bg-2);
+  text-align: center; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.bs-logo-drop:hover,
+.bs-logo-drop[data-hover] {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* ── Toast animation ─────────────────────────────────────────────────────────── */
+@keyframes bsToastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

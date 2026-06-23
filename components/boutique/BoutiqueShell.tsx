@@ -11,10 +11,11 @@ import VentesPage from './VentesPage';
 import StockPage from './StockPage';
 import FinancePage from './FinancePage';
 import ClientsPage from './ClientsPage';
+import SettingsPage from './SettingsPage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
 import styles from './Boutique.module.css';
 
-type PageId = 'overview' | 'ventes' | 'stock' | 'finance' | 'clients';
+type PageId = 'overview' | 'ventes' | 'stock' | 'finance' | 'clients' | 'settings';
 
 const PAGE_LABELS: Record<PageId, string> = {
   overview: "Vue d'ensemble",
@@ -22,6 +23,7 @@ const PAGE_LABELS: Record<PageId, string> = {
   stock:    'Stock boutique',
   finance:  'Finance',
   clients:  'Clients',
+  settings: 'Réglages boutique',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
@@ -30,6 +32,7 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   stock:    'Rechercher un produit, SKU…',
   finance:  'Rechercher un mouvement…',
   clients:  'Rechercher un client…',
+  settings: 'Rechercher un paramètre…',
 };
 
 const NAV_TO_PAGE: Record<string, PageId> = {
@@ -38,6 +41,7 @@ const NAV_TO_PAGE: Record<string, PageId> = {
   stock:    'stock',
   finance:  'finance',
   clients:  'clients',
+  settings: 'settings',
 };
 
 export interface BoutiqueShellProps {
@@ -80,6 +84,22 @@ export default function BoutiqueShell({
     })),
     [page],
   );
+
+  if (page === 'settings') {
+    const pageMap: Record<string, PageId> = {
+      '/': 'overview', '/ventes': 'ventes', '/stock': 'stock',
+      '/finance': 'finance', '/clients': 'clients',
+    };
+    return (
+      <SettingsPage
+        onBack={() => setPage('overview')}
+        onNavigate={href => { const p = pageMap[href]; if (p) setPage(p); }}
+        shopName={shopName}
+        userName={userName}
+        userRole={userRole}
+      />
+    );
+  }
 
   return (
     <div className={styles.page}>
