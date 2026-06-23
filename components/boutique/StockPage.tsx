@@ -170,7 +170,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
                         <div style={{ width: `${ratio * 100}%`, background: barColor }} />
                       </div>
                     </td>
-                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{p.prix.toLocaleString('fr-FR')} F</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{p.prix.toLocaleString('fr-FR')} FCFA</td>
                     <td>
                       {isLow
                         ? <span className={styles.tag} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertTriangleIcon size={11} />Stock bas</span>

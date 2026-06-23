@@ -76,7 +76,7 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS }: ClientsPagePro
                   </td>
                   <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13 }}>{c.visits}</td>
                   <td style={{ color: 'var(--muted)', fontSize: 13 }}>{c.last}</td>
-                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{c.total.toLocaleString('fr-FR')} F</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{c.total.toLocaleString('fr-FR')} FCFA</td>
                   <td>
                     <span className={`${styles.tag} ${styles[CLIENT_STATUS_CLASS[c.status] as keyof typeof styles]}`}>
                       {c.status === 'VIP' && <StarIcon size={10} />}

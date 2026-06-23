@@ -52,7 +52,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Aperçu</div>
           <h1 className={styles.title}>Caisse du <span className={styles.serif}>jour</span></h1>
-          <p className={styles.subtitle}>{today} · {jourCount} vente{jourCount !== 1 ? 's' : ''} · {jourMontant.toLocaleString('fr-FR')} F encaissés</p>
+          <p className={styles.subtitle}>{today} · {jourCount} vente{jourCount !== 1 ? 's' : ''} · {jourMontant.toLocaleString('fr-FR')} FCFACFA encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><PrinterIcon size={14} /> Rapport journée</button>
@@ -106,7 +106,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
                       )}
                   </td>
                   <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.items}</td>
-                  <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, fontWeight: 500 }}>{s.amount.toLocaleString('fr-FR')} F</td>
+                  <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, fontWeight: 500 }}>{s.amount.toLocaleString('fr-FR')} FCFA</td>
                   <td><span className={styles.tag} style={PAYMENT_STYLE[s.payment]}>{s.payment}</span></td>
                 </tr>
               ))}
@@ -132,7 +132,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
                   <div className={styles.payFill} style={{ width: `${m.pct}%`, background: m.color }} />
                 </div>
                 <div className={styles.payPct}>{m.pct}%</div>
-                <div className={styles.payAmt}>{m.amount.toLocaleString('fr-FR')} F</div>
+                <div className={styles.payAmt}>{m.amount.toLocaleString('fr-FR')} FCFA</div>
               </div>
             ))}
           </div>
@@ -171,7 +171,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
                     </div>
                   </td>
                   <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 12 }}>{p.qty}</td>
-                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 12, fontWeight: 500 }}>{p.ca.toLocaleString('fr-FR')} F</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 12, fontWeight: 500 }}>{p.ca.toLocaleString('fr-FR')} FCFA</td>
                 </tr>
               ))}
             </tbody>

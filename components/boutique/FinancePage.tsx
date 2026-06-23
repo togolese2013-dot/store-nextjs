@@ -522,7 +522,7 @@ export default function FinancePage() {
                       {m.description ?? m.categorie ?? m.reference}
                     </td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-geist-mono, monospace)', fontSize: 13, fontWeight: 600, color: amount >= 0 ? 'var(--ok)' : 'var(--danger)', whiteSpace: 'nowrap' }}>
-                      {amount >= 0 ? '+' : ''}{fmt(amount)} F
+                      {amount >= 0 ? '+' : ''}{fmt(amount)} FCFA
                     </td>
                   </tr>
                 );

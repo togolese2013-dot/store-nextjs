@@ -92,7 +92,7 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Ventes</div>
           <h1 className={styles.title}>Registre des <span className={styles.serif}>ventes</span></h1>
-          <p className={styles.subtitle}>{filtered.length} vente{filtered.length !== 1 ? 's' : ''} · {fmt(totalDisplay)} F encaissés</p>
+          <p className={styles.subtitle}>{filtered.length} vente{filtered.length !== 1 ? 's' : ''} · {fmt(totalDisplay)} FCFA encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -169,7 +169,7 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
                       )}
                   </td>
                   <td style={{ fontSize: 12.5, color: 'var(--muted)', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.items}</td>
-                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{s.amount.toLocaleString('fr-FR')} F</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{s.amount.toLocaleString('fr-FR')} FCFA</td>
                   <td><span className={styles.tag} style={PAYMENT_STYLE[s.payment]}>{s.payment}</span></td>
                   <td style={{ fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                     {s.vendeur ?? '—'}
