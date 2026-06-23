@@ -29,7 +29,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
 
   const KPIS: KpiItem[] = [
     {
-      label: 'CA du jour', unit: 'F', sub: 'vs hier même heure', sparkColor: '#C9601E',
+      label: 'CA du jour', unit: 'FCFA', sub: 'vs hier même heure', sparkColor: '#C9601E',
       value: jourMontant.toLocaleString('fr-FR'),
     },
     {
@@ -41,7 +41,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
       value: String(clientsServis),
     },
     {
-      label: 'Panier moyen', unit: 'F', sub: 'ce jour', sparkColor: '#2D6A4F',
+      label: 'Panier moyen', unit: 'FCFA', sub: 'ce jour', sparkColor: '#2D6A4F',
       value: panierMoyen > 0 ? panierMoyen.toLocaleString('fr-FR') : '—',
     },
   ];
@@ -52,7 +52,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Aperçu</div>
           <h1 className={styles.title}>Caisse du <span className={styles.serif}>jour</span></h1>
-          <p className={styles.subtitle}>{today} · {jourCount} vente{jourCount !== 1 ? 's' : ''} · {jourMontant.toLocaleString('fr-FR')} FCFACFA encaissés</p>
+          <p className={styles.subtitle}>{today} · {jourCount} vente{jourCount !== 1 ? 's' : ''} · {jourMontant.toLocaleString('fr-FR')} FCFA encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><PrinterIcon size={14} /> Rapport journée</button>

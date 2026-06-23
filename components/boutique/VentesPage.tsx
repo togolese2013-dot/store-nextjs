@@ -69,7 +69,7 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
     {
       label: 'CA du jour',
       value: fmt(caJour),
-      unit: 'F',
+      unit: 'FCFA',
       sub: `${nbJour} vente${nbJour !== 1 ? 's' : ''} aujourd'hui`,
     },
     {
@@ -81,7 +81,7 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
     {
       label: 'Panier moyen',
       value: panierMoy !== null ? fmt(panierMoy) : '—',
-      unit: panierMoy !== null ? 'F' : null,
+      unit: panierMoy !== null ? 'FCFA' : null,
       sub: "aujourd'hui",
     },
   ];

@@ -446,7 +446,7 @@ export default function FinancePage() {
           <div className={styles.kpiHead}><div className={styles.kpiLabel}>Entrées du jour</div></div>
           <div className={styles.kpiValueRow}>
             <div className={styles.kpiValue}>{loading ? '—' : fmt(day?.entrees_jour ?? 0)}</div>
-            <div className={styles.kpiUnit}>F</div>
+            <div className={styles.kpiUnit}>FCFA</div>
           </div>
           <div className={styles.kpiFoot}><div className={styles.kpiSub}>ventes encaissées</div></div>
         </div>
@@ -455,7 +455,7 @@ export default function FinancePage() {
           <div className={styles.kpiHead}><div className={styles.kpiLabel}>Sorties du jour</div></div>
           <div className={styles.kpiValueRow}>
             <div className={styles.kpiValue}>{loading ? '—' : fmt(day?.sorties_jour ?? 0)}</div>
-            <div className={styles.kpiUnit}>F</div>
+            <div className={styles.kpiUnit}>FCFA</div>
           </div>
           <div className={styles.kpiFoot}><div className={styles.kpiSub}>dépenses</div></div>
         </div>
@@ -469,7 +469,7 @@ export default function FinancePage() {
           </div>
           <div className={styles.kpiValueRow}>
             <div className={styles.kpiValue}>{loading ? '—' : fmt(day?.benefice_jour ?? 0)}</div>
-            <div className={styles.kpiUnit}>F</div>
+            <div className={styles.kpiUnit}>FCFA</div>
           </div>
           <div className={styles.kpiFoot}><div className={styles.kpiSub}>vs hier</div></div>
         </div>

@@ -43,16 +43,16 @@ export const PAY_BREAKDOWN: { name: string; color: string; pct: number; amount: 
 
 /* ─── KPI sets ──────────────────────────────────── */
 export const OVERVIEW_KPIS: KpiItem[] = [
-  { label: 'CA du jour',     value: '—', unit: 'F', sub: 'vs hier même heure', sparkColor: '#C9601E' },
+  { label: 'CA du jour',     value: '—', unit: 'FCFA', sub: 'vs hier même heure', sparkColor: '#C9601E' },
   { label: 'Ventes du jour', value: '—',             sub: 'vs hier',             sparkColor: '#3B6A8F' },
   { label: 'Clients servis', value: '—',             sub: "aujourd'hui",          sparkColor: '#5C4A88' },
-  { label: 'Panier moyen',   value: '—', unit: 'F', sub: 'ce jour',              sparkColor: '#2D6A4F' },
+  { label: 'Panier moyen',   value: '—', unit: 'FCFA', sub: 'ce jour',              sparkColor: '#2D6A4F' },
 ];
 
 export const VENTES_KPIS: KpiItem[] = [
-  { label: 'CA du jour',   value: '—', unit: 'F', sub: 'vs hier',      sparkColor: '#C9601E' },
+  { label: 'CA du jour',   value: '—', unit: 'FCFA', sub: 'vs hier',      sparkColor: '#C9601E' },
   { label: 'Ventes',       value: '—',             sub: "aujourd'hui", sparkColor: '#3B6A8F' },
-  { label: 'Panier moyen', value: '—', unit: 'F', sub: "aujourd'hui", sparkColor: '#5C4A88' },
+  { label: 'Panier moyen', value: '—', unit: 'FCFA', sub: "aujourd'hui", sparkColor: '#5C4A88' },
 ];
 
 export const STOCK_KPIS: KpiItem[] = [
@@ -62,13 +62,13 @@ export const STOCK_KPIS: KpiItem[] = [
 ];
 
 export const FINANCE_KPIS: KpiItem[] = [
-  { label: 'Entrées du jour', value: '—', unit: 'F', sub: 'ventes encaissées',  sparkColor: '#2D6A4F' },
-  { label: 'Sorties du jour', value: '—', unit: 'F', sub: 'dépenses',           sparkColor: '#C9601E' },
-  { label: 'Bénéfice net',    value: '—', unit: 'F', sub: 'vs hier',            sparkColor: '#5C4A88' },
+  { label: 'Entrées du jour', value: '—', unit: 'FCFA', sub: 'ventes encaissées',  sparkColor: '#2D6A4F' },
+  { label: 'Sorties du jour', value: '—', unit: 'FCFA', sub: 'dépenses',           sparkColor: '#C9601E' },
+  { label: 'Bénéfice net',    value: '—', unit: 'FCFA', sub: 'vs hier',            sparkColor: '#5C4A88' },
 ];
 
 export const CLIENTS_KPIS: KpiItem[] = [
   { label: 'Clients enregistrés',  value: '—',           sub: 'ce mois',          sparkColor: '#3B6A8F' },
   { label: 'Client du mois',       value: '—', serif: true, sub: '—' },
-  { label: 'Panier moyen clients', value: '—', unit: 'F', sub: 'clients identifiés', sparkColor: '#5C4A88' },
+  { label: 'Panier moyen clients', value: '—', unit: 'FCFA', sub: 'clients identifiés', sparkColor: '#5C4A88' },
 ];
