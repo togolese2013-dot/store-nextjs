@@ -179,6 +179,7 @@ interface Props {
   userName?: string;
   userRole?: string;
   shopName?: string;
+  refreshRef?: { current: (() => void) | null };
 }
 
 export default function BoutiqueDataLoader({
@@ -188,6 +189,7 @@ export default function BoutiqueDataLoader({
   userName,
   userRole,
   shopName,
+  refreshRef,
 }: Props) {
   const [sales,         setSales]         = useState<Sale[]>([]);
   const [stock,         setStock]         = useState<BoutiqueStock[]>([]);
@@ -213,6 +215,10 @@ export default function BoutiqueDataLoader({
   }, []);
 
   useEffect(() => { fetchFactures(); }, [fetchFactures]);
+  useEffect(() => {
+    if (refreshRef) { refreshRef.current = fetchFactures; }
+    return () => { if (refreshRef) refreshRef.current = null; };
+  }, [refreshRef, fetchFactures]);
 
   const { subscribe } = useAdminSSE();
   useEffect(() => subscribe((e) => {

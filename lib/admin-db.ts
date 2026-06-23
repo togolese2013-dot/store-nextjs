@@ -3016,6 +3016,10 @@ async function financeEntrieCols() {
   );
   const names = new Set(rows.map(r => (r.COLUMN_NAME as string).toLowerCase()));
   // Auto-migrate optional columns
+  if (!names.has("shop_id")) {
+    try { await db.execute("ALTER TABLE finance_entries ADD COLUMN shop_id INT NOT NULL DEFAULT 1"); } catch { /* already exists */ }
+    names.add("shop_id");
+  }
   if (!names.has("admin_id")) {
     try { await db.execute("ALTER TABLE finance_entries ADD COLUMN admin_id INT NULL"); } catch { /* already exists */ }
     names.add("admin_id");
@@ -3034,11 +3038,11 @@ async function financeEntrieCols() {
       `ALTER TABLE finance_entries MODIFY COLUMN type ENUM('caisse','depense','rentree','vente','transfert') NOT NULL`
     );
   } catch { /* already correct or DB doesn't support */ }
-  // Ensure 'mix_by_yas' is in the mode_paiement ENUM
+  // Ensure all mode_paiement values (incl. mixx_by_yas with 2 x) are in the ENUM
   if (names.has("mode_paiement")) {
     try {
       await db.execute(
-        `ALTER TABLE finance_entries MODIFY COLUMN mode_paiement ENUM('especes','moov_money','tmoney','virement_bancaire','mix_by_yas') NULL`
+        `ALTER TABLE finance_entries MODIFY COLUMN mode_paiement ENUM('especes','moov_money','tmoney','virement_bancaire','mix_by_yas','mixx_by_yas') NULL`
       );
     } catch { /* already correct */ }
   }

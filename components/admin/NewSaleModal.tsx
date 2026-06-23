@@ -127,6 +127,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   const [activeIdx,  setActiveIdx]  = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const skipNextFocusRef = useRef(false);
 
   /* ── Client ── */
   const [clientNom,        setClientNom]        = useState('');
@@ -218,6 +219,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
       }];
     });
     setProdSearch(''); setShowDrop(false); setActiveIdx(-1);
+    skipNextFocusRef.current = true;
     setTimeout(() => searchInputRef.current?.focus(), 0);
   }
 
@@ -538,7 +540,10 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
                 value={prodSearch}
                 disabled={loadingStock}
                 onChange={e => { setProdSearch(e.target.value); setShowDrop(true); setActiveIdx(-1); }}
-                onFocus={() => setShowDrop(true)}
+                onFocus={() => {
+                  if (skipNextFocusRef.current) { skipNextFocusRef.current = false; return; }
+                  setShowDrop(true);
+                }}
                 onKeyDown={handleSearchKey}
                 autoComplete="off"
               />
