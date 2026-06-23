@@ -144,11 +144,12 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Heure</th>
+                <th>Date &amp; heure</th>
                 <th>Client</th>
                 <th>Articles</th>
                 <th style={{ textAlign: 'right' }}>Montant</th>
                 <th>Paiement</th>
+                <th>Vendeur</th>
                 <th />
               </tr>
             </thead>
@@ -156,7 +157,7 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
               {filtered.map(s => (
                 <tr key={s.id}>
                   <td><span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12.5, fontWeight: 500 }}>{s.id}</span></td>
-                  <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, color: 'var(--muted)' }}>{s.time}</td>
+                  <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{s.time}</td>
                   <td>
                     {s.client === '—'
                       ? <span style={{ color: 'var(--muted)', fontSize: 13 }}>Anonyme</span>
@@ -170,6 +171,9 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
                   <td style={{ fontSize: 12.5, color: 'var(--muted)', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.items}</td>
                   <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{s.amount.toLocaleString('fr-FR')} F</td>
                   <td><span className={styles.tag} style={PAYMENT_STYLE[s.payment]}>{s.payment}</span></td>
+                  <td style={{ fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    {s.vendeur ?? '—'}
+                  </td>
                   <td className={styles.actionsCell}>
                     <button type="button" className={styles.rowMenu} title="Imprimer le reçu"><PrinterIcon size={14} /></button>
                   </td>

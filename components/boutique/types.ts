@@ -17,6 +17,7 @@ export interface Sale {
   amount: number;
   payment: PaymentMethod;
   items: string;
+  vendeur?: string | null;
 }
 
 export interface BoutiqueStock {

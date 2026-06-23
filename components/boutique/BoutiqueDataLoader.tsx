@@ -58,6 +58,7 @@ interface ApiFacture {
   total: number;
   mode_paiement: ApiPaymentMode;
   created_at: string;
+  vendeur?: string | null;
 }
 
 interface ApiStockItem {
@@ -102,12 +103,13 @@ function mapFacture(f: ApiFacture): Sale {
     client:   name,
     init:     isAnon ? '' : initials(name),
     color:    isAnon ? '#8A8278' : SWATCHES[hashStr(name) % SWATCHES.length],
-    time:     formatTime(f.created_at),
+    time:     formatDateTime(f.created_at),
     isoDate:  f.created_at,
     products: Array.isArray(parsed) ? parsed.length : 0,
     amount:   Number(f.total),
     payment:  mapPaymentMode(f.mode_paiement),
     items:    itemNames || '—',
+    vendeur:  f.vendeur ?? null,
   };
 }
 
