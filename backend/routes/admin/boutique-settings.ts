@@ -1,5 +1,4 @@
 import express from "express";
-import { z } from "zod";
 import { getSession } from "../../lib/auth";
 import { getSettings, setSettings } from "@/lib/admin-db";
 
@@ -21,19 +20,15 @@ router.get("/api/admin/boutique/settings", async (req, res) => {
   res.json(result);
 });
 
-const SaveSchema = z.object({
-  section: z.string().min(1).max(50).regex(/^[a-z_]+$/),
-  state: z.record(z.unknown()),
-});
-
 router.post("/api/admin/boutique/settings", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
-  const parsed = SaveSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Données invalides." });
+  const { section, state } = req.body as { section?: unknown; state?: unknown };
+  if (typeof section !== "string" || !/^[a-z_]{1,50}$/.test(section) || typeof state !== "object" || !state) {
+    return res.status(400).json({ error: "Données invalides." });
+  }
 
-  const { section, state } = parsed.data;
   await setSettings(
     { [`${PREFIX}${section}`]: JSON.stringify(state) },
     session.shop_id ?? 1,
