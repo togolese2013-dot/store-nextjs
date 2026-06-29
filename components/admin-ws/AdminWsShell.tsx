@@ -159,7 +159,7 @@ export default function AdminWsShell({
         {page === 'workspaces'   && <WorkspacesPage workspaces={workspaces} onToggle={onToggleWorkspace} />}
         {page === 'integrations' && <IntegrationsPage integrations={integrations} />}
         {page === 'reports'      && <ReportsPage reports={reports} />}
-        {page === 'logs'         && <LogsPage log={log} />}
+        {page === 'logs'         && <LogsPage />}
         {page === 'settings'     && <SettingsPage />}
       </main>
     </div>
