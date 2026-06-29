@@ -155,11 +155,7 @@ export default function AdminWsShell({
 
         {/* Page routing */}
         {page === 'overview'     && <OverviewPage onInvite={onInvite} shopName={shopName} members={members} workspaces={workspaces} log={log} />}
-        {page === 'users'        && <UsersRolesPage initialMembers={members.map((m): UsersRolesMember => ({
-          name: m.name, init: m.init, color: m.color, email: m.email,
-          phone: undefined, role: (m.role as UsersRolesMember['role']) || 'Vendeur',
-          workspaces: m.workspaces, last: m.last, status: m.status as UsersRolesMember['status'],
-        }))} />}
+        {page === 'users'        && <UsersRolesPage />}
         {page === 'workspaces'   && <WorkspacesPage workspaces={workspaces} onToggle={onToggleWorkspace} />}
         {page === 'integrations' && <IntegrationsPage integrations={integrations} />}
         {page === 'reports'      && <ReportsPage reports={reports} />}
