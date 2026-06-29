@@ -38,11 +38,12 @@ import WorkspacesPage from './WorkspacesPage';
 import IntegrationsPage from './IntegrationsPage';
 import ReportsPage from './ReportsPage';
 import LogsPage from './LogsPage';
+import SettingsPage from './SettingsPage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
 import styles from './Admin.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
-type PageId = 'overview' | 'users' | 'workspaces' | 'integrations' | 'reports' | 'logs';
+type PageId = 'overview' | 'users' | 'workspaces' | 'integrations' | 'reports' | 'logs' | 'settings';
 
 const PAGE_LABELS: Record<PageId, string> = {
   overview:     "Vue d'ensemble",
@@ -51,6 +52,7 @@ const PAGE_LABELS: Record<PageId, string> = {
   integrations: 'Intégrations',
   reports:      'Rapports',
   logs:         "Journal d'activité",
+  settings:     'Paramètres compte',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
@@ -60,6 +62,7 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   integrations: 'Rechercher une intégration…',
   reports:      'Rechercher un rapport…',
   logs:         'Rechercher dans le journal…',
+  settings:     'Rechercher dans les paramètres…',
 };
 
 const NAV_TO_PAGE: Record<string, PageId> = {
@@ -69,6 +72,7 @@ const NAV_TO_PAGE: Record<string, PageId> = {
   integrations: 'integrations',
   reports:      'reports',
   logs:         'logs',
+  settings:     'settings',
 };
 
 /* ─── Props ─────────────────────────────────────────────────────── */
@@ -160,6 +164,7 @@ export default function AdminWsShell({
         {page === 'integrations' && <IntegrationsPage integrations={integrations} />}
         {page === 'reports'      && <ReportsPage reports={reports} />}
         {page === 'logs'         && <LogsPage log={log} />}
+        {page === 'settings'     && <SettingsPage />}
       </main>
     </div>
   );

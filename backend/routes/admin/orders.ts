@@ -1,6 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
+import { logActivity } from "../../lib/activity-log";
 import { sendWaDeliveryConfirmation } from "../../lib/whatsapp";
 import { db } from "@/lib/db";
 import type mysql from "mysql2/promise";
@@ -170,6 +171,9 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
       emitAdminEvent("stock");
     }
     emitAdminEvent("commande");
+    const statusLabels: Record<string, string> = { confirmed: "confirmée", shipped: "expédiée", delivered: "livrée", cancelled: "annulée" };
+    const statusLabel = statusLabels[String(status)] ?? String(status);
+    logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: `commande_${statusLabel}`, entity: "commande", entityId: id, label: `Commande #${id} ${statusLabel}`, workspace: "Store" });
     return res.json({ ok: true });
   }
 

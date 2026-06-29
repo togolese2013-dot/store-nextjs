@@ -1,6 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { emitAdminEvent } from "../../lib/admin-events";
+import { logActivity } from "../../lib/activity-log";
 import { hasPageAccess } from "@/lib/admin-permissions";
 import { getProducts, getProductCount, getProductStatusCounts, getCategories, db, produitCols, invalidateProduitColsCache } from "@/lib/db";
 import { getStockStats, getPrincipalEntrepot } from "@/lib/admin-db";
@@ -210,6 +211,7 @@ router.post("/api/admin/products", async (req, res) => {
     }
 
     emitAdminEvent("produit");
+    logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: "produit_créé", entity: "produit", entityId: newId, label: `Produit créé : ${body.nom}`, workspace: "Magasin" });
     return res.json({ ok: true, id: newId });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
@@ -429,6 +431,7 @@ router.patch("/api/admin/products/:id", async (req, res) => {
     }
 
     emitAdminEvent("produit");
+    logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: "produit_modifié", entity: "produit", entityId: Number(req.params.id), label: `Produit #${req.params.id} modifié`, workspace: "Magasin" });
     // Re-read slug from DB so the client can update its state reliably
     const [refreshed] = await (db as import("mysql2/promise").Pool).execute<mysql.RowDataPacket[]>(
       "SELECT slug FROM produits WHERE id = ? LIMIT 1", [req.params.id]
@@ -447,10 +450,12 @@ router.delete("/api/admin/products/:id", async (req, res) => {
       !hasPageAccess(session.role, session.permissions, "magasin", "delete_product")) {
     return res.status(403).json({ error: "Accès refusé." });
   }
+  const delId = Number(req.params.id);
   await (db as import("mysql2/promise").Pool).execute(
-    "DELETE FROM produits WHERE id = ?", [req.params.id]
+    "DELETE FROM produits WHERE id = ?", [delId]
   );
   emitAdminEvent("produit");
+  logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: "produit_supprimé", entity: "produit", entityId: delId, label: `Produit #${delId} supprimé`, workspace: "Magasin" });
   res.json({ ok: true });
 });
 

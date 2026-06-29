@@ -1,5 +1,6 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
+import { logActivity } from "../../lib/activity-log";
 import {
   listBoutiqueClients, countBoutiqueClients, createBoutiqueClient,
   getBoutiqueClientsStats, updateBoutiqueClient, deleteBoutiqueClient,
@@ -71,6 +72,7 @@ router.post("/api/admin/boutique-clients", async (req, res) => {
   );
   if (existing) return res.status(400).json({ error: "Un client avec ce numéro existe déjà." });
   const id = await createBoutiqueClient({ ...req.body, shop_id: shopId });
+  logActivity({ shopId, username: session.nom ?? session.username ?? "Admin", actionType: "client_créé", entity: "client", entityId: id, label: `Nouveau client : ${req.body.nom} (${req.body.telephone})`, workspace: "Boutique" });
   res.json({ success: true, id });
 });
 

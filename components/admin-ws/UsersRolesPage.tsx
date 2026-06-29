@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './AdminUsers.css';
 import { I } from './users-icons';
-import { MEMBERS, ROLES, ROLE_ST, ROLE_COLOR } from './users-data';
+import { ROLES, ROLE_ST, ROLE_COLOR, getInitials } from './users-data';
 import type { Member, RoleName, RowAction } from './users-types';
 import {
   AddMemberModal, RowMenu, ConfirmModal, RoleChangeModal, RolesModal, Toast,
@@ -20,17 +20,62 @@ import {
 } from './UsersModals';
 
 export interface UsersRolesPageProps {
-  /** Membres initiaux (défaut : données démo). */
-  initialMembers?: Member[];
-  /** Notifié à chaque mutation de la liste (pour persistance). */
   onMembersChange?: (members: Member[]) => void;
+}
+
+const DB_ROLE_MAP: Record<string, RoleName> = {
+  super_admin: 'Propriétaire',
+  admin:       'Propriétaire',
+  manager:     'Gérant',
+  staff:       'Vendeur',
+  comptable:   'Comptable',
+};
+
+function formatLastLogin(ts: string | null): string {
+  if (!ts) return '—';
+  const diff = Date.now() - new Date(ts).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 2) return "À l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `il y a ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'hier';
+  return `il y a ${d}j`;
+}
+
+function apiUserToMember(u: Record<string, unknown>): Member {
+  const role: RoleName = DB_ROLE_MAP[u.role as string] ?? 'Vendeur';
+  return {
+    name:       (u.nom as string) || (u.username as string),
+    init:       getInitials((u.nom as string) || (u.username as string)),
+    color:      ROLE_COLOR[role],
+    email:      (u.email as string) || (u.username as string),
+    role,
+    workspaces: 'Tous',
+    last:       formatLastLogin(u.last_login as string | null),
+    status:     (u.actif as number) === 1 ? 'Actif' : 'Inactif',
+  };
 }
 
 const statusClass = (s: Member['status']) =>
   s === 'Actif' ? 'actif' : s === 'Invitation' ? 'attente' : 'inactif';
 
-export default function UsersRolesPage({ initialMembers = MEMBERS, onMembersChange }: UsersRolesPageProps) {
-  const [members, setMembers] = useState<Member[]>(initialMembers);
+export default function UsersRolesPage({ onMembersChange }: UsersRolesPageProps) {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/users', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data.users)) {
+          setMembers(data.users.map(apiUserToMember));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   // modales
   const [addOpen, setAddOpen] = useState(false);
@@ -119,6 +164,10 @@ export default function UsersRolesPage({ initialMembers = MEMBERS, onMembersChan
 
   const pending = members.filter((m) => m.status === 'Invitation').length;
 
+  if (loading) return (
+    <div className="admin-users" style={{ padding: '2rem', color: 'var(--muted)' }}>Chargement…</div>
+  );
+
   return (
     <div className="admin-users">
       {/* En-tête */}
@@ -126,7 +175,7 @@ export default function UsersRolesPage({ initialMembers = MEMBERS, onMembersChan
         <div className="head-l">
           <div className="eyb">Admin · Équipe</div>
           <h1 className="t1">Utilisateurs & <span className="serif">rôles</span></h1>
-          <p className="sub">{members.length} membres · 4 rôles · {pending} invitation{pending > 1 ? 's' : ''} en attente</p>
+          <p className="sub">{members.length} membre{members.length > 1 ? 's' : ''} · 4 rôles · {pending} invitation{pending > 1 ? 's' : ''} en attente</p>
         </div>
         <div className="actions">
           <button className="btn" onClick={() => setRolesOpen(true)}><I.shield size={14} /> Gérer les rôles</button>
@@ -136,13 +185,16 @@ export default function UsersRolesPage({ initialMembers = MEMBERS, onMembersChan
 
       {/* Cartes de rôles */}
       <div className="role-grid">
-        {ROLES.map((r) => (
-          <div key={r.name} className="role-card">
-            <div className="role-name"><span className="role-dot" style={{ background: r.color }} />{r.name}</div>
-            <div className="role-count">{r.count} <span style={{ fontSize: 13, color: 'var(--muted-2)', fontWeight: 400 }}>membre{r.count > 1 ? 's' : ''}</span></div>
-            <div className="role-perms">{r.perms}</div>
-          </div>
-        ))}
+        {ROLES.map((r) => {
+          const count = members.filter(m => m.role === r.name).length;
+          return (
+            <div key={r.name} className="role-card">
+              <div className="role-name"><span className="role-dot" style={{ background: r.color }} />{r.name}</div>
+              <div className="role-count">{count} <span style={{ fontSize: 13, color: 'var(--muted-2)', fontWeight: 400 }}>membre{count > 1 ? 's' : ''}</span></div>
+              <div className="role-perms">{r.perms}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Tableau */}

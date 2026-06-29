@@ -1,6 +1,7 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
 import { hasPageAccess } from "@/lib/admin-permissions";
+import { logActivity } from "../../lib/activity-log";
 import {
   getStockBoutiqueStats, getStockBoutiqueList, getRecentBoutiqueMovements,
   createBoutiqueMouvement,
@@ -55,6 +56,7 @@ router.post("/api/admin/stock-boutique/mouvement", async (req, res) => {
     if (Number(quantite) <= 0) {
       return res.status(400).json({ error: "La quantité doit être supérieure à 0." });
     }
+    const shopId = session.shop_id ?? 1;
     await createBoutiqueMouvement({
       produit_id:   Number(produit_id),
       type,
@@ -62,8 +64,10 @@ router.post("/api/admin/stock-boutique/mouvement", async (req, res) => {
       motif:        motif  || undefined,
       ref_commande: ref_commande || undefined,
       admin_id:     session.id,
-      shop_id:      session.shop_id ?? 1,
+      shop_id:      shopId,
     });
+    const typeLabels: Record<string, string> = { entree: "Entrée stock", sortie: "Transfert → Boutique", retrait: "Retrait stock", ajustement: "Ajustement stock" };
+    logActivity({ shopId, username: session.nom ?? session.username ?? "Admin", actionType: "stock_mouvement", entity: "stock", entityId: Number(produit_id), label: `${typeLabels[type] ?? type} : ${quantite} unités${motif ? ` (${motif})` : ""}`, workspace: "Magasin" });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });

@@ -65,6 +65,8 @@ import adminSaasDashboardRoutes from "./routes/admin/saas-dashboard";
 import adminBillingRoutes       from "./routes/admin/billing";
 import adminAiRoutes            from "./routes/admin/ai";
 import adminStockAlertsRoutes   from "./routes/admin/stock-alerts";
+import adminActivityLogsRoutes  from "./routes/admin/activity-logs";
+import { ensureActivityLogsTable } from "./lib/activity-log";
 import { expireShopSubscriptions } from "@/lib/shops";
 import { startReviewNotifier } from "./lib/review-notifier";
 
@@ -214,6 +216,7 @@ app.use(adminSaasDashboardRoutes);
 app.use(adminBillingRoutes);
 app.use(adminAiRoutes);
 app.use(adminStockAlertsRoutes);
+app.use(adminActivityLogsRoutes);
 
 app.listen(PORT, async () => {
   console.log(`[backend] Serveur démarré sur le port ${PORT}`);
@@ -258,6 +261,12 @@ try {
     console.log("[backend] security_logs table OK");
   } catch (e) {
     console.error("[backend] ensureSecurityLogsTable failed:", e);
+  }
+  try {
+    await ensureActivityLogsTable();
+    console.log("[backend] activity_logs table OK");
+  } catch (e) {
+    console.error("[backend] ensureActivityLogsTable failed:", e);
   }
   try {
     await ensureIndexes();

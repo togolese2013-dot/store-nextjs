@@ -41,9 +41,19 @@ async function requireSuperAdmin(req: express.Request, res: express.Response) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 router.get("/api/admin/users", async (req, res) => {
-  const session = await requireSuperAdmin(req, res);
-  if (!session) return;
-  const users = await listAdminUsers();
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+
+  let shopId: number;
+  if (session.role === "super_admin") {
+    shopId = req.query.shop_id ? Number(req.query.shop_id) : (session.shop_id ?? 1);
+  } else if (["admin", "manager"].includes(session.role)) {
+    shopId = session.shop_id ?? 1;
+  } else {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
+
+  const users = await listAdminUsers(shopId);
   res.json({ users });
 });
 

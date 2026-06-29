@@ -4,6 +4,7 @@ import { getSession } from "../../lib/auth";
 import { hasPageAccess } from "@/lib/admin-permissions";
 import { emitAdminEvent } from "../../lib/admin-events";
 import { sendBoutiqueVenteNotif } from "../../lib/whatsapp";
+import { logActivity } from "../../lib/activity-log";
 import {
   listFactures, createVenteWithStock, getVentesStats,
   updateFactureStatut, updateFacture, deleteFacture, getFactureById,
@@ -85,6 +86,7 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
 
     const { id, reference } = await createVenteWithStock({ ...body, admin_id: session.id, shop_id: shopId });
     emitAdminEvent("vente");
+    logActivity({ shopId, username: session.nom ?? session.username ?? "Admin", actionType: "vente_créée", entity: "vente", entityId: id, label: `Vente ${reference} — ${body.client_nom} (${Number(body.total ?? 0).toLocaleString("fr")} FCFA)`, workspace: "Boutique" });
     if (body.client_tel) {
       const rawItems = typeof body.items === "string" ? JSON.parse(body.items) : body.items ?? [];
       sendBoutiqueVenteNotif({
@@ -137,6 +139,8 @@ router.patch("/api/admin/ventes/factures/:id", async (req, res) => {
       });
     }
     emitAdminEvent("vente");
+    const isPayment = req.body?.montant_paiement !== undefined;
+    logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: isPayment ? "paiement_ajouté" : "vente_modifiée", entity: "vente", entityId: Number(req.params.id), label: isPayment ? `Paiement enregistré sur vente #${req.params.id}` : `Vente #${req.params.id} modifiée`, workspace: "Boutique" });
     res.json({ ok: true, vendeur: session.nom });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -150,7 +154,9 @@ router.delete("/api/admin/ventes/factures/:id", async (req, res) => {
       !hasPageAccess(session.role, session.permissions, "boutique", "delete_vente")) {
     return res.status(403).json({ error: "Accès refusé." });
   }
-  await deleteFacture(Number(req.params.id));
+  const facId = Number(req.params.id);
+  await deleteFacture(facId);
+  logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: "vente_supprimée", entity: "vente", entityId: facId, label: `Vente #${facId} supprimée`, workspace: "Boutique" });
   res.json({ ok: true });
 });
 
