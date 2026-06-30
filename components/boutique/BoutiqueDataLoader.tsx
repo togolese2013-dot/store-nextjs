@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import BoutiqueShell from './BoutiqueShell';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
+import { BoutiqueSettingsProvider, buildConfig, type BoutiqueConfig } from './BoutiqueSettingsContext';
+import type { StoreState } from './settings/types';
 
 const SWATCHES = [
   '#3B6A8F', '#2D6A4F', '#7A2C3A', '#D4A437', '#B8501A',
@@ -200,6 +202,20 @@ export default function BoutiqueDataLoader({
   const [overviewStats, setOverviewStats] = useState<OverviewStats>({
     ventes_jour_count: 0, ventes_jour_montant: 0, ca_total: 0, factures_payees: 0,
   });
+  const [boutiqueConfig, setBoutiqueConfig] = useState<BoutiqueConfig>(buildConfig({}));
+
+  const fetchBoutiqueSettings = useCallback(() => {
+    fetch('/api/admin/boutique/settings')
+      .then(r => r.json())
+      .then((data: Record<string, Partial<StoreState>>) => {
+        const merged: Partial<StoreState> = {};
+        for (const v of Object.values(data)) Object.assign(merged, v);
+        setBoutiqueConfig(buildConfig(merged));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { fetchBoutiqueSettings(); }, [fetchBoutiqueSettings]);
 
   const fetchFactures = useCallback(() => {
     fetch('/api/admin/ventes/factures?limit=50')
@@ -256,19 +272,21 @@ export default function BoutiqueDataLoader({
   }, []);
 
   return (
-    <BoutiqueShell
-      sales={sales}
-      stock={stock}
-      movements={movements}
-      clients={clients}
-      overviewStats={overviewStats}
-      onSwitchWorkspace={onSwitchWorkspace}
-      onNewSale={onNewSale}
-      onRequestTransfer={onRequestTransfer}
-      onRefreshStock={fetchStock}
-      userName={userName}
-      userRole={userRole}
-      shopName={shopName}
-    />
+    <BoutiqueSettingsProvider cfg={boutiqueConfig} refresh={fetchBoutiqueSettings}>
+      <BoutiqueShell
+        sales={sales}
+        stock={stock}
+        movements={movements}
+        clients={clients}
+        overviewStats={overviewStats}
+        onSwitchWorkspace={onSwitchWorkspace}
+        onNewSale={onNewSale}
+        onRequestTransfer={onRequestTransfer}
+        onRefreshStock={fetchStock}
+        userName={userName}
+        userRole={userRole}
+        shopName={shopName}
+      />
+    </BoutiqueSettingsProvider>
   );
 }

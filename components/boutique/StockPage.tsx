@@ -11,6 +11,7 @@ import { SAMPLE_STOCK } from './sample-data';
 import Sparkline from './Sparkline';
 import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
 import styles from './Boutique.module.css';
+import { useBoutiqueConfig, fmtAmount } from './BoutiqueSettingsContext';
 import TransferRequestModal from '@/components/admin/TransferRequestModal';
 import { TransferConfirmation } from './TransferConfirmation';
 
@@ -39,8 +40,9 @@ const LABEL: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(
 const ROW: React.CSSProperties = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 };
 
 export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPageProps) {
-  const low      = stock.filter(p => p.boutique < p.seuil);
-  const okCount  = stock.filter(p => p.boutique >= p.seuil).length;
+  const cfg      = useBoutiqueConfig();
+  const low      = stock.filter(p => p.boutique < Math.max(p.seuil, cfg.seuilGlobal));
+  const okCount  = stock.filter(p => p.boutique >= Math.max(p.seuil, cfg.seuilGlobal)).length;
 
   const STOCK_KPIS: import('./types').KpiItem[] = [
     { label: 'Références en boutique', value: String(stock.length), sub: 'du catalogue',                    sparkColor: '#3B6A8F' },
@@ -147,8 +149,9 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
                   </td>
                 </tr>
               ) : stock.map(p => {
-                const isLow = p.boutique < p.seuil;
-                const ratio = p.seuil > 0 ? Math.min(1, p.boutique / p.seuil) : 1;
+                const seuil = Math.max(p.seuil, cfg.seuilGlobal);
+                const isLow = p.boutique < seuil;
+                const ratio = seuil > 0 ? Math.min(1, p.boutique / seuil) : 1;
                 const barColor = isLow ? 'var(--danger)' : ratio < 0.8 ? 'var(--warn)' : 'var(--ok)';
                 return (
                   <tr key={p.produit_id}>
@@ -164,13 +167,13 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
                     <td><span className={styles.tag}>{p.cat}</span></td>
                     <td style={{ minWidth: 140 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: isLow ? 'var(--danger)' : 'var(--ink)' }}>
-                        {p.boutique} <span style={{ color: 'var(--muted-2)', fontSize: 11, fontWeight: 400 }}>/ seuil {p.seuil}</span>
+                        {p.boutique} <span style={{ color: 'var(--muted-2)', fontSize: 11, fontWeight: 400 }}>/ seuil {seuil}</span>
                       </div>
                       <div className={styles.stockBar}>
                         <div style={{ width: `${ratio * 100}%`, background: barColor }} />
                       </div>
                     </td>
-                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{p.prix.toLocaleString('fr-FR')} FCFA</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{fmtAmount(p.prix, cfg)}</td>
                     <td>
                       {isLow
                         ? <span className={styles.tag} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertTriangleIcon size={11} />Stock bas</span>

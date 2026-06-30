@@ -85,22 +85,6 @@ export default function BoutiqueShell({
     [page],
   );
 
-  if (page === 'settings') {
-    const pageMap: Record<string, PageId> = {
-      '/': 'overview', '/ventes': 'ventes', '/stock': 'stock',
-      '/finance': 'finance', '/clients': 'clients',
-    };
-    return (
-      <SettingsPage
-        onBack={() => setPage('overview')}
-        onNavigate={href => { const p = pageMap[href]; if (p) setPage(p); }}
-        shopName={shopName}
-        userName={userName}
-        userRole={userRole}
-      />
-    );
-  }
-
   return (
     <div className={styles.page}>
       <Sidebar
@@ -137,11 +121,12 @@ export default function BoutiqueShell({
         </header>
 
         {/* Page routing */}
-        {page === 'overview' && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} />}
-        {page === 'ventes'   && <VentesPage sales={sales} onNewSale={onNewSale} />}
-        {page === 'stock'    && <StockPage stock={stock} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
-        {page === 'finance'  && <FinancePage />}
-        {page === 'clients'  && <ClientsPage clients={clients} />}
+        {page === 'overview'  && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} />}
+        {page === 'ventes'    && <VentesPage sales={sales} onNewSale={onNewSale} />}
+        {page === 'stock'     && <StockPage stock={stock} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
+        {page === 'finance'   && <FinancePage />}
+        {page === 'clients'   && <ClientsPage clients={clients} />}
+        {page === 'settings'  && <SettingsPage shopName={shopName} />}
       </main>
     </div>
   );

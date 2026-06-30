@@ -8,8 +8,7 @@ import type { Sale } from './types';
 import { PAYMENT_STYLE } from './sample-data';
 import { DownloadIcon, PlusIcon, FilterIcon, ChevDownIcon, PrinterIcon } from './icons';
 import styles from './Boutique.module.css';
-
-const fmt = (n: number) => n.toLocaleString('fr-FR');
+import { useBoutiqueConfig, fmtNum, fmtAmount } from './BoutiqueSettingsContext';
 
 function isoPrefix(date: Date, unit: 'day' | 'month') {
   const y = date.getFullYear();
@@ -34,6 +33,7 @@ export interface VentesPageProps {
 }
 
 export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
+  const cfg = useBoutiqueConfig();
   const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
 
   const now = useMemo(() => new Date(), []);
@@ -68,8 +68,8 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
   const kpis = [
     {
       label: 'CA du jour',
-      value: fmt(caJour),
-      unit: 'FCFA',
+      value: fmtNum(caJour, cfg),
+      unit: cfg.symbol,
       sub: `${nbJour} vente${nbJour !== 1 ? 's' : ''} aujourd'hui`,
     },
     {
@@ -80,8 +80,8 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
     },
     {
       label: 'Panier moyen',
-      value: panierMoy !== null ? fmt(panierMoy) : '—',
-      unit: panierMoy !== null ? 'FCFA' : null,
+      value: panierMoy !== null ? fmtNum(panierMoy, cfg) : '—',
+      unit: panierMoy !== null ? cfg.symbol : null,
       sub: "aujourd'hui",
     },
   ];
@@ -92,7 +92,7 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Ventes</div>
           <h1 className={styles.title}>Registre des <span className={styles.serif}>ventes</span></h1>
-          <p className={styles.subtitle}>{filtered.length} vente{filtered.length !== 1 ? 's' : ''} · {fmt(totalDisplay)} FCFA encaissés</p>
+          <p className={styles.subtitle}>{filtered.length} vente{filtered.length !== 1 ? 's' : ''} · {fmtAmount(totalDisplay, cfg)} encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
@@ -169,7 +169,7 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
                       )}
                   </td>
                   <td style={{ fontSize: 12.5, color: 'var(--muted)', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.items}</td>
-                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{s.amount.toLocaleString('fr-FR')} FCFA</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{fmtAmount(s.amount, cfg)}</td>
                   <td><span className={styles.tag} style={PAYMENT_STYLE[s.payment]}>{s.payment}</span></td>
                   <td style={{ fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                     {s.vendeur ?? '—'}

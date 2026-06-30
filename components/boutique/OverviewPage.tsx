@@ -11,6 +11,7 @@ import {
 import Sparkline from './Sparkline';
 import { PrinterIcon, PlusIcon, TrendIcon } from './icons';
 import styles from './Boutique.module.css';
+import { useBoutiqueConfig, fmtNum, fmtAmount } from './BoutiqueSettingsContext';
 
 interface OverviewPageProps {
   sales?: Sale[];
@@ -19,6 +20,7 @@ interface OverviewPageProps {
 }
 
 export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNewSale }: OverviewPageProps) {
+  const cfg = useBoutiqueConfig();
   const lowStock = SAMPLE_STOCK.filter(p => p.boutique < p.seuil);
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -29,8 +31,8 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
 
   const KPIS: KpiItem[] = [
     {
-      label: 'CA du jour', unit: 'FCFA', sub: 'vs hier même heure', sparkColor: '#C9601E',
-      value: jourMontant.toLocaleString('fr-FR'),
+      label: 'CA du jour', unit: cfg.symbol, sub: 'vs hier même heure', sparkColor: '#C9601E',
+      value: fmtNum(jourMontant, cfg),
     },
     {
       label: 'Ventes du jour', sub: 'vs hier', sparkColor: '#3B6A8F',
@@ -41,8 +43,8 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
       value: String(clientsServis),
     },
     {
-      label: 'Panier moyen', unit: 'FCFA', sub: 'ce jour', sparkColor: '#2D6A4F',
-      value: panierMoyen > 0 ? panierMoyen.toLocaleString('fr-FR') : '—',
+      label: 'Panier moyen', unit: cfg.symbol, sub: 'ce jour', sparkColor: '#2D6A4F',
+      value: panierMoyen > 0 ? fmtNum(panierMoyen, cfg) : '—',
     },
   ];
 
@@ -52,7 +54,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Aperçu</div>
           <h1 className={styles.title}>Caisse du <span className={styles.serif}>jour</span></h1>
-          <p className={styles.subtitle}>{today} · {jourCount} vente{jourCount !== 1 ? 's' : ''} · {jourMontant.toLocaleString('fr-FR')} FCFA encaissés</p>
+          <p className={styles.subtitle}>{today} · {jourCount} vente{jourCount !== 1 ? 's' : ''} · {fmtAmount(jourMontant, cfg)} encaissés</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn}><PrinterIcon size={14} /> Rapport journée</button>
@@ -106,7 +108,7 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
                       )}
                   </td>
                   <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.items}</td>
-                  <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, fontWeight: 500 }}>{s.amount.toLocaleString('fr-FR')} FCFA</td>
+                  <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, fontWeight: 500 }}>{fmtAmount(s.amount, cfg)}</td>
                   <td><span className={styles.tag} style={PAYMENT_STYLE[s.payment]}>{s.payment}</span></td>
                 </tr>
               ))}

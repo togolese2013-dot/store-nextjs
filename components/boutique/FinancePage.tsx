@@ -5,6 +5,7 @@ import { DownloadIcon, PlusIcon } from './icons';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import styles from './Boutique.module.css';
 import '@/components/admin/sale-modal.css';
+import { useBoutiqueConfig, fmtNum, type BoutiqueConfig } from './BoutiqueSettingsContext';
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
@@ -39,7 +40,6 @@ interface FinanceEntry {
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 
-const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 function typeLabel(type: string): string {
   switch (type) {
@@ -87,6 +87,7 @@ function formatDate(iso: string): string {
 /* ─── WalletStrip ───────────────────────────────────────────── */
 
 function WalletStrip({ wallets, loading }: { wallets: Wallet[]; loading: boolean }) {
+  const cfg = useBoutiqueConfig();
   const [hovered, setHovered] = useState<string | null>(null);
   const total = wallets.reduce((s, w) => s + w.solde, 0);
 
@@ -104,10 +105,10 @@ function WalletStrip({ wallets, loading }: { wallets: Wallet[]; loading: boolean
           Total caisse
         </div>
         <div style={{ fontFamily: 'var(--font-geist-mono, monospace)', fontSize: 26, fontWeight: 600, letterSpacing: '-.03em', color: 'var(--ink)', lineHeight: 1 }}>
-          {loading ? '—' : fmt(total)}
+          {loading ? '—' : fmtNum(total, cfg)}
         </div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-          FCFA · {wallets.length} comptes
+          {cfg.symbol} · {wallets.length} comptes
         </div>
       </div>
 
@@ -134,12 +135,12 @@ function WalletStrip({ wallets, loading }: { wallets: Wallet[]; loading: boolean
             </div>
           </div>
           <div style={{ fontFamily: 'var(--font-geist-mono, monospace)', fontSize: 16, fontWeight: 400, color: 'var(--ink)', letterSpacing: '-.01em' }}>
-            {loading ? '—' : fmt(w.solde)}
-            <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 3 }}>FCFA</span>
+            {loading ? '—' : fmtNum(w.solde, cfg)}
+            <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 3 }}>{cfg.symbol}</span>
           </div>
           {!loading && (
             <div style={{ fontSize: 10.5, marginTop: 4, fontWeight: 500, color: w.delta >= 0 ? '#2D6A4F' : '#C9601E' }}>
-              {w.delta >= 0 ? '+' : ''}{fmt(w.delta)} auj.
+              {w.delta >= 0 ? '+' : ''}{fmtNum(w.delta, cfg)} auj.
             </div>
           )}
         </div>
@@ -179,6 +180,7 @@ const CloseIcon = ({ size = 16 }: { size?: number }) => (
 );
 
 function MouvementModal({ onClose, onSaved }: ModalProps) {
+  const cfg = useBoutiqueConfig();
   const [type,    setType]    = useState('depense');
   const [mode,    setMode]    = useState('especes');
   const [montant, setMontant] = useState('');
@@ -233,7 +235,7 @@ function MouvementModal({ onClose, onSaved }: ModalProps) {
               <div className="sm-price-wrap">
                 <input className="sm-in mono" type="number" min="1" value={montant}
                   onChange={e => setMontant(e.target.value)} placeholder="0" />
-                <span className="sm-suffix">FCFA</span>
+                <span className="sm-suffix">{cfg.symbol}</span>
               </div>
             </div>
 
@@ -269,6 +271,7 @@ function MouvementModal({ onClose, onSaved }: ModalProps) {
 }
 
 function TransfertModal({ onClose, onSaved }: ModalProps) {
+  const cfg = useBoutiqueConfig();
   const [from,    setFrom]    = useState('especes');
   const [to,      setTo]      = useState('mixx_by_yas');
   const [montant, setMontant] = useState('');
@@ -331,7 +334,7 @@ function TransfertModal({ onClose, onSaved }: ModalProps) {
               <div className="sm-price-wrap">
                 <input className="sm-in mono" type="number" min="1" value={montant}
                   onChange={e => setMontant(e.target.value)} placeholder="0" />
-                <span className="sm-suffix">FCFA</span>
+                <span className="sm-suffix">{cfg.symbol}</span>
               </div>
             </div>
 
@@ -363,6 +366,7 @@ const PAGE_SIZE = 20;
 type ModalKind = 'mouvement' | 'transfert' | null;
 
 export default function FinancePage() {
+  const cfg = useBoutiqueConfig();
   const [day,     setDay]     = useState<DayStats | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [entries, setEntries] = useState<FinanceEntry[]>([]);
@@ -445,8 +449,8 @@ export default function FinancePage() {
         <div className={styles.kpi}>
           <div className={styles.kpiHead}><div className={styles.kpiLabel}>Entrées du jour</div></div>
           <div className={styles.kpiValueRow}>
-            <div className={styles.kpiValue}>{loading ? '—' : fmt(day?.entrees_jour ?? 0)}</div>
-            <div className={styles.kpiUnit}>FCFA</div>
+            <div className={styles.kpiValue}>{loading ? '—' : fmtNum(day?.entrees_jour ?? 0, cfg)}</div>
+            <div className={styles.kpiUnit}>{cfg.symbol}</div>
           </div>
           <div className={styles.kpiFoot}><div className={styles.kpiSub}>ventes encaissées</div></div>
         </div>
@@ -454,8 +458,8 @@ export default function FinancePage() {
         <div className={styles.kpi}>
           <div className={styles.kpiHead}><div className={styles.kpiLabel}>Sorties du jour</div></div>
           <div className={styles.kpiValueRow}>
-            <div className={styles.kpiValue}>{loading ? '—' : fmt(day?.sorties_jour ?? 0)}</div>
-            <div className={styles.kpiUnit}>FCFA</div>
+            <div className={styles.kpiValue}>{loading ? '—' : fmtNum(day?.sorties_jour ?? 0, cfg)}</div>
+            <div className={styles.kpiUnit}>{cfg.symbol}</div>
           </div>
           <div className={styles.kpiFoot}><div className={styles.kpiSub}>dépenses</div></div>
         </div>
@@ -468,8 +472,8 @@ export default function FinancePage() {
             )}
           </div>
           <div className={styles.kpiValueRow}>
-            <div className={styles.kpiValue}>{loading ? '—' : fmt(day?.benefice_jour ?? 0)}</div>
-            <div className={styles.kpiUnit}>FCFA</div>
+            <div className={styles.kpiValue}>{loading ? '—' : fmtNum(day?.benefice_jour ?? 0, cfg)}</div>
+            <div className={styles.kpiUnit}>{cfg.symbol}</div>
           </div>
           <div className={styles.kpiFoot}><div className={styles.kpiSub}>vs hier</div></div>
         </div>
@@ -522,7 +526,7 @@ export default function FinancePage() {
                       {m.description ?? m.categorie ?? m.reference}
                     </td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-geist-mono, monospace)', fontSize: 13, fontWeight: 600, color: amount >= 0 ? 'var(--ok)' : 'var(--danger)', whiteSpace: 'nowrap' }}>
-                      {amount >= 0 ? '+' : ''}{fmt(amount)} FCFA
+                      {amount >= 0 ? '+' : ''}{fmtNum(amount, cfg)} {cfg.symbol}
                     </td>
                   </tr>
                 );

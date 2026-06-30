@@ -20,6 +20,7 @@ import {
 } from './UsersModals';
 
 export interface UsersRolesPageProps {
+  initialMembers?: Member[];
   onMembersChange?: (members: Member[]) => void;
 }
 
@@ -61,19 +62,19 @@ function apiUserToMember(u: Record<string, unknown>): Member {
 const statusClass = (s: Member['status']) =>
   s === 'Actif' ? 'actif' : s === 'Invitation' ? 'attente' : 'inactif';
 
-export default function UsersRolesPage({ onMembersChange }: UsersRolesPageProps) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function UsersRolesPage({ initialMembers, onMembersChange }: UsersRolesPageProps) {
+  const [members, setMembers] = useState<Member[]>(initialMembers ?? []);
+  const [loading, setLoading] = useState(!initialMembers || initialMembers.length === 0);
 
   useEffect(() => {
     fetch('/api/admin/users', { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
-        if (Array.isArray(data.users)) {
+        if (Array.isArray(data.users) && data.users.length > 0) {
           setMembers(data.users.map(apiUserToMember));
         }
       })
-      .catch(() => {})
+      .catch(e => console.error('[UsersRolesPage] fetch error:', e))
       .finally(() => setLoading(false));
   }, []);
 
