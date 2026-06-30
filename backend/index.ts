@@ -192,6 +192,7 @@ app.use(adminPaymentPlansRoutes);
 app.use(adminVerificationsRoutes);
 app.use(adminCommerciauxRoutes);
 app.use(adminSecurityLogsRoutes);
+app.use(adminActivityLogsRoutes);
 app.use(adminRapportsRoutes);
 app.use(adminTendancesRoutes);
 app.use(adminPerfProduitsRoutes);
