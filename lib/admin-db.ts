@@ -157,6 +157,13 @@ export async function createStockSortie(data: {
         [data.quantite, data.quantite, data.variant_id]
       );
       stockApres = available - data.quantite;
+
+      // Track transfer in boutique_mouvements (variant-level)
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
+        [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
+      );
     } else {
       // Product-level: existing logic
       const [[row]] = await conn.execute<mysql.RowDataPacket[]>(
