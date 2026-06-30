@@ -79,6 +79,7 @@ export default function LogsPage() {
   const [logs, setLogs]           = useState<RawLog[]>([]);
   const [total, setTotal]         = useState(0);
   const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
   const [page, setPage]           = useState(1);
   const [wsFilter, setWsFilter]   = useState('');
   const [actFilter, setActFilter] = useState('');
@@ -99,10 +100,12 @@ export default function LogsPage() {
     fetch(`/api/admin/activity-logs?${params}`, { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
+        if (data.error) { setError(data.error); setLogs([]); setTotal(0); return; }
+        setError(null);
         setLogs(Array.isArray(data.logs) ? data.logs : []);
         setTotal(Number(data.total ?? 0));
       })
-      .catch(() => {})
+      .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
   }, [page, wsFilter, actFilter, memberFilter]);
 
@@ -228,6 +231,8 @@ export default function LogsPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>Chargement…</td></tr>
+              ) : error ? (
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--danger)', padding: '2rem', fontSize: 13 }}>Erreur API : {error}</td></tr>
               ) : logs.length === 0 ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>Aucun événement{hasFilter ? ' pour ces filtres' : ''}.</td></tr>
               ) : logs.map(l => {
