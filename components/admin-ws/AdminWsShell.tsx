@@ -110,12 +110,23 @@ export default function AdminWsShell({
 }: AdminWsShellProps) {
   const [page, setPage] = useState<PageId>(defaultPage);
 
+  const LIVE_COUNTS: Record<string, number> = {
+    users:        members.length,
+    workspaces:   workspaces.length,
+    integrations: integrations.length,
+  };
+
   const groups = useMemo(() =>
     DEFAULT_NAV_GROUPS.map(g => ({
       ...g,
-      items: g.items.map(it => ({ ...it, active: it.id === page })),
+      items: g.items.map(it => ({
+        ...it,
+        active: it.id === page,
+        ...(it.id && it.id in LIVE_COUNTS ? { count: LIVE_COUNTS[it.id] } : {}),
+      })),
     })),
-    [page],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [page, members.length, workspaces.length, integrations.length],
   );
 
   return (

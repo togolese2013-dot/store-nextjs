@@ -88,6 +88,8 @@ router.post("/api/admin/users", async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 12);
+    const VALID_ROLES = ['super_admin', 'admin', 'manager', 'staff', 'comptable', 'livreur'];
+    const dbRole = VALID_ROLES.includes(role) ? role : 'staff';
     await createAdminUser({
       nom,
       username:             username.trim().toLowerCase(),
@@ -95,7 +97,7 @@ router.post("/api/admin/users", async (req, res) => {
       telephone:            telephone || null,
       poste:                poste || "staff",
       password_hash:        hash,
-      role:                 role === "super_admin" ? "super_admin" : poste === "Livreur" ? "livreur" : "admin",
+      role:                 dbRole,
       must_change_password: true,
     });
     res.status(201).json({ ok: true });

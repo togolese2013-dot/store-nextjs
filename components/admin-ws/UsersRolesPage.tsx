@@ -114,10 +114,46 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
   const patch = (email: string, changes: Partial<Member>) =>
     setMembers((prev) => prev.map((m) => (m.email === email ? { ...m, ...changes } : m)));
 
-  const addMember = (m: Member) => {
-    setMembers((prev) => [...prev, m]);
-    setAddOpen(false);
-    flash(`${m.name} a été enregistré dans l'équipe`);
+  const ROLE_TO_DB: Record<RoleName, string> = {
+    'Propriétaire': 'super_admin',
+    'Gérant':       'manager',
+    'Vendeur':      'staff',
+    'Comptable':    'comptable',
+  };
+
+  function genPassword(): string {
+    const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    let p = '';
+    for (let i = 0; i < 8; i++) p += chars[Math.floor(Math.random() * chars.length)];
+    return p.charAt(0).toUpperCase() + p.slice(1) + '!';
+  }
+
+  const addMember = async (m: Member) => {
+    const username = m.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '') || m.name.toLowerCase().replace(/\s+/g, '');
+    const tempPassword = genPassword();
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nom:       m.name,
+          username,
+          email:     m.email || null,
+          telephone: (m as Member & { phone?: string }).phone || null,
+          poste:     m.role,
+          role:      ROLE_TO_DB[m.role] ?? 'staff',
+          password:  tempPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { flash(`Erreur : ${data.error ?? res.status}`); return; }
+      setMembers((prev) => [...prev, m]);
+      setAddOpen(false);
+      flash(`${m.name} ajouté — mot de passe temp : ${tempPassword}`);
+    } catch {
+      flash('Erreur réseau, membre non sauvegardé');
+    }
   };
 
   const saveEdit = (m: Member) => {

@@ -145,8 +145,8 @@ export default function AdminWsDataLoader({
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/admin/users').then(r => r.json()).catch(() => ({ users: [] })),
-      fetch('/api/admin/team').then(r => r.json()).catch(() => ({ utilisateurs: [] })),
+      fetch('/api/admin/users', { credentials: 'include' }).then(r => r.json()).catch(() => ({ users: [] })),
+      fetch('/api/admin/team', { credentials: 'include' }).then(r => r.json()).catch(() => ({ utilisateurs: [] })),
     ]).then(([usersRes, teamRes]) => {
       const admins: Member[] = Array.isArray(usersRes.users)
         ? (usersRes.users as ApiAdminUser[]).map(mapAdminUser)
