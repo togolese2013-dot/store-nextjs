@@ -64,13 +64,23 @@ const statusClass = (s: Member['status']) =>
 
 export default function UsersRolesPage({ initialMembers, onMembersChange }: UsersRolesPageProps) {
   const [members, setMembers] = useState<Member[]>(initialMembers ?? []);
-  const [loading, setLoading] = useState(!initialMembers || initialMembers.length === 0);
+  const [loading, setLoading] = useState(true);
+  const localFetchDone = React.useRef(false);
+
+  // Sync when DataLoader passes fresh initialMembers (prop change after async fetch)
+  useEffect(() => {
+    if (initialMembers && initialMembers.length > 0 && !localFetchDone.current) {
+      setMembers(initialMembers);
+      setLoading(false);
+    }
+  }, [initialMembers]);
 
   useEffect(() => {
     fetch('/api/admin/users', { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data.users) && data.users.length > 0) {
+          localFetchDone.current = true;
           setMembers(data.users.map(apiUserToMember));
         }
       })
