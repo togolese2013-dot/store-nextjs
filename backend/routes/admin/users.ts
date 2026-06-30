@@ -106,7 +106,14 @@ router.post("/api/admin/users", async (req, res) => {
     });
     res.status(201).json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('Duplicate entry') && msg.includes('email')) {
+      return res.status(409).json({ error: "Cette adresse email est déjà utilisée." });
+    }
+    if (msg.includes('Duplicate entry') && msg.includes('username')) {
+      return res.status(409).json({ error: "Ce nom d'utilisateur est déjà utilisé." });
+    }
+    res.status(500).json({ error: msg });
   }
 });
 
