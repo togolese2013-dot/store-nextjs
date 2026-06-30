@@ -47,13 +47,20 @@ function formatLastLogin(ts: string | null): string {
 
 function apiUserToMember(u: Record<string, unknown>): Member {
   const role: RoleName = DB_ROLE_MAP[u.role as string] ?? 'Vendeur';
+  let workspaces = 'Tous';
+  if (u.permissions) {
+    try {
+      const p = typeof u.permissions === 'string' ? JSON.parse(u.permissions) : u.permissions;
+      if (p?.workspaces) workspaces = p.workspaces;
+    } catch { /* keep default */ }
+  }
   return {
     name:       (u.nom as string) || (u.username as string),
     init:       getInitials((u.nom as string) || (u.username as string)),
     color:      ROLE_COLOR[role],
     email:      (u.email as string) || (u.username as string),
     role,
-    workspaces: 'Tous',
+    workspaces,
     last:       formatLastLogin(u.last_login as string | null),
     status:     (u.actif as number) === 1 ? 'Actif' : 'Inactif',
   };
@@ -147,13 +154,14 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nom:       m.name,
+          nom:        m.name,
           username,
-          email:     m.email || null,
-          telephone: (m as Member & { phone?: string }).phone || null,
-          poste:     m.role,
-          role:      ROLE_TO_DB[m.role] ?? 'staff',
-          password:  tempPassword,
+          email:      m.email || null,
+          telephone:  (m as Member & { phone?: string }).phone || null,
+          poste:      m.role,
+          role:       ROLE_TO_DB[m.role] ?? 'staff',
+          password:   tempPassword,
+          workspaces: m.workspaces || 'Tous',
         }),
       });
       const data = await res.json();

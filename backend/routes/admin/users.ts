@@ -68,7 +68,7 @@ router.post("/api/admin/users", async (req, res) => {
     return res.status(403).json({ error: "Accès réservé au propriétaire." });
   }
   try {
-    const { nom, username, email, telephone, poste, password, role } = req.body as Record<string, string>;
+    const { nom, username, email, telephone, poste, password, role, workspaces } = req.body as Record<string, string>;
     if (!nom || !username || !password) {
       return res.status(400).json({ error: "Nom, nom d'utilisateur et mot de passe requis." });
     }
@@ -107,6 +107,7 @@ router.post("/api/admin/users", async (req, res) => {
       role:                 dbRole,
       must_change_password: true,
       shop_id: targetShopId,
+      permissions: workspaces ? JSON.stringify({ workspaces }) : null,
     });
     res.status(201).json({ ok: true });
   } catch (err) {
