@@ -239,46 +239,82 @@ function ProfilSection({ s, u, onSave }: { s: S; u: <K extends keyof S>(k: K, v:
   );
 }
 
-function AbonnementSection({ toast }: { toast: (m: string) => void }) {
-  const limits = [
-    { label: 'Workspaces actifs',   val: '3',      max: '5'     },
-    { label: "Membres de l'équipe", val: '6',      max: '20'    },
-    { label: 'Volume de ventes',    val: '48 200', max: '∞'     },
-    { label: 'Stockage données',    val: '2,4 Go', max: '10 Go' },
+interface SubData {
+  plan: string; planLabel: string; status: string; statusLabel: string;
+  prix_mensuel: number; renewal_date: string | null;
+  limits: { max_users: number; max_entrepots: number };
+  usage: { membres: number; workspaces: number };
+}
+
+function AbonnementSection({ toast, sub }: { toast: (m: string) => void; sub: SubData | null }) {
+  const TOTAL_WS = 4;
+  const NEXT_PLAN: Record<string, string> = { free: 'Basic', basic: 'Pro', pro: 'Business', business: 'Enterprise' };
+
+  const fmtPrice = (p: number) => p === 0 ? 'Gratuit' : `${p.toLocaleString('fr-FR')} FCFA / mois`;
+  const fmtDate  = (d: string | null) => d
+    ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+  const statusStyle = (s: string) =>
+    s === 'active'  ? { color: 'var(--ok)',     bg: 'var(--ok-bg)' } :
+    s === 'trial'   ? { color: '#C9601E',        bg: 'rgba(201,96,30,.1)' } :
+                      { color: 'var(--danger)',   bg: 'rgba(220,60,60,.1)' };
+
+  if (!sub) return (
+    <SCard id="abonnement" icon="🧾" iconVariant="ok" title="Abonnement" sub="Votre plan actuel, limites d'utilisation et renouvellement.">
+      <div style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>Chargement…</div>
+    </SCard>
+  );
+
+  const ss    = statusStyle(sub.status);
+  const date  = fmtDate(sub.renewal_date);
+  const nextP = NEXT_PLAN[sub.plan] ?? 'Enterprise';
+  const maxW  = sub.limits.max_entrepots === 0 ? null : sub.limits.max_entrepots;
+  const maxM  = sub.limits.max_users     === 0 ? null : sub.limits.max_users;
+
+  const rows = [
+    { label: 'Workspaces actifs',   val: sub.usage.workspaces, max: maxW  ?? TOTAL_WS, pct: (sub.usage.workspaces / TOTAL_WS) * 100, unlimited: false },
+    { label: "Membres de l'équipe", val: sub.usage.membres,    max: maxM,               pct: maxM ? (sub.usage.membres / maxM) * 100 : 20, unlimited: maxM === null },
   ];
+
   return (
     <SCard id="abonnement" icon="🧾" iconVariant="ok" title="Abonnement" sub="Votre plan actuel, limites d'utilisation et renouvellement.">
       <div style={{ border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'flex-start', gap: 16, background: 'linear-gradient(135deg, var(--bg-2) 0%, var(--surface) 100%)' }}>
         <div style={{ width: 46, height: 46, borderRadius: 13, background: 'var(--ink)', color: 'white', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 20 }}>🧾</div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-.02em' }}>Business</span>
-            <Tag color="var(--ok)" bg="var(--ok-bg)">Actif</Tag>
+            <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-.02em' }}>{sub.planLabel}</span>
+            <Tag color={ss.color} bg={ss.bg}>{sub.statusLabel}</Tag>
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
-            Renouvellement le <strong style={{ color: 'var(--ink)' }}>15 juillet 2026</strong> · 45 000 FCFA / mois
+            {date
+              ? <>Renouvellement le <strong style={{ color: 'var(--ink)' }}>{date}</strong> · {fmtPrice(sub.prix_mensuel)}</>
+              : fmtPrice(sub.prix_mensuel)
+            }
           </div>
         </div>
         <Btn variant="sm" onClick={() => toast('Changement de plan')}>Changer</Btn>
       </div>
+
       <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-        {limits.map((it, i) => (
-          <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderBottom: i < limits.length - 1 ? '1px solid var(--border)' : 'none' }}>
+        {rows.map((it, i) => (
+          <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : 'none' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{it.label}</div>
               <div style={{ marginTop: 5, height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', maxWidth: 220 }}>
-                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 'inherit', width: it.max === '∞' ? '30%' : `${(parseInt(it.val) / parseInt(it.max)) * 100}%` }} />
+                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 'inherit', width: `${Math.min(100, it.pct)}%` }} />
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12.5, fontWeight: 500 }}>{it.val}</span>
-              {it.max !== '∞' && <span style={{ fontSize: 11.5, color: 'var(--muted-2)' }}> / {it.max}</span>}
+              {!it.unlimited && it.max !== null && <span style={{ fontSize: 11.5, color: 'var(--muted-2)' }}> / {it.max}</span>}
+              {it.unlimited && <span style={{ fontSize: 11.5, color: 'var(--muted-2)' }}> / ∞</span>}
             </div>
           </div>
         ))}
       </div>
+
       <div style={{ display: 'flex', gap: 10 }}>
-        <Btn onClick={() => toast('Mise à niveau vers Enterprise')}>Passer à Enterprise</Btn>
+        <Btn onClick={() => toast(`Mise à niveau vers ${nextP}`)}>Passer à {nextP}</Btn>
         <Btn onClick={() => toast("Annulation d'abonnement")}>Annuler l'abonnement</Btn>
       </div>
     </SCard>
@@ -566,6 +602,7 @@ function SettingsNav({ active, onNav }: { active: string; onNav: (id: string) =>
 
 export default function SettingsPage() {
   const [s, setS] = useState<S>(INIT);
+  const [sub, setSub] = useState<SubData | null>(null);
   const [active, setActive] = useState('profil');
   const [toast, setToast] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<typeof DANGER_ACTIONS[number] | null>(null);
@@ -581,6 +618,13 @@ export default function SettingsPage() {
   }, []);
 
   // Load data on mount
+  useEffect(() => {
+    fetch('/api/admin/settings/subscription', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (!d.error) setSub(d as SubData); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     Promise.all([
       fetch('/api/admin/settings/shop-profile', { credentials: 'include' }).then(r => r.json()).catch(() => ({})),
@@ -688,7 +732,7 @@ export default function SettingsPage() {
           </h1>
 
           <ProfilSection        s={s} u={u} onSave={saveProfil} />
-          <AbonnementSection    toast={flash} />
+          <AbonnementSection    toast={flash} sub={sub} />
           <FacturationSection   toast={flash} />
           <SecuriteSection      s={s} u={u} onSave={saveSecurite} toast={flash} />
           <SessionsSection      toast={flash} />

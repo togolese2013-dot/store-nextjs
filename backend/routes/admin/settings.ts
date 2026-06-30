@@ -1,7 +1,8 @@
 import express from "express";
 import { getSession } from "../../lib/auth";
-import { getSettings, setSettings, listAdminUsers, createAdminUser } from "@/lib/admin-db";
+import { getSettings, setSettings, listAdminUsers, createAdminUser, getAdminById } from "@/lib/admin-db";
 import { getShopById, setShopDomain, updateShop } from "@/lib/shops";
+import { getPlanLimits, getPlanPrice } from "@/lib/plan-configs";
 import bcrypt from "bcryptjs";
 import { addVercelDomain, removeVercelDomain, checkVercelDomain } from "../../lib/vercel-domains";
 
@@ -152,6 +153,49 @@ router.patch("/api/admin/settings/shop-profile", async (req, res) => {
     if (nom || email) await updateShop(shopId, { ...(nom ? { nom } : {}), ...(email ? { email } : {}) });
     await setSettings({ shop_telephone: telephone ?? '', shop_adresse: adresse ?? '', shop_ville: ville ?? '', shop_pays: pays ?? 'Togo' }, shopId);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── GET /api/admin/settings/subscription ────────────────────────────────────
+router.get("/api/admin/settings/subscription", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const dbUser = await getAdminById(session.id);
+    const shopId = dbUser?.shop_id ?? session.shop_id ?? 1;
+    const shop = await getShopById(shopId);
+    if (!shop) return res.status(404).json({ error: "Boutique introuvable." });
+
+    const [limits, prix, users] = await Promise.all([
+      getPlanLimits(shop.plan),
+      getPlanPrice(shop.plan),
+      listAdminUsers(shopId),
+    ]);
+
+    const membresCount = users.filter((u: { actif: number | boolean }) => u.actif === 1 || u.actif === true).length;
+
+    let activeWorkspaces = 4;
+    try {
+      const raw = (shop as Record<string, unknown>).disabled_workspaces as string | null;
+      const disabled = raw ? JSON.parse(raw) : [];
+      activeWorkspaces = 4 - (Array.isArray(disabled) ? disabled.length : 0);
+    } catch { /* keep 4 */ }
+
+    const PLAN_LABELS: Record<string, string> = { free: 'Gratuit', basic: 'Basic', pro: 'Pro', business: 'Business' };
+    const STATUS_LABELS: Record<string, string> = { trial: 'Essai', active: 'Actif', expired: 'Expiré', suspended: 'Suspendu' };
+
+    res.json({
+      plan:         shop.plan,
+      planLabel:    PLAN_LABELS[shop.plan] ?? shop.plan,
+      status:       shop.subscription_status,
+      statusLabel:  STATUS_LABELS[(shop as Record<string, unknown>).subscription_status as string] ?? 'Actif',
+      prix_mensuel: prix,
+      renewal_date: (shop as Record<string, unknown>).current_period_end ?? (shop as Record<string, unknown>).trial_ends_at ?? null,
+      limits:       { max_users: limits.max_users, max_entrepots: limits.max_entrepots },
+      usage:        { membres: membresCount, workspaces: activeWorkspaces },
+    });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
