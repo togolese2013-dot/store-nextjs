@@ -69,12 +69,12 @@ router.post("/api/admin/users", async (req, res) => {
       return res.status(400).json({ error: "Nom, nom d'utilisateur et mot de passe requis." });
     }
 
-    // Check username uniqueness
-    const existing = await getAdminByUsername(username.trim().toLowerCase());
-    if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est déjà utilisé." });
-
     // Plan limit: max_users per shop
     const targetShopId = req.body.shop_id ? Number(req.body.shop_id) : (session.shop_id ?? 1);
+
+    // Check username uniqueness within shop
+    const existing = await getAdminByUsername(username.trim().toLowerCase(), targetShopId);
+    if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est déjà utilisé." });
     if (targetShopId !== 1) {
       const { getPlanLimits } = await import("@/lib/plan-configs");
       const { getShopById }   = await import("@/lib/shops");
@@ -102,6 +102,7 @@ router.post("/api/admin/users", async (req, res) => {
       password_hash:        hash,
       role:                 dbRole,
       must_change_password: true,
+      shop_id: targetShopId,
     });
     res.status(201).json({ ok: true });
   } catch (err) {
