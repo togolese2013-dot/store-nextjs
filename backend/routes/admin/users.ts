@@ -44,11 +44,15 @@ router.get("/api/admin/users", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
 
+  // Always use DB shop_id to avoid stale JWT values
+  const dbUser = await getAdminById(session.id);
+  if (!dbUser) return res.status(401).json({ error: "Utilisateur introuvable." });
+
   let shopId: number;
-  if (session.role === "super_admin") {
-    shopId = req.query.shop_id ? Number(req.query.shop_id) : (session.shop_id ?? 1);
-  } else if (["admin", "manager"].includes(session.role)) {
-    shopId = session.shop_id ?? 1;
+  if (["super_admin", "admin", "manager"].includes(dbUser.role)) {
+    shopId = req.query.shop_id && dbUser.role === "super_admin"
+      ? Number(req.query.shop_id)
+      : (dbUser.shop_id ?? 1);
   } else {
     return res.status(403).json({ error: "Accès refusé." });
   }
