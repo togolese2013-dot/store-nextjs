@@ -58,8 +58,11 @@ router.get("/api/admin/users", async (req, res) => {
 });
 
 router.post("/api/admin/users", async (req, res) => {
-  const session = await requireSuperAdmin(req, res);
-  if (!session) return;
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!['super_admin', 'admin'].includes(session.role)) {
+    return res.status(403).json({ error: "Accès réservé au propriétaire." });
+  }
   try {
     const { nom, username, email, telephone, poste, password, role } = req.body as Record<string, string>;
     if (!nom || !username || !password) {
