@@ -204,9 +204,9 @@ function Tag({ children, color, bg }: { children: React.ReactNode; color?: strin
 
 // ── Sections ───────────────────────────────────────────────────────
 
-function ProfilSection({ s, u, toast }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; toast: (m: string) => void }) {
+function ProfilSection({ s, u, onSave }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void }) {
   return (
-    <SCard id="profil" icon="🏢" title="Profil de l'entreprise" sub="Informations légales et coordonnées de votre organisation." onSave={() => toast('Profil enregistré')}>
+    <SCard id="profil" icon="🏢" title="Profil de l'entreprise" sub="Informations légales et coordonnées de votre organisation." onSave={onSave}>
       <Row2>
         <Fld label="Nom de l'entreprise"><In value={s.nom_ent} onChange={v => u('nom_ent', v)} placeholder="Maison Diallo" /></Fld>
         <Fld label="Email principal"><In value={s.email_ent} onChange={v => u('email_ent', v)} placeholder="contact@entreprise.tg" type="email" /></Fld>
@@ -323,9 +323,9 @@ function FacturationSection({ toast }: { toast: (m: string) => void }) {
   );
 }
 
-function SecuriteSection({ s, u, toast }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; toast: (m: string) => void }) {
+function SecuriteSection({ s, u, onSave, toast }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void; toast: (m: string) => void }) {
   return (
-    <SCard id="securite" icon="🛡" title="Sécurité & authentification" sub="Protégez l'accès à votre compte avec une double vérification." onSave={() => toast('Paramètres de sécurité enregistrés')}>
+    <SCard id="securite" icon="🛡" title="Sécurité & authentification" sub="Protégez l'accès à votre compte avec une double vérification." onSave={onSave}>
       <TRow label="Authentification à deux facteurs (2FA)" desc="Un code temporaire sera demandé à chaque connexion, en plus du mot de passe." on={s.two_fa} onChange={v => u('two_fa', v)}>
         {s.two_fa && (
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -387,9 +387,9 @@ function SessionsSection({ toast }: { toast: (m: string) => void }) {
   );
 }
 
-function NotificationsSection({ s, u, toast }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; toast: (m: string) => void }) {
+function NotificationsSection({ s, u, onSave }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void }) {
   return (
-    <SCard id="notifications" icon="🔔" title="Notifications" sub="Alertes système, rapports automatiques et communications de sécurité." onSave={() => toast('Notifications enregistrées')}>
+    <SCard id="notifications" icon="🔔" title="Notifications" sub="Alertes système, rapports automatiques et communications de sécurité." onSave={onSave}>
       <TRow label="Alertes d'anomalie critique" desc="Erreur système, paiement échoué, dépassement de seuil sur un workspace" on={s.notif_anomalie} onChange={v => u('notif_anomalie', v)} />
       <TRow label="Confirmation de paiement" desc="Notification à chaque renouvellement ou changement de plan" on={s.notif_paiement} onChange={v => u('notif_paiement', v)} />
       <TRow label="Rapport hebdomadaire consolidé" desc="Synthèse CA, équipe et performances tous workspaces — envoyé le lundi" on={s.notif_rapport_hebdo} onChange={v => u('notif_rapport_hebdo', v)} />
@@ -405,10 +405,10 @@ function NotificationsSection({ s, u, toast }: { s: S; u: <K extends keyof S>(k:
   );
 }
 
-function PreferencesSection({ s, u, toast }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; toast: (m: string) => void }) {
+function PreferencesSection({ s, u, onSave }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void }) {
   const datePreview = s.format_date === 'JJ/MM/AAAA' ? '29/06/2026' : s.format_date === 'MM/JJ/AAAA' ? '06/29/2026' : '2026-06-29';
   return (
-    <SCard id="preferences" icon="🌐" title="Préférences" sub="Langue de l'interface, fuseau horaire et formats d'affichage." onSave={() => toast('Préférences enregistrées')}>
+    <SCard id="preferences" icon="🌐" title="Préférences" sub="Langue de l'interface, fuseau horaire et formats d'affichage." onSave={onSave}>
       <Row2>
         <Fld label="Langue de l'interface">
           <Seg value={s.langue} onChange={v => u('langue', v as Langue)} options={['Français', 'English']} />
@@ -580,6 +580,75 @@ export default function SettingsPage() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  // Load data on mount
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/admin/settings/shop-profile', { credentials: 'include' }).then(r => r.json()).catch(() => ({})),
+      fetch('/api/admin/settings', { credentials: 'include' }).then(r => r.json()).catch(() => ({})),
+    ]).then(([profile, cfg]) => {
+      setS(prev => ({
+        ...prev,
+        nom_ent:   profile.nom       || prev.nom_ent,
+        email_ent: profile.email     || prev.email_ent,
+        tel:       profile.telephone || prev.tel,
+        adresse:   profile.adresse   || prev.adresse,
+        secteur:   cfg.shop_secteur      || prev.secteur,
+        taille:    cfg.shop_taille       || prev.taille,
+        site:      cfg.shop_site         || prev.site,
+        two_fa:    cfg.security_2fa === 'true',
+        pin_admin: cfg.security_pin_admin || prev.pin_admin,
+        session_timeout: cfg.security_session_timeout || prev.session_timeout,
+        notif_anomalie:       cfg.notif_anomalie       !== 'false',
+        notif_paiement:       cfg.notif_paiement       !== 'false',
+        notif_rapport_hebdo:  cfg.notif_rapport_hebdo  !== 'false',
+        notif_rapport_mensuel:cfg.notif_rapport_mensuel!== 'false',
+        notif_alerte_secu:    cfg.notif_alerte_secu    !== 'false',
+        notif_canal:  (cfg.notif_canal as NotifCanal)     || prev.notif_canal,
+        langue:       (cfg.pref_langue as Langue)         || prev.langue,
+        fuseau:       cfg.pref_fuseau      || prev.fuseau,
+        format_date:  (cfg.pref_format_date as FormatDate)|| prev.format_date,
+      }));
+    });
+  }, []);
+
+  const post = (body: Record<string, string>) =>
+    fetch('/api/admin/settings', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  const saveProfil = async () => {
+    await Promise.all([
+      fetch('/api/admin/settings/shop-profile', {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: s.nom_ent, email: s.email_ent, telephone: s.tel, adresse: s.adresse }),
+      }),
+      post({ shop_secteur: s.secteur, shop_taille: s.taille, shop_site: s.site }),
+    ]);
+    flash('Profil enregistré');
+  };
+
+  const saveSecurite = async () => {
+    await post({ security_2fa: String(s.two_fa), security_pin_admin: s.pin_admin, security_session_timeout: s.session_timeout });
+    flash('Paramètres de sécurité enregistrés');
+  };
+
+  const saveNotifs = async () => {
+    await post({
+      notif_anomalie: String(s.notif_anomalie), notif_paiement: String(s.notif_paiement),
+      notif_rapport_hebdo: String(s.notif_rapport_hebdo), notif_rapport_mensuel: String(s.notif_rapport_mensuel),
+      notif_alerte_secu: String(s.notif_alerte_secu), notif_canal: s.notif_canal,
+    });
+    flash('Notifications enregistrées');
+  };
+
+  const savePreferences = async () => {
+    await post({ pref_langue: s.langue, pref_fuseau: s.fuseau, pref_format_date: s.format_date });
+    flash('Préférences enregistrées');
+  };
+
   const onNav = (id: string) => {
     setActive(id);
     const el = document.getElementById(`ss-${id}`);
@@ -618,13 +687,13 @@ export default function SettingsPage() {
             Paramètres <span style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontStyle: 'italic', fontWeight: 400 }}>compte</span>
           </h1>
 
-          <ProfilSection       s={s} u={u} toast={flash} />
-          <AbonnementSection   toast={flash} />
-          <FacturationSection  toast={flash} />
-          <SecuriteSection     s={s} u={u} toast={flash} />
-          <SessionsSection     toast={flash} />
-          <NotificationsSection s={s} u={u} toast={flash} />
-          <PreferencesSection  s={s} u={u} toast={flash} />
+          <ProfilSection        s={s} u={u} onSave={saveProfil} />
+          <AbonnementSection    toast={flash} />
+          <FacturationSection   toast={flash} />
+          <SecuriteSection      s={s} u={u} onSave={saveSecurite} toast={flash} />
+          <SessionsSection      toast={flash} />
+          <NotificationsSection s={s} u={u} onSave={saveNotifs} />
+          <PreferencesSection   s={s} u={u} onSave={savePreferences} />
           <DonneesSection      toast={flash} />
           <DangerSection       toast={flash} onConfirm={a => setConfirmAction(a)} />
         </div>
