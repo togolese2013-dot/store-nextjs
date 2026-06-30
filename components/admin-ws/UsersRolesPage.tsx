@@ -75,16 +75,19 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
     }
   }, [initialMembers]);
 
+  const [fetchDebug, setFetchDebug] = useState<string | null>(null);
+
   useEffect(() => {
     fetch('/api/admin/users', { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
+        setFetchDebug(`status:ok users:${JSON.stringify(data).slice(0, 120)}`);
         if (Array.isArray(data.users) && data.users.length > 0) {
           localFetchDone.current = true;
           setMembers(data.users.map(apiUserToMember));
         }
       })
-      .catch(e => console.error('[UsersRolesPage] fetch error:', e))
+      .catch(e => { setFetchDebug(`error:${String(e)}`); console.error('[UsersRolesPage]', e); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -217,6 +220,11 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
 
   return (
     <div className="admin-users">
+      {fetchDebug && (
+        <div style={{ background: '#1a1a1a', color: '#0f0', fontFamily: 'monospace', fontSize: 11, padding: '6px 12px', wordBreak: 'break-all', margin: '0 0 8px' }}>
+          DEBUG: {fetchDebug}
+        </div>
+      )}
       {/* En-tête */}
       <div className="head">
         <div className="head-l">
