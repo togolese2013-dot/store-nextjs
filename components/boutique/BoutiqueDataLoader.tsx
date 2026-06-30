@@ -73,6 +73,18 @@ interface ApiStockItem {
   prix_unitaire: number;
 }
 
+export interface StockMouvement {
+  id: number;
+  produit_id: number;
+  nom_produit: string;
+  type: 'entree' | 'retrait' | 'ajustement';
+  quantite: number;
+  motif: string | null;
+  ref_commande: string | null;
+  admin_nom: string | null;
+  created_at: string;
+}
+
 interface ApiFinanceEntry {
   reference: string;
   type: 'caisse' | 'depense' | 'rentree' | 'vente' | 'transfert';
@@ -195,9 +207,10 @@ export default function BoutiqueDataLoader({
   shopName,
   refreshRef,
 }: Props) {
-  const [sales,         setSales]         = useState<Sale[]>([]);
-  const [stock,         setStock]         = useState<BoutiqueStock[]>([]);
-  const [movements,     setMovements]     = useState<CashMovement[]>([]);
+  const [sales,            setSales]            = useState<Sale[]>([]);
+  const [stock,            setStock]            = useState<BoutiqueStock[]>([]);
+  const [movements,        setMovements]        = useState<CashMovement[]>([]);
+  const [stockMovements,   setStockMovements]   = useState<StockMouvement[]>([]);
   const [clients,       setClients]       = useState<BoutiqueClient[]>([]);
   const [overviewStats, setOverviewStats] = useState<OverviewStats>({
     ventes_jour_count: 0, ventes_jour_montant: 0, ca_total: 0, factures_payees: 0,
@@ -243,15 +256,20 @@ export default function BoutiqueDataLoader({
     if (e.type === 'vente') fetchFactures();
   }), [subscribe, fetchFactures]);
 
-  function fetchStock() {
+  const fetchStock = useCallback(() => {
     fetch('/api/admin/stock-boutique')
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d.items)) setStock((d.items as ApiStockItem[]).map(mapStockItem));
+        if (Array.isArray(d.movements)) setStockMovements(d.movements as StockMouvement[]);
       })
       .catch(() => {});
-  }
-  useEffect(() => { fetchStock(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { fetchStock(); }, [fetchStock]);
+
+  useEffect(() => subscribe((e) => {
+    if (e.type === 'stock_transfer') fetchStock();
+  }), [subscribe, fetchStock]);
 
   useEffect(() => {
     fetch('/api/admin/finance?limit=50')
@@ -277,6 +295,7 @@ export default function BoutiqueDataLoader({
         sales={sales}
         stock={stock}
         movements={movements}
+        stockMovements={stockMovements}
         clients={clients}
         overviewStats={overviewStats}
         onSwitchWorkspace={onSwitchWorkspace}

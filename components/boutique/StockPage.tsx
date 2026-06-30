@@ -10,6 +10,7 @@ import type { TransferRequest } from '@/lib/transferStore';
 import { SAMPLE_STOCK } from './sample-data';
 import Sparkline from './Sparkline';
 import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
+import type { StockMouvement } from './BoutiqueDataLoader';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtAmount } from './BoutiqueSettingsContext';
 import TransferRequestModal from '@/components/admin/TransferRequestModal';
@@ -17,6 +18,7 @@ import { TransferConfirmation } from './TransferConfirmation';
 
 export interface StockPageProps {
   stock?: BoutiqueStock[];
+  stockMovements?: StockMouvement[];
   onRequestTransfer?: (sku: string) => void;
   onRefresh?: () => void;
 }
@@ -39,7 +41,7 @@ const FIELD: React.CSSProperties = { display: 'flex', flexDirection: 'column', g
 const LABEL: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em' };
 const ROW: React.CSSProperties = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 };
 
-export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPageProps) {
+export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], onRefresh }: StockPageProps) {
   const cfg      = useBoutiqueConfig();
   const low      = stock.filter(p => p.boutique < Math.max(p.seuil, cfg.seuilGlobal));
   const okCount  = stock.filter(p => p.boutique >= Math.max(p.seuil, cfg.seuilGlobal)).length;
@@ -196,6 +198,61 @@ export default function StockPage({ stock = SAMPLE_STOCK, onRefresh }: StockPage
           </div>
         </div>
       </div>
+
+      {/* ── Mouvements récents ── */}
+      {stockMovements.length > 0 && (
+        <div className={styles.tableWrap} style={{ marginTop: 16 }}>
+          <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Mouvements récents — Stock boutique</span>
+          </div>
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Produit</th>
+                  <th>Type</th>
+                  <th style={{ textAlign: 'right' }}>Quantité</th>
+                  <th>Motif</th>
+                  <th>Par</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockMovements.map(mv => {
+                  const isEntree = mv.type === 'entree';
+                  const isRetrait = mv.type === 'retrait';
+                  const date = (() => {
+                    try {
+                      const d = new Date(mv.created_at);
+                      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' ' +
+                             d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                    } catch { return mv.created_at; }
+                  })();
+                  return (
+                    <tr key={mv.id}>
+                      <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: 'var(--muted)' }}>{date}</td>
+                      <td style={{ fontWeight: 500 }}>{mv.nom_produit}</td>
+                      <td>
+                        <span className={styles.tag} style={{
+                          background: isEntree ? 'var(--ok-bg)' : isRetrait ? 'var(--danger-bg)' : 'var(--bg-2,#f5f5f3)',
+                          color: isEntree ? 'var(--ok)' : isRetrait ? 'var(--danger)' : 'var(--muted)',
+                        }}>
+                          {isEntree ? '↑ Entrée' : isRetrait ? '↓ Retrait' : 'Ajust.'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 600, color: isEntree ? 'var(--ok)' : 'var(--danger)' }}>
+                        {isEntree ? '+' : '−'}{mv.quantite}
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{mv.motif ?? '—'}</td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{mv.admin_nom ?? '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Drawer demande de transfert ── */}
       <TransferRequestModal

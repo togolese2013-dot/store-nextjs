@@ -8600,6 +8600,7 @@ var import_express13 = __toESM(require("express"));
 init_auth();
 init_admin_db();
 init_shops();
+init_plan_configs();
 var import_bcryptjs2 = __toESM(require("bcryptjs"));
 
 // lib/vercel-domains.ts
@@ -8788,6 +8789,43 @@ router13.patch("/api/admin/settings/shop-profile", async (req, res) => {
     if (nom || email) await updateShop(shopId, { ...nom ? { nom } : {}, ...email ? { email } : {} });
     await setSettings({ shop_telephone: telephone ?? "", shop_adresse: adresse ?? "", shop_ville: ville ?? "", shop_pays: pays ?? "Togo" }, shopId);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router13.get("/api/admin/settings/subscription", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const dbUser = await getAdminById(session.id);
+    const shopId = dbUser?.shop_id ?? session.shop_id ?? 1;
+    const shop = await getShopById(shopId);
+    if (!shop) return res.status(404).json({ error: "Boutique introuvable." });
+    const [limits, prix, users] = await Promise.all([
+      getPlanLimits(shop.plan),
+      getPlanPrice(shop.plan),
+      listAdminUsers(shopId)
+    ]);
+    const membresCount = users.filter((u) => u.actif === 1 || u.actif === true).length;
+    let activeWorkspaces = 4;
+    try {
+      const raw = shop.disabled_workspaces;
+      const disabled = raw ? JSON.parse(raw) : [];
+      activeWorkspaces = 4 - (Array.isArray(disabled) ? disabled.length : 0);
+    } catch {
+    }
+    const PLAN_LABELS = { free: "Gratuit", basic: "Basic", pro: "Pro", business: "Business" };
+    const STATUS_LABELS = { trial: "Essai", active: "Actif", expired: "Expir\xE9", suspended: "Suspendu" };
+    res.json({
+      plan: shop.plan,
+      planLabel: PLAN_LABELS[shop.plan] ?? shop.plan,
+      status: shop.subscription_status,
+      statusLabel: STATUS_LABELS[shop.subscription_status] ?? "Actif",
+      prix_mensuel: prix,
+      renewal_date: shop.current_period_end ?? shop.trial_ends_at ?? null,
+      limits: { max_users: limits.max_users, max_entrepots: limits.max_entrepots },
+      usage: { membres: membresCount, workspaces: activeWorkspaces }
+    });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
@@ -9272,11 +9310,11 @@ async function requireSuperAdmin(req, res) {
 router21.get("/api/admin/users", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const dbUser = await getAdminById(session.id);
+  if (!dbUser) return res.status(401).json({ error: "Utilisateur introuvable." });
   let shopId;
-  if (session.role === "super_admin") {
-    shopId = req.query.shop_id ? Number(req.query.shop_id) : session.shop_id ?? 1;
-  } else if (["admin", "manager"].includes(session.role)) {
-    shopId = session.shop_id ?? 1;
+  if (["super_admin", "admin", "manager"].includes(dbUser.role)) {
+    shopId = req.query.shop_id && dbUser.role === "super_admin" ? Number(req.query.shop_id) : dbUser.shop_id ?? 1;
   } else {
     return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
   }
@@ -9284,16 +9322,19 @@ router21.get("/api/admin/users", async (req, res) => {
   res.json({ users });
 });
 router21.post("/api/admin/users", async (req, res) => {
-  const session = await requireSuperAdmin(req, res);
-  if (!session) return;
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Acc\xE8s r\xE9serv\xE9 au propri\xE9taire." });
+  }
   try {
-    const { nom, username, email, telephone, poste, password, role } = req.body;
+    const { nom, username, email, telephone, poste, password, role, workspaces } = req.body;
     if (!nom || !username || !password) {
       return res.status(400).json({ error: "Nom, nom d'utilisateur et mot de passe requis." });
     }
-    const existing = await getAdminByUsername(username.trim().toLowerCase());
-    if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est d\xE9j\xE0 utilis\xE9." });
     const targetShopId = req.body.shop_id ? Number(req.body.shop_id) : session.shop_id ?? 1;
+    const existing = await getAdminByUsername(username.trim().toLowerCase(), targetShopId);
+    if (existing) return res.status(409).json({ error: "Ce nom d'utilisateur est d\xE9j\xE0 utilis\xE9." });
     if (targetShopId !== 1) {
       const { getPlanLimits: getPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
       const { getShopById: getShopById2 } = await Promise.resolve().then(() => (init_shops(), shops_exports));
@@ -9310,6 +9351,8 @@ router21.post("/api/admin/users", async (req, res) => {
       }
     }
     const hash = await import_bcryptjs3.default.hash(password, 12);
+    const VALID_ROLES = ["super_admin", "admin", "manager", "staff", "comptable", "livreur"];
+    const dbRole = VALID_ROLES.includes(role) ? role : "staff";
     await createAdminUser({
       nom,
       username: username.trim().toLowerCase(),
@@ -9317,12 +9360,21 @@ router21.post("/api/admin/users", async (req, res) => {
       telephone: telephone || null,
       poste: poste || "staff",
       password_hash: hash,
-      role: role === "super_admin" ? "super_admin" : poste === "Livreur" ? "livreur" : "admin",
-      must_change_password: true
+      role: dbRole,
+      must_change_password: true,
+      shop_id: targetShopId,
+      permissions: workspaces ? JSON.stringify({ workspaces }) : null
     });
     res.status(201).json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Duplicate entry") && msg.includes("email")) {
+      return res.status(409).json({ error: "Cette adresse email est d\xE9j\xE0 utilis\xE9e." });
+    }
+    if (msg.includes("Duplicate entry") && msg.includes("username")) {
+      return res.status(409).json({ error: "Ce nom d'utilisateur est d\xE9j\xE0 utilis\xE9." });
+    }
+    res.status(500).json({ error: msg });
   }
 });
 router21.patch("/api/admin/users/:id", async (req, res) => {
@@ -14471,6 +14523,7 @@ app.use(payment_plans_default);
 app.use(verifications_default);
 app.use(commerciaux_default);
 app.use(security_logs_default);
+app.use(activity_logs_default);
 app.use(rapports_default);
 app.use(tendances_default);
 app.use(performance_produits_default);

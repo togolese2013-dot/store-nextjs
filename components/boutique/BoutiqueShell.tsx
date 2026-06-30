@@ -9,6 +9,7 @@ import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import OverviewPage from './OverviewPage';
 import VentesPage from './VentesPage';
 import StockPage from './StockPage';
+import type { StockMouvement } from './BoutiqueDataLoader';
 import FinancePage from './FinancePage';
 import ClientsPage from './ClientsPage';
 import SettingsPage from './SettingsPage';
@@ -55,6 +56,7 @@ export interface BoutiqueShellProps {
   onNewSale?: () => void;
   onRequestTransfer?: (sku: string) => void;
   onRefreshStock?: () => void;
+  stockMovements?: StockMouvement[];
   userName?: string;
   userRole?: string;
   shopName?: string;
@@ -71,6 +73,7 @@ export default function BoutiqueShell({
   onNewSale,
   onRequestTransfer,
   onRefreshStock,
+  stockMovements = [],
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
@@ -123,7 +126,7 @@ export default function BoutiqueShell({
         {/* Page routing */}
         {page === 'overview'  && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} />}
         {page === 'ventes'    && <VentesPage sales={sales} onNewSale={onNewSale} />}
-        {page === 'stock'     && <StockPage stock={stock} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
+        {page === 'stock'     && <StockPage stock={stock} stockMovements={stockMovements} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
         {page === 'finance'   && <FinancePage />}
         {page === 'clients'   && <ClientsPage clients={clients} />}
         {page === 'settings'  && <SettingsPage shopName={shopName} />}

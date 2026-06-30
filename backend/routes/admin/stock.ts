@@ -73,6 +73,7 @@ router.post("/api/admin/stock/sortie", async (req, res) => {
       ...(variant_id ? { variant_id: Number(variant_id) } : {}),
     });
     emitAdminEvent("stock");
+    emitAdminEvent("stock_transfer");
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
