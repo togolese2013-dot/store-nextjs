@@ -750,6 +750,7 @@ __export(admin_db_exports, {
   createStockEntree: () => createStockEntree,
   createStockSortie: () => createStockSortie,
   createTombolaSession: () => createTombolaSession,
+  createTransferRequest: () => createTransferRequest,
   createUtilisateur: () => createUtilisateur,
   createVariantGroup: () => createVariantGroup,
   createVenteWithStock: () => createVenteWithStock,
@@ -834,6 +835,7 @@ __export(admin_db_exports, {
   getTokenVersion: () => getTokenVersion,
   getTombolaParticipants: () => getTombolaParticipants,
   getTombolaSession: () => getTombolaSession,
+  getTransferRequestById: () => getTransferRequestById,
   getUtilisateurById: () => getUtilisateurById,
   getUtilisateurByUsername: () => getUtilisateurByUsername,
   getUtilisateurPermissions: () => getUtilisateurPermissions,
@@ -867,6 +869,7 @@ __export(admin_db_exports, {
   listSiteClients: () => listSiteClients,
   listStockAlerts: () => listStockAlerts,
   listTombolaSessions: () => listTombolaSessions,
+  listTransferRequests: () => listTransferRequests,
   listUtilisateurs: () => listUtilisateurs,
   listVariantGroups: () => listVariantGroups,
   listWaMessages: () => listWaMessages,
@@ -876,6 +879,8 @@ __export(admin_db_exports, {
   markTrancheUnpaid: () => markTrancheUnpaid,
   migrateAdminLivreursToTeam: () => migrateAdminLivreursToTeam,
   recevoirAchat: () => recevoirAchat,
+  resetBoutiqueDemoData: () => resetBoutiqueDemoData,
+  resolveTransferRequest: () => resolveTransferRequest,
   saveIncomingMessage: () => saveIncomingMessage,
   setSetting: () => setSetting,
   setSettings: () => setSettings,
@@ -1058,6 +1063,11 @@ async function createStockSortie(data) {
         [data.quantite, data.quantite, data.variant_id]
       );
       stockApres = available - data.quantite;
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
+        [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
+      );
     } else {
       const [[row]] = await conn.execute(
         `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
@@ -1134,6 +1144,91 @@ async function createStockAjustement(data) {
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note, user_id)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [data.produit_id, type, abs, stockApres, data.motif, data.user_id ?? null]
+    );
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+async function ensureTransferRequestsTable() {
+  return runOnce("transfer_requests", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS transfer_requests (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id       INT UNSIGNED NOT NULL DEFAULT 1,
+        produit_id    INT NOT NULL,
+        produit_nom   VARCHAR(255) NOT NULL,
+        reference_sku VARCHAR(100) NULL,
+        quantite      INT NOT NULL,
+        note          VARCHAR(500) NULL,
+        requested_by  VARCHAR(150) NULL,
+        status        ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at   TIMESTAMP NULL,
+        INDEX idx_shop_status (shop_id, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  });
+}
+async function listTransferRequests(shopId, status) {
+  await ensureTransferRequestsTable();
+  const conditions = ["shop_id = ?"];
+  const params = [shopId];
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+  const [rows] = await db.query(
+    `SELECT * FROM transfer_requests WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC LIMIT 100`,
+    params
+  );
+  return rows;
+}
+async function getTransferRequestById(id, shopId) {
+  await ensureTransferRequestsTable();
+  const [rows] = await db.execute(
+    "SELECT * FROM transfer_requests WHERE id = ? AND shop_id = ?",
+    [id, shopId]
+  );
+  return rows[0] ?? null;
+}
+async function createTransferRequest(data) {
+  await ensureTransferRequestsTable();
+  const [result] = await db.execute(
+    `INSERT INTO transfer_requests (shop_id, produit_id, produit_nom, reference_sku, quantite, note, requested_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [data.shop_id, data.produit_id, data.produit_nom, data.reference_sku ?? null, data.quantite, data.note ?? null, data.requested_by ?? null]
+  );
+  return result.insertId;
+}
+async function resolveTransferRequest(id, shopId, status) {
+  await db.execute(
+    "UPDATE transfer_requests SET status = ?, resolved_at = NOW() WHERE id = ? AND shop_id = ? AND status = 'pending'",
+    [status, id, shopId]
+  );
+}
+async function resetBoutiqueDemoData(shopId) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute(
+      `DELETE bs FROM boutique_stock bs JOIN produits p ON p.id = bs.produit_id WHERE p.shop_id = ?`,
+      [shopId]
+    );
+    await conn.execute(
+      `DELETE bm FROM boutique_mouvements bm JOIN produits p ON p.id = bm.produit_id WHERE p.shop_id = ?`,
+      [shopId]
+    );
+    await conn.execute(`DELETE FROM factures WHERE shop_id = ?`, [shopId]);
+    await conn.execute(`DELETE FROM finance_entries WHERE shop_id = ?`, [shopId]);
+    await conn.execute(`DELETE FROM boutique_clients WHERE shop_id = ?`, [shopId]);
+    await conn.execute(`UPDATE produits SET stock_boutique = 0 WHERE shop_id = ?`, [shopId]);
+    await conn.execute(
+      `UPDATE product_variants pv JOIN produits p ON p.id = pv.produit_id SET pv.stock_boutique = 0 WHERE p.shop_id = ?`,
+      [shopId]
     );
     await conn.commit();
   } catch (err) {
@@ -5112,6 +5207,7 @@ var shops_exports = {};
 __export(shops_exports, {
   activateBasicPlan: () => activateBasicPlan,
   activateShopSubscription: () => activateShopSubscription,
+  archiveShop: () => archiveShop,
   createShop: () => createShop,
   ensureShopsTable: () => ensureShopsTable,
   expireShopSubscriptions: () => expireShopSubscriptions,
@@ -5123,6 +5219,7 @@ __export(shops_exports, {
   listShops: () => listShops,
   listShopsWithStats: () => listShopsWithStats,
   recordShopPayment: () => recordShopPayment,
+  selfDeleteShop: () => selfDeleteShop,
   setShopDomain: () => setShopDomain,
   updateShop: () => updateShop
 });
@@ -5137,7 +5234,7 @@ async function ensureShopsTable() {
       plan                ENUM('basic','pro','business')                        NOT NULL DEFAULT 'basic',
       actif               TINYINT(1)                                            NOT NULL DEFAULT 1,
       custom_domain       VARCHAR(255)                                          NULL UNIQUE,
-      subscription_status ENUM('trial','active','expired','suspended')         NOT NULL DEFAULT 'trial',
+      subscription_status ENUM('trial','active','expired','suspended','archived') NOT NULL DEFAULT 'trial',
       trial_ends_at       DATETIME                                              NULL,
       current_period_end  DATETIME                                              NULL,
       created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -5145,7 +5242,7 @@ async function ensureShopsTable() {
   `);
   const alterCols = [
     `ALTER TABLE shops ADD COLUMN custom_domain VARCHAR(255) NULL UNIQUE`,
-    `ALTER TABLE shops ADD COLUMN subscription_status ENUM('trial','active','expired','suspended') NOT NULL DEFAULT 'trial'`,
+    `ALTER TABLE shops ADD COLUMN subscription_status ENUM('trial','active','expired','suspended','archived') NOT NULL DEFAULT 'trial'`,
     `ALTER TABLE shops ADD COLUMN trial_ends_at DATETIME NULL`,
     `ALTER TABLE shops ADD COLUMN current_period_end DATETIME NULL`,
     `ALTER TABLE shops ADD COLUMN pays VARCHAR(100) NULL`
@@ -5155,6 +5252,12 @@ async function ensureShopsTable() {
       await db.execute(sql);
     } catch {
     }
+  }
+  try {
+    await db.execute(
+      `ALTER TABLE shops MODIFY COLUMN subscription_status ENUM('trial','active','expired','suspended','archived') NOT NULL DEFAULT 'trial'`
+    );
+  } catch {
   }
   await db.execute(`
     CREATE TABLE IF NOT EXISTS shop_payments (
@@ -5293,6 +5396,7 @@ function isShopAccessAllowed(shop) {
   if (shop.id === 1) return true;
   if (!shop.actif) return false;
   if (shop.subscription_status === "suspended") return false;
+  if (shop.subscription_status === "archived") return false;
   if (shop.plan === "basic") return true;
   if (shop.subscription_status === "trial") {
     if (!shop.trial_ends_at) return true;
@@ -5325,6 +5429,13 @@ async function activateBasicPlan(shopId) {
     `UPDATE shops SET plan = 'basic', subscription_status = 'active', current_period_end = NULL WHERE id = ?`,
     [shopId]
   );
+}
+async function archiveShop(shopId) {
+  await ensureShopsTable();
+  await db.execute(`UPDATE shops SET subscription_status = 'archived' WHERE id = ?`, [shopId]);
+}
+async function selfDeleteShop(shopId) {
+  await updateShop(shopId, { actif: false, subscription_status: "suspended" });
 }
 async function recordShopPayment(data) {
   await ensureShopsTable();
@@ -5807,7 +5918,7 @@ __export(plan_configs_exports, {
   updatePlanLimits: () => updatePlanLimits,
   updateSaasSettings: () => updateSaasSettings
 });
-async function ensureTable3() {
+async function ensureTable2() {
   if (tableReady) return;
   const pool2 = db;
   await pool2.execute(`
@@ -5864,7 +5975,7 @@ async function ensureSaasSettings() {
 }
 async function getPlanLimits(plan) {
   try {
-    await ensureTable3();
+    await ensureTable2();
     const [rows] = await db.execute(
       "SELECT * FROM plan_configs WHERE plan = ?",
       [plan]
@@ -5876,7 +5987,7 @@ async function getPlanLimits(plan) {
 }
 async function getAllPlanLimits() {
   try {
-    await ensureTable3();
+    await ensureTable2();
     const [rows] = await db.execute(
       "SELECT * FROM plan_configs ORDER BY FIELD(plan,'basic','pro','business')"
     );
@@ -5886,7 +5997,7 @@ async function getAllPlanLimits() {
   }
 }
 async function updatePlanLimits(plan, limits) {
-  await ensureTable3();
+  await ensureTable2();
   const sets = [];
   const vals = [];
   for (const [k, v] of Object.entries(limits)) {
@@ -5901,7 +6012,7 @@ async function updatePlanLimits(plan, limits) {
 }
 async function getPlanPrice(plan) {
   try {
-    await ensureTable3();
+    await ensureTable2();
     await ensurePriceCols();
     const [rows] = await db.execute(
       "SELECT prix_mensuel FROM plan_configs WHERE plan = ?",
@@ -5913,7 +6024,7 @@ async function getPlanPrice(plan) {
   return DEFAULT_PRICES[plan]?.prix_mensuel ?? 0;
 }
 async function getPlansWithPrices() {
-  await ensureTable3();
+  await ensureTable2();
   await ensurePriceCols();
   const [rows] = await db.execute(`
     SELECT pc.*,
@@ -5936,7 +6047,7 @@ async function getPlansWithPrices() {
   }));
 }
 async function updatePlanFull(plan, data) {
-  await ensureTable3();
+  await ensureTable2();
   await ensurePriceCols();
   await db.execute(`
     UPDATE plan_configs SET
@@ -6128,15 +6239,15 @@ async function runWeeklyReportsForAllShops() {
     console.error("[weekly-report] cron error:", e);
   }
 }
-var import_express49, router49, ai_default;
+var import_express50, router50, ai_default;
 var init_ai = __esm({
   "routes/admin/ai.ts"() {
     "use strict";
-    import_express49 = __toESM(require("express"));
+    import_express50 = __toESM(require("express"));
     init_auth();
     init_db();
-    router49 = import_express49.default.Router();
-    router49.post("/api/admin/ai/suggestions", async (req, res) => {
+    router50 = import_express50.default.Router();
+    router50.post("/api/admin/ai/suggestions", async (req, res) => {
       const session = await getSession(req);
       if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
       const key = apiKey();
@@ -6193,7 +6304,7 @@ Langue : fran\xE7ais, ton professionnel.`,
         res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
       }
     });
-    router49.post("/api/admin/ai/classify-products", async (req, res) => {
+    router50.post("/api/admin/ai/classify-products", async (req, res) => {
       const session = await getSession(req);
       if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
       const key = apiKey();
@@ -6236,7 +6347,7 @@ Cat\xE9gories : ${JSON.stringify(cats)}`,
         res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
       }
     });
-    router49.post("/api/admin/ai/stock-forecast", async (req, res) => {
+    router50.post("/api/admin/ai/stock-forecast", async (req, res) => {
       const session = await getSession(req);
       if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
       const key = apiKey();
@@ -6281,7 +6392,7 @@ qte_a_commander : stock pour couvrir 45 jours.`,
         res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
       }
     });
-    router49.post("/api/admin/ai/query", async (req, res) => {
+    router50.post("/api/admin/ai/query", async (req, res) => {
       const session = await getSession(req);
       if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
       const key = apiKey();
@@ -6318,7 +6429,7 @@ Question : ${question}`,
         res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
       }
     });
-    router49.post("/api/admin/ai/weekly-report", async (req, res) => {
+    router50.post("/api/admin/ai/weekly-report", async (req, res) => {
       const session = await getSession(req);
       if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
       const key = apiKey();
@@ -6331,7 +6442,7 @@ Question : ${question}`,
         res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
       }
     });
-    ai_default = router49;
+    ai_default = router50;
   }
 });
 
@@ -6343,7 +6454,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_dotenv = require("dotenv");
 var import_path = require("path");
-var import_express52 = __toESM(require("express"));
+var import_express53 = __toESM(require("express"));
 var import_cors = __toESM(require("cors"));
 var import_cookie_parser = __toESM(require("cookie-parser"));
 var import_helmet = __toESM(require("helmet"));
@@ -7545,125 +7656,12 @@ router3.delete("/api/admin/variant-groups/:id", async (req, res) => {
 });
 var variants_default = router3;
 
-// routes/admin/variant-groups.ts
+// routes/admin/stock.ts
 var import_express4 = __toESM(require("express"));
 init_auth();
-init_db();
-var router4 = import_express4.default.Router();
-var _tableReady = false;
-async function ensureTable2() {
-  if (_tableReady) return;
-  const pool2 = db;
-  await pool2.execute(`
-    CREATE TABLE IF NOT EXISTS variant_groups (
-      id         INT AUTO_INCREMENT PRIMARY KEY,
-      nom        VARCHAR(150) NOT NULL,
-      type       VARCHAR(50)  NOT NULL DEFAULT 'text',
-      valeurs    JSON NULL,
-      shop_id    INT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  try {
-    await pool2.execute("ALTER TABLE variant_groups ADD COLUMN shop_id INT NULL");
-  } catch (e) {
-    if (e.code !== "ER_DUP_FIELDNAME") throw e;
-  }
-  _tableReady = true;
-}
-router4.get("/api/admin/variant-groups", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  try {
-    await ensureTable2();
-    const pool2 = db;
-    const [rows] = await pool2.execute(
-      "SELECT id, nom, type, valeurs, shop_id, created_at FROM variant_groups ORDER BY nom ASC"
-    );
-    const groups = rows.map((r) => ({
-      id: Number(r.id),
-      nom: r.nom,
-      type: r.type,
-      valeurs: r.valeurs ? typeof r.valeurs === "string" ? JSON.parse(r.valeurs) : r.valeurs : [],
-      shop_id: r.shop_id ? Number(r.shop_id) : null,
-      created_at: r.created_at
-    }));
-    res.json({ groups });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
-  }
-});
-router4.post("/api/admin/variant-groups", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  try {
-    await ensureTable2();
-    const { nom, type = "text", valeurs, shop_id } = req.body;
-    if (!nom?.trim()) return res.status(400).json({ error: "Nom requis." });
-    const pool2 = db;
-    const [result] = await pool2.execute(
-      "INSERT INTO variant_groups (nom, type, valeurs, shop_id) VALUES (?, ?, ?, ?)",
-      [
-        nom.trim(),
-        type,
-        Array.isArray(valeurs) ? JSON.stringify(valeurs) : null,
-        shop_id ? Number(shop_id) : null
-      ]
-    );
-    res.status(201).json({ ok: true, id: result.insertId });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
-  }
-});
-router4.patch("/api/admin/variant-groups/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  try {
-    await ensureTable2();
-    const { nom, type, valeurs } = req.body;
-    const pool2 = db;
-    const sets = [];
-    const vals = [];
-    if (nom !== void 0) {
-      sets.push("nom = ?");
-      vals.push(String(nom).trim());
-    }
-    if (type !== void 0) {
-      sets.push("type = ?");
-      vals.push(String(type));
-    }
-    if (valeurs !== void 0) {
-      sets.push("valeurs = ?");
-      vals.push(Array.isArray(valeurs) ? JSON.stringify(valeurs) : null);
-    }
-    if (!sets.length) return res.json({ ok: true });
-    vals.push(Number(req.params.id));
-    await pool2.execute(`UPDATE variant_groups SET ${sets.join(", ")} WHERE id = ?`, vals);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
-  }
-});
-router4.delete("/api/admin/variant-groups/:id", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
-  try {
-    await ensureTable2();
-    const pool2 = db;
-    await pool2.execute("DELETE FROM variant_groups WHERE id = ?", [req.params.id]);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
-  }
-});
-var variant_groups_default = router4;
-
-// routes/admin/stock.ts
-var import_express5 = __toESM(require("express"));
-init_auth();
 init_admin_db();
-var router5 = import_express5.default.Router();
-router5.get("/api/admin/stock/produits", async (req, res) => {
+var router4 = import_express4.default.Router();
+router4.get("/api/admin/stock/produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -7673,10 +7671,10 @@ router5.get("/api/admin/stock/produits", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router5.get("/api/admin/stock/entrepots", (_req, res) => {
+router4.get("/api/admin/stock/entrepots", (_req, res) => {
   res.json({ entrepots: [] });
 });
-router5.get("/api/admin/stock/mouvements", async (req, res) => {
+router4.get("/api/admin/stock/mouvements", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -7693,7 +7691,7 @@ router5.get("/api/admin/stock/mouvements", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router5.post("/api/admin/stock/entree", async (req, res) => {
+router4.post("/api/admin/stock/entree", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -7715,7 +7713,7 @@ router5.post("/api/admin/stock/entree", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router5.post("/api/admin/stock/sortie", async (req, res) => {
+router4.post("/api/admin/stock/sortie", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -7732,12 +7730,13 @@ router5.post("/api/admin/stock/sortie", async (req, res) => {
       ...variant_id ? { variant_id: Number(variant_id) } : {}
     });
     emitAdminEvent("stock");
+    emitAdminEvent("stock_transfer");
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router5.post("/api/admin/stock/ajustement", async (req, res) => {
+router4.post("/api/admin/stock/ajustement", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -7761,7 +7760,88 @@ router5.post("/api/admin/stock/ajustement", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var stock_default = router5;
+var stock_default = router4;
+
+// routes/admin/transfer-requests.ts
+var import_express5 = __toESM(require("express"));
+init_auth();
+init_admin_db();
+var router5 = import_express5.default.Router();
+router5.get("/api/admin/transfer-requests", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const status = req.query.status;
+    const requests = await listTransferRequests(session.shop_id ?? 1, status);
+    res.json({ requests });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router5.post("/api/admin/transfer-requests", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const { produit_id, produit_nom, reference_sku, quantite, note } = req.body;
+  if (!produit_id || !produit_nom?.trim() || !quantite || Number(quantite) <= 0) {
+    return res.status(400).json({ error: "produit_id, produit_nom et quantite (> 0) requis." });
+  }
+  try {
+    const shopId = session.shop_id ?? 1;
+    const id = await createTransferRequest({
+      shop_id: shopId,
+      produit_id: Number(produit_id),
+      produit_nom: produit_nom.trim(),
+      reference_sku: reference_sku ?? null,
+      quantite: Number(quantite),
+      note: note ?? null,
+      requested_by: session.nom ?? session.username ?? "Boutique"
+    });
+    emitAdminEvent("transfer_request");
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router5.post("/api/admin/transfer-requests/:id/approve", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const reqRow = await getTransferRequestById(Number(req.params.id), shopId);
+    if (!reqRow) return res.status(404).json({ error: "Demande introuvable." });
+    if (reqRow.status !== "pending") return res.status(400).json({ error: "Demande d\xE9j\xE0 trait\xE9e." });
+    await createStockSortie({
+      produit_id: reqRow.produit_id,
+      quantite: reqRow.quantite,
+      reference: reqRow.reference_sku ?? void 0,
+      note: `Transfert demande #${reqRow.id}${reqRow.note ? " \u2014 " + reqRow.note : ""}`,
+      user_id: session.id
+    });
+    await resolveTransferRequest(reqRow.id, shopId, "approved");
+    emitAdminEvent("stock");
+    emitAdminEvent("stock_transfer");
+    emitAdminEvent("transfer_request");
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router5.post("/api/admin/transfer-requests/:id/reject", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const reqRow = await getTransferRequestById(Number(req.params.id), shopId);
+    if (!reqRow) return res.status(404).json({ error: "Demande introuvable." });
+    if (reqRow.status !== "pending") return res.status(400).json({ error: "Demande d\xE9j\xE0 trait\xE9e." });
+    await resolveTransferRequest(reqRow.id, shopId, "rejected");
+    emitAdminEvent("transfer_request");
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+var transfer_requests_default = router5;
 
 // routes/admin/stock-boutique.ts
 var import_express6 = __toESM(require("express"));
@@ -7958,6 +8038,45 @@ router7.post("/api/admin/ventes/factures", async (req, res) => {
     res.json({ ok: true, id });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router7.get("/api/admin/ventes/factures/export", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const search = req.query.q || void 0;
+    const statut = req.query.statut || void 0;
+    const shopId = session.shop_id ?? 1;
+    const { items } = await listFactures({ search, statut, limit: 5e3, offset: 0, shopId });
+    const escape = (v) => {
+      const s = v == null ? "" : String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const MODES = {
+      especes: "Esp\xE8ces",
+      moov_money: "Moov Money",
+      tmoney: "TMoney",
+      virement_bancaire: "Virement bancaire",
+      mix_by_yas: "Mix by Yas"
+    };
+    const headers = ["R\xE9f\xE9rence", "Client", "T\xE9l\xE9phone", "Total", "Mode paiement", "Statut", "Vendeur", "Date"];
+    const rows = items.map((f) => [
+      f.reference,
+      f.client_nom,
+      f.client_tel ?? "",
+      Number(f.total),
+      f.mode_paiement ? MODES[f.mode_paiement] ?? f.mode_paiement : "",
+      f.statut,
+      f.vendeur ?? "",
+      String(f.created_at).slice(0, 10)
+    ].map(escape).join(","));
+    const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
+    const filename = `ventes_${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + csv);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
 router7.get("/api/admin/ventes/factures/:id", async (req, res) => {
@@ -9059,6 +9178,36 @@ router16.get("/api/admin/boutique-clients", async (req, res) => {
     res.status(500).json({ error: msg });
   }
 });
+router16.get("/api/admin/boutique-clients/export", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const clients = await listBoutiqueClients(5e3, 0, "", "tous", shopId);
+    const escape = (v) => {
+      const s = v == null ? "" : String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const headers = ["Nom", "T\xE9l\xE9phone", "Email", "Localisation", "Type", "Solde", "Notes", "Cr\xE9\xE9 le"];
+    const rows = clients.map((c) => [
+      c.nom,
+      c.telephone ?? "",
+      c.email ?? "",
+      c.localisation ?? "",
+      c.type_client,
+      Number(c.solde),
+      c.notes ?? "",
+      String(c.created_at).slice(0, 10)
+    ].map(escape).join(","));
+    const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
+    const filename = `clients_${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + csv);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
 router16.get("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -9139,12 +9288,113 @@ router17.post("/api/admin/boutique/settings", async (req, res) => {
 });
 var boutique_settings_default = router17;
 
-// routes/admin/newsletter.ts
+// routes/admin/shop-danger.ts
 var import_express18 = __toESM(require("express"));
 init_auth();
+init_shops();
 init_admin_db();
 var router18 = import_express18.default.Router();
-router18.get("/api/admin/newsletter", async (req, res) => {
+function normalize(s) {
+  return s.trim().toLowerCase();
+}
+router18.post("/api/admin/shop/reset-demo-data", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Droits insuffisants." });
+  }
+  const shopId = session.shop_id ?? 1;
+  if (shopId === 1) return res.status(403).json({ error: "Action indisponible pour cette boutique." });
+  const shop = await getShopById(shopId);
+  if (!shop) return res.status(404).json({ error: "Boutique introuvable." });
+  const confirmNom = String(req.body.confirm_nom ?? "");
+  if (normalize(confirmNom) !== normalize(shop.nom)) {
+    return res.status(400).json({ error: "Le nom saisi ne correspond pas au nom de la boutique." });
+  }
+  try {
+    await resetBoutiqueDemoData(shopId);
+    logActivity({
+      shopId,
+      username: session.nom ?? session.username ?? "Admin",
+      actionType: "boutique_reinitialisee",
+      entity: "shop",
+      entityId: shopId,
+      label: `Donn\xE9es Boutique r\xE9initialis\xE9es (ventes, stock, clients)`,
+      workspace: "Boutique"
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router18.post("/api/admin/shop/archive", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Droits insuffisants." });
+  }
+  const shopId = session.shop_id ?? 1;
+  if (shopId === 1) return res.status(403).json({ error: "Action indisponible pour cette boutique." });
+  const shop = await getShopById(shopId);
+  if (!shop) return res.status(404).json({ error: "Boutique introuvable." });
+  const confirmNom = String(req.body.confirm_nom ?? "");
+  if (normalize(confirmNom) !== normalize(shop.nom)) {
+    return res.status(400).json({ error: "Le nom saisi ne correspond pas au nom de la boutique." });
+  }
+  try {
+    await archiveShop(shopId);
+    logActivity({
+      shopId,
+      username: session.nom ?? session.username ?? "Admin",
+      actionType: "boutique_archivee",
+      entity: "shop",
+      entityId: shopId,
+      label: `Boutique archiv\xE9e par le propri\xE9taire`,
+      workspace: "Boutique"
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+router18.post("/api/admin/shop/delete", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!["super_admin", "admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Droits insuffisants." });
+  }
+  const shopId = session.shop_id ?? 1;
+  if (shopId === 1) return res.status(403).json({ error: "Action indisponible pour cette boutique." });
+  const shop = await getShopById(shopId);
+  if (!shop) return res.status(404).json({ error: "Boutique introuvable." });
+  const confirmNom = String(req.body.confirm_nom ?? "");
+  if (normalize(confirmNom) !== normalize(shop.nom)) {
+    return res.status(400).json({ error: "Le nom saisi ne correspond pas au nom de la boutique." });
+  }
+  try {
+    await selfDeleteShop(shopId);
+    logActivity({
+      shopId,
+      username: session.nom ?? session.username ?? "Admin",
+      actionType: "boutique_supprimee",
+      entity: "shop",
+      entityId: shopId,
+      label: `Boutique supprim\xE9e par le propri\xE9taire (r\xE9cup\xE9rable par le support)`,
+      workspace: "Boutique"
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+var shop_danger_default = router18;
+
+// routes/admin/newsletter.ts
+var import_express19 = __toESM(require("express"));
+init_auth();
+init_admin_db();
+var router19 = import_express19.default.Router();
+router19.get("/api/admin/newsletter", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -9154,7 +9404,7 @@ router18.get("/api/admin/newsletter", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router18.delete("/api/admin/newsletter", async (req, res) => {
+router19.delete("/api/admin/newsletter", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -9166,14 +9416,14 @@ router18.delete("/api/admin/newsletter", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur." });
   }
 });
-var newsletter_default = router18;
+var newsletter_default = router19;
 
 // routes/admin/schema.ts
-var import_express19 = __toESM(require("express"));
+var import_express20 = __toESM(require("express"));
 init_auth();
 init_db();
-var router19 = import_express19.default.Router();
-router19.get("/api/admin/schema/columns", async (req, res) => {
+var router20 = import_express20.default.Router();
+router20.get("/api/admin/schema/columns", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const table = req.query.table || "produits";
@@ -9190,7 +9440,7 @@ router19.get("/api/admin/schema/columns", async (req, res) => {
     hasImagesJson: names.has("images_json")
   });
 });
-router19.post("/api/admin/schema/migrate", async (req, res) => {
+router20.post("/api/admin/schema/migrate", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const results = {};
@@ -9218,12 +9468,12 @@ router19.post("/api/admin/schema/migrate", async (req, res) => {
     res.status(500).json({ error: String(err) });
   }
 });
-var schema_default = router19;
+var schema_default = router20;
 
 // routes/admin/events.ts
-var import_express20 = __toESM(require("express"));
+var import_express21 = __toESM(require("express"));
 init_auth();
-var router20 = import_express20.default.Router();
+var router21 = import_express21.default.Router();
 function sseSetup(res) {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -9233,7 +9483,7 @@ function sseSetup(res) {
 }
 var HEARTBEAT_MS = 75e3;
 var AUTO_CLOSE_MS = 5 * 6e4;
-router20.get("/api/admin/sse", async (req, res) => {
+router21.get("/api/admin/sse", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).end("Non autoris\xE9");
   sseSetup(res);
@@ -9276,17 +9526,17 @@ router20.get("/api/admin/sse", async (req, res) => {
     res.end();
   });
 });
-router20.get("/api/admin/events", async (req, res) => res.redirect(307, "/api/admin/sse"));
-router20.get("/api/admin/orders/sse", async (req, res) => res.redirect(307, "/api/admin/sse"));
-var events_default = router20;
+router21.get("/api/admin/events", async (req, res) => res.redirect(307, "/api/admin/sse"));
+router21.get("/api/admin/orders/sse", async (req, res) => res.redirect(307, "/api/admin/sse"));
+var events_default = router21;
 
 // routes/admin/users.ts
-var import_express21 = __toESM(require("express"));
+var import_express22 = __toESM(require("express"));
 var import_bcryptjs3 = __toESM(require("bcryptjs"));
 init_db();
 init_auth();
 init_admin_db();
-var router21 = import_express21.default.Router();
+var router22 = import_express22.default.Router();
 async function requireSuperAdmin(req, res) {
   const session = await getSession(req);
   if (!session) {
@@ -9307,7 +9557,7 @@ async function requireSuperAdmin(req, res) {
   }
   return session;
 }
-router21.get("/api/admin/users", async (req, res) => {
+router22.get("/api/admin/users", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const dbUser = await getAdminById(session.id);
@@ -9321,7 +9571,7 @@ router21.get("/api/admin/users", async (req, res) => {
   const users = await listAdminUsers(shopId);
   res.json({ users });
 });
-router21.post("/api/admin/users", async (req, res) => {
+router22.post("/api/admin/users", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role)) {
@@ -9377,7 +9627,7 @@ router21.post("/api/admin/users", async (req, res) => {
     res.status(500).json({ error: msg });
   }
 });
-router21.patch("/api/admin/users/:id", async (req, res) => {
+router22.patch("/api/admin/users/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const targetId = Number(req.params.id);
@@ -9407,7 +9657,7 @@ router21.patch("/api/admin/users/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router21.delete("/api/admin/users/:id", async (req, res) => {
+router22.delete("/api/admin/users/:id", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   const targetId = Number(req.params.id);
@@ -9419,7 +9669,7 @@ router21.delete("/api/admin/users/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router21.get("/api/admin/users/:id/permissions", async (req, res) => {
+router22.get("/api/admin/users/:id/permissions", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   const { listAdminUsers: list } = await Promise.resolve().then(() => (init_admin_db(), admin_db_exports));
@@ -9435,7 +9685,7 @@ router21.get("/api/admin/users/:id/permissions", async (req, res) => {
   }
   res.json({ permissions: perms });
 });
-router21.put("/api/admin/users/:id/permissions", async (req, res) => {
+router22.put("/api/admin/users/:id/permissions", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   try {
@@ -9448,13 +9698,13 @@ router21.put("/api/admin/users/:id/permissions", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router21.get("/api/admin/team", async (req, res) => {
+router22.get("/api/admin/team", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   const [utilisateurs, permissions] = await Promise.all([listUtilisateurs(), listPermissions()]);
   res.json({ utilisateurs, permissions });
 });
-router21.post("/api/admin/team", async (req, res) => {
+router22.post("/api/admin/team", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   try {
@@ -9468,7 +9718,7 @@ router21.post("/api/admin/team", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router21.patch("/api/admin/team/:id", async (req, res) => {
+router22.patch("/api/admin/team/:id", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   try {
@@ -9488,7 +9738,7 @@ router21.patch("/api/admin/team/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router21.delete("/api/admin/team/:id", async (req, res) => {
+router22.delete("/api/admin/team/:id", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   try {
@@ -9498,7 +9748,7 @@ router21.delete("/api/admin/team/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router21.get("/api/admin/team/:id/permissions", async (req, res) => {
+router22.get("/api/admin/team/:id/permissions", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   const user = await getUtilisateurById(Number(req.params.id));
@@ -9512,7 +9762,7 @@ router21.get("/api/admin/team/:id/permissions", async (req, res) => {
   }
   res.json({ permissions: perms });
 });
-router21.put("/api/admin/team/:id/permissions", async (req, res) => {
+router22.put("/api/admin/team/:id/permissions", async (req, res) => {
   const session = await requireSuperAdmin(req, res);
   if (!session) return;
   try {
@@ -9525,14 +9775,14 @@ router21.put("/api/admin/team/:id/permissions", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var users_default = router21;
+var users_default = router22;
 
 // routes/admin/reviews.ts
-var import_express22 = __toESM(require("express"));
+var import_express23 = __toESM(require("express"));
 init_auth();
 init_admin_db();
-var router22 = import_express22.default.Router();
-router22.post("/api/admin/reviews", async (req, res) => {
+var router23 = import_express23.default.Router();
+router23.post("/api/admin/reviews", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { id, approved, _delete } = req.body;
@@ -9548,14 +9798,14 @@ router22.post("/api/admin/reviews", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var reviews_default = router22;
+var reviews_default = router23;
 
 // routes/admin/payment-plans.ts
-var import_express23 = __toESM(require("express"));
+var import_express24 = __toESM(require("express"));
 init_auth();
 init_admin_db();
 init_db();
-var router23 = import_express23.default.Router();
+var router24 = import_express24.default.Router();
 var _paymentTablesReady = false;
 async function ensurePaymentTables() {
   if (_paymentTablesReady) return;
@@ -9594,7 +9844,7 @@ async function ensurePaymentTables() {
   }
   _paymentTablesReady = true;
 }
-router23.get("/api/admin/payment-plans", async (req, res) => {
+router24.get("/api/admin/payment-plans", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   try {
@@ -9605,7 +9855,7 @@ router23.get("/api/admin/payment-plans", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router23.get("/api/admin/payment-plans/order/:orderId", async (req, res) => {
+router24.get("/api/admin/payment-plans/order/:orderId", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   try {
@@ -9617,7 +9867,7 @@ router23.get("/api/admin/payment-plans/order/:orderId", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router23.patch("/api/admin/payment-tranches/:id", async (req, res) => {
+router24.patch("/api/admin/payment-tranches/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   try {
@@ -9632,7 +9882,7 @@ router23.patch("/api/admin/payment-tranches/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router23.delete("/api/admin/payment-plans/:id", async (req, res) => {
+router24.delete("/api/admin/payment-plans/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   try {
@@ -9642,14 +9892,14 @@ router23.delete("/api/admin/payment-plans/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var payment_plans_default = router23;
+var payment_plans_default = router24;
 
 // routes/admin/verifications.ts
-var import_express24 = __toESM(require("express"));
+var import_express25 = __toESM(require("express"));
 init_auth();
 init_db();
-var router24 = import_express24.default.Router();
-router24.get("/api/admin/verifications", async (req, res) => {
+var router25 = import_express25.default.Router();
+router25.get("/api/admin/verifications", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   try {
@@ -9668,7 +9918,7 @@ router24.get("/api/admin/verifications", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router24.patch("/api/admin/verifications/:id", async (req, res) => {
+router25.patch("/api/admin/verifications/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   try {
@@ -9698,13 +9948,13 @@ router24.patch("/api/admin/verifications/:id", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-var verifications_default = router24;
+var verifications_default = router25;
 
 // routes/admin/commerciaux.ts
-var import_express25 = __toESM(require("express"));
+var import_express26 = __toESM(require("express"));
 init_db();
 init_auth();
-var router25 = import_express25.default.Router();
+var router26 = import_express26.default.Router();
 var pool = db;
 async function ensureCommerciauxTables() {
   await pool.execute(`
@@ -9741,7 +9991,7 @@ async function ensureCommerciauxTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 }
-router25.get("/api/admin/commerciaux", async (req, res) => {
+router26.get("/api/admin/commerciaux", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -9763,7 +10013,7 @@ router25.get("/api/admin/commerciaux", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-router25.get("/api/admin/commerciaux/stats", async (req, res) => {
+router26.get("/api/admin/commerciaux/stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -9782,7 +10032,7 @@ router25.get("/api/admin/commerciaux/stats", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-router25.post("/api/admin/commerciaux", async (req, res) => {
+router26.post("/api/admin/commerciaux", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { nom, email, telephone, taux_commission } = req.body;
@@ -9797,7 +10047,7 @@ router25.post("/api/admin/commerciaux", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-router25.patch("/api/admin/commerciaux/:id", async (req, res) => {
+router26.patch("/api/admin/commerciaux/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { nom, email, telephone, taux_commission, actif } = req.body;
@@ -9811,7 +10061,7 @@ router25.patch("/api/admin/commerciaux/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-router25.get("/api/admin/commerciaux/commissions", async (req, res) => {
+router26.get("/api/admin/commerciaux/commissions", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -9826,7 +10076,7 @@ router25.get("/api/admin/commerciaux/commissions", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-router25.patch("/api/admin/commerciaux/commissions/:id", async (req, res) => {
+router26.patch("/api/admin/commerciaux/commissions/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -9839,7 +10089,7 @@ router25.patch("/api/admin/commerciaux/commissions/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-router25.get("/api/admin/commerciaux/:id/produits", async (req, res) => {
+router26.get("/api/admin/commerciaux/:id/produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -9855,7 +10105,7 @@ router25.get("/api/admin/commerciaux/:id/produits", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-router25.put("/api/admin/commerciaux/:id/produits", async (req, res) => {
+router26.put("/api/admin/commerciaux/:id/produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { produit_ids } = req.body;
@@ -9870,14 +10120,14 @@ router25.put("/api/admin/commerciaux/:id/produits", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-var commerciaux_default = router25;
+var commerciaux_default = router26;
 
 // routes/livreur.ts
-var import_express26 = __toESM(require("express"));
+var import_express27 = __toESM(require("express"));
 init_auth();
 init_admin_db();
 init_db();
-var router26 = import_express26.default.Router();
+var router27 = import_express27.default.Router();
 async function requireLivreur(req, res) {
   const session = await getSession(req);
   if (!session) {
@@ -9904,7 +10154,7 @@ async function requireLivreur(req, res) {
   res.status(403).json({ error: "Acc\xE8s r\xE9serv\xE9 aux livreurs." });
   return null;
 }
-router26.get("/api/livreur/profile", async (req, res) => {
+router27.get("/api/livreur/profile", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   try {
@@ -9920,7 +10170,7 @@ router26.get("/api/livreur/profile", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router26.get("/api/livreur/stats", async (req, res) => {
+router27.get("/api/livreur/stats", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   const pool2 = db;
@@ -9958,7 +10208,7 @@ router26.get("/api/livreur/stats", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router26.get("/api/livreur/orders/available", async (req, res) => {
+router27.get("/api/livreur/orders/available", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   const pool2 = db;
@@ -9988,7 +10238,7 @@ router26.get("/api/livreur/orders/available", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router26.get("/api/livreur/orders/mine", async (req, res) => {
+router27.get("/api/livreur/orders/mine", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   const pool2 = db;
@@ -10020,7 +10270,7 @@ router26.get("/api/livreur/orders/mine", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router26.get("/api/livreur/orders/history", async (req, res) => {
+router27.get("/api/livreur/orders/history", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   const pool2 = db;
@@ -10053,7 +10303,7 @@ router26.get("/api/livreur/orders/history", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router26.patch("/api/livreur/orders/:id/accept", async (req, res) => {
+router27.patch("/api/livreur/orders/:id/accept", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   const pool2 = db;
@@ -10099,7 +10349,7 @@ router26.patch("/api/livreur/orders/:id/accept", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router26.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
+router27.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   const pool2 = db;
@@ -10173,7 +10423,7 @@ router26.patch("/api/livreur/orders/:id/deliver", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router26.patch("/api/livreur/orders/:id/fail", async (req, res) => {
+router27.patch("/api/livreur/orders/:id/fail", async (req, res) => {
   const ctx = await requireLivreur(req, res);
   if (!ctx) return;
   const pool2 = db;
@@ -10219,14 +10469,14 @@ router26.patch("/api/livreur/orders/:id/fail", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var livreur_default = router26;
+var livreur_default = router27;
 
 // routes/public.ts
-var import_express27 = __toESM(require("express"));
+var import_express28 = __toESM(require("express"));
 init_db();
 init_admin_db();
 init_shops();
-var router27 = import_express27.default.Router();
+var router28 = import_express28.default.Router();
 var _shopCache = /* @__PURE__ */ new Map();
 var SHOP_CACHE_TTL = 6e4;
 async function resolveShopId(req) {
@@ -10356,7 +10606,7 @@ async function loadBestsellerProducts(limit, shopId = 1) {
   _bsCacheMap.set(shopId, { data: products, ts: Date.now() });
   return products;
 }
-router27.get("/api/health", async (_req, res) => {
+router28.get("/api/health", async (_req, res) => {
   let dbStatus = "untested";
   let tables = [];
   try {
@@ -10370,7 +10620,7 @@ router27.get("/api/health", async (_req, res) => {
   }
   res.json({ status: "ok", db_status: dbStatus, tables });
 });
-router27.get("/api/products", async (req, res) => {
+router28.get("/api/products", async (req, res) => {
   try {
     const shopId = await resolveShopId(req);
     const idsParam = req.query.ids;
@@ -10412,7 +10662,7 @@ router27.get("/api/products", async (req, res) => {
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }
 });
-router27.get("/api/categories", async (req, res) => {
+router28.get("/api/categories", async (req, res) => {
   try {
     const shopId = await resolveShopId(req);
     const categories = await getCategories(shopId);
@@ -10421,7 +10671,7 @@ router27.get("/api/categories", async (req, res) => {
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }
 });
-router27.post("/api/newsletter", async (req, res) => {
+router28.post("/api/newsletter", async (req, res) => {
   try {
     const { email } = req.body;
     if (!email?.trim()) return res.status(400).json({ error: "Email requis." });
@@ -10431,7 +10681,7 @@ router27.post("/api/newsletter", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router27.get("/api/reviews/ratings", async (req, res) => {
+router28.get("/api/reviews/ratings", async (req, res) => {
   try {
     const idsParam = req.query.ids;
     if (!idsParam) return res.json({ ratings: {} });
@@ -10461,7 +10711,7 @@ router27.get("/api/reviews/ratings", async (req, res) => {
     res.json({ ratings: {} });
   }
 });
-router27.get("/api/reviews", async (req, res) => {
+router28.get("/api/reviews", async (req, res) => {
   try {
     const produit_id = req.query.produit_id ? Number(req.query.produit_id) : void 0;
     const reviews = await listReviews({ produit_id });
@@ -10470,7 +10720,7 @@ router27.get("/api/reviews", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router27.post("/api/reviews", async (req, res) => {
+router28.post("/api/reviews", async (req, res) => {
   try {
     const { produit_id, nom, note, commentaire } = req.body;
     if (!produit_id || !nom || !note) return res.status(400).json({ error: "Champs requis." });
@@ -10481,7 +10731,7 @@ router27.post("/api/reviews", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router27.get("/api/settings/public", async (req, res) => {
+router28.get("/api/settings/public", async (req, res) => {
   try {
     const shopId = await resolveShopId(req);
     const settings = await getSettings(shopId);
@@ -10490,7 +10740,7 @@ router27.get("/api/settings/public", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router27.get("/api/products/bestsellers", async (req, res) => {
+router28.get("/api/products/bestsellers", async (req, res) => {
   try {
     const shopId = await resolveShopId(req);
     const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 8)));
@@ -10500,7 +10750,7 @@ router27.get("/api/products/bestsellers", async (req, res) => {
     res.status(500).json({ success: false, error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router27.get("/api/orders/track", async (req, res) => {
+router28.get("/api/orders/track", async (req, res) => {
   try {
     const q = (req.query.q ?? "").trim();
     if (!q || q.length < 3) {
@@ -10577,7 +10827,7 @@ router27.get("/api/orders/track", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router27.get("/api/public/coupons/validate", async (req, res) => {
+router28.get("/api/public/coupons/validate", async (req, res) => {
   try {
     const code = String(req.query.code ?? "").trim().toUpperCase();
     const total = Number(req.query.total ?? 0);
@@ -10598,7 +10848,7 @@ router27.get("/api/public/coupons/validate", async (req, res) => {
     res.status(500).json({ valid: false, error: "Erreur serveur." });
   }
 });
-router27.get("/api/public/delivery-zones", async (req, res) => {
+router28.get("/api/public/delivery-zones", async (req, res) => {
   try {
     const shopId = await resolveShopId(req);
     const zones = await getDeliveryZones(true, shopId);
@@ -10607,7 +10857,7 @@ router27.get("/api/public/delivery-zones", async (req, res) => {
     res.json([]);
   }
 });
-router27.get("/api/resolve-domain", async (req, res) => {
+router28.get("/api/resolve-domain", async (req, res) => {
   const h = String(req.query.h ?? "").toLowerCase().trim().replace(/^www\./, "");
   if (!h) return res.json({ slug: null });
   try {
@@ -10618,7 +10868,7 @@ router27.get("/api/resolve-domain", async (req, res) => {
     res.json({ slug: null });
   }
 });
-router27.get("/api/public/products/:id/variants", async (req, res) => {
+router28.get("/api/public/products/:id/variants", async (req, res) => {
   try {
     const productId = Number(req.params.id);
     if (!productId || isNaN(productId)) return res.json([]);
@@ -10645,10 +10895,10 @@ router27.get("/api/public/products/:id/variants", async (req, res) => {
     res.json([]);
   }
 });
-var public_default = router27;
+var public_default = router28;
 
 // routes/account.ts
-var import_express28 = __toESM(require("express"));
+var import_express29 = __toESM(require("express"));
 var import_bcryptjs4 = __toESM(require("bcryptjs"));
 init_db();
 init_admin_db();
@@ -10690,9 +10940,9 @@ function clearClientCookie(res) {
 }
 
 // routes/account.ts
-var router28 = import_express28.default.Router();
+var router29 = import_express29.default.Router();
 var tableReady2 = false;
-async function ensureTable4() {
+async function ensureTable3() {
   if (tableReady2) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS client_users (
@@ -10730,9 +10980,9 @@ function toPayload(row) {
     photo_url: row.photo_url ?? null
   };
 }
-router28.post("/api/account/register", async (req, res) => {
+router29.post("/api/account/register", async (req, res) => {
   try {
-    await ensureTable4();
+    await ensureTable3();
     const { nom, identifier, password } = req.body;
     if (!nom?.trim() || !identifier?.trim() || !password?.trim()) {
       return res.status(400).json({ error: "Nom, identifiant et mot de passe requis." });
@@ -10766,9 +11016,9 @@ router28.post("/api/account/register", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router28.post("/api/account/login", async (req, res) => {
+router29.post("/api/account/login", async (req, res) => {
   try {
-    await ensureTable4();
+    await ensureTable3();
     const { identifier, password } = req.body;
     if (!identifier?.trim() || !password?.trim()) {
       return res.status(400).json({ error: "Identifiant et mot de passe requis." });
@@ -10790,9 +11040,9 @@ router28.post("/api/account/login", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router28.get("/api/account/me", async (req, res) => {
+router29.get("/api/account/me", async (req, res) => {
   try {
-    await ensureTable4();
+    await ensureTable3();
     const session = await getClientSession(req);
     if (!session) return res.json({ user: null });
     const pool2 = db;
@@ -10807,11 +11057,11 @@ router28.get("/api/account/me", async (req, res) => {
     return res.json({ user: null });
   }
 });
-router28.post("/api/account/logout", (_req, res) => {
+router29.post("/api/account/logout", (_req, res) => {
   clearClientCookie(res);
   return res.json({ ok: true });
 });
-router28.get("/api/account/google", (_req, res) => {
+router29.get("/api/account/google", (_req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
   if (!clientId || !redirectUri) {
@@ -10827,10 +11077,10 @@ router28.get("/api/account/google", (_req, res) => {
   });
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
-router28.get("/api/account/google/callback", async (req, res) => {
+router29.get("/api/account/google/callback", async (req, res) => {
   const siteUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3003";
   try {
-    await ensureTable4();
+    await ensureTable3();
     const code = req.query.code;
     if (!code) return res.redirect(`${siteUrl}/?auth_error=no_code`);
     const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -10901,7 +11151,7 @@ router28.get("/api/account/google/callback", async (req, res) => {
     return res.redirect(`${siteUrl2}/?auth_error=server`);
   }
 });
-router28.get("/api/account/orders", async (req, res) => {
+router29.get("/api/account/orders", async (req, res) => {
   try {
     const session = await getClientSession(req);
     if (!session) return res.status(401).json({ error: "Non connect\xE9." });
@@ -10934,7 +11184,7 @@ router28.get("/api/account/orders", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router28.get("/api/account/orders/:ref", async (req, res) => {
+router29.get("/api/account/orders/:ref", async (req, res) => {
   try {
     const session = await getClientSession(req);
     if (!session) return res.status(401).json({ error: "Non connect\xE9." });
@@ -10992,7 +11242,7 @@ async function ensureVerifTable() {
   }
   verifTableReady = true;
 }
-router28.get("/api/account/verification", async (req, res) => {
+router29.get("/api/account/verification", async (req, res) => {
   try {
     const session = await getClientSession(req);
     if (!session) return res.status(401).json({ error: "Non connect\xE9." });
@@ -11009,7 +11259,7 @@ router28.get("/api/account/verification", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router28.post("/api/account/verification", async (req, res) => {
+router29.post("/api/account/verification", async (req, res) => {
   try {
     const session = await getClientSession(req);
     if (!session) return res.status(401).json({ error: "Non connect\xE9." });
@@ -11073,7 +11323,7 @@ async function ensureAddressTable() {
   `);
   addressTableReady = true;
 }
-router28.get("/api/account/addresses", async (req, res) => {
+router29.get("/api/account/addresses", async (req, res) => {
   try {
     const session = await getClientSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -11088,7 +11338,7 @@ router28.get("/api/account/addresses", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router28.post("/api/account/addresses", async (req, res) => {
+router29.post("/api/account/addresses", async (req, res) => {
   try {
     const session = await getClientSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -11114,7 +11364,7 @@ router28.post("/api/account/addresses", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router28.delete("/api/account/addresses/:id", async (req, res) => {
+router29.delete("/api/account/addresses/:id", async (req, res) => {
   try {
     const session = await getClientSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -11128,14 +11378,14 @@ router28.delete("/api/account/addresses/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-var account_default = router28;
+var account_default = router29;
 
 // routes/orders.ts
-var import_express29 = __toESM(require("express"));
+var import_express30 = __toESM(require("express"));
 init_admin_db();
 init_whatsapp();
 init_db();
-var router29 = import_express29.default.Router();
+var router30 = import_express30.default.Router();
 function normalizeTogoPhone(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
   const local = digits.startsWith("228") ? digits.slice(3) : digits;
@@ -11162,7 +11412,7 @@ async function ensureOrderCols() {
   }
   _orderColsReady = true;
 }
-router29.post("/api/orders", async (req, res) => {
+router30.post("/api/orders", async (req, res) => {
   try {
     await ensureOrderCols();
     await ensurePaymentTables();
@@ -11338,13 +11588,13 @@ router29.post("/api/orders", async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-var orders_default2 = router29;
+var orders_default2 = router30;
 
 // routes/mobile-money.ts
-var import_express30 = __toESM(require("express"));
+var import_express31 = __toESM(require("express"));
 init_db();
 init_admin_db();
-var router30 = import_express30.default.Router();
+var router31 = import_express31.default.Router();
 var FEDAPAY_BASE = "https://api.fedapay.com/v1";
 function fedapayHeaders() {
   return {
@@ -11356,7 +11606,7 @@ var OPERATOR_MODE = {
   flooz: "moov",
   yas: "moov"
 };
-router30.get("/api/debug/fedapay-test", async (req, res) => {
+router31.get("/api/debug/fedapay-test", async (req, res) => {
   const phone = String(req.query.phone || "90000000");
   const log = { phone };
   try {
@@ -11409,7 +11659,7 @@ router30.get("/api/debug/fedapay-test", async (req, res) => {
     return res.status(500).json({ ok: false, error: String(err), log });
   }
 });
-router30.post("/api/orders/pay/mobile-money", async (req, res) => {
+router31.post("/api/orders/pay/mobile-money", async (req, res) => {
   try {
     const { orderId, orderRef, operator, phone, total, nom } = req.body;
     if (!orderId || !operator || !phone || !total) {
@@ -11486,7 +11736,7 @@ router30.post("/api/orders/pay/mobile-money", async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router30.get("/api/orders/pay/status/:txId", async (req, res) => {
+router31.get("/api/orders/pay/status/:txId", async (req, res) => {
   try {
     const txId = Number(req.params.txId);
     const pool2 = db;
@@ -11501,7 +11751,7 @@ router30.get("/api/orders/pay/status/:txId", async (req, res) => {
     return res.status(500).json({ error: "Erreur statut." });
   }
 });
-router30.post("/api/webhooks/fedapay", async (req, res) => {
+router31.post("/api/webhooks/fedapay", async (req, res) => {
   try {
     const event = req.body;
     if (event.name !== "transaction.approved") {
@@ -11534,16 +11784,16 @@ router30.post("/api/webhooks/fedapay", async (req, res) => {
     return res.status(500).json({ error: "Erreur webhook." });
   }
 });
-var mobile_money_default = router30;
+var mobile_money_default = router31;
 
 // index.ts
 init_admin_db();
 
 // routes/admin/security-logs.ts
-var import_express31 = __toESM(require("express"));
+var import_express32 = __toESM(require("express"));
 init_auth();
-var router31 = import_express31.default.Router();
-router31.get("/api/admin/security-logs", async (req, res) => {
+var router32 = import_express32.default.Router();
+router32.get("/api/admin/security-logs", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role)) {
@@ -11554,13 +11804,13 @@ router31.get("/api/admin/security-logs", async (req, res) => {
   const logs = await getSecurityLogs(limit, shopId);
   res.json({ logs });
 });
-var security_logs_default = router31;
+var security_logs_default = router32;
 
 // routes/admin/rapports.ts
-var import_express32 = __toESM(require("express"));
+var import_express33 = __toESM(require("express"));
 init_auth();
 init_db();
-var router32 = import_express32.default.Router();
+var router33 = import_express33.default.Router();
 function periodClause(col, periode) {
   switch (periode) {
     case "aujourd_hui":
@@ -11577,7 +11827,7 @@ function periodClause(col, periode) {
       return "1=1";
   }
 }
-router32.get("/api/admin/rapports", async (req, res) => {
+router33.get("/api/admin/rapports", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const shopId = session.shop_id ?? 1;
@@ -11910,17 +12160,17 @@ router32.get("/api/admin/rapports", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-var rapports_default = router32;
+var rapports_default = router33;
 
 // routes/admin/tendances.ts
-var import_express33 = __toESM(require("express"));
+var import_express34 = __toESM(require("express"));
 init_auth();
 init_db();
-var router33 = import_express33.default.Router();
+var router34 = import_express34.default.Router();
 var MOIS_LABELS = ["Jan", "F\xE9v", "Mar", "Avr", "Mai", "Jun", "Jul", "Ao\xFB", "Sep", "Oct", "Nov", "D\xE9c"];
 var SITE_JOIN = `LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'`;
 var SITE_COND = `(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)`;
-router33.get("/api/admin/tendances", async (req, res) => {
+router34.get("/api/admin/tendances", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const shopId = session.shop_id ?? 1;
@@ -12110,13 +12360,13 @@ router33.get("/api/admin/tendances", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-var tendances_default = router33;
+var tendances_default = router34;
 
 // routes/admin/performance-produits.ts
-var import_express34 = __toESM(require("express"));
+var import_express35 = __toESM(require("express"));
 init_auth();
 init_db();
-var router34 = import_express34.default.Router();
+var router35 = import_express35.default.Router();
 async function ensurePrixAchat() {
   try {
     await db.execute(`ALTER TABLE products ADD COLUMN prix_achat DECIMAL(12,2) NULL DEFAULT NULL`);
@@ -12124,7 +12374,7 @@ async function ensurePrixAchat() {
   }
 }
 ensurePrixAchat().catch(console.error);
-router34.get("/api/admin/performance-produits", async (req, res) => {
+router35.get("/api/admin/performance-produits", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const shopId = session.shop_id ?? 1;
@@ -12238,15 +12488,15 @@ router34.get("/api/admin/performance-produits", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-var performance_produits_default = router34;
+var performance_produits_default = router35;
 
 // routes/admin/whatsapp-inbox.ts
-var import_express35 = __toESM(require("express"));
+var import_express36 = __toESM(require("express"));
 init_auth();
 init_db();
 init_admin_db();
 init_whatsapp();
-var router35 = import_express35.default.Router();
+var router36 = import_express36.default.Router();
 var WA_GRAPH = "https://graph.facebook.com/v18.0";
 async function ensureWaMessagesCols() {
   const alters = [
@@ -12263,7 +12513,7 @@ async function ensureWaMessagesCols() {
     }
   }
 }
-router35.get("/api/admin/whatsapp/webhook", async (req, res) => {
+router36.get("/api/admin/whatsapp/webhook", async (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
@@ -12274,7 +12524,7 @@ router35.get("/api/admin/whatsapp/webhook", async (req, res) => {
   }
   return res.status(403).end();
 });
-router35.post("/api/admin/whatsapp/webhook", async (req, res) => {
+router36.post("/api/admin/whatsapp/webhook", async (req, res) => {
   res.sendStatus(200);
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
@@ -12322,7 +12572,7 @@ router35.post("/api/admin/whatsapp/webhook", async (req, res) => {
     console.error("[webhook/whatsapp/inbound]", err);
   }
 });
-router35.get("/api/admin/whatsapp/threads", async (req, res) => {
+router36.get("/api/admin/whatsapp/threads", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const shopId = session.shop_id ?? 1;
@@ -12359,7 +12609,7 @@ router35.get("/api/admin/whatsapp/threads", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-router35.get("/api/admin/whatsapp/threads/:phone", async (req, res) => {
+router36.get("/api/admin/whatsapp/threads/:phone", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { phone } = req.params;
@@ -12384,7 +12634,7 @@ router35.get("/api/admin/whatsapp/threads/:phone", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-router35.get("/api/admin/whatsapp/media/:mediaId", async (req, res) => {
+router36.get("/api/admin/whatsapp/media/:mediaId", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).end();
   try {
@@ -12410,7 +12660,7 @@ router35.get("/api/admin/whatsapp/media/:mediaId", async (req, res) => {
     res.status(500).end();
   }
 });
-router35.post("/api/admin/whatsapp/threads/:phone/send", async (req, res) => {
+router36.post("/api/admin/whatsapp/threads/:phone/send", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { phone } = req.params;
@@ -12427,7 +12677,7 @@ router35.post("/api/admin/whatsapp/threads/:phone/send", async (req, res) => {
   emitAdminEvent("message", { type_action: "sent", to: phone });
   res.json({ ok: true });
 });
-router35.post("/api/admin/whatsapp/threads/:phone/send-image", async (req, res) => {
+router36.post("/api/admin/whatsapp/threads/:phone/send-image", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { phone } = req.params;
@@ -12451,7 +12701,7 @@ router35.post("/api/admin/whatsapp/threads/:phone/send-image", async (req, res) 
   });
   res.json({ ok: true });
 });
-router35.post("/api/admin/whatsapp/threads/:phone/send-audio", async (req, res) => {
+router36.post("/api/admin/whatsapp/threads/:phone/send-audio", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { phone } = req.params;
@@ -12474,7 +12724,7 @@ router35.post("/api/admin/whatsapp/threads/:phone/send-audio", async (req, res) 
   });
   res.json({ ok: true });
 });
-router35.delete("/api/admin/whatsapp/threads/:phone", async (req, res) => {
+router36.delete("/api/admin/whatsapp/threads/:phone", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9" });
   const { phone } = req.params;
@@ -12486,12 +12736,12 @@ router35.delete("/api/admin/whatsapp/threads/:phone", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-var whatsapp_inbox_default = router35;
+var whatsapp_inbox_default = router36;
 
 // routes/whatsapp-webhook.ts
-var import_express36 = __toESM(require("express"));
+var import_express37 = __toESM(require("express"));
 init_db();
-var router36 = import_express36.default.Router();
+var router37 = import_express37.default.Router();
 var VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN ?? "togolese_webhook";
 async function ensureWaMessagesTable() {
   try {
@@ -12514,7 +12764,7 @@ async function ensureWaMessagesTable() {
     console.error("[ensureWaMessagesTable]", err);
   }
 }
-router36.get("/api/webhooks/whatsapp", (req, res) => {
+router37.get("/api/webhooks/whatsapp", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
@@ -12523,7 +12773,7 @@ router36.get("/api/webhooks/whatsapp", (req, res) => {
   }
   return res.status(403).end();
 });
-router36.post("/api/webhooks/whatsapp", async (req, res) => {
+router37.post("/api/webhooks/whatsapp", async (req, res) => {
   res.sendStatus(200);
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
@@ -12550,14 +12800,14 @@ router36.post("/api/webhooks/whatsapp", async (req, res) => {
     console.error("[webhook/whatsapp]", err);
   }
 });
-var whatsapp_webhook_default = router36;
+var whatsapp_webhook_default = router37;
 
 // routes/analytics.ts
-var import_express37 = __toESM(require("express"));
+var import_express38 = __toESM(require("express"));
 init_auth();
 init_db();
 var import_http = __toESM(require("http"));
-var router37 = import_express37.default.Router();
+var router38 = import_express38.default.Router();
 async function ensurePageViewsTable() {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS page_views (
@@ -12637,7 +12887,7 @@ function getClientIp(req) {
   }
   return req.socket?.remoteAddress ?? "";
 }
-router37.post("/api/analytics/hit", async (req, res) => {
+router38.post("/api/analytics/hit", async (req, res) => {
   try {
     const { page, referrer, device, session_id, visitor_id } = req.body;
     if (!page || !session_id) return res.status(400).json({ ok: false });
@@ -12671,7 +12921,7 @@ router37.post("/api/analytics/hit", async (req, res) => {
   }
 });
 var JOURS = ["", "Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-router37.get("/api/admin/analytics", async (req, res) => {
+router38.get("/api/admin/analytics", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -12858,12 +13108,12 @@ router37.get("/api/admin/analytics", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-var analytics_default = router37;
+var analytics_default = router38;
 
 // routes/referrals.ts
-var import_express38 = __toESM(require("express"));
+var import_express39 = __toESM(require("express"));
 init_db();
-var router38 = import_express38.default.Router();
+var router39 = import_express39.default.Router();
 async function ensureReferralsTable() {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS referrals (
@@ -12895,7 +13145,7 @@ async function uniqueCode(nom) {
   }
   return generateCode2(nom) + Date.now().toString(36).slice(-3).toUpperCase();
 }
-router38.post("/api/referrals", async (req, res) => {
+router39.post("/api/referrals", async (req, res) => {
   try {
     const { nom, telephone } = req.body;
     if (!nom?.trim() || !telephone?.trim()) {
@@ -12926,7 +13176,7 @@ router38.post("/api/referrals", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router38.get("/api/referrals", async (req, res) => {
+router39.get("/api/referrals", async (req, res) => {
   try {
     const code = String(req.query.code ?? "").trim().toUpperCase();
     if (!code) return res.status(400).json({ error: "Code manquant." });
@@ -12941,7 +13191,7 @@ router38.get("/api/referrals", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur." });
   }
 });
-router38.get("/api/referrals/validate", async (req, res) => {
+router39.get("/api/referrals/validate", async (req, res) => {
   try {
     const code = String(req.query.code ?? "").trim().toUpperCase();
     if (!code) return res.status(400).json({ valid: false });
@@ -12956,14 +13206,14 @@ router38.get("/api/referrals/validate", async (req, res) => {
     res.status(500).json({ valid: false });
   }
 });
-var referrals_default = router38;
+var referrals_default = router39;
 
 // routes/admin/delivery-zones.ts
-var import_express39 = __toESM(require("express"));
+var import_express40 = __toESM(require("express"));
 init_auth();
 init_admin_db();
 init_db();
-var router39 = import_express39.default.Router();
+var router40 = import_express40.default.Router();
 async function ensureDeliveryZonesTable() {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS delivery_zones (
@@ -12982,7 +13232,7 @@ async function ensureDeliveryZonesTable() {
   }
 }
 ensureDeliveryZonesTable().catch(console.error);
-router39.get("/api/admin/delivery-zones", async (req, res) => {
+router40.get("/api/admin/delivery-zones", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -12992,7 +13242,7 @@ router39.get("/api/admin/delivery-zones", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router39.post("/api/admin/delivery-zones", async (req, res) => {
+router40.post("/api/admin/delivery-zones", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -13021,7 +13271,7 @@ router39.post("/api/admin/delivery-zones", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router39.delete("/api/admin/delivery-zones/:id", async (req, res) => {
+router40.delete("/api/admin/delivery-zones/:id", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -13034,14 +13284,14 @@ router39.delete("/api/admin/delivery-zones/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-var delivery_zones_default = router39;
+var delivery_zones_default = router40;
 
 // routes/admin/coupons.ts
-var import_express40 = __toESM(require("express"));
+var import_express41 = __toESM(require("express"));
 init_auth();
 init_admin_db();
 init_db();
-var router40 = import_express40.default.Router();
+var router41 = import_express41.default.Router();
 async function ensureCouponsTable2() {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS coupons (
@@ -13072,7 +13322,7 @@ async function ensureCouponsTable2() {
   }
 }
 ensureCouponsTable2().catch(console.error);
-router40.get("/api/admin/coupons", async (req, res) => {
+router41.get("/api/admin/coupons", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -13082,7 +13332,7 @@ router40.get("/api/admin/coupons", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router40.post("/api/admin/coupons", async (req, res) => {
+router41.post("/api/admin/coupons", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -13114,12 +13364,12 @@ router40.post("/api/admin/coupons", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-var coupons_default = router40;
+var coupons_default = router41;
 
 // routes/admin/social.ts
-var import_express41 = __toESM(require("express"));
+var import_express42 = __toESM(require("express"));
 init_auth();
-var router41 = import_express41.default.Router();
+var router42 = import_express42.default.Router();
 var N8N_WEBHOOK = "https://n8n.togolese.fr/webhook/facebook-publisher";
 var AD_ACCOUNT_ID = "act_976291178146381";
 var PAGE_ID = "1110500725482756";
@@ -13190,7 +13440,7 @@ async function boostPost(postId, budgetPerDay, days) {
   }, token);
   return ad.id;
 }
-router41.post("/api/admin/social/publish", async (req, res) => {
+router42.post("/api/admin/social/publish", async (req, res) => {
   try {
     const session = await getSession(req);
     if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -13229,21 +13479,21 @@ router41.post("/api/admin/social/publish", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-var social_default = router41;
+var social_default = router42;
 
 // routes/admin/whatsapp-campagne.ts
-var import_express42 = __toESM(require("express"));
+var import_express43 = __toESM(require("express"));
 init_auth();
 init_db();
 init_whatsapp();
-var router42 = import_express42.default.Router();
+var router43 = import_express43.default.Router();
 function formatTgPhone(num) {
   const digits = num.replace(/[\s+\-()]/g, "");
   if (digits.startsWith("228")) return digits;
   if (digits.startsWith("0")) return `228${digits.slice(1)}`;
   return `228${digits}`;
 }
-router42.get("/api/admin/whatsapp-campagne/test-credentials", async (req, res) => {
+router43.get("/api/admin/whatsapp-campagne/test-credentials", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { getSetting: getSetting2 } = await Promise.resolve().then(() => (init_admin_db(), admin_db_exports));
@@ -13256,7 +13506,7 @@ router42.get("/api/admin/whatsapp-campagne/test-credentials", async (req, res) =
   const data = await r.json();
   res.json({ status: r.status, phoneId, tokenPreview: token.slice(0, 20) + "...", data });
 });
-router42.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
+router43.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const clientIds = req.query.ids ?? "";
@@ -13282,7 +13532,7 @@ router42.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router42.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
+router43.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
   console.log("[campagne] POST /send received, body:", JSON.stringify(req.body).slice(0, 200));
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
@@ -13338,10 +13588,10 @@ router42.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var whatsapp_campagne_default = router42;
+var whatsapp_campagne_default = router43;
 
 // routes/admin/livreur-inscriptions.ts
-var import_express43 = __toESM(require("express"));
+var import_express44 = __toESM(require("express"));
 var import_bcryptjs5 = __toESM(require("bcryptjs"));
 var import_cloudinary2 = require("cloudinary");
 init_auth();
@@ -13352,7 +13602,7 @@ import_cloudinary2.v2.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
-var router43 = import_express43.default.Router();
+var router44 = import_express44.default.Router();
 async function requireAdmin(req, res) {
   const session = await getSession(req);
   if (!session) {
@@ -13377,7 +13627,7 @@ async function uploadBase64ToCloudinary(base64) {
     );
   });
 }
-router43.post("/api/livreur/inscription", async (req, res) => {
+router44.post("/api/livreur/inscription", async (req, res) => {
   try {
     await ensureLivreurInscriptionsTable();
     const { nom, telephone, numero_plaque, password, carte_identite } = req.body;
@@ -13426,7 +13676,7 @@ router43.post("/api/livreur/inscription", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router43.get("/api/admin/livreur-inscriptions", async (req, res) => {
+router44.get("/api/admin/livreur-inscriptions", async (req, res) => {
   const session = await requireAdmin(req, res);
   if (!session) return;
   try {
@@ -13437,7 +13687,7 @@ router43.get("/api/admin/livreur-inscriptions", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router43.post("/api/admin/livreur-inscriptions/:id/approve", async (req, res) => {
+router44.post("/api/admin/livreur-inscriptions/:id/approve", async (req, res) => {
   const session = await requireAdmin(req, res);
   if (!session) return;
   try {
@@ -13464,7 +13714,7 @@ router43.post("/api/admin/livreur-inscriptions/:id/approve", async (req, res) =>
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-router43.post("/api/admin/livreur-inscriptions/:id/reject", async (req, res) => {
+router44.post("/api/admin/livreur-inscriptions/:id/reject", async (req, res) => {
   const session = await requireAdmin(req, res);
   if (!session) return;
   try {
@@ -13481,14 +13731,14 @@ router43.post("/api/admin/livreur-inscriptions/:id/reject", async (req, res) => 
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
   }
 });
-var livreur_inscriptions_default = router43;
+var livreur_inscriptions_default = router44;
 
 // routes/admin/entrepots.ts
-var import_express44 = __toESM(require("express"));
+var import_express45 = __toESM(require("express"));
 init_auth();
 init_admin_db();
-var router44 = import_express44.default.Router();
-router44.get("/api/admin/entrepots", async (req, res) => {
+var router45 = import_express45.default.Router();
+router45.get("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
@@ -13501,7 +13751,7 @@ router44.get("/api/admin/entrepots", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router44.post("/api/admin/entrepots", async (req, res) => {
+router45.post("/api/admin/entrepots", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
@@ -13529,7 +13779,7 @@ router44.post("/api/admin/entrepots", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router44.delete("/api/admin/entrepots/:id", async (req, res) => {
+router45.delete("/api/admin/entrepots/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role) && !hasPageAccess(session.role, session.permissions, "magasin", "entrepots")) {
@@ -13542,15 +13792,15 @@ router44.delete("/api/admin/entrepots/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var entrepots_default = router44;
+var entrepots_default = router45;
 
 // routes/admin/tombola.ts
-var import_express45 = __toESM(require("express"));
+var import_express46 = __toESM(require("express"));
 init_auth();
 init_whatsapp();
 init_admin_db();
-var router45 = import_express45.default.Router();
-router45.get("/api/admin/tombola", async (req, res) => {
+var router46 = import_express46.default.Router();
+router46.get("/api/admin/tombola", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
   try {
@@ -13560,7 +13810,7 @@ router45.get("/api/admin/tombola", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-router45.post("/api/admin/tombola", async (req, res) => {
+router46.post("/api/admin/tombola", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
   const { id, nom, min_montant, min_participants, prize_description, statut } = req.body;
@@ -13588,7 +13838,7 @@ router45.post("/api/admin/tombola", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-router45.get("/api/admin/tombola/:id/participants", async (req, res) => {
+router46.get("/api/admin/tombola/:id/participants", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
   try {
@@ -13603,7 +13853,7 @@ router45.get("/api/admin/tombola/:id/participants", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-router45.post("/api/admin/tombola/:id/spin", async (req, res) => {
+router46.post("/api/admin/tombola/:id/spin", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
   const { winner_facture_id } = req.body;
@@ -13619,7 +13869,7 @@ router45.post("/api/admin/tombola/:id/spin", async (req, res) => {
     res.status(500).json({ error: e instanceof Error ? e.message : "Erreur serveur" });
   }
 });
-router45.post("/api/admin/tombola/:id/notify", async (req, res) => {
+router46.post("/api/admin/tombola/:id/notify", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
   try {
@@ -13638,7 +13888,7 @@ router45.post("/api/admin/tombola/:id/notify", async (req, res) => {
     res.status(500).json({ error: e instanceof Error ? e.message : "Erreur envoi WhatsApp" });
   }
 });
-router45.delete("/api/admin/tombola/:id", async (req, res) => {
+router46.delete("/api/admin/tombola/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non authentifi\xE9" });
   try {
@@ -13648,10 +13898,10 @@ router45.delete("/api/admin/tombola/:id", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-var tombola_default = router45;
+var tombola_default = router46;
 
 // routes/admin/onboarding.ts
-var import_express46 = __toESM(require("express"));
+var import_express47 = __toESM(require("express"));
 var import_bcryptjs6 = __toESM(require("bcryptjs"));
 init_admin_db();
 init_shops();
@@ -13777,9 +14027,9 @@ Pour toute aide : support@togolese.tg`;
 }
 
 // routes/admin/onboarding.ts
-var router46 = import_express46.default.Router();
+var router47 = import_express47.default.Router();
 var SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
-router46.post("/api/admin/onboarding", async (req, res) => {
+router47.post("/api/admin/onboarding", async (req, res) => {
   try {
     const {
       shop_nom,
@@ -13852,7 +14102,7 @@ router46.post("/api/admin/onboarding", async (req, res) => {
     res.status(500).json({ error: msg });
   }
 });
-router46.get("/api/admin/onboarding/check-slug", async (req, res) => {
+router47.get("/api/admin/onboarding/check-slug", async (req, res) => {
   const slug = String(req.query.slug ?? "").toLowerCase();
   if (!SLUG_RE.test(slug)) return res.json({ available: false, reason: "format" });
   if (["admin", "api", "www", "mail", "default", "app"].includes(slug)) {
@@ -13861,14 +14111,14 @@ router46.get("/api/admin/onboarding/check-slug", async (req, res) => {
   const existing = await getShopBySlug(slug);
   res.json({ available: !existing });
 });
-var onboarding_default = router46;
+var onboarding_default = router47;
 
 // routes/admin/saas-dashboard.ts
-var import_express47 = __toESM(require("express"));
+var import_express48 = __toESM(require("express"));
 init_auth();
 init_shops();
 init_db();
-var router47 = import_express47.default.Router();
+var router48 = import_express48.default.Router();
 function requireSuperAdmin2(session, res) {
   if (!session) {
     res.status(401).json({ error: "Non autoris\xE9." });
@@ -13880,7 +14130,7 @@ function requireSuperAdmin2(session, res) {
   }
   return true;
 }
-router47.get("/api/admin/saas/shops", async (req, res) => {
+router48.get("/api/admin/saas/shops", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   try {
@@ -13894,7 +14144,7 @@ router47.get("/api/admin/saas/shops", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.patch("/api/admin/saas/shops/:id", async (req, res) => {
+router48.patch("/api/admin/saas/shops/:id", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const id = Number(req.params.id);
@@ -13920,7 +14170,7 @@ router47.patch("/api/admin/saas/shops/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.get("/api/admin/saas/stats", async (req, res) => {
+router48.get("/api/admin/saas/stats", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   try {
@@ -13939,7 +14189,7 @@ router47.get("/api/admin/saas/stats", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.get("/api/admin/saas/payments", async (req, res) => {
+router48.get("/api/admin/saas/payments", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   try {
@@ -13955,7 +14205,7 @@ router47.get("/api/admin/saas/payments", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.patch("/api/admin/saas/payments/:id/approve", async (req, res) => {
+router48.patch("/api/admin/saas/payments/:id/approve", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const id = Number(req.params.id);
@@ -13978,7 +14228,7 @@ router47.patch("/api/admin/saas/payments/:id/approve", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
+router48.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const id = Number(req.params.id);
@@ -13992,7 +14242,7 @@ router47.patch("/api/admin/saas/payments/:id/reject", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.get("/api/admin/workspace-stats", async (req, res) => {
+router48.get("/api/admin/workspace-stats", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -14010,7 +14260,7 @@ router47.get("/api/admin/workspace-stats", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.post("/api/admin/saas/shops", async (req, res) => {
+router48.post("/api/admin/saas/shops", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const { nom, email, plan = "basic", pays } = req.body;
@@ -14027,7 +14277,7 @@ router47.post("/api/admin/saas/shops", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.get("/api/admin/workspace-settings", async (req, res) => {
+router48.get("/api/admin/workspace-settings", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -14045,7 +14295,7 @@ router47.get("/api/admin/workspace-settings", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.patch("/api/admin/workspace-settings", async (req, res) => {
+router48.patch("/api/admin/workspace-settings", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin"].includes(session.role)) return res.status(403).json({ error: "Acc\xE8s refus\xE9." });
@@ -14071,7 +14321,7 @@ router47.patch("/api/admin/workspace-settings", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.delete("/api/admin/saas/shops/:id", async (req, res) => {
+router48.delete("/api/admin/saas/shops/:id", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const id = Number(req.params.id);
@@ -14085,14 +14335,14 @@ router47.delete("/api/admin/saas/shops/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.get("/api/admin/saas/plan-configs", async (req, res) => {
+router48.get("/api/admin/saas/plan-configs", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const { getAllPlanLimits: getAllPlanLimits2 } = await Promise.resolve().then(() => (init_plan_configs(), plan_configs_exports));
   const configs = await getAllPlanLimits2();
   res.json({ configs });
 });
-router47.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
+router48.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const plan = req.params.plan;
@@ -14103,7 +14353,7 @@ router47.patch("/api/admin/saas/plan-configs/:plan", async (req, res) => {
   await updatePlanLimits2(plan, req.body);
   res.json({ ok: true });
 });
-router47.get("/api/admin/saas/plans", async (req, res) => {
+router48.get("/api/admin/saas/plans", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   try {
@@ -14114,7 +14364,7 @@ router47.get("/api/admin/saas/plans", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router47.put("/api/admin/saas/plans", async (req, res) => {
+router48.put("/api/admin/saas/plans", async (req, res) => {
   const session = await getSession(req);
   if (!requireSuperAdmin2(session, res)) return;
   const { plans, global: globalCfg } = req.body;
@@ -14146,10 +14396,10 @@ router47.put("/api/admin/saas/plans", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var saas_dashboard_default = router47;
+var saas_dashboard_default = router48;
 
 // routes/admin/billing.ts
-var import_express48 = __toESM(require("express"));
+var import_express49 = __toESM(require("express"));
 init_auth();
 init_shops();
 
@@ -14169,12 +14419,12 @@ async function getPlanPrice2(plan) {
 }
 
 // routes/admin/billing.ts
-var router48 = import_express48.default.Router();
+var router49 = import_express49.default.Router();
 var MERCHANT_NUMBERS = {
   moov: process.env.MERCHANT_MOOV ?? "98165380",
   yas: process.env.MERCHANT_YAS ?? "90226491"
 };
-router48.get("/api/admin/billing", async (req, res) => {
+router49.get("/api/admin/billing", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -14197,7 +14447,7 @@ router48.get("/api/admin/billing", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router48.post("/api/admin/billing/initiate", async (req, res) => {
+router49.post("/api/admin/billing/initiate", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const { plan, duration_months = 1, operator, mm_reference } = req.body;
@@ -14239,23 +14489,23 @@ router48.post("/api/admin/billing/initiate", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-var billing_default = router48;
+var billing_default = router49;
 
 // index.ts
 init_ai();
 
 // routes/admin/stock-alerts.ts
-var import_express50 = __toESM(require("express"));
+var import_express51 = __toESM(require("express"));
 init_auth();
 init_admin_db();
-var router50 = import_express50.default.Router();
-router50.get("/api/admin/stock-alerts", async (req, res) => {
+var router51 = import_express51.default.Router();
+router51.get("/api/admin/stock-alerts", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   const alerts = await listStockAlerts(session.shop_id ?? 1);
   res.json({ alerts });
 });
-router50.post("/api/admin/stock-alerts", async (req, res) => {
+router51.post("/api/admin/stock-alerts", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -14276,7 +14526,7 @@ router50.post("/api/admin/stock-alerts", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router50.patch("/api/admin/stock-alerts/:id", async (req, res) => {
+router51.patch("/api/admin/stock-alerts/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
@@ -14294,19 +14544,19 @@ router50.patch("/api/admin/stock-alerts/:id", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
 });
-router50.delete("/api/admin/stock-alerts/:id", async (req, res) => {
+router51.delete("/api/admin/stock-alerts/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   await deleteStockAlert(Number(req.params.id), session.shop_id ?? 1);
   res.json({ ok: true });
 });
-var stock_alerts_default = router50;
+var stock_alerts_default = router51;
 
 // routes/admin/activity-logs.ts
-var import_express51 = __toESM(require("express"));
+var import_express52 = __toESM(require("express"));
 init_auth();
-var router51 = import_express51.default.Router();
-router51.get("/api/admin/activity-logs", async (req, res) => {
+var router52 = import_express52.default.Router();
+router52.get("/api/admin/activity-logs", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   if (!["super_admin", "admin", "manager"].includes(session.role)) {
@@ -14327,7 +14577,7 @@ router51.get("/api/admin/activity-logs", async (req, res) => {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur" });
   }
 });
-var activity_logs_default = router51;
+var activity_logs_default = router52;
 
 // index.ts
 init_shops();
@@ -14419,7 +14669,7 @@ function startReviewNotifier() {
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(process.cwd(), ".env") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env.local") });
 (0, import_dotenv.config)({ path: (0, import_path.resolve)(__dirname, "../.env") });
-var app = (0, import_express52.default)();
+var app = (0, import_express53.default)();
 var PORT = Number(process.env.PORT) || 4e3;
 function splitEnvList(value) {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
@@ -14494,14 +14744,14 @@ var generalLimiter = (0, import_express_rate_limit.rateLimit)({
   // uploads exempt
 });
 app.use(generalLimiter);
-app.use(import_express52.default.json({ limit: "5mb" }));
-app.use(import_express52.default.urlencoded({ extended: true, limit: "5mb" }));
+app.use(import_express53.default.json({ limit: "5mb" }));
+app.use(import_express53.default.urlencoded({ extended: true, limit: "5mb" }));
 app.use((0, import_cookie_parser.default)());
 app.use(auth_default);
 app.use(products_default);
 app.use(variants_default);
-app.use(variant_groups_default);
 app.use(stock_default);
+app.use(transfer_requests_default);
 app.use(stock_boutique_default);
 app.use(ventes_default);
 app.use(livraisons_default);
@@ -14514,6 +14764,7 @@ app.use(fournisseurs_default);
 app.use(categories_default);
 app.use(boutique_clients_default);
 app.use(boutique_settings_default);
+app.use(shop_danger_default);
 app.use(newsletter_default);
 app.use(schema_default);
 app.use(events_default);
