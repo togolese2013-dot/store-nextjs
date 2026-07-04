@@ -9,7 +9,7 @@ export interface Shop {
   plan:                "basic" | "pro" | "business";
   actif:               boolean;
   custom_domain:       string | null;
-  subscription_status: "trial" | "active" | "expired" | "suspended";
+  subscription_status: "trial" | "active" | "expired" | "suspended" | "archived";
   trial_ends_at:       string | null;
   current_period_end:  string | null;
   pays:                string | null;
@@ -43,7 +43,7 @@ export async function ensureShopsTable(): Promise<void> {
       plan                ENUM('basic','pro','business')                        NOT NULL DEFAULT 'basic',
       actif               TINYINT(1)                                            NOT NULL DEFAULT 1,
       custom_domain       VARCHAR(255)                                          NULL UNIQUE,
-      subscription_status ENUM('trial','active','expired','suspended')         NOT NULL DEFAULT 'trial',
+      subscription_status ENUM('trial','active','expired','suspended','archived') NOT NULL DEFAULT 'trial',
       trial_ends_at       DATETIME                                              NULL,
       current_period_end  DATETIME                                              NULL,
       created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -52,7 +52,7 @@ export async function ensureShopsTable(): Promise<void> {
   // Idempotent column additions for existing installations
   const alterCols = [
     `ALTER TABLE shops ADD COLUMN custom_domain VARCHAR(255) NULL UNIQUE`,
-    `ALTER TABLE shops ADD COLUMN subscription_status ENUM('trial','active','expired','suspended') NOT NULL DEFAULT 'trial'`,
+    `ALTER TABLE shops ADD COLUMN subscription_status ENUM('trial','active','expired','suspended','archived') NOT NULL DEFAULT 'trial'`,
     `ALTER TABLE shops ADD COLUMN trial_ends_at DATETIME NULL`,
     `ALTER TABLE shops ADD COLUMN current_period_end DATETIME NULL`,
     `ALTER TABLE shops ADD COLUMN pays VARCHAR(100) NULL`,
@@ -60,6 +60,12 @@ export async function ensureShopsTable(): Promise<void> {
   for (const sql of alterCols) {
     try { await db.execute(sql); } catch { /* already exists */ }
   }
+  // Widen the ENUM for existing installations created before 'archived' was added
+  try {
+    await db.execute(
+      `ALTER TABLE shops MODIFY COLUMN subscription_status ENUM('trial','active','expired','suspended','archived') NOT NULL DEFAULT 'trial'`
+    );
+  } catch { /* already up to date */ }
 
   // shop_payments table
   await db.execute(`
@@ -165,7 +171,7 @@ export async function listShops(): Promise<Shop[]> {
 
 export async function updateShop(
   id: number,
-  data: Partial<{ nom: string; email: string; plan: "basic" | "pro" | "business"; actif: boolean; subscription_status: "trial" | "active" | "expired" | "suspended" }>
+  data: Partial<{ nom: string; email: string; plan: "basic" | "pro" | "business"; actif: boolean; subscription_status: "trial" | "active" | "expired" | "suspended" | "archived" }>
 ): Promise<void> {
   await ensureShopsTable();
   const sets: string[] = [];
@@ -211,6 +217,7 @@ export function isShopAccessAllowed(shop: Shop): boolean {
   // Check suspension first — overrides plan
   if (!shop.actif) return false;
   if (shop.subscription_status === "suspended") return false;
+  if (shop.subscription_status === "archived") return false;
   if (shop.plan === "basic") return true;
   if (shop.subscription_status === "trial") {
     if (!shop.trial_ends_at) return true;
@@ -255,6 +262,22 @@ export async function activateBasicPlan(shopId: number): Promise<void> {
     `UPDATE shops SET plan = 'basic', subscription_status = 'active', current_period_end = NULL WHERE id = ?`,
     [shopId]
   );
+}
+
+/** Owner-initiated archive — reversible via /admin/billing (picking any plan reactivates). */
+export async function archiveShop(shopId: number): Promise<void> {
+  await ensureShopsTable();
+  await db.execute(`UPDATE shops SET subscription_status = 'archived' WHERE id = ?`, [shopId]);
+}
+
+/**
+ * Owner-initiated "delete" — soft-delete only, no data is erased.
+ * Sets actif=0 (the same kill switch super-admin uses to suspend a tenant), which
+ * blocks all admin access and cannot be self-reversed from /admin/billing (unlike
+ * 'archived'). Only a super-admin can restore access (toggle actif back to true).
+ */
+export async function selfDeleteShop(shopId: number): Promise<void> {
+  await updateShop(shopId, { actif: false, subscription_status: "suspended" });
 }
 
 export async function recordShopPayment(data: {

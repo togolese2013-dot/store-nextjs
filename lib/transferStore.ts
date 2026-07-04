@@ -1,13 +1,8 @@
 // transferStore.ts
 //
-// Framework-agnostic store — keeps Boutique and Magasin in sync via localStorage.
-// Cross-tab sync via the `storage` event.
-//
-// TO REPLACE IN PRODUCTION:
-//   request()  -> POST /api/admin/transfer-requests
-//   approve()  -> POST /api/admin/transfer-requests/:id/approve  (server creates movement)
-//   reject()   -> POST /api/admin/transfer-requests/:id/reject
-//   pending()  -> GET  /api/admin/transfer-requests?status=pending
+// API-backed store for Magasin ⇄ Boutique stock transfer requests.
+// Persisted server-side (`transfer_requests` table) — approval executes the
+// real stock movement via createStockSortie (backend/routes/admin/transfer-requests.ts).
 
 export type TransferStatus = 'pending' | 'approved' | 'rejected';
 
@@ -27,138 +22,108 @@ export interface TransferRequest {
   resolvedLabel?: string;
 }
 
-export interface StockMovement {
-  date:     string;
-  product:  string;
-  sku:      string;
-  type:     string;
-  qty:      number;
-  from:     string;
-  to:       string;
-  auto?:    boolean;
-  reqId?:   string;
-}
-
 export interface CreateTransferInput {
-  product:  string;
-  sku?:     string;
-  qty:      number | string;
-  from?:    string;
-  note?:    string;
+  produit_id: number;
+  product:    string;
+  sku?:       string;
+  qty:        number | string;
+  from?:      string;
+  note?:      string;
 }
 
-const REQ_KEY  = 'shopsaas_transfer_requests';
-const MOV_KEY  = 'shopsaas_boutique_movements';
-const SEQ_KEY  = 'shopsaas_transfer_seq';
-export const TRANSFER_EVENT = 'shopsaas-transfer-change';
-
-function read<T>(key: string): T[] {
-  if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem(key) || '[]') as T[]; }
-  catch { return []; }
+interface ApiTransferRequest {
+  id:            number;
+  produit_nom:   string;
+  reference_sku: string | null;
+  quantite:      number;
+  note:          string | null;
+  requested_by:  string | null;
+  status:        TransferStatus;
+  created_at:    string;
+  resolved_at:   string | null;
 }
 
-function write<T>(key: string, val: T[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(val));
-  emit();
-}
+const MOIS = ['jan', 'fév', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
 
-function emit(): void {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(TRANSFER_EVENT));
-}
-
-const MOIS = ['jan','fév','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'];
-
-function nowLabel(): string {
-  const d  = new Date();
+function fmtLabel(iso: string): string {
+  const d = new Date(iso);
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
   return `${d.getDate()} ${MOIS[d.getMonth()]}, ${hh}h${mm}`;
 }
 
-// cross-tab sync
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === REQ_KEY || e.key === MOV_KEY) emit();
-  });
+function mapRequest(r: ApiTransferRequest): TransferRequest {
+  return {
+    id:            'TR-' + r.id,
+    product:       r.produit_nom,
+    sku:           r.reference_sku || '—',
+    qty:           r.quantite,
+    from:          'Magasin',
+    note:          r.note ?? '',
+    destination:   'Boutique',
+    requestedBy:   r.requested_by ?? 'Boutique',
+    status:        r.status,
+    createdAt:     new Date(r.created_at).getTime(),
+    timeLabel:     fmtLabel(r.created_at),
+    resolvedAt:    r.resolved_at ? new Date(r.resolved_at).getTime() : undefined,
+    resolvedLabel: r.resolved_at ? fmtLabel(r.resolved_at) : undefined,
+  };
 }
 
 export const TransferStore = {
-  requests:  (): TransferRequest[]  => read<TransferRequest>(REQ_KEY),
-  pending:   (): TransferRequest[]  => read<TransferRequest>(REQ_KEY).filter(r => r.status === 'pending'),
-  byStatus:  (s: TransferStatus)    => read<TransferRequest>(REQ_KEY).filter(r => r.status === s),
-  movements: (): StockMovement[]    => read<StockMovement>(MOV_KEY),
+  async byStatus(status: TransferStatus): Promise<TransferRequest[]> {
+    const res = await fetch(`/api/admin/transfer-requests?status=${status}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.requests) ? (data.requests as ApiTransferRequest[]).map(mapRequest) : [];
+  },
 
-  request(data: CreateTransferInput): TransferRequest {
-    const list = read<TransferRequest>(REQ_KEY);
-    const n    = (parseInt(localStorage.getItem(SEQ_KEY) || '1240', 10)) + 1;
-    localStorage.setItem(SEQ_KEY, String(n));
-    const rec: TransferRequest = {
-      id:          'TR-' + n,
+  pending(): Promise<TransferRequest[]> {
+    return TransferStore.byStatus('pending');
+  },
+
+  async request(data: CreateTransferInput): Promise<TransferRequest> {
+    const res = await fetch('/api/admin/transfer-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        produit_id:    data.produit_id,
+        produit_nom:   data.product || 'Produit',
+        reference_sku: data.sku ?? null,
+        quantite:      Math.abs(parseInt(String(data.qty), 10)) || 1,
+        note:          data.note ?? '',
+      }),
+    });
+    const created = await res.json();
+    if (!res.ok) throw new Error(created.error ?? 'Erreur lors de la demande de transfert.');
+    return {
+      id:          'TR-' + created.id,
       product:     data.product || 'Produit',
       sku:         data.sku || '—',
       qty:         Math.abs(parseInt(String(data.qty), 10)) || 1,
-      from:        data.from || 'Lomé Central',
+      from:        data.from || 'Magasin',
       note:        data.note || '',
       destination: 'Boutique',
       requestedBy: 'Boutique',
       status:      'pending',
       createdAt:   Date.now(),
-      timeLabel:   nowLabel(),
+      timeLabel:   fmtLabel(new Date().toISOString()),
     };
-    list.unshift(rec);
-    write(REQ_KEY, list);
-    return rec;
   },
 
-  approve(id: string): TransferRequest | null {
-    const list = read<TransferRequest>(REQ_KEY);
-    const r    = list.find(x => x.id === id);
-    if (!r || r.status !== 'pending') return null;
-    r.status       = 'approved';
-    r.resolvedAt   = Date.now();
-    r.resolvedLabel = nowLabel();
-    write(REQ_KEY, list);
-
-    const movs = read<StockMovement>(MOV_KEY);
-    movs.unshift({
-      date:    nowLabel(),
-      product: r.product,
-      sku:     r.sku,
-      type:    'Sortie',
-      qty:     -r.qty,
-      from:    r.from,
-      to:      'Boutique',
-      auto:    true,
-      reqId:   r.id,
-    });
-    write(MOV_KEY, movs);
-    return r;
+  async approve(id: string): Promise<TransferRequest | null> {
+    const numId = id.replace(/^TR-/, '');
+    const res = await fetch(`/api/admin/transfer-requests/${numId}/approve`, { method: 'POST' });
+    if (!res.ok) return null;
+    const list = await TransferStore.byStatus('approved');
+    return list.find(r => r.id === id) ?? null;
   },
 
-  reject(id: string): TransferRequest | null {
-    const list = read<TransferRequest>(REQ_KEY);
-    const r    = list.find(x => x.id === id);
-    if (!r || r.status !== 'pending') return null;
-    r.status        = 'rejected';
-    r.resolvedAt    = Date.now();
-    r.resolvedLabel = nowLabel();
-    write(REQ_KEY, list);
-    return r;
-  },
-
-  subscribe(cb: () => void): () => void {
-    if (typeof window === 'undefined') return () => {};
-    window.addEventListener(TRANSFER_EVENT, cb);
-    return () => window.removeEventListener(TRANSFER_EVENT, cb);
-  },
-
-  reset(): void {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(REQ_KEY);
-    localStorage.removeItem(MOV_KEY);
-    emit();
+  async reject(id: string): Promise<TransferRequest | null> {
+    const numId = id.replace(/^TR-/, '');
+    const res = await fetch(`/api/admin/transfer-requests/${numId}/reject`, { method: 'POST' });
+    if (!res.ok) return null;
+    const list = await TransferStore.byStatus('rejected');
+    return list.find(r => r.id === id) ?? null;
   },
 };

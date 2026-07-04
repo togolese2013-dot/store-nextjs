@@ -54,6 +54,7 @@ function mapPaymentMode(mode: ApiPaymentMode): Sale['payment'] {
 }
 
 interface ApiFacture {
+  id: number;
   reference: string;
   client_nom: string | null;
   items: string;
@@ -97,8 +98,11 @@ interface ApiBoutiqueClient {
   id: number;
   nom: string;
   telephone: string | null;
+  email: string | null;
+  localisation: string | null;
   type_client: 'particulier' | 'professionnel';
   solde: number;
+  notes: string | null;
   created_at: string;
 }
 
@@ -114,6 +118,7 @@ function mapFacture(f: ApiFacture): Sale {
     : '';
   return {
     id:       f.reference,
+    numericId: f.id,
     client:   name,
     init:     isAnon ? '' : initials(name),
     color:    isAnon ? '#8A8278' : SWATCHES[hashStr(name) % SWATCHES.length],
@@ -176,15 +181,22 @@ function mapBoutiqueClient(c: ApiBoutiqueClient): BoutiqueClient {
   else if (abs > 10000) status = 'Régulier';
 
   return {
-    name:   c.nom,
-    init:   initials(c.nom),
-    color:  SWATCHES[hashStr(c.nom) % SWATCHES.length],
-    visits: 0,
-    last:   new Date(c.created_at).toLocaleDateString('fr-FR', {
+    id:           c.id,
+    name:         c.nom,
+    init:         initials(c.nom),
+    color:        SWATCHES[hashStr(c.nom) % SWATCHES.length],
+    visits:       0,
+    last:         new Date(c.created_at).toLocaleDateString('fr-FR', {
       day: 'numeric', month: 'long', year: 'numeric',
     }),
-    total:  abs,
+    total:        abs,
     status,
+    telephone:    c.telephone,
+    email:        c.email,
+    localisation: c.localisation,
+    type_client:  c.type_client,
+    solde:        Number(c.solde),
+    notes:        c.notes,
   };
 }
 
@@ -280,14 +292,17 @@ export default function BoutiqueDataLoader({
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    fetch('/api/admin/boutique-clients?limit=30')
+  const [clientsTotal, setClientsTotal] = useState(0);
+  const fetchClients = useCallback(() => {
+    fetch('/api/admin/boutique-clients?page=1')
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d.data)) setClients((d.data as ApiBoutiqueClient[]).map(mapBoutiqueClient));
+        if (typeof d.total === 'number') setClientsTotal(d.total);
       })
       .catch(() => {});
   }, []);
+  useEffect(() => { fetchClients(); }, [fetchClients]);
 
   return (
     <BoutiqueSettingsProvider cfg={boutiqueConfig} refresh={fetchBoutiqueSettings}>
@@ -297,6 +312,8 @@ export default function BoutiqueDataLoader({
         movements={movements}
         stockMovements={stockMovements}
         clients={clients}
+        clientsTotal={clientsTotal}
+        onRefreshClients={fetchClients}
         overviewStats={overviewStats}
         onSwitchWorkspace={onSwitchWorkspace}
         onNewSale={onNewSale}

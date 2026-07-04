@@ -66,9 +66,3 @@ export const FINANCE_KPIS: KpiItem[] = [
   { label: 'Sorties du jour', value: '—', unit: 'FCFA', sub: 'dépenses',           sparkColor: '#C9601E' },
   { label: 'Bénéfice net',    value: '—', unit: 'FCFA', sub: 'vs hier',            sparkColor: '#5C4A88' },
 ];
-
-export const CLIENTS_KPIS: KpiItem[] = [
-  { label: 'Clients enregistrés',  value: '—',           sub: 'ce mois',          sparkColor: '#3B6A8F' },
-  { label: 'Client du mois',       value: '—', serif: true, sub: '—' },
-  { label: 'Panier moyen clients', value: '—', unit: 'FCFA', sub: 'clients identifiés', sparkColor: '#5C4A88' },
-];

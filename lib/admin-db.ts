@@ -314,6 +314,125 @@ export async function createStockAjustement(data: {
   }
 }
 
+// ─── Transfer Requests (Boutique → Magasin) ────────────────────────────────────
+
+export type TransferRequestStatus = "pending" | "approved" | "rejected";
+
+export interface TransferRequestRow {
+  id:            number;
+  shop_id:       number;
+  produit_id:    number;
+  produit_nom:   string;
+  reference_sku: string | null;
+  quantite:      number;
+  note:          string | null;
+  requested_by:  string | null;
+  status:        TransferRequestStatus;
+  created_at:    string;
+  resolved_at:   string | null;
+}
+
+async function ensureTransferRequestsTable(): Promise<void> {
+  return runOnce("transfer_requests", async () => {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS transfer_requests (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        shop_id       INT UNSIGNED NOT NULL DEFAULT 1,
+        produit_id    INT NOT NULL,
+        produit_nom   VARCHAR(255) NOT NULL,
+        reference_sku VARCHAR(100) NULL,
+        quantite      INT NOT NULL,
+        note          VARCHAR(500) NULL,
+        requested_by  VARCHAR(150) NULL,
+        status        ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at   TIMESTAMP NULL,
+        INDEX idx_shop_status (shop_id, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  });
+}
+
+export async function listTransferRequests(shopId: number, status?: TransferRequestStatus): Promise<TransferRequestRow[]> {
+  await ensureTransferRequestsTable();
+  const conditions: string[] = ["shop_id = ?"];
+  const params: (string | number)[] = [shopId];
+  if (status) { conditions.push("status = ?"); params.push(status); }
+  const [rows] = await db.query<mysql.RowDataPacket[]>(
+    `SELECT * FROM transfer_requests WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC LIMIT 100`,
+    params
+  );
+  return rows as TransferRequestRow[];
+}
+
+export async function getTransferRequestById(id: number, shopId: number): Promise<TransferRequestRow | null> {
+  await ensureTransferRequestsTable();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT * FROM transfer_requests WHERE id = ? AND shop_id = ?", [id, shopId]
+  );
+  return (rows[0] as TransferRequestRow) ?? null;
+}
+
+export async function createTransferRequest(data: {
+  shop_id:       number;
+  produit_id:    number;
+  produit_nom:   string;
+  reference_sku?: string | null;
+  quantite:      number;
+  note?:         string | null;
+  requested_by?: string | null;
+}): Promise<number> {
+  await ensureTransferRequestsTable();
+  const [result] = await db.execute<mysql.ResultSetHeader>(
+    `INSERT INTO transfer_requests (shop_id, produit_id, produit_nom, reference_sku, quantite, note, requested_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [data.shop_id, data.produit_id, data.produit_nom, data.reference_sku ?? null, data.quantite, data.note ?? null, data.requested_by ?? null]
+  );
+  return result.insertId;
+}
+
+export async function resolveTransferRequest(id: number, shopId: number, status: "approved" | "rejected"): Promise<void> {
+  await db.execute(
+    "UPDATE transfer_requests SET status = ?, resolved_at = NOW() WHERE id = ? AND shop_id = ? AND status = 'pending'",
+    [status, id, shopId]
+  );
+}
+
+// ─── Boutique Danger Zone (Réinitialiser) ──────────────────────────────────────
+
+/**
+ * Wipes this shop's Boutique transactional data (ventes, stock boutique, clients, caisse).
+ * Does NOT touch the product catalog (produits) or Magasin warehouse stock/history.
+ */
+export async function resetBoutiqueDemoData(shopId: number): Promise<void> {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute(
+      `DELETE bs FROM boutique_stock bs JOIN produits p ON p.id = bs.produit_id WHERE p.shop_id = ?`,
+      [shopId]
+    );
+    await conn.execute(
+      `DELETE bm FROM boutique_mouvements bm JOIN produits p ON p.id = bm.produit_id WHERE p.shop_id = ?`,
+      [shopId]
+    );
+    await conn.execute(`DELETE FROM factures WHERE shop_id = ?`, [shopId]);
+    await conn.execute(`DELETE FROM finance_entries WHERE shop_id = ?`, [shopId]);
+    await conn.execute(`DELETE FROM boutique_clients WHERE shop_id = ?`, [shopId]);
+    await conn.execute(`UPDATE produits SET stock_boutique = 0 WHERE shop_id = ?`, [shopId]);
+    await conn.execute(
+      `UPDATE product_variants pv JOIN produits p ON p.id = pv.produit_id SET pv.stock_boutique = 0 WHERE p.shop_id = ?`,
+      [shopId]
+    );
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // ─── Stock Movements ───────────────────────────────────────────────────────────
 
 export interface StockMouvement {

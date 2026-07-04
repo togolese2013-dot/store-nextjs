@@ -231,7 +231,7 @@ export default function BoutiqueSettings({
                 <FiscalSection   {...sp} />
                 <HorairesSection {...sp} />
                 <NotifsSection   {...sp} />
-                <DangerSection toast={toast} confirm={confirm} />
+                <DangerSection toast={toast} shopName={shopName ?? s.nom} />
               </div>
             </div>
           </div>

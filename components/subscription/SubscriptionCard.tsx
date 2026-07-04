@@ -25,7 +25,7 @@ function planLabel(p: string): string {
 
 export function SubscriptionCard({ plan, status, trialEndsAt, periodEnd, onClick }: Props) {
   const isTrial   = status === 'trial'
-  const isExpired = status === 'expired' || status === 'suspended'
+  const isExpired = status === 'expired' || status === 'suspended' || status === 'archived'
   const days      = isTrial ? daysUntil(trialEndsAt) : daysUntil(periodEnd)
   const isWarn    = !isExpired && days !== null && days <= 14
 

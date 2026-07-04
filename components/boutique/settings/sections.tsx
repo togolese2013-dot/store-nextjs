@@ -1,7 +1,7 @@
 // All sections of the BoutiqueSettings page
 
 import React, { useState } from 'react';
-import type { SectionProps, ConfirmOptions, StoreState } from './types';
+import type { SectionProps, StoreState } from './types';
 import { DEVISES, PAYS_LIST, JOURS, TEAM, fmtPreview } from './constants';
 import {
   Toggle, Seg, TRow, Fld, In, Ta, Sel, Card, Row2, LogoDrop,
@@ -556,57 +556,141 @@ export function NotifsSection({ s, u, save }: SectionProps) {
 
 // ── Zone danger ───────────────────────────────────────────────────────────────
 
+type DangerAction = 'reset' | 'archive' | 'delete' | null;
+
+const DANGER_ITEMS: Record<Exclude<DangerAction, null>, { label: string; desc: string; btn: string; endpoint: string; danger?: boolean }> = {
+  reset: {
+    label: 'Réinitialiser les données de démonstration',
+    desc: "Efface les ventes, le stock boutique et les clients de cette boutique. Le catalogue produits n'est pas touché.",
+    btn: 'Réinitialiser',
+    endpoint: '/api/admin/shop/reset-demo-data',
+  },
+  archive: {
+    label: 'Archiver la boutique',
+    desc: "La boutique sera masquée et l'accès admin bloqué jusqu'à réactivation depuis la page Abonnement (choisir un plan).",
+    btn: 'Archiver',
+    endpoint: '/api/admin/shop/archive',
+  },
+  delete: {
+    label: 'Supprimer définitivement la boutique',
+    desc: "Bloque immédiatement et durablement l'accès à cette boutique. Aucune donnée n'est effacée — seul un administrateur de la plateforme peut restaurer l'accès.",
+    btn: 'Supprimer',
+    endpoint: '/api/admin/shop/delete',
+    danger: true,
+  },
+};
+
 export function DangerSection({
-  toast, confirm,
-}: { toast: (m: string) => void; confirm: (o: ConfirmOptions) => void }) {
-  const items = [
-    {
-      label: 'Réinitialiser les données de démonstration',
-      desc: "Remet les ventes, stocks et clients d'exemple à leur état initial.",
-      btn: 'Réinitialiser', danger: false,
-    },
-    {
-      label: 'Archiver la boutique',
-      desc: 'La boutique sera masquée mais toutes ses données seront conservées.',
-      btn: 'Archiver', danger: false,
-    },
-    {
-      label: 'Supprimer définitivement la boutique',
-      desc: 'Toutes les données seront effacées. Cette action est irréversible.',
-      btn: 'Supprimer', danger: true,
-    },
+  toast, shopName,
+}: { toast: (m: string) => void; shopName?: string }) {
+  const [active,  setActive]  = useState<DangerAction>(null);
+  const [typed,   setTyped]   = useState('');
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState('');
+
+  const name = shopName ?? '';
+  const items: { key: Exclude<DangerAction, null>; danger: boolean }[] = [
+    { key: 'reset',   danger: false },
+    { key: 'archive', danger: false },
+    { key: 'delete',  danger: true  },
   ];
+
+  function open(key: Exclude<DangerAction, null>) {
+    setActive(key);
+    setTyped('');
+    setError('');
+  }
+
+  async function confirmAction() {
+    if (!active) return;
+    const item = DANGER_ITEMS[active];
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch(item.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm_nom: typed }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? 'Erreur.'); setSaving(false); return; }
+      toast(`${item.btn} effectué`);
+      setActive(null);
+      if (active === 'archive') {
+        window.location.href = '/admin/billing';
+      } else if (active === 'delete') {
+        await fetch('/api/admin/auth/logout', { method: 'POST' }).catch(() => {});
+        window.location.href = '/admin/login';
+      }
+    } catch {
+      setError('Erreur réseau.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <Card id="danger" Icon={AlertTriIcon} title="Zone danger" sub="Actions irréversibles — manipulation uniquement par le propriétaire." dangerZone>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {items.map(it => (
-          <div key={it.label} style={{
-            display: 'flex', alignItems: 'flex-start',
-            justifyContent: 'space-between', gap: 16, padding: 16,
-            background: it.danger ? 'var(--danger-bg)' : 'var(--bg-2)',
-            borderRadius: 12,
-            border: `1px solid ${it.danger ? 'rgba(156,58,20,.2)' : 'var(--border)'}`,
-          }}>
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 500, color: it.danger ? 'var(--danger)' : 'var(--ink)' }}>{it.label}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>{it.desc}</div>
+        {items.map(({ key, danger }) => {
+          const it = DANGER_ITEMS[key];
+          return (
+            <div key={key} style={{
+              display: 'flex', alignItems: 'flex-start',
+              justifyContent: 'space-between', gap: 16, padding: 16,
+              background: danger ? 'var(--danger-bg)' : 'var(--bg-2)',
+              borderRadius: 12,
+              border: `1px solid ${danger ? 'rgba(156,58,20,.2)' : 'var(--border)'}`,
+            }}>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 500, color: danger ? 'var(--danger)' : 'var(--ink)' }}>{it.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>{it.desc}</div>
+              </div>
+              <button
+                type="button"
+                className={danger ? 'bs-btn ghost-danger' : 'bs-btn'}
+                style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                onClick={() => open(key)}
+              >{it.btn}</button>
             </div>
-            <button
-              type="button"
-              className={it.danger ? 'bs-btn ghost-danger' : 'bs-btn'}
-              style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-              onClick={() => confirm({
-                tone: it.danger ? 'danger' : undefined,
-                title: `${it.label} ?`,
-                sub: it.desc,
-                confirmLabel: it.btn,
-                onConfirm: () => toast(`${it.btn} effectué`),
-              })}
-            >{it.btn}</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {active && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(20,17,14,.4)', padding: 16,
+        }} onClick={() => !saving && setActive(null)}>
+          <div style={{
+            background: 'var(--surface)', borderRadius: 16, width: '100%', maxWidth: 440,
+            padding: 24, boxShadow: '0 20px 60px rgba(20,17,14,.25)',
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: 'var(--danger)' }}>{DANGER_ITEMS[active].label} ?</h3>
+            <p style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5, marginTop: 8 }}>{DANGER_ITEMS[active].desc}</p>
+            <p style={{ fontSize: 12.5, marginTop: 14, marginBottom: 6 }}>
+              Tapez <strong>{name}</strong> pour confirmer :
+            </p>
+            <input
+              value={typed}
+              onChange={e => setTyped(e.target.value)}
+              placeholder={name}
+              style={{ width: '100%', padding: '9px 12px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 9, background: 'var(--bg)', boxSizing: 'border-box' }}
+            />
+            {error && <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button type="button" className="bs-btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setActive(null)} disabled={saving}>Annuler</button>
+              <button
+                type="button"
+                className="bs-btn ghost-danger"
+                style={{ flex: 1, justifyContent: 'center' }}
+                disabled={saving || typed.trim().toLowerCase() !== name.trim().toLowerCase()}
+                onClick={confirmAction}
+              >{saving ? 'En cours…' : DANGER_ITEMS[active].btn}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

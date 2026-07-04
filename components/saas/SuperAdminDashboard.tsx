@@ -18,7 +18,7 @@ interface ShopRow {
   plan:                'basic' | 'pro' | 'business';
   plan_limit:          string;
   actif:               boolean;
-  subscription_status: 'trial' | 'active' | 'expired' | 'suspended';
+  subscription_status: 'trial' | 'active' | 'expired' | 'suspended' | 'archived';
   trial_ends_at:       string | null;
   current_period_end:  string | null;
   product_count:       number;
@@ -107,6 +107,13 @@ function StatusBadge({ actif, subscriptionStatus, trialEndsAt }: {
     return (
       <span className={s.statusBadge} style={{ background: '#FEF3C7', color: '#92400E' }}>
         <span className={s.statusDot} style={{ background: '#F59E0B' }} />Expiré
+      </span>
+    );
+  }
+  if (subscriptionStatus === 'archived') {
+    return (
+      <span className={s.statusBadge} style={{ background: '#F1F5F9', color: '#475569' }}>
+        <span className={s.statusDot} style={{ background: '#94A3B8' }} />Archivée
       </span>
     );
   }

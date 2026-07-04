@@ -109,6 +109,40 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
   }
 });
 
+router.get("/api/admin/ventes/factures/export", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const search = (req.query.q as string)      || undefined;
+    const statut = (req.query.statut as string) || undefined;
+    const shopId = session.shop_id ?? 1;
+    const { items } = await listFactures({ search, statut, limit: 5000, offset: 0, shopId });
+
+    const escape = (v: unknown) => {
+      const s = v == null ? "" : String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const MODES: Record<string, string> = {
+      especes: "Espèces", moov_money: "Moov Money", tmoney: "TMoney",
+      virement_bancaire: "Virement bancaire", mix_by_yas: "Mix by Yas",
+    };
+    const headers = ["Référence", "Client", "Téléphone", "Total", "Mode paiement", "Statut", "Vendeur", "Date"];
+    const rows = items.map(f => [
+      f.reference, f.client_nom, f.client_tel ?? "", Number(f.total),
+      f.mode_paiement ? (MODES[f.mode_paiement] ?? f.mode_paiement) : "",
+      f.statut, f.vendeur ?? "", String(f.created_at).slice(0, 10),
+    ].map(escape).join(","));
+
+    const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
+    const filename = `ventes_${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("﻿" + csv);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+
 router.get("/api/admin/ventes/factures/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });

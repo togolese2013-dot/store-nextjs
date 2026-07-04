@@ -9,6 +9,15 @@ import { PAYMENT_STYLE } from './sample-data';
 import { DownloadIcon, PlusIcon, FilterIcon, ChevDownIcon, PrinterIcon } from './icons';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtNum, fmtAmount } from './BoutiqueSettingsContext';
+import BoutiqueDocPrint, { type PrintItem } from '@/components/admin/BoutiqueDocPrint';
+
+interface ApiFactureItem { nom: string; reference?: string; qty: number; prix: number; total: number; }
+interface ApiFactureDetail {
+  reference: string; client_nom: string; client_tel: string | null;
+  items: string; sous_total: number; remise: number; total: number;
+  mode_paiement: string | null; statut_paiement: string | null;
+  adresse_livraison: string | null; created_at: string;
+}
 
 function isoPrefix(date: Date, unit: 'day' | 'month') {
   const y = date.getFullYear();
@@ -16,6 +25,30 @@ function isoPrefix(date: Date, unit: 'day' | 'month') {
   if (unit === 'month') return `${y}-${m}`;
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+function buildPrintProps(f: ApiFactureDetail) {
+  let items: ApiFactureItem[] = [];
+  try { items = typeof f.items === 'string' ? JSON.parse(f.items) : (f.items ?? []); }
+  catch { items = []; }
+  const printItems: PrintItem[] = items.map(i => ({
+    nom: i.nom, reference: i.reference, qty: i.qty, prix: i.prix, total: i.total,
+  }));
+  return {
+    type: 'facture' as const,
+    format: 'A5' as const,
+    reference: f.reference,
+    date: f.created_at,
+    client_nom: f.client_nom || 'Client anonyme',
+    client_tel: f.client_tel,
+    items: printItems,
+    sous_total: f.sous_total,
+    remise: f.remise,
+    total: f.total,
+    mode_paiement: f.mode_paiement,
+    statut_paiement: f.statut_paiement,
+    adresse_livraison: f.adresse_livraison,
+  };
 }
 
 function startOfWeek(date: Date): Date {
@@ -35,6 +68,43 @@ export interface VentesPageProps {
 export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
   const cfg = useBoutiqueConfig();
   const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
+  const [exporting, setExporting] = useState(false);
+  const [printDoc, setPrintDoc] = useState<ReturnType<typeof buildPrintProps> | null>(null);
+  const [printError, setPrintError] = useState('');
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await fetch('/api/admin/ventes/factures/export');
+      if (!res.ok) return;
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="(.+?)"/);
+      const filename = match ? match[1] : 'ventes.csv';
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objUrl);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handlePrint(numericId: number) {
+    setPrintError('');
+    try {
+      const res = await fetch(`/api/admin/ventes/factures/${numericId}`);
+      if (!res.ok) { setPrintError('Facture introuvable.'); return; }
+      const f: ApiFactureDetail = await res.json();
+      setPrintDoc(buildPrintProps(f));
+    } catch {
+      setPrintError('Erreur réseau.');
+    }
+  }
 
   const now = useMemo(() => new Date(), []);
   const todayPfx  = isoPrefix(now, 'day');
@@ -95,12 +165,18 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
           <p className={styles.subtitle}>{filtered.length} vente{filtered.length !== 1 ? 's' : ''} · {fmtAmount(totalDisplay, cfg)} encaissés</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Exporter</button>
+          <button type="button" className={styles.btn} onClick={handleExport} disabled={exporting}>
+            <DownloadIcon size={14} /> {exporting ? 'Export…' : 'Exporter'}
+          </button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onNewSale}>
             <PlusIcon size={14} /> Nouvelle vente
           </button>
         </div>
       </div>
+
+      {printError && (
+        <p style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 8, marginTop: 12 }}>{printError}</p>
+      )}
 
       <div className={styles.kpis3}>
         {kpis.map(k => (
@@ -175,7 +251,9 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
                     {s.vendeur ?? '—'}
                   </td>
                   <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu} title="Imprimer le reçu"><PrinterIcon size={14} /></button>
+                    <button type="button" className={styles.rowMenu} title="Imprimer le reçu" onClick={() => handlePrint(s.numericId)}>
+                      <PrinterIcon size={14} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -191,6 +269,10 @@ export default function VentesPage({ sales = [], onNewSale }: VentesPageProps) {
           </div>
         </div>
       </div>
+
+      {printDoc && (
+        <BoutiqueDocPrint {...printDoc} onClose={() => setPrintDoc(null)} />
+      )}
     </>
   );
 }

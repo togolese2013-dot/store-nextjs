@@ -68,6 +68,8 @@ export default function TransferRequestModal({
   const [form,          setForm]          = useState<FormState>(() => emptyState(defaultProduct));
   const [magasinProds,  setMagasinProds]  = useState<MagasinProduct[]>([]);
   const [loadingProds,  setLoadingProds]  = useState(false);
+  const [submitting,    setSubmitting]    = useState(false);
+  const [error,         setError]         = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -101,17 +103,27 @@ export default function TransferRequestModal({
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const submit = () => {
+  const submit = async () => {
     const prod = magasinProds.find(p => p.nom === form.product);
-    const record = TransferStore.request({
-      product: form.product || 'Produit',
-      sku: prod ? prod.reference : '—',
-      qty: form.qty,
-      from: 'Magasin',
-      note: form.note,
-    });
-    onSubmitted?.(record);
-    onClose();
+    if (!prod) { setError('Sélectionnez un produit.'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      const record = await TransferStore.request({
+        produit_id: prod.id,
+        product: form.product || 'Produit',
+        sku: prod.reference || '—',
+        qty: form.qty,
+        from: 'Magasin',
+        note: form.note,
+      });
+      onSubmitted?.(record);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la demande.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -189,14 +201,18 @@ export default function TransferRequestModal({
               />
             </div>
           </div>
+
+          {error && (
+            <p style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 12 }}>{error}</p>
+          )}
         </div>
 
         <div className="tr-foot">
           <button className="tr-btn" onClick={onClose}>
             Annuler
           </button>
-          <button className="tr-btn tr-pri" onClick={submit} disabled={!form.product || loadingProds}>
-            Demander le transfert
+          <button className="tr-btn tr-pri" onClick={submit} disabled={!form.product || loadingProds || submitting}>
+            {submitting ? 'Envoi…' : 'Demander le transfert'}
           </button>
         </div>
       </div>

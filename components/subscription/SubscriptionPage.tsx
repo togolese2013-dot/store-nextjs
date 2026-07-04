@@ -8,7 +8,7 @@ interface BillingInfo {
   shop_id:             number
   nom:                 string
   plan:                PlanId
-  subscription_status: 'trial' | 'active' | 'expired' | 'suspended'
+  subscription_status: 'trial' | 'active' | 'expired' | 'suspended' | 'archived'
   trial_ends_at:       string | null
   current_period_end:  string | null
   merchant_moov:       string
@@ -180,6 +180,7 @@ export function SubscriptionPage({ onBack }: Props) {
     }
     if (info.subscription_status === 'expired')   return 'Expiré'
     if (info.subscription_status === 'suspended') return 'Suspendu'
+    if (info.subscription_status === 'archived')  return 'Archivée'
     return 'Actif'
   })()
 

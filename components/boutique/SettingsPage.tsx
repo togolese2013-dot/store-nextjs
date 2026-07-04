@@ -164,7 +164,7 @@ export default function SettingsPage({ shopName }: Props) {
             <FiscalSection    {...sp} />
             <HorairesSection  {...sp} />
             <NotifsSection    {...sp} />
-            <DangerSection toast={toast} confirm={confirm} />
+            <DangerSection toast={toast} shopName={shopName ?? s.nom} />
           </div>
         </div>
 

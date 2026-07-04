@@ -46,6 +46,33 @@ router.get("/api/admin/boutique-clients", async (req, res) => {
   }
 });
 
+router.get("/api/admin/boutique-clients/export", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const shopId = session.shop_id ?? 1;
+    const clients = await listBoutiqueClients(5000, 0, "", "tous", shopId);
+
+    const escape = (v: unknown) => {
+      const s = v == null ? "" : String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const headers = ["Nom", "Téléphone", "Email", "Localisation", "Type", "Solde", "Notes", "Créé le"];
+    const rows = clients.map(c => [
+      c.nom, c.telephone ?? "", c.email ?? "", c.localisation ?? "",
+      c.type_client, Number(c.solde), c.notes ?? "", String(c.created_at).slice(0, 10),
+    ].map(escape).join(","));
+
+    const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
+    const filename = `clients_${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("﻿" + csv);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur serveur." });
+  }
+});
+
 router.get("/api/admin/boutique-clients/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });

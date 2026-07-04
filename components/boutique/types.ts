@@ -6,6 +6,8 @@ export type PaymentMethod = 'Espèces' | 'Wave' | 'Orange M.' | 'Carte';
 
 export interface Sale {
   id: string;
+  /** Numeric facture id — used for detail/print lookups (GET /api/admin/ventes/factures/:id) */
+  numericId: number;
   /** Client name, or '—' for anonymous */
   client: string;
   init: string;
@@ -47,8 +49,10 @@ export interface CashMovement {
 }
 
 export type ClientStatus = 'VIP' | 'Fidèle' | 'Régulier' | 'Nouveau';
+export type ClientType = 'particulier' | 'professionnel';
 
 export interface BoutiqueClient {
+  id: number;
   name: string;
   init: string;
   color: string;
@@ -56,6 +60,12 @@ export interface BoutiqueClient {
   last: string;
   total: number;
   status: ClientStatus;
+  telephone: string | null;
+  email: string | null;
+  localisation: string | null;
+  type_client: ClientType;
+  solde: number;
+  notes: string | null;
 }
 
 export interface KpiItem {

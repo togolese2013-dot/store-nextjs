@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { TransferStore } from '@/lib/transferStore';
 import type { TransferRequest } from '@/lib/transferStore';
+import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import styles from './TransferBanner.module.css';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -33,21 +34,17 @@ function ArrowRight() {
 
 export function usePendingTransfers(): TransferRequest[] {
   const [list, setList] = useState<TransferRequest[]>([]);
-  useEffect(() => {
-    const update = () => setList(TransferStore.pending());
-    update();
-    return TransferStore.subscribe(update);
-  }, []);
-  return list;
-}
+  const { subscribe } = useAdminSSE();
 
-export function useStoreMovements() {
-  const [list, setList] = useState(() => TransferStore.movements());
-  useEffect(() => {
-    const update = () => setList(TransferStore.movements());
-    update();
-    return TransferStore.subscribe(update);
+  const load = useCallback(() => {
+    TransferStore.pending().then(setList).catch(() => {});
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => subscribe((e) => {
+    if (e.type === 'transfer_request') load();
+  }), [subscribe, load]);
+
   return list;
 }
 
@@ -71,15 +68,15 @@ export function TransferBanner({ onApproved, onRejected, confirmReject }: Transf
   const pending = usePendingTransfers();
   if (pending.length === 0) return null;
 
-  function handleApprove(r: TransferRequest) {
-    const approved = TransferStore.approve(r.id);
+  async function handleApprove(r: TransferRequest) {
+    const approved = await TransferStore.approve(r.id);
     if (approved) onApproved?.(approved);
   }
 
   async function handleReject(r: TransferRequest) {
     const ok = confirmReject ? await confirmReject(r) : true;
     if (!ok) return;
-    const rejected = TransferStore.reject(r.id);
+    const rejected = await TransferStore.reject(r.id);
     if (rejected) onRejected?.(rejected);
   }
 
