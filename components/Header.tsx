@@ -12,6 +12,7 @@ import { clsx } from "clsx";
 import { useCart } from "@/context/CartContext";
 import { type Product, finalPrice, formatPrice } from "@/lib/utils";
 import AccountDropdown, { type ClientUser } from "@/components/AccountDropdown";
+import ShopLogo from "@/components/ShopLogo";
 
 function useWishlistCount() {
   const [count, setCount] = useState(0);
@@ -32,7 +33,12 @@ const NAV = [
   { label: "Promos",     href: "/products?promo=true", icon: Tag, hot: true },
 ];
 
-export default function Header() {
+interface HeaderProps {
+  siteName?: string;
+  logoUrl?: string | null;
+}
+
+export default function Header({ siteName = "Togolese Shop", logoUrl = null }: HeaderProps) {
   const { count: cartCount } = useCart();
   const wishlistCount = useWishlistCount();
   const [open, setOpen]               = useState(false);
@@ -193,7 +199,7 @@ export default function Header() {
 
             {/* Logo centré */}
             <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-              <Image src="/logo-togolese-shop.svg" alt="Togolese Shop" width={120} height={28} className="h-7 w-auto" priority />
+              <ShopLogo siteName={siteName} logoUrl={logoUrl} className="h-7 w-auto" />
             </Link>
 
             <div className="flex items-center gap-0.5 ml-auto">
@@ -222,7 +228,7 @@ export default function Header() {
 
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0 mr-3">
-              <Image src="/logo-togolese-shop.svg" alt="Togolese Shop" width={120} height={28} className="h-7 w-auto" priority />
+              <ShopLogo siteName={siteName} logoUrl={logoUrl} className="h-7 w-auto" />
             </Link>
 
             {/* Search */}

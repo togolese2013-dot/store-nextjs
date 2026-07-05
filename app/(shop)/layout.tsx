@@ -9,8 +9,11 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import ReferralBanner from "@/components/ReferralBanner";
 import RefDetector from "@/components/RefDetector";
 import ThemeLoader from "@/components/ThemeLoader";
+import { getSiteName, getSiteLogo } from "@/lib/site-settings";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
+  const [siteName, logoUrl] = await Promise.all([getSiteName(), getSiteLogo()]);
+
   return (
     <CartProvider>
       <ThemeLoader />
@@ -20,11 +23,11 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       </Suspense>
       <ReferralBanner />
       <AnnouncementBar />
-      <Header />
+      <Header siteName={siteName} logoUrl={logoUrl} />
       <main className="flex-1 w-full overflow-x-hidden">
         {children}
       </main>
-      <Footer />
+      <Footer siteName={siteName} logoUrl={logoUrl} />
       <WhatsAppButton />
     </CartProvider>
   );

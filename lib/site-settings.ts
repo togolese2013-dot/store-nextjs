@@ -25,6 +25,17 @@ export async function getSiteName(shopId?: number): Promise<string> {
   }
 }
 
+/** Returns the shop logo URL stored in admin settings, or "" if none uploaded. */
+export async function getSiteLogo(shopId?: number): Promise<string> {
+  try {
+    const id  = shopId ?? await getShopId();
+    const url = await getSetting("site_logo", id);
+    return url?.trim() || "";
+  } catch {
+    return "";
+  }
+}
+
 /** Returns the main WhatsApp number stored in admin settings. */
 export async function getSiteWhatsApp(shopId?: number): Promise<string> {
   try {

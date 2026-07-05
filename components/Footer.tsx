@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { MapPin, Phone, Clock, Instagram, Facebook, Youtube } from "lucide-react";
+import ShopLogo from "@/components/ShopLogo";
 
-export default function Footer() {
+interface FooterProps {
+  siteName?: string;
+  logoUrl?: string | null;
+}
+
+export default function Footer({ siteName = "Togolese Shop", logoUrl = null }: FooterProps) {
   const year = new Date().getFullYear();
 
   return (
@@ -13,11 +19,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <Link href="/" className="inline-block mb-4">
-              <img
-                src="/logo-togolese-shop-white.svg"
-                alt="Togolese Shop"
-                className="h-7 w-auto"
-              />
+              <ShopLogo siteName={siteName} logoUrl={logoUrl} variant="light" className="h-7 w-auto" />
             </Link>
             <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-xs">
               Votre boutique spécialisée en accessoires photographiques au Togo.
