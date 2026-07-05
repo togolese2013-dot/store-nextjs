@@ -170,15 +170,3 @@ export interface StockMovement {
   to: string;
 }
 
-export type AlertChannel = 'Email' | 'SMS' | 'WhatsApp';
-
-export interface StockAlert {
-  id?: number;
-  name: string;
-  target: string;
-  targetType: 'Produit' | 'Catégorie';
-  threshold: number;
-  channels: AlertChannel[];
-  active: boolean;
-  triggered: boolean;
-}

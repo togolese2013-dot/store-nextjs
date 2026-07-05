@@ -4,13 +4,13 @@ import React, { useMemo, useState } from 'react';
 import type {
   Product, Category, Brand, KpiCard, TabSpec,
   Variant, Supplier, PurchaseOrder,
-  StockMovement, StockAlert,
+  StockMovement,
 } from './types';
 import {
   SAMPLE_PRODUCTS, SAMPLE_KPIS, SAMPLE_CATEGORIES,
   SAMPLE_BRANDS, DEFAULT_TABS,
   SAMPLE_VARIANTS, SAMPLE_SUPPLIERS, SAMPLE_PURCHASE_ORDERS,
-  SAMPLE_MOVEMENTS, SAMPLE_ALERTS,
+  SAMPLE_MOVEMENTS,
 } from './sample-data';
 import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import KpiStrip from './KpiStrip';
@@ -22,7 +22,6 @@ import VariantesPage from './VariantesPage';
 import FournisseursPage from './FournisseursPage';
 import AchatsPage from './AchatsPage';
 import MouvementsPage from './MouvementsPage';
-import AlertesPage from './AlertesPage';
 import ReglagesPage from './ReglagesPage';
 import {
   SearchIcon, BellIcon, ChevLeftIcon,
@@ -37,7 +36,7 @@ import styles from './Magasin.module.css';
 export type PageId =
   | 'overview' | 'products' | 'categories' | 'brands' | 'variantes'
   | 'fournisseurs' | 'achats'
-  | 'mouvements' | 'alertes'
+  | 'mouvements'
   | 'reglages';
 
 const PAGE_LABELS: Record<PageId, string> = {
@@ -49,7 +48,6 @@ const PAGE_LABELS: Record<PageId, string> = {
   fournisseurs: 'Fournisseurs',
   achats:       'Achats',
   mouvements:   'Mouvements',
-  alertes:      'Alertes stock',
   reglages:     'Réglages',
 };
 
@@ -62,7 +60,6 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   fournisseurs: 'Rechercher un fournisseur, pays…',
   achats:       'Rechercher une référence, fournisseur…',
   mouvements:   'Rechercher un produit, type…',
-  alertes:      'Rechercher une règle, produit…',
   reglages:     'Rechercher dans les réglages…',
 };
 
@@ -75,7 +72,6 @@ const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
   suppliers:   'fournisseurs',
   achats:      'achats',
   movements:   'mouvements',
-  alerts:      'alertes',
   settings:    'reglages',
 };
 
@@ -89,7 +85,6 @@ const PAGE_TO_NAV: Record<PageId, string> = {
   fournisseurs: 'suppliers',
   achats:       'achats',
   mouvements:   'movements',
-  alertes:      'alerts',
   reglages:     'settings',
 };
 
@@ -106,7 +101,6 @@ export interface MagasinShellProps {
   suppliers?:   Supplier[];
   orders?:      PurchaseOrder[];
   movements?:   StockMovement[];
-  alerts?:      StockAlert[];
 
   searchQuery?: string;
   onSearch?:    (q: string) => void;
@@ -114,6 +108,7 @@ export interface MagasinShellProps {
   onSwitchWorkspace?: () => void;
   onCreateProduct?:   () => void;
   onActivePageChange?: (p: PageId) => void;
+  onStockChange?: () => void;
 
   onDelete?:  (p: Product) => void;
   onArchive?: (p: Product) => void;
@@ -142,7 +137,6 @@ export default function MagasinShell({
   suppliers    = SAMPLE_SUPPLIERS,
   orders       = SAMPLE_PURCHASE_ORDERS,
   movements    = SAMPLE_MOVEMENTS,
-  alerts       = SAMPLE_ALERTS,
   searchQuery,
   onSearch,
   onSwitchWorkspace,
@@ -155,6 +149,7 @@ export default function MagasinShell({
   onPageChange,
   onExport,
   onActivePageChange,
+  onStockChange,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
@@ -256,8 +251,7 @@ export default function MagasinShell({
         {activePage === 'variantes'    && <VariantesPage variants={variants} />}
         {activePage === 'fournisseurs' && <FournisseursPage suppliers={suppliers} />}
         {activePage === 'achats'       && <AchatsPage orders={orders} />}
-        {activePage === 'mouvements'   && <MouvementsPage movements={movements} />}
-        {activePage === 'alertes'      && <AlertesPage alerts={alerts} />}
+        {activePage === 'mouvements'   && <MouvementsPage movements={movements} onStockChange={onStockChange} />}
         {activePage === 'reglages'     && <ReglagesPage />}
       </main>
     </div>

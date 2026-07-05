@@ -1,7 +1,7 @@
 import type {
   Product, KpiCard, TabSpec, Category, Brand,
   Variant, Supplier, PurchaseOrder,
-  StockMovement, StockAlert,
+  StockMovement,
 } from './types';
 
 export const ACCENT = '#3B6A8F';
@@ -29,5 +29,4 @@ export const SAMPLE_VARIANTS: Variant[] = [];
 export const SAMPLE_SUPPLIERS: Supplier[] = [];
 export const SAMPLE_PURCHASE_ORDERS: PurchaseOrder[] = [];
 export const SAMPLE_MOVEMENTS: StockMovement[] = [];
-export const SAMPLE_ALERTS: StockAlert[] = [];
 export const SAMPLE_BRANDS: Brand[] = [];

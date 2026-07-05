@@ -28,14 +28,12 @@ interface DrawerProd {
 const MV_TYPES = [
   { id: 'entree',    label: 'Entrée stock',       short: 'Entrée stock'       },
   { id: 'sortie',    label: 'Sortie → Boutique',  short: 'Sortie boutique'    },
-  { id: 'transfert', label: 'Transfert entrepôt', short: 'Transfert entrepôt' },
 ] as const;
 type MvTypeId = typeof MV_TYPES[number]['id'];
 
 const RAISONS: Record<MvTypeId, string[]> = {
   entree:    ['Réception fournisseur', 'Retour client', 'Correction inventaire', 'Autre'],
   sortie:    ['Transfert boutique', 'Commande en ligne', 'Retour client', 'Autre'],
-  transfert: ['Rééquilibrage stock', 'Urgence commande', 'Réorganisation', 'Autre'],
 };
 
 const SWATCHES = ['#1F3D6E','#3A2F25','#E8C988','#7A2C3A','#D4A437','#2D6A4F','#5C4A88','#3B6A8F','#C9601E','#B8501A','#9C3A14','#6B9E3A'];
@@ -104,7 +102,7 @@ export interface MouvementDrawerProps {
   onClose:        () => void;
   onSuccess?:     () => void;
   defaultType?:   MvTypeId;
-  defaultDstWh?:  string | null; // pré-sélectionne entrepôt destination (Entrée / Transfert)
+  defaultDstWh?:  string | null; // pré-sélectionne le libellé destination (Entrée)
   produits?:      DrawerProdRaw[];
 }
 
@@ -141,8 +139,6 @@ export default function MouvementDrawer({
   const [showSugg, setShowSugg] = useState(false);
   const [qty,      setQty]      = useState(1);
   const [supplier, setSupplier] = useState('');
-  const [srcWh,    setSrcWh]    = useState('Lomé Central');
-  const [dstWh,    setDstWh]    = useState('Lomé Nord');
   const [raison,   setRaison]   = useState(RAISONS[defaultType][0]);
   const [step,     setStep]     = useState<'form' | 'loading' | 'success'>('form');
   const [apiError, setApiError] = useState('');
@@ -181,14 +177,6 @@ export default function MouvementDrawer({
     setStep('loading');
 
     try {
-      if (type === 'transfert') {
-        // No backend route yet — simulate
-        await new Promise(r => setTimeout(r, 1400));
-        setStep('success');
-        onSuccess?.();
-        return;
-      }
-
       const endpoint = type === 'entree' ? '/api/admin/stock/entree' : '/api/admin/stock/sortie';
       const noteStr  = type === 'entree' && supplier
         ? `${raison} — ${supplier}`
@@ -236,27 +224,19 @@ export default function MouvementDrawer({
         <TrNode label={defaultDstWh ?? 'Stock Magasin'} sub="Destination" icon={<IcBox />}   dest />
       </>
     );
-    if (type === 'sortie') return (
+    return (
       <>
         <TrNode label="Stock Magasin" sub="Source"      icon={<IcBox />}   />
         <TransferRail fast={isLoading} />
         <TrNode label="Boutique"      sub="Destination" icon={<IcStore />} dest />
       </>
     );
-    return (
-      <>
-        <TrNode label={srcWh} sub="Source"      icon={<IcWH />} />
-        <TransferRail fast={isLoading} />
-        <TrNode label={dstWh} sub="Destination" icon={<IcWH />} dest />
-      </>
-    );
   };
 
-  const successTitle = { entree: 'Entrée enregistrée !', sortie: 'Sortie enregistrée !', transfert: 'Transfert effectué !' };
+  const successTitle = { entree: 'Entrée enregistrée !', sortie: 'Sortie enregistrée !' };
   const successMsg   = {
-    entree:    `${qty} × ${product} ajouté${qty > 1 ? 's' : ''} au Stock Magasin`,
-    sortie:    `${qty} × ${product} transféré${qty > 1 ? 's' : ''} vers la Boutique`,
-    transfert: `${qty} × ${product} de ${srcWh} → ${dstWh}`,
+    entree: `${qty} × ${product} ajouté${qty > 1 ? 's' : ''} au Stock Magasin`,
+    sortie: `${qty} × ${product} transféré${qty > 1 ? 's' : ''} vers la Boutique`,
   };
 
   // ── SUCCESS screen ─────────────────────────────────────────────────────────
@@ -295,7 +275,7 @@ export default function MouvementDrawer({
 
   // ── FORM ───────────────────────────────────────────────────────────────────
 
-  const confirmLabel = type === 'entree' ? "Confirmer l'entrée" : type === 'sortie' ? 'Confirmer la sortie' : 'Confirmer le transfert';
+  const confirmLabel = type === 'entree' ? "Confirmer l'entrée" : 'Confirmer la sortie';
 
   return (
     <div style={drawerCss} onMouseDown={e => e.stopPropagation()}>
@@ -312,7 +292,7 @@ export default function MouvementDrawer({
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Type selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {MV_TYPES.map(t => (
             <button key={t.id} type="button" onClick={() => setType(t.id)} disabled={isLoading}
               style={{ padding: '8px 6px', borderRadius: 9, border: `1.5px solid ${type === t.id ? 'var(--accent)' : 'var(--border)'}`, textAlign: 'center', fontSize: 12, fontWeight: 600, lineHeight: 1.35, cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit', background: type === t.id ? 'var(--accent-bg)' : 'var(--surface)', color: type === t.id ? 'var(--accent)' : 'var(--muted)' }}>
@@ -333,24 +313,11 @@ export default function MouvementDrawer({
           </div>
         )}
 
-        {/* Entrepôts (transfert only) */}
-        {type === 'transfert' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <label style={labelCss}>Entrepôt source</label>
-              <input style={inputCss} value={srcWh} disabled={isLoading} onChange={e => setSrcWh(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <label style={labelCss}>Entrepôt destination</label>
-              <input style={inputCss} value={dstWh} disabled={isLoading} onChange={e => setDstWh(e.target.value)} />
-            </div>
-          </div>
-        )}
 
         {/* Product autocomplete */}
         <div className="mv-sugg" style={{ display: 'flex', flexDirection: 'column', gap: 7, position: 'relative' }}>
           <label style={labelCss}>
-            {type === 'entree' ? 'Produit à recevoir' : type === 'sortie' ? 'Produit à transférer' : 'Produit à déplacer'}
+            {type === 'entree' ? 'Produit à recevoir' : 'Produit à transférer'}
           </label>
           <div style={{ position: 'relative' }}>
             <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">

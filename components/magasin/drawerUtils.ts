@@ -18,6 +18,7 @@ export function injectKeyframes(): void {
     @keyframes mgPop   { from { transform: scale(.86); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     @keyframes mgDot   { 0%{left:8px;opacity:0} 20%{opacity:1} 80%{opacity:1} 100%{left:calc(100% - 8px);opacity:0} }
     @keyframes mgPulse { 0%,100%{box-shadow:0 0 0 0 rgba(59,106,143,.38)} 55%{box-shadow:0 0 0 9px rgba(59,106,143,0)} }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
   `;
   document.head.appendChild(el);
 }

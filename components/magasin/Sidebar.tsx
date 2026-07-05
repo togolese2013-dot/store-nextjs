@@ -35,7 +35,6 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
     section: 'Stock',
     items: [
       { icon: HistoryIcon,     label: 'Mouvements',   id: 'movements' },
-      { icon: BoxIcon,         label: 'Alertes stock', id: 'alerts' },
     ],
   },
   {
