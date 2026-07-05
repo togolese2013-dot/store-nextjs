@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/context/CartContext";
 import { calcPrice } from "@/context/CartContext";
 import { formatPrice } from "@/lib/utils";
@@ -9,6 +9,7 @@ import Link from "next/link";
 import {
   ShoppingBag, ArrowRight, Check, MapPin, Phone,
   User, MessageSquare, ChevronDown, Truck, Star, Loader2, Link2, ShieldCheck, Package,
+  Camera, X as XIcon,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -17,8 +18,16 @@ const PHONE_PREFIXES = [
   { code: "+225", flag: "🇨🇮", label: "Côte d'Ivoire" },
   { code: "+229", flag: "🇧🇯", label: "Bénin" },
   { code: "+226", flag: "🇧🇫", label: "Burkina Faso" },
+  { code: "+223", flag: "🇲🇱", label: "Mali" },
+  { code: "+227", flag: "🇳🇪", label: "Niger" },
   { code: "+233", flag: "🇬🇭", label: "Ghana" },
   { code: "+221", flag: "🇸🇳", label: "Sénégal" },
+  { code: "+224", flag: "🇬🇳", label: "Guinée" },
+  { code: "+220", flag: "🇬🇲", label: "Gambie" },
+  { code: "+245", flag: "🇬🇼", label: "Guinée-Bissau" },
+  { code: "+232", flag: "🇸🇱", label: "Sierra Leone" },
+  { code: "+231", flag: "🇱🇷", label: "Libéria" },
+  { code: "+238", flag: "🇨🇻", label: "Cap-Vert" },
   { code: "+234", flag: "🇳🇬", label: "Nigeria" },
   { code: "+237", flag: "🇨🇲", label: "Cameroun" },
   { code: "+33",  flag: "🇫🇷", label: "France" },
@@ -138,6 +147,7 @@ export default function CheckoutPage() {
   const [phoneNumber,  setPhoneNumber]  = useState("");
   const [submitted,    setSubmitted]    = useState(false);
   const [loading,      setLoading]      = useState(false);
+  const submittingRef = useRef(false); // sync guard against double-submit
   const [errors,       setErrors]       = useState<Partial<Form & { telephone: string; reference: string }>>({});
   const [submitError,  setSubmitError]  = useState("");
   const [orderedItems, setOrderedItems] = useState<typeof items>([]);
@@ -145,6 +155,7 @@ export default function CheckoutPage() {
   const [orderRef,     setOrderRef]     = useState("");
   const [zones,        setZones]        = useState<DeliveryZone[]>([]);
   const [refCode,      setRefCode]      = useState<string | null>(null);
+  const [filleulPct,   setFilleulPct]   = useState(10);
   const [couponInput,  setCouponInput]  = useState("");
   const [coupon,       setCoupon]       = useState<{ code: string; type: string; valeur: number; remise: number } | null>(null);
   const [couponError,  setCouponError]  = useState("");
@@ -152,7 +163,8 @@ export default function CheckoutPage() {
   const [nbTranches,   setNbTranches]   = useState<0 | 2 | 3 | 4>(0); // 0 = comptant
   const [isVerifie,    setIsVerifie]    = useState<boolean | null>(null);
   const [payMode,      setPayMode]      = useState<"livraison" | "flooz" | "yas" | "echelonne">("livraison");
-  const [mmRef,        setMmRef]        = useState("");
+  const [mmScreenshot,        setMmScreenshot]        = useState<File | null>(null);
+  const [mmScreenshotB64,     setMmScreenshotB64]     = useState<string>("");
 
   /* ── Saved addresses ── */
   interface SavedAddress { id: number; nom: string; telephone: string; adresse: string; zone_livraison: string; is_default: number }
@@ -165,6 +177,10 @@ export default function CheckoutPage() {
     fetch("/api/public/delivery-zones")
       .then(r => r.json())
       .then(d => Array.isArray(d) && setZones(d))
+      .catch(() => {});
+    fetch("/api/admin/referrals/settings")
+      .then(r => r.json())
+      .then(d => { if (typeof d.filleul_pct === "number") setFilleulPct(d.filleul_pct); })
       .catch(() => {});
   }, []);
 
@@ -201,7 +217,7 @@ export default function CheckoutPage() {
 
   const selectedZone     = zones.find(z => z.nom === form.zone);
   const deliveryFee      = selectedZone?.fee ?? 0;
-  const referralDiscount = refCode ? Math.round(selectedTotal * 0.10) : 0;
+  const referralDiscount = refCode ? Math.round(selectedTotal * filleulPct / 100) : 0;
   const couponDiscount   = coupon?.remise ?? 0;
   const grandTotal       = selectedTotal + deliveryFee - referralDiscount - couponDiscount;
   const montantTranche   = nbTranches > 0
@@ -236,17 +252,62 @@ export default function CheckoutPage() {
     }
   }
 
+  // Compress screenshot before upload (max 1200px wide, JPEG 0.75)
+  function handleScreenshotChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setErrors(err => ({ ...err, reference: "Image trop lourde (max 10 Mo)." }));
+      return;
+    }
+    setMmScreenshot(file);
+    setMmScreenshotB64("");
+    setErrors(err => ({ ...err, reference: undefined }));
+    // Compress immediately so submit is instant
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX_W  = 1200;
+        const ratio  = Math.min(1, MAX_W / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setMmScreenshotB64(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function applyCoupon() {
     const code = couponInput.trim().toUpperCase();
     if (!code) return;
-    setCouponLoading(true);
     setCouponError("");
     setCoupon(null);
+    setRefCode(null);
+    setCouponLoading(true);
     try {
+      // 1. Try coupon first
       const res  = await fetch(`/api/public/coupons/validate?code=${encodeURIComponent(code)}&total=${selectedTotal}`);
       const data = await res.json();
-      if (!data.valid) { setCouponError(data.error ?? "Code invalide."); }
-      else             { setCoupon(data); }
+      if (data.valid) {
+        if (selectedItems.some(i => i.remise > 0)) {
+          setCouponError("Les codes promo ne sont pas applicables sur les articles déjà en promotion.");
+        } else {
+          setCoupon(data);
+        }
+        return;
+      }
+      // 2. Not a coupon → try referral
+      const refRes  = await fetch(`/api/referrals/validate?code=${encodeURIComponent(code)}`);
+      const refData = await refRes.json();
+      if (refData.valid) {
+        setRefCode(code);
+      } else {
+        setCouponError("Code invalide ou introuvable.");
+      }
     } catch {
       setCouponError("Erreur réseau.");
     } finally {
@@ -263,8 +324,12 @@ export default function CheckoutPage() {
     }
     if (!form.adresse.trim())   e.adresse   = "Votre adresse est requise.";
     if (!form.zone)             e.zone      = "Choisissez une zone de livraison.";
-    if ((payMode === "flooz" || payMode === "yas") && !mmRef.trim()) {
-      e.reference = "La référence de transaction est obligatoire.";
+    if (payMode === "flooz" || payMode === "yas") {
+      if (!mmScreenshot) {
+        e.reference = "La capture d'écran de confirmation est obligatoire.";
+      } else if (!mmScreenshotB64) {
+        e.reference = "Compression en cours, patientez quelques secondes…";
+      }
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -278,20 +343,26 @@ export default function CheckoutPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return; // sync guard — blocks before React re-render
     if (!validate()) return;
     if (selectedItems.length === 0) return;
+    submittingRef.current = true;
     setLoading(true);
     setSubmitError("");
     try {
       const telephone = `${phonePrefix} ${normalizeLocalPhone(phoneNumber)}`;
       const orderItems = selectedItems.map(i => ({
-        id:           i.id,
-        nom:          i.nom,
-        reference:    i.reference,
+        id:            i.id,
+        nom:           i.nom,
+        reference:     i.reference,
         prix_unitaire: calcPrice(i),
-        qty:          i.qty,
-        total:        calcPrice(i) * i.qty,
+        qty:           i.qty,
+        total:         calcPrice(i) * i.qty,
+        ...(i.variantId ? { variantId: i.variantId } : {}),
       }));
+      // Screenshot already compressed at file-selection time
+      const mmScreenshotPayload = (payMode === "flooz" || payMode === "yas") ? mmScreenshotB64 || null : null;
+
       const res = await fetch("/api/orders", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -311,7 +382,7 @@ export default function CheckoutPage() {
           coupon_remise:     couponDiscount > 0 ? couponDiscount : undefined,
           payment_mode:      payMode === "flooz" ? "moov_direct" : payMode === "yas" ? "yas_direct" : payMode === "echelonne" && nbTranches > 0 ? `${nbTranches}x` : "comptant",
           nb_tranches:       nbTranches > 0 ? nbTranches : undefined,
-          mm_transaction_ref: (payMode === "flooz" || payMode === "yas") ? mmRef.trim() : null,
+          mm_screenshot_b64: mmScreenshotPayload,
         }),
       });
       const data = await res.json();
@@ -326,6 +397,7 @@ export default function CheckoutPage() {
       setSubmitError("Erreur réseau. Vérifiez votre connexion et réessayez.");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   }
 
@@ -359,44 +431,34 @@ export default function CheckoutPage() {
   /* Success screen */
   if (submitted) {
     return (
-      <div className="max-w-lg mx-auto px-6 py-16 text-center">
-        {/* Big check circle */}
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
-          style={{ background: "#DDEBE2" }}>
-          <Check className="w-10 h-10" style={{ color: "#2D6A4F" }} strokeWidth={2.5} />
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
+          <Check className="w-10 h-10 text-green-600" />
         </div>
-        <h1 className="text-[28px] leading-[1.1] tracking-[-0.01em] mb-2"
-          style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontStyle: "italic", color: "#14110E" }}>
-          Commande confirmée !
-        </h1>
-        <p className="text-[14px] mb-1" style={{ color: "#6B635B" }}>Order confirmed!</p>
+        <h1 className="font-display text-2xl font-800 text-slate-900 mb-3">Commande confirmée !</h1>
         {orderRef && (
-          <p className="text-[12.5px] font-mono inline-block px-3 py-1 rounded-full border mb-6"
-            style={{ color: "#8A8278", borderColor: "#E8E1D4", background: "#FBF7F1" }}>
+          <p className="text-xs font-mono bg-slate-100 text-slate-600 inline-block px-3 py-1 rounded-lg mb-4">
             Réf. {orderRef}
           </p>
         )}
-        <p className="text-[14px] max-w-sm mx-auto mb-6" style={{ color: "#6B635B" }}>
+        <p className="text-slate-600 text-sm max-w-sm mx-auto mb-6">
           Votre commande a bien été enregistrée. Notre équipe vous contactera très bientôt pour confirmer la livraison.
         </p>
 
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold mb-8"
-          style={{ background: "#DDEBE2", borderColor: "#2D6A4F20", color: "#2D6A4F" }}>
-          <Star className="w-4 h-4" fill="currentColor" />
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-50 border border-brand-100 text-brand-800 text-sm font-semibold mb-8">
+          <Star className="w-4 h-4 text-brand-600" fill="currentColor" />
           ~{Math.floor(orderedTotal / 100)} points fidélité à recevoir après livraison
-          <Link href="/fidelite" className="text-xs hover:underline ml-1" style={{ color: "#2D6A4F" }}>En savoir plus →</Link>
+          <Link href="/fidelite" className="text-xs text-brand-600 hover:underline ml-1">En savoir plus →</Link>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
           <Link href="/"
-            className="px-6 py-3 rounded-[14px] border text-[14px] font-medium"
-            style={{ borderColor: "#E8E1D4", color: "#14110E" }}
+            className="px-6 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-brand-300 transition-colors"
           >
             Retour à l'accueil
           </Link>
           <Link href="/products"
-            className="px-6 py-3 rounded-[14px] text-white text-[14px] font-medium"
-            style={{ background: "#14110E" }}
+            className="px-6 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 transition-colors"
           >
             Continuer les achats
           </Link>
@@ -454,22 +516,28 @@ export default function CheckoutPage() {
   );
 
   return (
-    <div className="min-h-screen" style={{ background: "#FBF7F1" }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b bg-white/80" style={{ borderColor: "#E8E1D4" }}>
-        <Link href="/cart" className="p-1 grid place-items-center" style={{ color: "#14110E" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-        </Link>
-        <h1 className="flex-1 text-[17px] font-medium tracking-[-0.025em]" style={{ color: "#14110E" }}>Finaliser ma commande</h1>
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+      {/* Breadcrumb */}
+      <div className="bg-white border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <nav className="flex items-center gap-2 text-sm text-slate-500">
+            <Link href="/" className="hover:text-brand-700 transition-colors">Accueil</Link>
+            <span>/</span>
+            <Link href="/cart" className="hover:text-brand-700 transition-colors">Panier</Link>
+            <span>/</span>
+            <span className="text-slate-900 font-medium">Commande</span>
+          </nav>
+        </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="font-display text-2xl font-800 text-slate-900 mb-7">Finaliser ma commande</h1>
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="grid lg:grid-cols-3 gap-8 items-start">
 
             {/* ── Form ── */}
-            <div className="lg:col-span-2 space-y-5">
+            <div className="lg:col-span-2 space-y-5 min-w-0">
 
               {/* Contact */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
@@ -563,7 +631,7 @@ export default function CheckoutPage() {
                           <select
                             value={phonePrefix}
                             onChange={e => setPhonePrefix(e.target.value)}
-                            className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800"
+                            className="h-full pl-3 pr-7 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base bg-white appearance-none cursor-pointer font-semibold text-slate-800 max-w-[110px]"
                           >
                             {PHONE_PREFIXES.map(p => (
                               <option key={p.code} value={p.code}>
@@ -711,7 +779,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Coupon */}
+              {/* Code promo / parrain */}
               <div className="bg-white rounded-3xl border border-slate-100 p-6">
                 <h2 className="font-display font-800 text-slate-900 text-base mb-4 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-brand-900 text-white text-xs font-bold flex items-center justify-center shrink-0">3</div>
@@ -731,24 +799,33 @@ export default function CheckoutPage() {
                       Retirer
                     </button>
                   </div>
+                ) : refCode ? (
+                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                    <div>
+                      <p className="text-sm font-bold text-emerald-800">{refCode} <span className="text-xs font-normal text-emerald-600">(parrain)</span></p>
+                      <p className="text-xs text-emerald-600">
+                        Remise −{filleulPct}% → <span className="font-bold">{formatPrice(referralDiscount)}</span>
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => { setRefCode(null); setCouponInput(""); }}
+                      className="text-xs text-emerald-600 hover:text-red-500 font-semibold transition-colors">
+                      Retirer
+                    </button>
+                  </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="relative">
                     <input
                       type="text"
                       value={couponInput}
                       onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
                       onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCoupon())}
+                      onBlur={applyCoupon}
                       placeholder="Code promo"
-                      className="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white"
+                      className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-brand-500 outline-none text-base font-mono tracking-widest uppercase bg-white pr-10"
                     />
-                    <button
-                      type="button"
-                      onClick={applyCoupon}
-                      disabled={couponLoading || !couponInput.trim()}
-                      className="px-5 py-3 rounded-2xl bg-brand-900 text-white font-bold text-sm hover:bg-brand-800 disabled:opacity-50 transition-colors shrink-0"
-                    >
-                      {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Appliquer"}
-                    </button>
+                    {couponLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
+                    )}
                   </div>
                 )}
                 {couponError && <p className="text-xs text-red-500 mt-2">{couponError}</p>}
@@ -787,7 +864,7 @@ export default function CheckoutPage() {
                     {
                       id: "yas",
                       label: "Mixx by Yas",
-                      sub: "Moov Africa Togo",
+                      sub: "Yas Togo",
                       locked: false,
                       logo: (
                         <img src="/logo-mixx-by-yas.svg" alt="Mixx by Yas" className="w-14 h-8 object-contain" />
@@ -924,23 +1001,37 @@ export default function CheckoutPage() {
                             </div>
                           </details>
 
-                          {/* Référence transaction */}
+                          {/* Capture d'écran confirmation */}
                           <div className="pt-2 border-t border-slate-100">
-                            <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                              Référence de transaction reçue par SMS{" "}
+                            <p className="text-xs font-bold text-slate-600 mb-1.5">
+                              Capture d'écran de confirmation{" "}
                               <span className="text-red-500">*</span>
+                            </p>
+                            <label className={`flex items-center gap-3 cursor-pointer rounded-xl border px-3 py-2.5 transition-colors ${errors.reference ? "border-red-300 bg-red-50" : mmScreenshot ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}>
+                              <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${mmScreenshot ? "bg-emerald-100" : "bg-slate-100"}`}>
+                                {mmScreenshot
+                                  ? <Check className="w-4 h-4 text-emerald-600" />
+                                  : <Camera className="w-4 h-4 text-slate-400" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium truncate ${mmScreenshot ? "text-emerald-700" : "text-slate-600"}`}>
+                                  {mmScreenshot ? mmScreenshot.name : "Ajouter la capture d'écran"}
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  {mmScreenshot ? (mmScreenshotB64 ? "Prête à envoyer" : "Compression…") : "JPG, PNG · max 10 Mo"}
+                                </p>
+                              </div>
+                              {mmScreenshot && (
+                                <button type="button" onClick={(ev) => { ev.preventDefault(); setMmScreenshot(null); setMmScreenshotB64(""); }}
+                                  className="text-slate-400 hover:text-red-500 transition-colors shrink-0">
+                                  <XIcon className="w-4 h-4" />
+                                </button>
+                              )}
+                              <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotChange} />
                             </label>
-                            <input
-                              type="text"
-                              value={mmRef}
-                              onChange={e => { setMmRef(e.target.value); setErrors(err => ({ ...err, reference: undefined })); }}
-                              placeholder={refPlaceholder}
-                              className={inputCls(errors.reference)}
-                              autoComplete="off"
-                            />
                             {errors.reference && <p className="text-xs text-red-500 mt-1">{errors.reference}</p>}
-                            <p className="text-[11px] text-slate-400 mt-1">
-                              Entrez la référence reçue après paiement pour valider la commande.
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                              Faites une capture du SMS de confirmation reçu après votre virement {isMoov ? "Moov" : "Yas"}.
                             </p>
                           </div>
                         </div>
@@ -1087,7 +1178,7 @@ export default function CheckoutPage() {
                   </div>
                   {referralDiscount > 0 && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-emerald-600 font-semibold">Remise parrainage −10%</span>
+                      <span className="text-emerald-600 font-semibold">Remise parrainage −{filleulPct}%</span>
                       <span className="text-emerald-600 font-bold">−{formatPrice(referralDiscount)}</span>
                     </div>
                   )}
