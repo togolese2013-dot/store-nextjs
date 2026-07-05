@@ -42,14 +42,14 @@ function extractShopSlug(hostname: string): string | null {
 
 /**
  * Returns true if the hostname is one of our platform domains
- * (togolese.tg, togolese.fr, localhost, or any subdomain thereof).
+ * (afrisika.com, togolese.tg, togolese.fr, localhost, or any subdomain thereof).
  */
 function isPlatformHost(hostname: string): boolean {
   const host = hostname.split(":")[0].toLowerCase();
   return (
     host === "localhost" ||
     host.startsWith("127.") ||
-    /^(.*\.)?togolese\.(tg|fr)$/.test(host)
+    /^(.*\.)?(togolese\.(tg|fr)|afrisika\.com)$/.test(host)
   );
 }
 

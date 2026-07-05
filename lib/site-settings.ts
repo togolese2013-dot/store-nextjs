@@ -1,7 +1,7 @@
 import { getSetting } from "./admin-db";
 import { getShopId } from "./shop-context";
 
-const FALLBACK_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://togolese.tg";
+const FALLBACK_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://afrisika.com";
 
 /** Returns the canonical site URL stored in admin settings, falls back to env var. */
 export async function getSiteUrl(shopId?: number): Promise<string> {
