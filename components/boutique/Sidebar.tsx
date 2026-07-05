@@ -24,7 +24,6 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
   {
     section: 'Paramètres',
     items: [
-      { icon: CogIcon,  label: 'Réglages boutique', id: 'settings' },
       { icon: HelpIcon, label: 'Aide & support',    id: 'help' },
     ],
   },
@@ -116,9 +115,9 @@ export default function Sidebar({
                 </div>
               </div>
               <div className={styles.userMenuBody}>
-                <button type="button" className={styles.userMenuItem} onClick={() => { setMenuOpen(false); onNav?.('settings'); }}>
+                <a href="/admin/settings" className={styles.userMenuItem} onClick={() => setMenuOpen(false)}>
                   <CogIcon size={14} /> Paramètres boutique
-                </button>
+                </a>
                 <a
                   href="/" target="_blank" rel="noreferrer"
                   className={styles.userMenuItem}

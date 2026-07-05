@@ -22,7 +22,6 @@ import VariantesPage from './VariantesPage';
 import FournisseursPage from './FournisseursPage';
 import AchatsPage from './AchatsPage';
 import MouvementsPage from './MouvementsPage';
-import ReglagesPage from './ReglagesPage';
 import {
   SearchIcon, BellIcon, ChevLeftIcon,
   DownloadIcon, UploadIcon, SparklesIcon, PlusIcon,
@@ -36,8 +35,7 @@ import styles from './Magasin.module.css';
 export type PageId =
   | 'overview' | 'products' | 'categories' | 'brands' | 'variantes'
   | 'fournisseurs' | 'achats'
-  | 'mouvements'
-  | 'reglages';
+  | 'mouvements';
 
 const PAGE_LABELS: Record<PageId, string> = {
   overview:     "Vue d'ensemble",
@@ -48,7 +46,6 @@ const PAGE_LABELS: Record<PageId, string> = {
   fournisseurs: 'Fournisseurs',
   achats:       'Achats',
   mouvements:   'Mouvements',
-  reglages:     'Réglages',
 };
 
 const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
@@ -60,7 +57,6 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   fournisseurs: 'Rechercher un fournisseur, pays…',
   achats:       'Rechercher une référence, fournisseur…',
   mouvements:   'Rechercher un produit, type…',
-  reglages:     'Rechercher dans les réglages…',
 };
 
 const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
@@ -72,7 +68,6 @@ const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
   suppliers:   'fournisseurs',
   achats:      'achats',
   movements:   'mouvements',
-  settings:    'reglages',
 };
 
 /** Reverse map — PageId → nav item id (for Sidebar activeId prop) */
@@ -85,7 +80,6 @@ const PAGE_TO_NAV: Record<PageId, string> = {
   fournisseurs: 'suppliers',
   achats:       'achats',
   mouvements:   'movements',
-  reglages:     'settings',
 };
 
 /* ─── Props ─────────────────────────────────────────────────────── */
@@ -252,7 +246,6 @@ export default function MagasinShell({
         {activePage === 'fournisseurs' && <FournisseursPage suppliers={suppliers} />}
         {activePage === 'achats'       && <AchatsPage orders={orders} />}
         {activePage === 'mouvements'   && <MouvementsPage movements={movements} onStockChange={onStockChange} />}
-        {activePage === 'reglages'     && <ReglagesPage />}
       </main>
     </div>
   );
