@@ -272,8 +272,6 @@ export async function createStockAjustement(data: {
   try {
     await conn.beginTransaction();
 
-    const abs  = Math.abs(data.quantite);
-    const type = data.quantite >= 0 ? "entree" : "retrait";
     let stockApres: number;
 
     if (data.variant_id) {
@@ -301,8 +299,8 @@ export async function createStockAjustement(data: {
 
     await conn.execute(
       `INSERT INTO stock_mouvements (produit_id, type, quantite, stock_apres, note, user_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [data.produit_id, type, abs, stockApres, data.motif, data.user_id ?? null]
+       VALUES (?, 'ajustement', ?, ?, ?, ?)`,
+      [data.produit_id, data.quantite, stockApres, data.motif, data.user_id ?? null]
     );
 
     await conn.commit();

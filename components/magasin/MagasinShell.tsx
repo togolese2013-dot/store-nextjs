@@ -3,14 +3,14 @@
 import React, { useMemo, useState } from 'react';
 import type {
   Product, Category, Brand, KpiCard, TabSpec,
-  Variant, Supplier, PurchaseOrder, Warehouse,
-  StockAdjustment, StockMovement, StockAlert,
+  Variant, Supplier, PurchaseOrder,
+  StockMovement, StockAlert,
 } from './types';
 import {
   SAMPLE_PRODUCTS, SAMPLE_KPIS, SAMPLE_CATEGORIES,
   SAMPLE_BRANDS, DEFAULT_TABS,
   SAMPLE_VARIANTS, SAMPLE_SUPPLIERS, SAMPLE_PURCHASE_ORDERS,
-  SAMPLE_WAREHOUSES, SAMPLE_ADJUSTMENTS, SAMPLE_MOVEMENTS, SAMPLE_ALERTS,
+  SAMPLE_MOVEMENTS, SAMPLE_ALERTS,
 } from './sample-data';
 import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import KpiStrip from './KpiStrip';
@@ -21,8 +21,6 @@ import BrandsPage from './BrandsPage';
 import VariantesPage from './VariantesPage';
 import FournisseursPage from './FournisseursPage';
 import AchatsPage from './AchatsPage';
-import EntrepotsPage from './EntrepotsPage';
-import AjustementsPage from './AjustementsPage';
 import MouvementsPage from './MouvementsPage';
 import AlertesPage from './AlertesPage';
 import ReglagesPage from './ReglagesPage';
@@ -38,8 +36,8 @@ import styles from './Magasin.module.css';
 /* ─── Types ─────────────────────────────────────────────────────── */
 export type PageId =
   | 'overview' | 'products' | 'categories' | 'brands' | 'variantes'
-  | 'fournisseurs' | 'achats' | 'entrepots'
-  | 'ajustements' | 'mouvements' | 'alertes'
+  | 'fournisseurs' | 'achats'
+  | 'mouvements' | 'alertes'
   | 'reglages';
 
 const PAGE_LABELS: Record<PageId, string> = {
@@ -50,8 +48,6 @@ const PAGE_LABELS: Record<PageId, string> = {
   variantes:    'Variantes',
   fournisseurs: 'Fournisseurs',
   achats:       'Achats',
-  entrepots:    'Entrepôts',
-  ajustements:  'Ajustements',
   mouvements:   'Mouvements',
   alertes:      'Alertes stock',
   reglages:     'Réglages',
@@ -65,8 +61,6 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   variantes:    'Rechercher un groupe de variantes…',
   fournisseurs: 'Rechercher un fournisseur, pays…',
   achats:       'Rechercher une référence, fournisseur…',
-  entrepots:    'Rechercher un entrepôt, ville…',
-  ajustements:  'Rechercher un produit, SKU…',
   mouvements:   'Rechercher un produit, type…',
   alertes:      'Rechercher une règle, produit…',
   reglages:     'Rechercher dans les réglages…',
@@ -80,8 +74,6 @@ const NAV_TO_PAGE: Partial<Record<string, PageId>> = {
   variants:    'variantes',
   suppliers:   'fournisseurs',
   achats:      'achats',
-  warehouses:  'entrepots',
-  adjustments: 'ajustements',
   movements:   'mouvements',
   alerts:      'alertes',
   settings:    'reglages',
@@ -96,8 +88,6 @@ const PAGE_TO_NAV: Record<PageId, string> = {
   variantes:    'variants',
   fournisseurs: 'suppliers',
   achats:       'achats',
-  entrepots:    'warehouses',
-  ajustements:  'adjustments',
   mouvements:   'movements',
   alertes:      'alerts',
   reglages:     'settings',
@@ -115,8 +105,6 @@ export interface MagasinShellProps {
   variants?:    Variant[];
   suppliers?:   Supplier[];
   orders?:      PurchaseOrder[];
-  warehouses?:  Warehouse[];
-  adjustments?: StockAdjustment[];
   movements?:   StockMovement[];
   alerts?:      StockAlert[];
 
@@ -153,8 +141,6 @@ export default function MagasinShell({
   variants     = SAMPLE_VARIANTS,
   suppliers    = SAMPLE_SUPPLIERS,
   orders       = SAMPLE_PURCHASE_ORDERS,
-  warehouses   = SAMPLE_WAREHOUSES,
-  adjustments  = SAMPLE_ADJUSTMENTS,
   movements    = SAMPLE_MOVEMENTS,
   alerts       = SAMPLE_ALERTS,
   searchQuery,
@@ -270,8 +256,6 @@ export default function MagasinShell({
         {activePage === 'variantes'    && <VariantesPage variants={variants} />}
         {activePage === 'fournisseurs' && <FournisseursPage suppliers={suppliers} />}
         {activePage === 'achats'       && <AchatsPage orders={orders} />}
-        {activePage === 'entrepots'    && <EntrepotsPage warehouses={warehouses} />}
-        {activePage === 'ajustements'  && <AjustementsPage adjustments={adjustments} />}
         {activePage === 'mouvements'   && <MouvementsPage movements={movements} />}
         {activePage === 'alertes'      && <AlertesPage alerts={alerts} />}
         {activePage === 'reglages'     && <ReglagesPage />}

@@ -155,27 +155,7 @@ export interface PurchaseOrder {
   articles?: ArticleLigne[];
 }
 
-export interface Warehouse {
-  id: string;
-  name: string;
-  location: string;
-  /** Hex accent color */
-  color: string;
-  capacity: number;
-  occupied: number;
-  products: number;
-  principal: boolean;
-}
 
-export interface StockAdjustment {
-  date: string;
-  product: string;
-  sku: string;
-  /** Positive = added, negative = removed */
-  delta: number;
-  reason: string;
-  author: string;
-}
 
 export type MovementType = 'Entrée' | 'Sortie' | 'Transfert' | 'Ajustement';
 

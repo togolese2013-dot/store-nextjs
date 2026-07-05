@@ -335,7 +335,6 @@ export function CommandPalette({ onClose, navigate, ui }: CommandPaletteProps) {
     : [
         { l: "Créer un produit",           ic: "plus"     as const, run: () => ui.openForm("product")    },
         { l: "Créer un bon d'achat",        ic: "plus"     as const, run: () => ui.openForm("po")         },
-        { l: "Nouvel ajustement de stock",  ic: "adj"      as const, run: () => ui.openForm("adjustment") },
         { l: "Exporter le catalogue",       ic: "download" as const, run: () => ui.openExport("Produits") },
       ];
   const actions = baseActions.filter((a) => !ql || a.l.toLowerCase().includes(ql));

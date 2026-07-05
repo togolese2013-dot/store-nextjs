@@ -280,7 +280,7 @@ export default function MouvementsPage(_props: MouvementsPageProps) {
                   </tr>
                 ) : items.map(m => {
                   const displayType = mapType(m.type);
-                  const qty  = m.type === 'entree' ? m.quantite : -m.quantite;
+                  const qty  = m.type === 'entree' || m.type === 'ajustement' ? m.quantite : -m.quantite;
                   const from = m.type === 'entree' ? 'Fournisseur' : 'Magasin';
                   const to   = m.type === 'entree' ? 'Magasin' : m.type === 'ajustement' ? '—' : 'Boutique';
                   return (

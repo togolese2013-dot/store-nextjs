@@ -8,18 +8,17 @@ interface MagasinConfigOpts {
   onRefresh?: () => void;
   onRefreshMeta?: () => void;
   onVariantChange?: () => void;
-  onAdjustmentChange?: () => void;
   onAlertChange?: () => void;
 }
 
 /* Shared live-data store — updated by setMagasinData() from the DataLoader */
-let _data: Record<string, any> = { PRODUCTS: [], CATEGORIES: [], BRANDS: [], SUPPLIERS: [], WAREHOUSES: [] };
+let _data: Record<string, any> = { PRODUCTS: [], CATEGORIES: [], BRANDS: [], SUPPLIERS: [] };
 
 export function setMagasinData(d: Record<string, any>) {
   _data = { ..._data, ...d };
 }
 
-export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange, onAdjustmentChange, onAlertChange }: MagasinConfigOpts = {}): AppConfig {
+export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange, onAlertChange }: MagasinConfigOpts = {}): AppConfig {
   return {
     name: "Magasin",
     data: () => _data,
@@ -28,7 +27,6 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
       const cats      = (_data.CATEGORIES  ?? []).map((c: any) => c.name ?? c.nom ?? "");
       const brands    = (_data.BRANDS      ?? []).map((b: any) => b.name ?? b.nom ?? "");
       const suppliers = (_data.SUPPLIERS   ?? []).map((s: any) => s.name ?? s.nom ?? "");
-      const warehouses= (_data.WAREHOUSES  ?? []).map((w: any) => w.name ?? w.nom ?? "");
       const prods     = (_data.PRODUCTS    ?? []).map((p: any) => p.name ?? p.nom ?? "");
       const countries = ["Togo", "Sénégal", "Côte d'Ivoire", "Ghana", "Mali", "Burkina Faso", "Bénin", "Niger"];
 
@@ -90,19 +88,8 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
           fields: [
             { k: "supplier",  l: "Fournisseur",          t: "select", options: suppliers, full: true },
             { k: "date",      l: "Date prévue",           t: "text",   ph: "30 juin 2026" },
-            { k: "warehouse", l: "Entrepôt destination", t: "select", options: warehouses },
             { k: "lines",     l: "Produits commandés",   t: "lines",  full: true },
             { k: "notes",     l: "Instructions",         t: "textarea", full: true },
-          ],
-        },
-        warehouse: {
-          label: "entrepôt", title: "entrepôt", eyebrow: "Logistique",
-          fields: [
-            { k: "name",     l: "Nom de l'entrepôt", t: "text",   ph: "Lomé Central", full: true },
-            { k: "location", l: "Localisation",      t: "text",   ph: "Adidogomé, Lomé", full: true },
-            { k: "capacity", l: "Capacité (unités)", t: "number" },
-            { k: "manager",  l: "Responsable",       t: "text",   ph: "K. Diallo" },
-            { k: "color",    l: "Couleur repère",    t: "color",  full: true },
           ],
         },
         variant: {
@@ -111,17 +98,6 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
             { k: "name",   l: "Nom du groupe",                   t: "text",     ph: "Taille",       full: true },
             { k: "type",   l: "Type",                             t: "select",   options: ["Texte", "Couleur", "Taille", "Matière", "Style", "Modèle", "Autre"] },
             { k: "values", l: "Valeurs (séparées par virgules)", t: "textarea", ph: "S, M, L, XL",  full: true },
-          ],
-        },
-        adjustment: {
-          label: "ajustement", title: "ajustement", eyebrow: "Stock",
-          fields: [
-            { k: "product",   l: "Produit",    t: "select", options: prods, full: true },
-            { k: "type",      l: "Type",       t: "seg",    options: ["Entrée", "Sortie", "Transfert"] },
-            { k: "qty",       l: "Quantité",   t: "number" },
-            { k: "warehouse", l: "Entrepôt",   t: "select", options: warehouses },
-            { k: "reason",    l: "Raison",     t: "select", options: ["Réception fournisseur", "Casse / détérioré", "Ajustement inventaire", "Transfert entrepôt", "Vente comptoir", "Retour client"] },
-            { k: "note",      l: "Commentaire",t: "textarea", full: true },
           ],
         },
         alert: {
@@ -140,14 +116,14 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
 
     detailLabels: {
       product: "produit", supplier: "fournisseur", brand: "marque",
-      category: "catégorie", warehouse: "entrepôt", po: "bon d'achat",
-      variant: "groupe", alert: "alerte", adjustment: "ajustement",
+      category: "catégorie", po: "bon d'achat",
+      variant: "groupe", alert: "alerte",
     },
 
     rowLabels: {
       product: "le produit", supplier: "le fournisseur", brand: "la marque",
-      category: "la catégorie", warehouse: "l'entrepôt", po: "le bon d'achat",
-      variant: "le groupe", alert: "l'alerte", adjustment: "l'ajustement",
+      category: "la catégorie", po: "le bon d'achat",
+      variant: "le groupe", alert: "l'alerte",
     },
 
     paletteNav: [
@@ -158,8 +134,6 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
       { l: "Variantes",       pg: "variantes",   ic: "box" },
       { l: "Fournisseurs",    pg: "fournisseurs",ic: "box" },
       { l: "Bons d'achat",    pg: "bons-achat",  ic: "file" },
-      { l: "Entrepôts",       pg: "entrepots",   ic: "box" },
-      { l: "Ajustements",     pg: "ajustements", ic: "adj" },
       { l: "Mouvements",      pg: "mouvements",  ic: "box" },
       { l: "Alertes stock",   pg: "alertes",     ic: "alert" },
     ],
@@ -167,7 +141,6 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
     paletteActions: (ui) => [
       { l: "Créer un produit",           ic: "plus",     run: () => { window.location.href = "/admin/products/new"; } },
       { l: "Créer un bon d'achat",       ic: "plus",     run: () => ui.openForm("po") },
-      { l: "Nouvel ajustement de stock", ic: "adj",      run: () => ui.openForm("adjustment") },
       { l: "Exporter le catalogue",      ic: "download", run: () => ui.openExport("Produits") },
       { l: "Importer des produits",      ic: "upload",   run: () => ui.openImport("Produits") },
       { l: "Suggestions IA",             ic: "sparkles", run: () => ui.openAI() },
@@ -278,13 +251,6 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
         }
         onRefreshMeta?.();
       }
-      if (kind === "warehouse") {
-        const body: Record<string, any> = { nom: values.name, adresse: values.location || null, notes: null };
-        if (mode === "edit" && values._raw?.id) body.id = Number(values._raw.id);
-        await fetch("/api/admin/entrepots", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        window.dispatchEvent(new CustomEvent("warehouse-saved"));
-        onRefreshMeta?.();
-      }
       if (kind === "variant") {
         const valeurs = (values.values || '').split(',').map((v: string) => v.trim()).filter(Boolean);
         const body = { nom: values.name, type: values.type || 'Texte', valeurs };
@@ -317,22 +283,6 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
         }
         onAlertChange?.();
       }
-      if (kind === "adjustment") {
-        const productObj = (_data.PRODUCTS ?? []).find((p: any) => (p.name ?? p.nom) === values.product);
-        if (!productObj?.id) throw new Error("Produit introuvable.");
-        const qty = Number(values.qty) || 0;
-        if (qty === 0) throw new Error("Quantité requise.");
-        // Sortie = négatif, Entrée/Transfert = positif
-        const quantite = values.type === "Sortie" ? -Math.abs(qty) : Math.abs(qty);
-        const motif = [values.reason, values.note].filter(Boolean).join(" — ") || "Ajustement manuel";
-        await fetch("/api/admin/stock/ajustement", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ produit_id: productObj.id, quantite, motif }),
-        });
-        onRefresh?.();
-        onAdjustmentChange?.();
-      }
     },
 
     onDeleteRow: async (kind, row) => {
@@ -350,10 +300,6 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange,
       }
       if (kind === "supplier" && row.id) {
         await fetch(`/api/admin/fournisseurs/${row.id}`, { method: "DELETE" });
-        onRefreshMeta?.();
-      }
-      if (kind === "warehouse" && row.id) {
-        await fetch(`/api/admin/entrepots/${row.id}`, { method: "DELETE" });
         onRefreshMeta?.();
       }
       if (kind === "po" && row.id) {

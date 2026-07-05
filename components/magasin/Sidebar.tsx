@@ -8,7 +8,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { NavGroup } from './types';
 import {
   HomeIcon, BoxIcon, FolderIcon, TagIcon, VariantsIcon, TruckIcon,
-  ReceiptIcon, WarehouseIcon, AdjustmentsIcon, HistoryIcon,
+  ReceiptIcon, HistoryIcon,
   CogIcon, HelpIcon, ChevDownIcon,
 } from './icons';
 import styles from './Magasin.module.css';
@@ -29,13 +29,11 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
     items: [
       { icon: TruckIcon,    label: 'Fournisseurs', id: 'suppliers' },
       { icon: ReceiptIcon,  label: 'Achats',       id: 'achats' },
-      { icon: WarehouseIcon,label: 'Entrepôts',    id: 'warehouses' },
     ],
   },
   {
     section: 'Stock',
     items: [
-      { icon: AdjustmentsIcon, label: 'Ajustements',  id: 'adjustments' },
       { icon: HistoryIcon,     label: 'Mouvements',   id: 'movements' },
       { icon: BoxIcon,         label: 'Alertes stock', id: 'alerts' },
     ],

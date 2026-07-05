@@ -86,11 +86,6 @@ export function DetailDrawer({ kind, row, onClose, ui }: DetailDrawerProps) {
           <button className="btn" onClick={() => { onClose(); ui.openForm(kind, "edit", row); }}>
             <Icons.edit size={14} /> Modifier
           </button>
-          {kind === "product" && (
-            <button className="btn" onClick={() => { onClose(); ui.openForm("adjustment", "create", { product: row.name }); }}>
-              <Icons.adj size={14} /> Ajuster
-            </button>
-          )}
           <button className="btn pri" onClick={onClose}>Fermer</button>
         </>
       }

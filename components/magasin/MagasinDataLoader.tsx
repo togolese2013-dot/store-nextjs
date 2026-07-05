@@ -154,10 +154,8 @@ export default function MagasinDataLoader({
   const [categories,  setCategories]  = useState<import('./types').Category[]>([]);
   const [brands,      setBrands]      = useState<import('./types').Brand[]>([]);
   const [suppliers,   setSuppliers]   = useState<import('./types').Supplier[]>([]);
-  const [warehouses,  setWarehouses]  = useState<import('./types').Warehouse[]>([]);
   const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
   const [variants,    setVariants]    = useState<Variant[]>([]);
-  const [adjustments, setAdjustments] = useState<import('./types').StockAdjustment[]>([]);
   const [alerts,      setAlerts]      = useState<import('./types').StockAlert[]>([]);
 
   /* UI state */
@@ -198,23 +196,6 @@ export default function MagasinDataLoader({
     } catch { /* keep current */ }
   }, []);
 
-  /* ── Fetch adjustments ── */
-  const fetchAdjustments = useCallback(async () => {
-    try {
-      const r = await fetch('/api/admin/stock/mouvements?type=ajustement&limit=50').then(r => r.json());
-      if (r.items) {
-        setAdjustments(r.items.map((m: any) => ({
-          date:    m.created_at ? new Date(m.created_at).toLocaleDateString('fr-FR') : '—',
-          product: m.nom_produit ?? '—',
-          sku:     m.reference  ?? '',
-          delta:   Number(m.quantite ?? 0),
-          reason:  m.note ?? '—',
-          author:  m.user_id ? `#${m.user_id}` : '—',
-        })));
-      }
-    } catch { /* keep current */ }
-  }, []);
-
   /* ── Fetch variant groups only ── */
   const fetchVariants = useCallback(async () => {
     try {
@@ -250,9 +231,8 @@ export default function MagasinDataLoader({
         logo: b.logo_url ?? undefined,
       })));
 
-      const [suppRes, whRes, achatRes, vgRes] = await Promise.all([
+      const [suppRes, achatRes, vgRes] = await Promise.all([
         fetch('/api/admin/fournisseurs').then(r => r.json()).catch(() => ({})),
-        fetch('/api/admin/entrepots').then(r => r.json()).catch(() => ({})),
         fetch('/api/admin/achats').then(r => r.json()).catch(() => ({})),
         fetch('/api/admin/variant-groups').then(r => r.json()).catch(() => ({})),
       ]);
@@ -271,15 +251,6 @@ export default function MagasinDataLoader({
         total:    f.total_achats ?? 0,
         delay:    f.delai_livraison ?? 0,
         status:   f.actif === 0 ? 'Inactif' : 'Actif',
-      })));
-      const WH_COLORS = ['#3B6A8F','#2D6A4F','#5C4A88','#C9601E','#7A2C3A','#D4A437'];
-      if (whRes.entrepots) setWarehouses(whRes.entrepots.map((e: any, i: number) => ({
-        id: String(e.id), name: e.nom, location: e.adresse ?? '',
-        color: WH_COLORS[i % WH_COLORS.length],
-        capacity: Number(e.capacite ?? 0),
-        occupied: Number(e.stock_total ?? 0),
-        products: Number(e.products_count ?? 0),
-        principal: Boolean(e.principal),
       })));
       if (achatRes.achats) setOrders(achatRes.achats.map((a: any) => {
         const s = a.statut ?? '';
@@ -309,7 +280,7 @@ export default function MagasinDataLoader({
   }, []);
 
   /* ── Initial load ── */
-  useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); fetchAdjustments(); fetchAlerts(); }, [fetchProducts, fetchMeta, fetchVariants, fetchAdjustments, fetchAlerts]);
+  useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); fetchAlerts(); }, [fetchProducts, fetchMeta, fetchVariants, fetchAlerts]);
 
   /* ── Debounced search ── */
   function handleSearch(q: string) {
@@ -328,17 +299,16 @@ export default function MagasinDataLoader({
   /* ── Sync live data into interaction-layer config store ── */
   useEffect(() => {
     setMagasinData({
-      PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands, SUPPLIERS: suppliers, WAREHOUSES: warehouses,
+      PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands, SUPPLIERS: suppliers,
       VARIANT_GROUPS: variants.map(v => ({ id: Number(v.id), nom: v.name, valeurs: v.values })),
     });
-  }, [allProducts, categories, brands, suppliers, warehouses, variants]);
+  }, [allProducts, categories, brands, suppliers, variants]);
 
   /* ── Build config (stable ref — onRefresh triggers re-fetch) ── */
   const config = useMemo(() => createMagasinConfig({
     onRefresh: () => fetchProducts(searchQuery, page),
     onRefreshMeta: () => fetchMeta(),
     onVariantChange: () => fetchVariants(),
-    onAdjustmentChange: () => fetchAdjustments(),
     onAlertChange: () => fetchAlerts(),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []); // intentionally stable — fetchProducts/searchQuery/page accessed via closure at call time
@@ -351,10 +321,8 @@ export default function MagasinDataLoader({
         categories={categories}
         brands={brands}
         suppliers={suppliers}
-        warehouses={warehouses}
         orders={orders}
         variants={variants}
-        adjustments={adjustments}
         alerts={alerts}
         kpis={kpis}
         tabs={tabs}
@@ -384,10 +352,8 @@ interface ShellWithUIProps extends Props {
   categories: import('./types').Category[];
   brands: import('./types').Brand[];
   suppliers: import('./types').Supplier[];
-  warehouses: import('./types').Warehouse[];
   orders: import('./types').PurchaseOrder[];
   variants: Variant[];
-  adjustments: import('./types').StockAdjustment[];
   alerts: import('./types').StockAlert[];
   kpis: KpiCard[];
   tabs: TabSpec[];
@@ -403,7 +369,7 @@ interface ShellWithUIProps extends Props {
 }
 
 function MagasinShellWithUI({
-  products, categories, brands, suppliers, warehouses, orders, variants, adjustments, alerts, kpis, tabs, searchQuery, onSearch,
+  products, categories, brands, suppliers, orders, variants, alerts, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
   fetchProducts, currentSearchQuery, currentPage,
@@ -423,10 +389,8 @@ function MagasinShellWithUI({
       categories={categories}
       brands={brands}
       suppliers={suppliers}
-      warehouses={warehouses}
       orders={orders}
       variants={variants}
-      adjustments={adjustments}
       alerts={alerts}
       kpis={kpis}
       tabs={tabs}
