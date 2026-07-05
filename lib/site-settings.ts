@@ -1,5 +1,6 @@
 import { getSetting } from "./admin-db";
 import { getShopId } from "./shop-context";
+import { getShopById } from "./shops";
 
 const FALLBACK_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://afrisika.com";
 
@@ -14,12 +15,14 @@ export async function getSiteUrl(shopId?: number): Promise<string> {
   }
 }
 
-/** Returns the store name stored in admin settings. */
+/** Returns the store name stored in admin settings, falls back to the shop's own name. */
 export async function getSiteName(shopId?: number): Promise<string> {
   try {
     const id   = shopId ?? await getShopId();
     const name = await getSetting("site_name", id);
-    return name?.trim() || "Togolese Shop";
+    if (name?.trim()) return name.trim();
+    const shop = await getShopById(id);
+    return shop?.nom?.trim() || "Togolese Shop";
   } catch {
     return "Togolese Shop";
   }
