@@ -14037,7 +14037,9 @@ router47.post("/api/admin/onboarding", async (req, res) => {
       admin_nom,
       admin_username,
       admin_email,
-      admin_password
+      admin_password,
+      theme_primary,
+      theme_accent
     } = req.body;
     if (!shop_nom?.trim()) return res.status(400).json({ error: "Nom de boutique requis." });
     if (!shop_slug?.trim()) return res.status(400).json({ error: "Slug requis." });
@@ -14073,6 +14075,14 @@ router47.post("/api/admin/onboarding", async (req, res) => {
       password_hash,
       shop_id: shopId
     });
+    if (theme_primary?.trim() || theme_accent?.trim()) {
+      const themeEntries = {};
+      if (theme_primary?.trim()) themeEntries.theme_primary = theme_primary.trim();
+      if (theme_accent?.trim()) themeEntries.theme_accent = theme_accent.trim();
+      setSettings(themeEntries, shopId).catch(
+        (e) => console.error("[onboarding] setSettings theme failed:", e)
+      );
+    }
     createEntrepotPrincipal(shopId, shop_nom.trim()).catch(
       (e) => console.error("[onboarding] createEntrepotPrincipal failed:", e)
     );

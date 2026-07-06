@@ -1,6 +1,6 @@
 import express from "express";
 import bcrypt from "bcryptjs";
-import { createAdminUser, getAdminByUsername, createEntrepotPrincipal } from "@/lib/admin-db";
+import { createAdminUser, getAdminByUsername, createEntrepotPrincipal, setSettings } from "@/lib/admin-db";
 import { createShop, getShopBySlug, activateBasicPlan } from "@/lib/shops";
 import { sendMail } from "../../lib/mailer";
 import { welcomeShopEmail } from "../../lib/email-templates";
@@ -14,6 +14,7 @@ router.post("/api/admin/onboarding", async (req, res) => {
     const {
       shop_nom, shop_slug, shop_email, shop_plan,
       admin_nom, admin_username, admin_email, admin_password,
+      theme_primary, theme_accent,
     } = req.body as Record<string, string>;
 
     // ── Validation ──────────────────────────────────────────────────
@@ -63,6 +64,16 @@ router.post("/api/admin/onboarding", async (req, res) => {
       password_hash,
       shop_id:       shopId,
     });
+
+    // ── Sauvegarder le thème choisi (fire-and-forget — non bloquant) ─────────
+    if (theme_primary?.trim() || theme_accent?.trim()) {
+      const themeEntries: Record<string, string> = {};
+      if (theme_primary?.trim()) themeEntries.theme_primary = theme_primary.trim();
+      if (theme_accent?.trim())  themeEntries.theme_accent  = theme_accent.trim();
+      setSettings(themeEntries, shopId).catch(e =>
+        console.error("[onboarding] setSettings theme failed:", e)
+      );
+    }
 
     // ── Créer entrepôt principal (fire-and-forget — non bloquant) ───────────────
     createEntrepotPrincipal(shopId, shop_nom.trim()).catch(e =>

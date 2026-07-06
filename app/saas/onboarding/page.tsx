@@ -25,6 +25,7 @@ import {
   ShoppingBag, ArrowRight, ArrowLeft, ShoppingCart, Upload, Check,
   Copy, Loader2,
 } from "lucide-react";
+import { THEME_PRESETS } from "@/lib/theme-presets";
 
 /* ─── Data ─────────────────────────────────────────────────────────────── */
 
@@ -58,8 +59,6 @@ const CURRENCIES = [
   { v: "XAF", label: "XAF — Franc CFA (CEMAC)",    symbol: "FCFA" },
   { v: "MAD", label: "MAD — Dirham marocain",       symbol: "DH"   },
 ];
-
-const COLORS = ["#E07A2C", "#1F3D2E", "#2563EB", "#9B3A2F", "#5A3B7A", "#1E5C3E", "#14110E"];
 
 type PaymentId = "wave" | "om" | "momo" | "flooz" | "cash" | "card";
 const PAYMENTS: { id: PaymentId; name: string; meta: string; bg: string; fg?: string; tag: string }[] = [
@@ -114,8 +113,10 @@ export default function OnboardingPage() {
   }, [country]);
 
   // Step 2
-  const [tagline, setTagline] = useState("");
-  const [color,   setColor]   = useState(COLORS[0]);
+  const [tagline,   setTagline]   = useState("");
+  const [presetIdx, setPresetIdx] = useState(0);
+  const color       = THEME_PRESETS[presetIdx].primary;
+  const themeAccent = THEME_PRESETS[presetIdx].accent;
   const [slug,    setSlugRaw] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
 
@@ -182,6 +183,8 @@ export default function OnboardingPage() {
           shop_email:     email.trim(),
           shop_plan:      plan,
           shop_currency:  currency,
+          theme_primary:  color,
+          theme_accent:   themeAccent,
           admin_nom:      ownerNom.trim() || name.trim() || username,
           admin_username: username.toLowerCase(),
           admin_email:    email.trim(),
@@ -376,22 +379,22 @@ export default function OnboardingPage() {
                   </label>
                 </Field>
 
-                <Field label="Couleur d'accent">
+                <Field label="Thème de couleur" hint="Modifiable plus tard dans Réglages > Thème.">
                   <div className="flex flex-wrap gap-2.5">
-                    {COLORS.map((c) => {
-                      const on = c === color;
+                    {THEME_PRESETS.map((p, i) => {
+                      const on = i === presetIdx;
                       return (
                         <button
-                          key={c}
+                          key={p.label}
                           type="button"
-                          onClick={() => setColor(c)}
-                          aria-label={`Couleur ${c}`}
-                          className="w-11 h-11 rounded-xl relative transition-transform hover:scale-105 grid place-items-center"
+                          onClick={() => setPresetIdx(i)}
+                          aria-label={p.label}
+                          title={p.label}
+                          className="w-11 h-11 rounded-xl relative transition-transform hover:scale-105 grid place-items-center overflow-hidden"
                           style={{
-                            background: c,
-                            color: c,
+                            background: `linear-gradient(135deg, ${p.primary} 50%, ${p.accent} 50%)`,
                             boxShadow: on
-                              ? `0 0 0 3px white, 0 0 0 5px ${c}`
+                              ? `0 0 0 3px white, 0 0 0 5px ${p.primary}`
                               : "0 1px 2px rgba(20,17,14,0.06)",
                           }}
                         >
@@ -406,6 +409,7 @@ export default function OnboardingPage() {
                       );
                     })}
                   </div>
+                  <p className="text-[12px] text-[#8A8278] mt-2">{THEME_PRESETS[presetIdx].label}</p>
                 </Field>
 
                 <Field label="Slogan court (optionnel)" hint="Une phrase qui décrit votre boutique en 60 caractères max.">
