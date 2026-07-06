@@ -99,7 +99,7 @@ const MODULES: Record<string, {
       { label: "Tendances des ventes", href: "/admin/tendances",         icon: BarChart2 },
       { label: "Réglages généraux",    href: "/admin/settings",          icon: Settings },
       { label: "Hero & Bannières",     href: "/admin/settings/hero",     icon: Image },
-      { label: "Apparence",            href: "/admin/settings/theme",    icon: Palette },
+      { label: "Apparence",            href: "/admin/settings?tab=theme", icon: Palette },
       { label: "Domaine & URL",        href: "/admin/settings/domain",   icon: Link2 },
       { label: "WhatsApp API",         href: "/admin/settings/whatsapp", icon: MessageCircle },
       { label: "Utilisateurs",         href: "/admin/users",             icon: Users },

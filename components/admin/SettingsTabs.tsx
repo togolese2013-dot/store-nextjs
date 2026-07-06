@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Store } from "lucide-react";
+import { Settings, Store, Palette } from "lucide-react";
 import AdminZonePage from "./AdminZonePage";
 import GeneralSettingsForm from "./GeneralSettingsForm";
+import ThemeSettingsForm from "./ThemeSettingsForm";
 import BoutiqueSettingsPage from "@/components/boutique/SettingsPage";
 
-type Tab = "site" | "boutique";
+type Tab = "site" | "boutique" | "theme";
 
 const TABS: { id: Tab; label: string; icon: typeof Settings }[] = [
   { id: "site",     label: "Général du site", icon: Settings },
   { id: "boutique", label: "Réglages boutique", icon: Store },
+  { id: "theme",    label: "Thème",             icon: Palette },
 ];
 
 function TabSwitcher({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
@@ -35,8 +37,14 @@ function TabSwitcher({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }
   );
 }
 
-export default function SettingsTabs({ settings }: { settings: Record<string, string> }) {
-  const [tab, setTab] = useState<Tab>("site");
+export default function SettingsTabs({
+  settings,
+  initialTab = "site",
+}: {
+  settings: Record<string, string>;
+  initialTab?: Tab;
+}) {
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   if (tab === "boutique") {
     return (
@@ -46,6 +54,21 @@ export default function SettingsTabs({ settings }: { settings: Record<string, st
         </div>
         <BoutiqueSettingsPage />
       </div>
+    );
+  }
+
+  if (tab === "theme") {
+    return (
+      <AdminZonePage
+        title="Thème"
+        description="Personnalisez les couleurs, la police et le logo du site vitrine."
+        icon={Palette}
+        iconClass="bg-pink-100 text-pink-700"
+        maxWidth="6xl"
+      >
+        <TabSwitcher tab={tab} onChange={setTab} />
+        <ThemeSettingsForm settings={settings} />
+      </AdminZonePage>
     );
   }
 

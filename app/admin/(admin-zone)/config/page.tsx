@@ -39,7 +39,7 @@ const ITEMS = [
   {
     label: "Apparence",
     desc:  "Couleurs, police, logo et pied de page du site vitrine",
-    href:  "/admin/settings/theme",
+    href:  "/admin/settings?tab=theme",
     icon:  Palette,
     color: "bg-pink-100 text-pink-700",
   },
