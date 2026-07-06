@@ -418,7 +418,7 @@ export default function ReglagesPage() {
             </div>
           </Field>
 
-          <Field label="Police">
+          <Field label="Police" hint="S'applique sur le site vitrine public — pas sur cette page d'administration">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {FONT_OPTIONS.map(f => (
                 <button key={f} type="button" onClick={() => { patch({ font: f }); applyThemeToDOM(s.couleur, s.accent, f); }} style={{
@@ -429,6 +429,17 @@ export default function ReglagesPage() {
                   {isSystemFont(f) ? 'Système' : f}
                 </button>
               ))}
+            </div>
+            <div style={{ marginTop: 10, padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)' }}>
+              <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted-2)', marginBottom: 6 }}>
+                Aperçu — {isSystemFont(s.font) ? 'Système' : s.font}
+              </div>
+              <div style={{ fontFamily: fontFamilyValue(s.font), fontSize: 20, fontWeight: 600, color: 'var(--ink)' }}>
+                {s.nomBoutique || 'Nom de votre boutique'}
+              </div>
+              <div style={{ fontFamily: fontFamilyValue(s.font), fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>
+                Livraison rapide à Lomé et partout au Togo.
+              </div>
             </div>
           </Field>
         </Section>
