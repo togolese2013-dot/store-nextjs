@@ -40,12 +40,13 @@ import CouponsPage from './CouponsPage';
 import LivraisonsPage from './LivraisonsPage';
 import PaiementsPage from './PaiementsPage';
 import ReglagesPage from './ReglagesPage';
+import ContenuVitrinePage from './ContenuVitrinePage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
 import { useUI } from '@/components/interaction-layer';
 import styles from './Store.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
-type PageId = 'overview' | 'commandes' | 'coupons' | 'livraisons' | 'paiements' | 'settings';
+type PageId = 'overview' | 'commandes' | 'coupons' | 'livraisons' | 'paiements' | 'contenu' | 'settings';
 
 const PAGE_LABELS: Record<PageId, string> = {
   overview:   "Vue d'ensemble",
@@ -53,6 +54,7 @@ const PAGE_LABELS: Record<PageId, string> = {
   coupons:    'Coupons',
   livraisons: 'Livraisons',
   paiements:  'Paiements',
+  contenu:    'Contenu vitrine',
   settings:   'Réglages boutique',
 };
 
@@ -62,6 +64,7 @@ const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
   coupons:    'Rechercher un code promo…',
   livraisons: 'Rechercher une zone de livraison…',
   paiements:  'Rechercher une transaction, client…',
+  contenu:    'Rechercher…',
   settings:   'Rechercher un réglage…',
 };
 
@@ -71,6 +74,7 @@ const NAV_TO_PAGE: Record<string, PageId> = {
   coupons:    'coupons',
   livraisons: 'livraisons',
   paiements:  'paiements',
+  contenu:    'contenu',
   settings:   'settings',
 };
 
@@ -151,6 +155,7 @@ export default function StoreShell({
         {page === 'coupons'    && <CouponsPage coupons={coupons} />}
         {page === 'livraisons' && <LivraisonsPage zones={zones} />}
         {page === 'paiements'  && <PaiementsPage payments={payments} />}
+        {page === 'contenu'    && <ContenuVitrinePage />}
         {page === 'settings'   && <ReglagesPage />}
       </main>
     </div>

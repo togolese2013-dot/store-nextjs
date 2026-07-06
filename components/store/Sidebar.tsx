@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import type { NavGroup } from './types';
 import {
   HomeIcon, CartIcon, PercentIcon, TruckIcon, CardIcon,
-  CogIcon, HelpIcon, ChevDownIcon,
+  CogIcon, HelpIcon, ChevDownIcon, ImageIcon,
 } from './icons';
 import styles from './Store.module.css';
 
@@ -19,6 +19,7 @@ export const DEFAULT_NAV_GROUPS: NavGroup[] = [
       { icon: PercentIcon, label: 'Coupons',    id: 'coupons' },
       { icon: TruckIcon,   label: 'Livraisons', id: 'livraisons' },
       { icon: CardIcon,    label: 'Paiements',         id: 'paiements' },
+      { icon: ImageIcon,   label: 'Contenu vitrine',   id: 'contenu' },
     ],
   },
   {

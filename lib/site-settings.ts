@@ -49,3 +49,30 @@ export async function getSiteWhatsApp(shopId?: number): Promise<string> {
     return "";
   }
 }
+
+/** Returns the shop's short description ("Identité" section of Réglages boutique), or "" if unset. */
+export async function getShopDescription(shopId?: number): Promise<string> {
+  try {
+    const id  = shopId ?? await getShopId();
+    const raw = await getSetting("boutique_identite", id);
+    if (!raw) return "";
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.desc === "string" ? parsed.desc.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Returns the 4 trust-bar items (label + sub) shown under the hero, or undefined if not customized. */
+export async function getTrustBarItems(shopId?: number): Promise<{ label: string; sub: string }[] | undefined> {
+  try {
+    const id  = shopId ?? await getShopId();
+    const raw = await getSetting("trust_bar_json", id);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length === 4) return parsed;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}

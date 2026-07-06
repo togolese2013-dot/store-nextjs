@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import { apiGet } from "@/lib/api";
 import type { Product } from "@/lib/utils";
-import { getSiteUrl, getSiteName } from "@/lib/site-settings";
+import { getSiteUrl, getSiteName, getShopDescription, getTrustBarItems } from "@/lib/site-settings";
 import ProductCard from "@/components/ProductCard";
 import ShuffledProductGrid from "@/components/ShuffledProductGrid";
 import HeroSection from "@/components/HeroSection";
@@ -14,9 +14,11 @@ import {
   MessageCircle, Truck, CreditCard, RefreshCw, ShieldCheck,
 } from "lucide-react";
 
+const DEFAULT_DESCRIPTION = "Boutique en ligne au Togo — électronique, accessoires, audio, gaming. Livraison rapide à Lomé et partout au Togo.";
+
 export async function generateMetadata(): Promise<Metadata> {
-  const [siteUrl, siteName] = await Promise.all([getSiteUrl(), getSiteName()]);
-  const description = "Boutique en ligne au Togo — électronique, accessoires, audio, gaming. Livraison rapide à Lomé et partout au Togo.";
+  const [siteUrl, siteName, shopDesc] = await Promise.all([getSiteUrl(), getSiteName(), getShopDescription()]);
+  const description = shopDesc || DEFAULT_DESCRIPTION;
   return {
     title:       siteName,
     description,
@@ -38,13 +40,17 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /* ─── Trust bar ─── */
-function TrustBar() {
-  const items = [
-    { icon: Truck,       label: "Livraison rapide",        sub: "Lomé & tout le Togo" },
-    { icon: CreditCard,  label: "Paiement à la livraison", sub: "Vous payez à la réception" },
-    { icon: RefreshCw,   label: "Retours acceptés",        sub: "7 jours après réception" },
-    { icon: ShieldCheck, label: "100% authentique",        sub: "Produits vérifiés" },
-  ];
+const TRUST_BAR_ICONS = [Truck, CreditCard, RefreshCw, ShieldCheck];
+const TRUST_BAR_DEFAULTS = [
+  { label: "Livraison rapide",        sub: "Lomé & tout le Togo" },
+  { label: "Paiement à la livraison", sub: "Vous payez à la réception" },
+  { label: "Retours acceptés",        sub: "7 jours après réception" },
+  { label: "100% authentique",        sub: "Produits vérifiés" },
+];
+
+function TrustBar({ items: customItems }: { items?: { label: string; sub: string }[] }) {
+  const base = customItems?.length === 4 ? customItems : TRUST_BAR_DEFAULTS;
+  const items = base.map((it, i) => ({ ...it, icon: TRUST_BAR_ICONS[i] }));
   return (
     <div className="hidden sm:block bg-white border-b border-[rgba(20,83,45,0.07)]">
       {/* Mobile — horizontal scroll */}
@@ -272,13 +278,14 @@ export default async function HomePage() {
   let newItems:    Product[] = [];
   let occasions:   Product[] = [];
 
-  const [bsRes, promoRes, newRes, occasionRes, siteUrl, siteName] = await Promise.allSettled([
+  const [bsRes, promoRes, newRes, occasionRes, siteUrl, siteName, trustBarRes] = await Promise.allSettled([
     apiGet<{ data: Product[] }>("/api/products/bestsellers?limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?promo=true&limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?new=true&limit=8").then(r => r.data),
     apiGet<{ data: Product[] }>("/api/products?occasion=true&limit=8").then(r => r.data),
     getSiteUrl(),
     getSiteName(),
+    getTrustBarItems(),
   ]);
   if (bsRes.status       === "fulfilled") bestsellers = bsRes.value;
   if (promoRes.status    === "fulfilled") promos      = promoRes.value;
@@ -290,6 +297,7 @@ export default async function HomePage() {
 
   const base = siteUrl.status === "fulfilled" ? siteUrl.value : "https://togolese.tg";
   const name = siteName.status === "fulfilled" ? siteName.value : "Togolese Shop";
+  const trustBarItems = trustBarRes.status === "fulfilled" ? trustBarRes.value : undefined;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -332,7 +340,7 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <HeroSection />
-      <TrustBar />
+      <TrustBar items={trustBarItems} />
 
       {bestsellers.length > 0 && (
         <Section
