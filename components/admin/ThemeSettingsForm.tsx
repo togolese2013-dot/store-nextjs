@@ -3,12 +3,7 @@
 import { useState, useRef } from "react";
 import { Loader2, Save, Image as ImageIcon, X, ShoppingBag, Tag, Upload } from "lucide-react";
 import { applyThemeToDOM, isSystemFont, SYSTEM_FONT_STACK, buildRamp, fontFamilyValue } from "@/lib/theme-utils";
-import { THEME_PRESETS as PRESETS } from "@/lib/theme-presets";
-
-const FONTS = [
-  "Geist", "Système", "Montserrat", "Inter", "Poppins", "Raleway",
-  "Nunito", "Plus Jakarta Sans", "Outfit", "DM Sans",
-];
+import { THEME_PRESETS as PRESETS, FONT_OPTIONS as FONTS } from "@/lib/theme-presets";
 
 /** Derive a hex preview from a brand ramp shade */
 function rampHex(primary: string, shade: number): string {

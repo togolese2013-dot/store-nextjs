@@ -6,6 +6,11 @@ export interface ThemePreset {
   footer: string;
 }
 
+export const FONT_OPTIONS = [
+  "Geist", "Système", "Montserrat", "Inter", "Poppins", "Raleway",
+  "Nunito", "Plus Jakarta Sans", "Outfit", "DM Sans",
+];
+
 export const THEME_PRESETS: ThemePreset[] = [
   { label: "Orange SaaS (défaut)", primary: "#E07A2C", accent: "#2D8A5F", footer: "#14110E" },
   { label: "Vert forêt",           primary: "#14532d", accent: "#f59e0b", footer: "#052e16" },
