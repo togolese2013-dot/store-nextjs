@@ -222,7 +222,7 @@ h1, h2, h3, h4, h5 {
 
 /* Vitrine theme (matches SaaS branding), scoped to app/(shop) via .shop-theme.
    Remaps the default Tailwind slate palette so every storefront component
-   using text-slate-*/bg-slate-*/border-slate-* picks up warm tones without
+   using slate text/background/border utilities picks up warm tones without
    touching each file individually. Does not affect admin (outside .shop-theme). */
 .shop-theme {
   --color-slate-50:  #FBF7F1;
