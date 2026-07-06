@@ -220,6 +220,23 @@ h1, h2, h3, h4, h5 {
   margin-bottom: 1rem;
 }
 
+/* Vitrine theme (matches SaaS branding), scoped to app/(shop) via .shop-theme.
+   Remaps the default Tailwind slate palette so every storefront component
+   using text-slate-*/bg-slate-*/border-slate-* picks up warm tones without
+   touching each file individually. Does not affect admin (outside .shop-theme). */
+.shop-theme {
+  --color-slate-50:  #FBF7F1;
+  --color-slate-100: #F0EBE0;
+  --color-slate-200: #E8E1D4;
+  --color-slate-300: #D6CCBA;
+  --color-slate-400: #A8A097;
+  --color-slate-500: #8A8278;
+  --color-slate-600: #6B635B;
+  --color-slate-700: #4A4038;
+  --color-slate-800: #2A2522;
+  --color-slate-900: #14110E;
+}
+
 /* ─── Card base — utilisé par ProductCard et autres ─── */
 .card-base {
   background: white;

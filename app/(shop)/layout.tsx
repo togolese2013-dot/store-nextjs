@@ -16,19 +16,21 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
 
   return (
     <CartProvider>
-      <ThemeLoader />
-      {/* Detect ?ref= param and set cookie */}
-      <Suspense fallback={null}>
-        <RefDetector />
-      </Suspense>
-      <ReferralBanner />
-      <AnnouncementBar />
-      <Header siteName={siteName} logoUrl={logoUrl} />
-      <main className="flex-1 w-full overflow-x-hidden">
-        {children}
-      </main>
-      <Footer siteName={siteName} logoUrl={logoUrl} />
-      <WhatsAppButton />
+      <div className="shop-theme flex flex-col min-h-screen w-full">
+        <ThemeLoader />
+        {/* Detect ?ref= param and set cookie */}
+        <Suspense fallback={null}>
+          <RefDetector />
+        </Suspense>
+        <ReferralBanner />
+        <AnnouncementBar />
+        <Header siteName={siteName} logoUrl={logoUrl} />
+        <main className="flex-1 w-full overflow-x-hidden">
+          {children}
+        </main>
+        <Footer siteName={siteName} logoUrl={logoUrl} />
+        <WhatsAppButton />
+      </div>
     </CartProvider>
   );
 }

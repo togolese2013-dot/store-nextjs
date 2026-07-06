@@ -140,7 +140,7 @@ function ProductGrid({ products }: { products: Product[] }) {
 /* ─── Promo banner ─── */
 function PromoBanner() {
   return (
-    <section className="py-5 lg:py-8 bg-[#f8fafb]">
+    <section className="py-5 lg:py-8 bg-[#FBF7F1]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-2xl lg:rounded-[24px] bg-brand-950 px-6 py-8 sm:px-10 sm:py-10 lg:px-14 lg:py-14">
           {/* Decorative halos */}
@@ -213,7 +213,7 @@ function Testimonials() {
   const colors = ["bg-brand-800", "bg-accent-500", "bg-brand-600", "bg-amber-500"];
 
   return (
-    <section className="py-10 lg:py-14 bg-[#f8fafb]">
+    <section className="py-10 lg:py-14 bg-[#FBF7F1]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-1.5 mb-2">
@@ -366,7 +366,7 @@ export default async function HomePage() {
           subtitle="Nouveautés"
           icon={Sparkles}
           viewAll={{ label: "Voir les nouveautés", href: "/products?new=true" }}
-          bg="bg-[#f8fafb]"
+          bg="bg-[#FBF7F1]"
         >
           <ProductGrid products={newItems} />
         </Section>

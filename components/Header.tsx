@@ -235,7 +235,7 @@ export default function Header({ siteName = "Togolese Shop", logoUrl = null }: H
             <div ref={dropdownRef} className="flex flex-1 max-w-xl relative">
               <form onSubmit={handleSearch} className="w-full">
                 <div className={clsx(
-                  "flex items-center w-full rounded-xl border-2 transition-all duration-200 bg-[#f8fafb]",
+                  "flex items-center w-full rounded-xl border-2 transition-all duration-200 bg-[#FBF7F1]",
                   searchFocus
                     ? "border-brand-600 bg-white shadow-[0_4px_16px_rgba(20,83,45,0.10)]"
                     : "border-[rgba(20,83,45,0.08)] hover:border-[rgba(20,83,45,0.14)]"
@@ -358,7 +358,7 @@ export default function Header({ siteName = "Togolese Shop", logoUrl = null }: H
                 onChange={e => setSearch(e.target.value)}
                 onFocus={() => { if (suggestions.length) setShowSug(true); }}
                 placeholder="Rechercher un produit…"
-                className="w-full pl-9 pr-4 py-2 text-[16px] bg-[#f8fafb] rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
+                className="w-full pl-9 pr-4 py-2 text-[16px] bg-[#FBF7F1] rounded-xl border-2 border-transparent focus:border-brand-600 focus:bg-white outline-none transition-all font-sans"
                 style={{ fontSize: "16px" }}
               />
             </form>

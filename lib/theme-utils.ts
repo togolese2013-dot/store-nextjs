@@ -36,9 +36,15 @@ export function isSystemFont(font: string) {
   return font === "Système";
 }
 
+/** Returns true if the font value maps to the Geist font already bundled via next/font (no Google Fonts fetch needed) */
+export function isGeistFont(font: string) {
+  return font === "Geist";
+}
+
 /** Build the CSS font-family value for a given font setting */
 export function fontFamilyValue(font: string): string {
   if (isSystemFont(font)) return SYSTEM_FONT_STACK;
+  if (isGeistFont(font)) return "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif";
   return `"${font}", ui-sans-serif, system-ui, sans-serif`;
 }
 
@@ -69,7 +75,7 @@ export function applyThemeToDOM(primary: string, accent: string, font: string) {
 
   // Update or add Google Fonts link
   const existingLink = document.getElementById("ts-gfont") as HTMLLinkElement | null;
-  if (font === "Montserrat" || isSystemFont(font)) {
+  if (font === "Montserrat" || isSystemFont(font) || isGeistFont(font)) {
     existingLink?.remove();
   } else {
     const href = fontUrl(font);

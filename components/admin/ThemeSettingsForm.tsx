@@ -2,15 +2,16 @@
 
 import { useState, useRef } from "react";
 import { Loader2, Save, Image as ImageIcon, X, ShoppingBag, Tag, Upload } from "lucide-react";
-import { applyThemeToDOM, isSystemFont, SYSTEM_FONT_STACK, buildRamp } from "@/lib/theme-utils";
+import { applyThemeToDOM, isSystemFont, SYSTEM_FONT_STACK, buildRamp, fontFamilyValue } from "@/lib/theme-utils";
 
 const FONTS = [
-  "Système", "Montserrat", "Inter", "Poppins", "Raleway",
+  "Geist", "Système", "Montserrat", "Inter", "Poppins", "Raleway",
   "Nunito", "Plus Jakarta Sans", "Outfit", "DM Sans",
 ];
 
 const PRESETS = [
-  { label: "Vert forêt (actuel)", primary: "#14532d", accent: "#f59e0b", footer: "#052e16" },
+  { label: "Orange SaaS (défaut)", primary: "#E07A2C", accent: "#2D8A5F", footer: "#14110E" },
+  { label: "Vert forêt",          primary: "#14532d", accent: "#f59e0b", footer: "#052e16" },
   { label: "Vert & Or",           primary: "#1B4332", accent: "#D4A017", footer: "#0a1f17" },
   { label: "Vert vif & Ambre",    primary: "#15803d", accent: "#d97706", footer: "#052e16" },
   { label: "Navy & Terracotta",   primary: "#0A2463", accent: "#F4623A", footer: "#060f2a" },
@@ -28,10 +29,10 @@ function rampHex(primary: string, shade: number): string {
 }
 
 export default function ThemeSettingsForm({ settings }: { settings: Record<string, string> }) {
-  const [primary, setPrimary] = useState(settings.theme_primary ?? "#14532d");
-  const [accent,  setAccent]  = useState(settings.theme_accent  ?? "#f59e0b");
-  const [footer,  setFooter]  = useState(settings.theme_footer  ?? "#052e16");
-  const [font,    setFont]    = useState(settings.theme_font    ?? "Montserrat");
+  const [primary, setPrimary] = useState(settings.theme_primary ?? "#E07A2C");
+  const [accent,  setAccent]  = useState(settings.theme_accent  ?? "#2D8A5F");
+  const [footer,  setFooter]  = useState(settings.theme_footer  ?? "#14110E");
+  const [font,    setFont]    = useState(settings.theme_font    ?? "Geist");
   const [logo,    setLogo]    = useState(settings.site_logo     ?? "");
   const [siteName] = useState(settings.site_name ?? "Togolese Shop");
 
@@ -256,7 +257,7 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
                     ? "border-brand-700 bg-brand-50 text-brand-900 font-bold"
                     : "border-slate-200 text-slate-600 hover:border-slate-300"
                 }`}
-                style={{ fontFamily: isSystemFont(f) ? SYSTEM_FONT_STACK : `'${f}', sans-serif` }}
+                style={{ fontFamily: fontFamilyValue(f) }}
               >
                 {isSystemFont(f) ? "Système" : f}
                 <span className="block text-[11px] opacity-50 font-normal mt-0.5">Aa Bb Cc</span>
@@ -291,7 +292,7 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
                   {siteName.charAt(0)}
                 </div>
               )}
-              <span className="text-sm font-bold" style={{ color: primary, fontFamily: isSystemFont(font) ? SYSTEM_FONT_STACK : `'${font}',sans-serif` }}>
+              <span className="text-sm font-bold" style={{ color: primary, fontFamily: fontFamilyValue(font) }}>
                 {siteName}
               </span>
             </div>
@@ -317,7 +318,7 @@ export default function ThemeSettingsForm({ settings }: { settings: Record<strin
                 Électronique Premium
               </p>
               <p className="text-white font-bold text-lg leading-tight mb-1"
-                style={{ fontFamily: isSystemFont(font) ? SYSTEM_FONT_STACK : `'${font}',sans-serif` }}>
+                style={{ fontFamily: fontFamilyValue(font) }}>
                 Capturez chaque<br />moment parfait
               </p>
               <p className="text-white/60 text-xs mb-3">Caméras, drones et accessoires.</p>
