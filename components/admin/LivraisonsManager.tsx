@@ -10,6 +10,7 @@ import {
 import type { LivraisonAdmin, Livreur, LivreurInscription } from "@/lib/admin-db";
 import PageHeader from "@/components/admin/PageHeader";
 import LivreurInscriptionsManager from "@/components/admin/LivreurInscriptionsManager";
+import { formatDateTime as sharedFormatDateTime } from "@/lib/format-date";
 
 /* ─── Types ─── */
 const STATUTS: { value: LivraisonAdmin["statut"]; label: string; color: string }[] = [
@@ -41,7 +42,7 @@ function statutBadge(statut: string) {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return sharedFormatDateTime(d);
 }
 
 /* ══════════════════════════════════════════════════════════════════

@@ -8,6 +8,7 @@ import type { WorkspaceHealth } from './types';
 import { SAMPLE_WORKSPACES } from './sample-data';
 import { PlusIcon } from './icons';
 import styles from './Admin.module.css';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
 
 export interface WorkspacesPageProps {
   workspaces?: WorkspaceHealth[];
@@ -15,6 +16,7 @@ export interface WorkspacesPageProps {
 }
 
 export default function WorkspacesPage({ workspaces = SAMPLE_WORKSPACES, onToggle }: WorkspacesPageProps) {
+  const t = useT();
   const [ws, setWs] = useState(workspaces);
 
   // Sync when parent updates (e.g. after fetch)
@@ -30,13 +32,13 @@ export default function WorkspacesPage({ workspaces = SAMPLE_WORKSPACES, onToggl
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.eyebrow}>Admin · Espaces</div>
-          <h1 className={styles.title}>Gestion des <span className={styles.serif}>workspaces</span></h1>
-          <p className={styles.subtitle}>4 espaces de travail · 3 actifs · activez ou désactivez l&apos;accès</p>
+          <div className={styles.eyebrow}>{t('workspaces.eyebrow')}</div>
+          <h1 className={styles.title}>{t('workspaces.title.main')} <span className={styles.serif}>{t('workspaces.title.serif')}</span></h1>
+          <p className={styles.subtitle}>{t('workspaces.subtitle')}</p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={`${styles.btn} ${styles.primary}`}>
-            <PlusIcon size={14} /> Activer un module
+            <PlusIcon size={14} /> {t('workspaces.activate_module_btn')}
           </button>
         </div>
       </div>
@@ -65,7 +67,7 @@ export default function WorkspacesPage({ workspaces = SAMPLE_WORKSPACES, onToggl
               </div>
               <div className={styles.intFootRow}>
                 <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, color: 'var(--ink)' }}>{w.count}</span>
-                <span style={{ fontSize: 11.5, color: 'var(--muted-2)' }}>Activité : {w.activity}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--muted-2)' }}>{t('workspaces.activity_label')} {w.activity}</span>
               </div>
             </div>
           );

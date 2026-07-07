@@ -6,6 +6,7 @@ import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
 import { BoutiqueSettingsProvider, buildConfig, type BoutiqueConfig } from './BoutiqueSettingsContext';
 import type { StoreState } from './settings/types';
+import { formatDate, formatDateTime as sharedFormatDateTime } from '@/lib/format-date';
 
 const SWATCHES = [
   '#3B6A8F', '#2D6A4F', '#7A2C3A', '#D4A437', '#B8501A',
@@ -30,14 +31,7 @@ function formatTime(dateStr: string): string {
 }
 
 function formatDateTime(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    return (
-      d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) +
-      ', ' +
-      d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    );
-  } catch { return dateStr; }
+  return sharedFormatDateTime(dateStr);
 }
 
 type ApiPaymentMode = 'especes' | 'moov_money' | 'tmoney' | 'virement_bancaire' | 'wave' | null;
@@ -186,9 +180,7 @@ function mapBoutiqueClient(c: ApiBoutiqueClient): BoutiqueClient {
     init:         initials(c.nom),
     color:        SWATCHES[hashStr(c.nom) % SWATCHES.length],
     visits:       0,
-    last:         new Date(c.created_at).toLocaleDateString('fr-FR', {
-      day: 'numeric', month: 'long', year: 'numeric',
-    }),
+    last:         formatDate(c.created_at),
     total:        abs,
     status,
     telephone:    c.telephone,

@@ -10,6 +10,7 @@ import {
   Crown, UserCircle2, ChevronDown, ChevronUp, Users, Package,
   ShoppingBag, Settings, BarChart2, RefreshCw,
 } from "lucide-react";
+import { formatDate as sharedFormatDate } from "@/lib/format-date";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ function posteColor(poste: string | null) { return POSTE_COLORS[poste ?? ""] ?? 
 
 function formatDate(d: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  return sharedFormatDate(d);
 }
 
 function parsePermissions(json: string | null): AdminPermissions {

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import styles from './Magasin.module.css';
+import { formatDate } from '@/lib/format-date';
 
 function money(n: number) { return n.toLocaleString('fr-FR'); }
 
@@ -87,7 +88,7 @@ export default function NouvelAchatDrawer({ onClose, onSaved }: NouvelAchatDrawe
     if (!dateAchat || !delay) return null;
     const d = new Date(dateAchat);
     d.setDate(d.getDate() + delay);
-    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDate(d);
   }, [dateAchat, transport, delay]);
 
   const total = articles.reduce((s, a) => s + (Number(a.qty) || 0) * (Number(a.prix) || 0), 0);

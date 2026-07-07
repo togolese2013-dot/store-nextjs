@@ -13,8 +13,10 @@ import { db } from "@/lib/db";
 import { getShopBySlug, ensureShopsTable } from "@/lib/shops";
 import { signToken, getSession, setAuthCookie, clearAuthCookie } from "../../lib/auth";
 import { logSecurityEvent } from "../../lib/security-log";
+import { createSession, revokeSessionByJti, revokeOtherSessions } from "../../lib/sessions";
 import type { AdminPermissions } from "@/lib/admin-permissions";
 import type mysql from "mysql2/promise";
+import crypto from "crypto";
 
 function getIp(req: express.Request): string {
   return (
@@ -151,6 +153,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
 
         const mustChange = Boolean((teamMember as unknown as { must_change_password?: number }).must_change_password);
         const tokenVersion = await getTokenVersion("utilisateurs", teamMember.id);
+        const jti = crypto.randomUUID();
         const token = await signToken({
           id:                  teamMember.id,
           username:            teamMember.username ?? slug,
@@ -162,8 +165,10 @@ router.post("/api/admin/auth/login", async (req, res) => {
           must_change_password: mustChange,
           token_version:       tokenVersion,
           shop_id:             shopId,
+          jti,
         });
         setAuthCookie(res, token);
+        await createSession({ jti, userId: teamMember.id, userTable: "utilisateurs", shopId, ip: getIp(req), userAgent: req.headers["user-agent"] }).catch(() => {});
         logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], "role=staff");
         return res.json({ ok: true, nom: teamMember.nom, role: "staff", poste: teamMember.poste, must_change_password: mustChange });
       }
@@ -192,6 +197,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
 
     const mustChange = Boolean(user.must_change_password);
     const tokenVersion = await getTokenVersion("admin_users", user.id);
+    const jti = crypto.randomUUID();
     const token = await signToken({
       id:                  user.id,
       username:            user.username,
@@ -203,9 +209,11 @@ router.post("/api/admin/auth/login", async (req, res) => {
       must_change_password: mustChange,
       token_version:       tokenVersion,
       shop_id:             shopId,
+      jti,
     });
     await updateAdminLastLogin(user.id);
     setAuthCookie(res, token);
+    await createSession({ jti, userId: user.id, userTable: "admin_users", shopId, ip: getIp(req), userAgent: req.headers["user-agent"] }).catch(() => {});
     logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], `role=${user.role}`, shopId);
     return res.json({ ok: true, nom: user.nom, role: user.role, must_change_password: mustChange });
   } catch (err) {
@@ -257,8 +265,9 @@ router.patch("/api/admin/auth/change-password", async (req, res) => {
     const table = session.role === "staff" ? "utilisateurs" : "admin_users";
     await incrementTokenVersion(table, Number(session.id));
     const newVersion = await getTokenVersion(table, Number(session.id));
+    if (session.jti) await revokeOtherSessions(Number(session.id), table, session.jti).catch(() => {});
 
-    // Re-issue JWT with must_change_password: false and new token_version
+    // Re-issue JWT with must_change_password: false and new token_version — keep same jti (this device stays logged in)
     const permissions = session.permissions ?? null;
     const newToken = await signToken({
       id:                  session.id,
@@ -271,6 +280,7 @@ router.patch("/api/admin/auth/change-password", async (req, res) => {
       must_change_password: false,
       token_version:       newVersion,
       shop_id:             session.shop_id,
+      jti:                 session.jti,
     });
     setAuthCookie(res, newToken);
     logSecurityEvent("password_change", session.username, getIp(req), req.headers["user-agent"]);
@@ -283,8 +293,8 @@ router.patch("/api/admin/auth/change-password", async (req, res) => {
 router.post("/api/admin/auth/logout", async (req, res) => {
   const session = await getSession(req);
   if (session) {
-    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
-    await incrementTokenVersion(table, Number(session.id)).catch(() => {});
+    // Revoke only this device's session — other devices stay logged in (see Sessions actives)
+    if (session.jti) await revokeSessionByJti(session.jti).catch(() => {});
     logSecurityEvent("logout", session.username, getIp(req), req.headers["user-agent"]);
   }
   clearAuthCookie(res);

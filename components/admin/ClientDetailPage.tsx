@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Phone, Mail, MapPin, Plus, Pencil, Eye } from "lucide-react";
 import type { BoutiqueClient, Facture } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import { formatDateTime as sharedFormatDateTime } from "@/lib/format-date";
 
 const STATUT_COLORS: Record<string, string> = {
   brouillon: "bg-slate-100 text-slate-600",
@@ -21,10 +22,7 @@ function derivedStatut(f: Facture): { label: string; color: string } {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
+  return sharedFormatDateTime(d);
 }
 
 function avatarColor(nom: string) {

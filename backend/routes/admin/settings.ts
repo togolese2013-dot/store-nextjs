@@ -5,6 +5,7 @@ import { getShopById, setShopDomain, updateShop } from "@/lib/shops";
 import { getPlanLimits, getPlanPrice } from "@/lib/plan-configs";
 import bcrypt from "bcryptjs";
 import { addVercelDomain, removeVercelDomain, checkVercelDomain } from "../../lib/vercel-domains";
+import { getSessionsForUser, revokeSessionById, revokeOtherSessions, touchSession } from "../../lib/sessions";
 
 const router = express.Router();
 
@@ -196,6 +197,53 @@ router.get("/api/admin/settings/subscription", async (req, res) => {
       limits:       { max_users: limits.max_users, max_entrepots: limits.max_entrepots },
       usage:        { membres: membresCount, workspaces: activeWorkspaces },
     });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── GET /api/admin/settings/sessions — appareils connectés à ce compte ───────
+router.get("/api/admin/settings/sessions", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
+    if (session.jti) await touchSession(session.jti).catch(() => {});
+    const rows = await getSessionsForUser(Number(session.id), table);
+    res.json({
+      sessions: rows.map(r => ({
+        id: r.id, device_label: r.device_label, ip: r.ip,
+        created_at: r.created_at, last_seen_at: r.last_seen_at,
+        current: r.jti === session.jti,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── POST /api/admin/settings/sessions/:id/revoke — déconnecte un appareil ────
+router.post("/api/admin/settings/sessions/:id/revoke", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  try {
+    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
+    await revokeSessionById(Number(req.params.id), Number(session.id), table);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+
+// ── POST /api/admin/settings/sessions/revoke-others — déconnecte tous les autres appareils ──
+router.post("/api/admin/settings/sessions/revoke-others", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!session.jti) return res.status(400).json({ error: "Session sans identifiant — reconnectez-vous." });
+  try {
+    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
+    await revokeOtherSessions(Number(session.id), table, session.jti);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }

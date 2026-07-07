@@ -2,6 +2,7 @@ import { jwtVerify, SignJWT } from "jose";
 import type { Request, Response } from "express";
 import type { AdminPermissions } from "@/lib/admin-permissions";
 import { getTokenVersion } from "@/lib/admin-db";
+import { isSessionRevoked } from "./sessions";
 
 export type { AdminPermissions };
 
@@ -47,6 +48,7 @@ export interface AdminPayload {
   must_change_password?: boolean;
   token_version:        number;
   shop_id:              number;
+  jti?:                 string;
 }
 
 export async function signToken(payload: AdminPayload): Promise<string> {
@@ -72,7 +74,7 @@ export async function getSession(req: Request): Promise<AdminPayload | null> {
   const payload = await verifyToken(token);
   if (!payload) return null;
 
-  // Verify token_version matches DB — catches revoked tokens (logout, password change)
+  // Verify token_version matches DB — catches a global revoke (password change)
   try {
     const table = payload.role === "staff" ? "utilisateurs" : "admin_users";
     const dbVersion = await getTokenVersion(table, Number(payload.id));
@@ -80,6 +82,15 @@ export async function getSession(req: Request): Promise<AdminPayload | null> {
   } catch {
     // DB unreachable — fail open to avoid locking everyone out on DB hiccup
     return payload;
+  }
+
+  // Verify this specific device/session hasn't been revoked individually (Sessions actives → Révoquer)
+  if (payload.jti) {
+    try {
+      if (await isSessionRevoked(payload.jti)) return null;
+    } catch {
+      // DB unreachable — fail open
+    }
   }
 
   return payload;

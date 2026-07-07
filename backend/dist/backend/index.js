@@ -5481,6 +5481,88 @@ var init_shops = __esm({
   }
 });
 
+// lib/sessions.ts
+async function ensureAdminSessionsTable() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      jti           VARCHAR(36)  NOT NULL UNIQUE,
+      user_id       INT UNSIGNED NOT NULL,
+      user_table    ENUM('admin_users','utilisateurs') NOT NULL,
+      shop_id       INT UNSIGNED NULL,
+      ip            VARCHAR(45)  NOT NULL DEFAULT '',
+      user_agent    VARCHAR(255) NULL,
+      device_label  VARCHAR(100) NULL,
+      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      revoked_at    DATETIME     NULL,
+      INDEX idx_user (user_id, user_table),
+      INDEX idx_revoked (revoked_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+}
+function deviceLabelFromUA(ua) {
+  if (!ua) return "Appareil inconnu";
+  const os = /iphone|ipad/i.test(ua) ? "iOS" : /android/i.test(ua) ? "Android" : /mac os x/i.test(ua) ? "macOS" : /windows/i.test(ua) ? "Windows" : /linux/i.test(ua) ? "Linux" : null;
+  const browser = /edg\//i.test(ua) ? "Edge" : /opr\/|opera/i.test(ua) ? "Opera" : /chrome\//i.test(ua) ? "Chrome" : /crios\//i.test(ua) ? "Chrome" : /firefox\//i.test(ua) ? "Firefox" : /safari\//i.test(ua) ? "Safari" : null;
+  if (os && browser) return `${os} \xB7 ${browser}`;
+  return os ?? browser ?? "Appareil inconnu";
+}
+async function createSession(data) {
+  await db.execute(
+    `INSERT INTO admin_sessions (jti, user_id, user_table, shop_id, ip, user_agent, device_label)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [data.jti, data.userId, data.userTable, data.shopId, data.ip, data.userAgent ?? null, deviceLabelFromUA(data.userAgent)]
+  );
+}
+async function isSessionRevoked(jti) {
+  const [rows] = await db.execute(
+    "SELECT revoked_at FROM admin_sessions WHERE jti = ? LIMIT 1",
+    [jti]
+  );
+  const row = rows[0];
+  if (!row) return false;
+  return row.revoked_at !== null;
+}
+async function touchSession(jti) {
+  await db.execute(
+    "UPDATE admin_sessions SET last_seen_at = NOW() WHERE jti = ? AND revoked_at IS NULL",
+    [jti]
+  );
+}
+async function getSessionsForUser(userId, userTable) {
+  const [rows] = await db.execute(
+    `SELECT id, jti, ip, device_label, created_at, last_seen_at
+     FROM admin_sessions
+     WHERE user_id = ? AND user_table = ? AND revoked_at IS NULL
+     ORDER BY last_seen_at DESC`,
+    [userId, userTable]
+  );
+  return rows;
+}
+async function revokeSessionById(id, userId, userTable) {
+  await db.execute(
+    "UPDATE admin_sessions SET revoked_at = NOW() WHERE id = ? AND user_id = ? AND user_table = ?",
+    [id, userId, userTable]
+  );
+}
+async function revokeSessionByJti(jti) {
+  await db.execute("UPDATE admin_sessions SET revoked_at = NOW() WHERE jti = ?", [jti]);
+}
+async function revokeOtherSessions(userId, userTable, exceptJti) {
+  await db.execute(
+    `UPDATE admin_sessions SET revoked_at = NOW()
+     WHERE user_id = ? AND user_table = ? AND jti != ? AND revoked_at IS NULL`,
+    [userId, userTable, exceptJti]
+  );
+}
+var init_sessions = __esm({
+  "lib/sessions.ts"() {
+    "use strict";
+    init_db();
+  }
+});
+
 // lib/auth.ts
 function cookieDomain() {
   if (process.env.NODE_ENV !== "production") return void 0;
@@ -5520,6 +5602,12 @@ async function getSession(req) {
   } catch {
     return payload;
   }
+  if (payload.jti) {
+    try {
+      if (await isSessionRevoked(payload.jti)) return null;
+    } catch {
+    }
+  }
   return payload;
 }
 function setAuthCookie(res, token) {
@@ -5546,6 +5634,7 @@ var init_auth = __esm({
     "use strict";
     import_jose = require("jose");
     init_admin_db();
+    init_sessions();
     jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
       console.error("FATAL: JWT_SECRET env var is not set. Server cannot start securely.");
@@ -6520,6 +6609,8 @@ async function getSecurityLogs(limit = 100, shopId) {
 }
 
 // routes/admin/auth.ts
+init_sessions();
+var import_crypto = __toESM(require("crypto"));
 function getIp(req) {
   return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ?? req.socket?.remoteAddress ?? "unknown";
 }
@@ -6619,6 +6710,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
         }
         const mustChange2 = Boolean(teamMember.must_change_password);
         const tokenVersion2 = await getTokenVersion("utilisateurs", teamMember.id);
+        const jti2 = import_crypto.default.randomUUID();
         const token2 = await signToken({
           id: teamMember.id,
           username: teamMember.username ?? slug,
@@ -6629,9 +6721,12 @@ router.post("/api/admin/auth/login", async (req, res) => {
           permissions: permissions2,
           must_change_password: mustChange2,
           token_version: tokenVersion2,
-          shop_id: shopId
+          shop_id: shopId,
+          jti: jti2
         });
         setAuthCookie(res, token2);
+        await createSession({ jti: jti2, userId: teamMember.id, userTable: "utilisateurs", shopId, ip: getIp(req), userAgent: req.headers["user-agent"] }).catch(() => {
+        });
         logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], "role=staff");
         return res.json({ ok: true, nom: teamMember.nom, role: "staff", poste: teamMember.poste, must_change_password: mustChange2 });
       }
@@ -6657,6 +6752,7 @@ router.post("/api/admin/auth/login", async (req, res) => {
     }
     const mustChange = Boolean(user.must_change_password);
     const tokenVersion = await getTokenVersion("admin_users", user.id);
+    const jti = import_crypto.default.randomUUID();
     const token = await signToken({
       id: user.id,
       username: user.username,
@@ -6667,10 +6763,13 @@ router.post("/api/admin/auth/login", async (req, res) => {
       permissions,
       must_change_password: mustChange,
       token_version: tokenVersion,
-      shop_id: shopId
+      shop_id: shopId,
+      jti
     });
     await updateAdminLastLogin(user.id);
     setAuthCookie(res, token);
+    await createSession({ jti, userId: user.id, userTable: "admin_users", shopId, ip: getIp(req), userAgent: req.headers["user-agent"] }).catch(() => {
+    });
     logSecurityEvent("login_success", slug, getIp(req), req.headers["user-agent"], `role=${user.role}`, shopId);
     return res.json({ ok: true, nom: user.nom, role: user.role, must_change_password: mustChange });
   } catch (err) {
@@ -6716,6 +6815,8 @@ router.patch("/api/admin/auth/change-password", async (req, res) => {
     const table = session.role === "staff" ? "utilisateurs" : "admin_users";
     await incrementTokenVersion(table, Number(session.id));
     const newVersion = await getTokenVersion(table, Number(session.id));
+    if (session.jti) await revokeOtherSessions(Number(session.id), table, session.jti).catch(() => {
+    });
     const permissions = session.permissions ?? null;
     const newToken = await signToken({
       id: session.id,
@@ -6727,7 +6828,8 @@ router.patch("/api/admin/auth/change-password", async (req, res) => {
       permissions,
       must_change_password: false,
       token_version: newVersion,
-      shop_id: session.shop_id
+      shop_id: session.shop_id,
+      jti: session.jti
     });
     setAuthCookie(res, newToken);
     logSecurityEvent("password_change", session.username, getIp(req), req.headers["user-agent"]);
@@ -6739,8 +6841,7 @@ router.patch("/api/admin/auth/change-password", async (req, res) => {
 router.post("/api/admin/auth/logout", async (req, res) => {
   const session = await getSession(req);
   if (session) {
-    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
-    await incrementTokenVersion(table, Number(session.id)).catch(() => {
+    if (session.jti) await revokeSessionByJti(session.jti).catch(() => {
     });
     logSecurityEvent("logout", session.username, getIp(req), req.headers["user-agent"]);
   }
@@ -8783,6 +8884,7 @@ async function checkVercelDomain(domain) {
 }
 
 // routes/admin/settings.ts
+init_sessions();
 var router13 = import_express13.default.Router();
 router13.get("/api/admin/settings", async (req, res) => {
   const session = await getSession(req);
@@ -8943,6 +9045,51 @@ router13.get("/api/admin/settings/subscription", async (req, res) => {
       limits: { max_users: limits.max_users, max_entrepots: limits.max_entrepots },
       usage: { membres: membresCount, workspaces: activeWorkspaces }
     });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router13.get("/api/admin/settings/sessions", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
+    if (session.jti) await touchSession(session.jti).catch(() => {
+    });
+    const rows = await getSessionsForUser(Number(session.id), table);
+    res.json({
+      sessions: rows.map((r) => ({
+        id: r.id,
+        device_label: r.device_label,
+        ip: r.ip,
+        created_at: r.created_at,
+        last_seen_at: r.last_seen_at,
+        current: r.jti === session.jti
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router13.post("/api/admin/settings/sessions/:id/revoke", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  try {
+    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
+    await revokeSessionById(Number(req.params.id), Number(session.id), table);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
+  }
+});
+router13.post("/api/admin/settings/sessions/revoke-others", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  if (!session.jti) return res.status(400).json({ error: "Session sans identifiant \u2014 reconnectez-vous." });
+  try {
+    const table = session.role === "staff" ? "utilisateurs" : "admin_users";
+    await revokeOtherSessions(Number(session.id), table, session.jti);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
@@ -11803,6 +11950,9 @@ router32.get("/api/admin/security-logs", async (req, res) => {
   res.json({ logs });
 });
 var security_logs_default = router32;
+
+// index.ts
+init_sessions();
 
 // routes/admin/rapports.ts
 var import_express33 = __toESM(require("express"));
@@ -14851,6 +15001,12 @@ app.listen(PORT, async () => {
     console.log("[backend] security_logs table OK");
   } catch (e) {
     console.error("[backend] ensureSecurityLogsTable failed:", e);
+  }
+  try {
+    await ensureAdminSessionsTable();
+    console.log("[backend] admin_sessions table OK");
+  } catch (e) {
+    console.error("[backend] ensureAdminSessionsTable failed:", e);
   }
   try {
     await ensureActivityLogsTable();

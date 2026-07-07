@@ -9,6 +9,7 @@ import PageHeader from "@/components/admin/PageHeader";
 import ProformaDocPrint from "@/components/admin/ProformaDocPrint";
 import type { ProformaItem } from "@/components/admin/ProformaDocPrint";
 import type { Devis } from "@/lib/admin-db";
+import { formatDate as sharedFormatDate } from "@/lib/format-date";
 
 /* ── Types ── */
 interface StockProduct {
@@ -71,7 +72,7 @@ function parseItems(raw: string | unknown[]): ProformaItem[] {
 
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR").format(n); }
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return sharedFormatDate(d);
 }
 
 /* ══════════════════════════════════════════════════════════════════════ */

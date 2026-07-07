@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { Facture, FactureItem, FacturePaiement } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import { formatDate as sharedFormatDate, formatDateTime as sharedFormatDateTime } from "@/lib/format-date";
 import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
 import type { PrintItem } from "@/components/admin/BoutiqueDocPrint";
 
@@ -33,16 +34,11 @@ const STATUT_LABELS: Record<string, string> = {
 };
 
 function formatDate(d: string) {
-  const dt = new Date(d);
-  return (
-    dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " +
-    dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-  );
+  return sharedFormatDateTime(d);
 }
 
 function formatDateShort(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return sharedFormatDate(d);
 }
 
 function addDays(d: string, days: number) {

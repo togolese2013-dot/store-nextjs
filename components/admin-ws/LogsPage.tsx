@@ -2,6 +2,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FilterIcon, DownloadIcon, ChevDownIcon } from './icons';
 import styles from './Admin.module.css';
+import { formatDateTime, formatDateLong } from '@/lib/format-date';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
+import type { DictKey } from '@/lib/i18n/admin-ws';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,21 +29,22 @@ const WS_COLORS: Record<string, string> = {
   Admin:    '#8A8278',
 };
 
-const ACTION_LABELS: Record<string, string> = {
-  vente_créée:       'Nouvelle vente',
-  vente_modifiée:    'Vente modifiée',
-  vente_supprimée:   'Vente supprimée',
-  paiement_ajouté:   'Paiement enregistré',
-  produit_créé:      'Produit créé',
-  produit_modifié:   'Produit modifié',
-  produit_supprimé:  'Produit supprimé',
-  'commande_confirmée':  'Commande confirmée',
-  'commande_expédiée':   'Commande expédiée',
-  'commande_livrée':     'Commande livrée',
-  'commande_annulée':    'Commande annulée',
-  stock_mouvement:   'Mouvement stock',
-  client_créé:       'Nouveau client',
-  client_modifié:    'Client modifié',
+// Values below are i18n dictionary KEYS, resolved via t() at render time.
+const ACTION_LABELS: Record<string, DictKey> = {
+  vente_créée:       'logs.action.vente_creee',
+  vente_modifiée:    'logs.action.vente_modifiee',
+  vente_supprimée:   'logs.action.vente_supprimee',
+  paiement_ajouté:   'logs.action.paiement_ajoute',
+  produit_créé:      'logs.action.produit_cree',
+  produit_modifié:   'logs.action.produit_modifie',
+  produit_supprimé:  'logs.action.produit_supprime',
+  'commande_confirmée':  'logs.action.commande_confirmee',
+  'commande_expédiée':   'logs.action.commande_expediee',
+  'commande_livrée':     'logs.action.commande_livree',
+  'commande_annulée':    'logs.action.commande_annulee',
+  stock_mouvement:   'logs.action.stock_mouvement',
+  client_créé:       'logs.action.client_cree',
+  client_modifié:    'logs.action.client_modifie',
 };
 
 const WORKSPACES   = ['Boutique', 'Magasin', 'Store', 'CRM', 'Admin'];
@@ -64,18 +68,17 @@ function initials(username: string): string {
 }
 
 function formatDate(ts: string): string {
-  const d = new Date(ts);
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) +
-    ', ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return formatDateTime(ts);
 }
 
 function todayStr(): string {
-  return new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  return formatDateLong(new Date());
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LogsPage() {
+  const t = useT();
   const [logs, setLogs]           = useState<RawLog[]>([]);
   const [total, setTotal]         = useState(0);
   const [loading, setLoading]     = useState(true);
@@ -134,21 +137,21 @@ export default function LogsPage() {
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.eyebrow}>Admin · Audit</div>
-          <h1 className={styles.title}>Journal d&apos;<span className={styles.serif}>activité</span></h1>
-          <p className={styles.subtitle}>Traçabilité complète des actions · qui a fait quoi, quand, où</p>
+          <div className={styles.eyebrow}>{t('logs.eyebrow')}</div>
+          <h1 className={styles.title}>{t('logs.title.main')}<span className={styles.serif}>{t('logs.title.serif')}</span></h1>
+          <p className={styles.subtitle}>{t('logs.subtitle')}</p>
         </div>
         <div className={styles.headerActions}>
           {hasFilter && (
             <button type="button" className={styles.btn} onClick={resetFilters}>
-              Réinitialiser ×
+              {t('logs.reset_btn')}
             </button>
           )}
           <button type="button" className={styles.btn} onClick={fetchLogs}>
-            <FilterIcon size={14} /> Actualiser
+            <FilterIcon size={14} /> {t('logs.refresh_btn')}
           </button>
           <button type="button" className={styles.btn}>
-            <DownloadIcon size={14} /> Exporter
+            <DownloadIcon size={14} /> {t('common.export')}
           </button>
         </div>
       </div>
@@ -163,13 +166,13 @@ export default function LogsPage() {
             style={wsFilter ? { background: 'var(--accent-bg)', color: 'var(--accent)' } : undefined}
             onClick={(e) => { e.stopPropagation(); setWsOpen(v => !v); setActOpen(false); }}
           >
-            {wsFilter || 'Workspace'} <ChevDownIcon size={10} />
+            {wsFilter || t('logs.filter.workspace_placeholder')} <ChevDownIcon size={10} />
           </button>
           {wsOpen && (
             <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '6px 0', minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}
               onClick={e => e.stopPropagation()}>
               <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', fontSize: 13, background: 'none', border: 0, cursor: 'pointer', color: 'var(--muted)' }}
-                onClick={() => { setWsFilter(''); setWsOpen(false); setPage(1); }}>Tous</button>
+                onClick={() => { setWsFilter(''); setWsOpen(false); setPage(1); }}>{t('logs.filter.all')}</button>
               {WORKSPACES.map(w => (
                 <button key={w} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', fontSize: 13, background: wsFilter === w ? 'var(--accent-bg)' : 'none', border: 0, cursor: 'pointer', color: wsFilter === w ? 'var(--accent)' : 'var(--fg)' }}
                   onClick={() => { setWsFilter(w); setWsOpen(false); setPage(1); }}>{w}</button>
@@ -186,16 +189,16 @@ export default function LogsPage() {
             style={actFilter ? { background: 'var(--accent-bg)', color: 'var(--accent)' } : undefined}
             onClick={(e) => { e.stopPropagation(); setActOpen(v => !v); setWsOpen(false); }}
           >
-            {actFilter ? (ACTION_LABELS[actFilter] ?? actFilter) : "Type d'action"} <ChevDownIcon size={10} />
+            {actFilter ? t(ACTION_LABELS[actFilter] ?? actFilter as DictKey) : t('logs.filter.action_type_placeholder')} <ChevDownIcon size={10} />
           </button>
           {actOpen && (
             <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '6px 0', minWidth: 200, maxHeight: 300, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}
               onClick={e => e.stopPropagation()}>
               <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', fontSize: 13, background: 'none', border: 0, cursor: 'pointer', color: 'var(--muted)' }}
-                onClick={() => { setActFilter(''); setActOpen(false); setPage(1); }}>Tous</button>
+                onClick={() => { setActFilter(''); setActOpen(false); setPage(1); }}>{t('logs.filter.all')}</button>
               {ACTION_TYPES.map(a => (
                 <button key={a} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 14px', fontSize: 13, background: actFilter === a ? 'var(--accent-bg)' : 'none', border: 0, cursor: 'pointer', color: actFilter === a ? 'var(--accent)' : 'var(--fg)' }}
-                  onClick={() => { setActFilter(a); setActOpen(false); setPage(1); }}>{ACTION_LABELS[a]}</button>
+                  onClick={() => { setActFilter(a); setActOpen(false); setPage(1); }}>{t(ACTION_LABELS[a])}</button>
               ))}
             </div>
           )}
@@ -204,14 +207,14 @@ export default function LogsPage() {
         {/* Member search */}
         <input
           type="text"
-          placeholder="Filtrer par membre…"
+          placeholder={t('logs.filter.member_placeholder')}
           value={memberFilter}
           onChange={e => { setMemberFilter(e.target.value); setPage(1); }}
           style={{ fontSize: 13, padding: '5px 12px', border: '1px solid var(--border)', borderRadius: 20, background: 'var(--surface)', color: 'var(--fg)', outline: 'none', width: 180 }}
         />
 
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted-2)', alignSelf: 'center' }}>
-          Période : {todayStr()}
+          {t('logs.period_label')} {todayStr()}
         </span>
       </div>
 
@@ -221,20 +224,20 @@ export default function LogsPage() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Date &amp; heure</th>
-                <th>Membre</th>
-                <th>Action</th>
-                <th>Détail</th>
-                <th>Workspace</th>
+                <th>{t('logs.table.datetime')}</th>
+                <th>{t('logs.table.member')}</th>
+                <th>{t('logs.table.action')}</th>
+                <th>{t('logs.table.detail')}</th>
+                <th>{t('logs.table.workspace')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>Chargement…</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>{t('common.loading')}</td></tr>
               ) : error ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--danger)', padding: '2rem', fontSize: 13 }}>Erreur API : {error}</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--danger)', padding: '2rem', fontSize: 13 }}>{t('logs.api_error_prefix')} {error}</td></tr>
               ) : logs.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>Aucun événement{hasFilter ? ' pour ces filtres' : ''}.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>{hasFilter ? t('logs.empty_filtered') : t('logs.empty')}</td></tr>
               ) : logs.map(l => {
                 const color   = avatarColor(l.username);
                 const wsColor = WS_COLORS[l.workspace] ?? '#8A8278';
@@ -249,7 +252,7 @@ export default function LogsPage() {
                         <span style={{ fontWeight: 500, fontSize: 13 }}>{l.username}</span>
                       </div>
                     </td>
-                    <td style={{ fontSize: 13, fontWeight: 500 }}>{ACTION_LABELS[l.action_type] ?? l.action_type}</td>
+                    <td style={{ fontSize: 13, fontWeight: 500 }}>{ACTION_LABELS[l.action_type] ? t(ACTION_LABELS[l.action_type]) : l.action_type}</td>
                     <td style={{ fontSize: 12.5, color: 'var(--muted)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {l.label ?? '—'}
                     </td>
@@ -263,7 +266,7 @@ export default function LogsPage() {
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>{total} événement{total > 1 ? 's' : ''} · page {page}/{totalPages}</span>
+          <span>{total} {t('common.word.event')}{total > 1 ? 's' : ''} · {t('logs.page_word')} {page}/{totalPages}</span>
           <div className={styles.pager}>
             <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
             {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {

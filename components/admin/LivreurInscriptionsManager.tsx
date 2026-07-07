@@ -2,9 +2,10 @@
 
 import { useState, useCallback } from "react";
 import type { LivreurInscription } from "@/lib/admin-db";
+import { formatDateTime as sharedFormatDateTime } from "@/lib/format-date";
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return sharedFormatDateTime(d);
 }
 
 function Badge({ statut }: { statut: LivreurInscription["statut"] }) {

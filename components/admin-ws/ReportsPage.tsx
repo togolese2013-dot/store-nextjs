@@ -7,6 +7,7 @@ import type { Report } from './types';
 import { SAMPLE_REPORTS } from './sample-data';
 import { CogIcon, PlusIcon, DownloadIcon } from './icons';
 import styles from './Admin.module.css';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
 
 export interface ReportsPageProps {
   reports?: Report[];
@@ -14,18 +15,19 @@ export interface ReportsPageProps {
 }
 
 export default function ReportsPage({ reports = SAMPLE_REPORTS, onGenerate }: ReportsPageProps) {
+  const t = useT();
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.eyebrow}>Admin · Rapports</div>
-          <h1 className={styles.title}>Rapports <span className={styles.serif}>avancés</span></h1>
-          <p className={styles.subtitle}>Générez et exportez des rapports consolidés sur tous les workspaces</p>
+          <div className={styles.eyebrow}>{t('reports.eyebrow')}</div>
+          <h1 className={styles.title}>{t('reports.title.main')} <span className={styles.serif}>{t('reports.title.serif')}</span></h1>
+          <p className={styles.subtitle}>{t('reports.subtitle')}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><CogIcon size={14} /> Rapports planifiés</button>
+          <button type="button" className={styles.btn}><CogIcon size={14} /> {t('reports.scheduled_btn')}</button>
           <button type="button" className={`${styles.btn} ${styles.primary}`}>
-            <PlusIcon size={14} /> Rapport personnalisé
+            <PlusIcon size={14} /> {t('reports.custom_btn')}
           </button>
         </div>
       </div>
@@ -41,7 +43,7 @@ export default function ReportsPage({ reports = SAMPLE_REPORTS, onGenerate }: Re
                 <div className={styles.repDesc}>{r.desc}</div>
               </div>
               <button type="button" className={`${styles.btn} ${styles.sm}`} onClick={() => onGenerate?.(r.name)}>
-                <DownloadIcon size={12} /> Générer
+                <DownloadIcon size={12} /> {t('common.generate')}
               </button>
             </div>
           );

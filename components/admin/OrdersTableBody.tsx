@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 import OrderStatusBadge from "./OrderStatusBadge";
 
 interface OrderRow {
@@ -45,7 +46,7 @@ export default function OrdersTableBody({ orders }: { orders: OrderRow[] }) {
             <OrderStatusBadge orderId={order.id} status={order.status} />
           </td>
           <td className="px-3 py-3 text-right text-xs text-slate-400 hidden sm:table-cell">
-            {new Date(order.created_at).toLocaleDateString("fr-FR")}
+            {formatDate(order.created_at)}
           </td>
         </tr>
       ))}

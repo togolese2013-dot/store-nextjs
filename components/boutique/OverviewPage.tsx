@@ -12,6 +12,7 @@ import Sparkline from './Sparkline';
 import { PrinterIcon, PlusIcon, TrendIcon } from './icons';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtNum, fmtAmount } from './BoutiqueSettingsContext';
+import { formatDate } from '@/lib/format-date';
 
 interface OverviewPageProps {
   sales?: Sale[];
@@ -22,7 +23,7 @@ interface OverviewPageProps {
 export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNewSale }: OverviewPageProps) {
   const cfg = useBoutiqueConfig();
   const lowStock = SAMPLE_STOCK.filter(p => p.boutique < p.seuil);
-  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const today = formatDate(new Date());
 
   const jourCount   = overviewStats?.ventes_jour_count   ?? 0;
   const jourMontant = overviewStats?.ventes_jour_montant ?? 0;

@@ -10,6 +10,7 @@ import PageHeader from "@/components/admin/PageHeader";
 import TabBar     from "@/components/admin/TabBar";
 import StatCard   from "@/components/admin/StatCard";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -391,7 +392,7 @@ export default function CommerciauxManager() {
                       <p className="font-semibold text-slate-800">{cm.commercial_nom}</p>
                       <p className="text-xs text-slate-400">{cm.commercial_email}</p>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(cm.created_at).toLocaleDateString("fr-FR")}</td>
+                    <td className="px-4 py-3 text-slate-500">{formatDate(cm.created_at)}</td>
                     <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">{formatPrice(cm.montant)}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${cm.statut === "paye" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>

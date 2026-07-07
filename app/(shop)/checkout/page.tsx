@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/context/CartContext";
 import { calcPrice } from "@/context/CartContext";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -227,7 +228,7 @@ export default function CheckoutPage() {
   function trancheDate(index: number) {
     const d = new Date();
     d.setDate(d.getDate() + index * 7);
-    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    return formatDate(d);
   }
 
   async function saveCurrentAddress() {

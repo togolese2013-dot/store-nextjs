@@ -26,6 +26,7 @@ import {
 } from './icons';
 import styles from './WorkspaceSelector.module.css';
 import { SubscriptionCard, SubscriptionModal } from '@/components/subscription';
+import { formatDate } from '@/lib/format-date';
 
 /* ─── Default workspaces ─────────────────────────────────────────── */
 export const DEFAULT_WORKSPACES: WorkspaceWithIcon[] = [
@@ -43,9 +44,7 @@ function daysUntil(dateStr: string | null | undefined): number | null {
 }
 
 function fmtDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
+  return formatDate(dateStr);
 }
 
 function planColors(plan: string): { text: string; bg: string } {

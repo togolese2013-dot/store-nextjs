@@ -16,6 +16,7 @@ import { formatPrice } from "@/lib/utils";
 import BoutiqueDocPrint from "@/components/admin/BoutiqueDocPrint";
 import { useAdminSSE } from "@/components/admin/useAdminSSE";
 import NewSaleModal from "@/components/admin/NewSaleModal";
+import { formatDateTime as sharedFormatDateTime } from "@/lib/format-date";
 
 /* ─── Types ─── */
 
@@ -66,12 +67,7 @@ function statutBadge(statut: string, list: { value: string; label: string; color
 }
 
 function formatDate(d: string) {
-  const dt = new Date(d);
-  return (
-    dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " +
-    dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-  );
+  return sharedFormatDateTime(d);
 }
 
 function getStatutDisplay(f: Facture): { label: string; color: string } {

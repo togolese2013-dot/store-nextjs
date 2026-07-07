@@ -7,6 +7,7 @@ import {
   Loader2, RefreshCw, ZoomIn,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { formatDate } from "@/lib/format-date";
 
 interface Verification {
   id: number;
@@ -164,7 +165,7 @@ function VerifCard({
         <div>
           <p className="font-semibold text-slate-900 text-sm">{v.nom}</p>
           <p className="text-xs text-slate-400">{v.email ?? v.telephone ?? "—"}</p>
-          <p className="text-[10px] text-slate-300 mt-0.5">{new Date(v.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
+          <p className="text-[10px] text-slate-300 mt-0.5">{formatDate(v.created_at)}</p>
         </div>
         <StatutBadge statut={v.statut} />
       </div>

@@ -1,4 +1,6 @@
-import { listReferrals } from "@/lib/admin-db";
+import { listReferrals, getSettings } from "@/lib/admin-db";
+import { getAdminSession } from "@/lib/auth";
+import { formatDate, toDatePrefs } from "@/lib/format-date";
 import PageHeader from "@/components/admin/PageHeader";
 import { Link2, Users } from "lucide-react";
 
@@ -7,6 +9,9 @@ export const metadata = { title: "Parrainage" };
 export default async function ParrainagePage() {
   let referrals: Awaited<ReturnType<typeof listReferrals>> = [];
   try { referrals = await listReferrals(); } catch { /* table may not exist */ }
+  const session   = await getAdminSession();
+  const settings  = await getSettings(session?.shop_id ?? 1);
+  const datePrefs = toDatePrefs({ pref_format_date: settings.pref_format_date, pref_fuseau: settings.pref_fuseau });
 
   const totalUses   = referrals.reduce((s, r) => s + r.uses_count, 0);
   const activeCount = referrals.filter(r => r.uses_count > 0).length;
@@ -90,7 +95,7 @@ export default async function ParrainagePage() {
                       )}
                     </td>
                     <td className="px-5 py-4 text-right text-slate-400 text-xs hidden sm:table-cell">
-                      {new Date(r.created_at).toLocaleDateString("fr-FR")}
+                      {formatDate(r.created_at, datePrefs)}
                     </td>
                   </tr>
                 ))}

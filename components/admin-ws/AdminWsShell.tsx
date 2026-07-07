@@ -41,28 +41,31 @@ import LogsPage from './LogsPage';
 import SettingsPage from './SettingsPage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
 import styles from './Admin.module.css';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
+import type { DictKey } from '@/lib/i18n/admin-ws';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 type PageId = 'overview' | 'users' | 'workspaces' | 'integrations' | 'reports' | 'logs' | 'settings';
 
-const PAGE_LABELS: Record<PageId, string> = {
-  overview:     "Vue d'ensemble",
-  users:        'Utilisateurs & rôles',
-  workspaces:   'Workspaces',
-  integrations: 'Intégrations',
-  reports:      'Rapports',
-  logs:         "Journal d'activité",
-  settings:     'Paramètres compte',
+// Values below are i18n dictionary KEYS, resolved via t() at render time.
+const PAGE_LABELS: Record<PageId, DictKey> = {
+  overview:     'shell.page.overview',
+  users:        'shell.page.users',
+  workspaces:   'shell.page.workspaces',
+  integrations: 'shell.page.integrations',
+  reports:      'shell.page.reports',
+  logs:         'shell.page.logs',
+  settings:     'shell.page.settings',
 };
 
-const SEARCH_PLACEHOLDERS: Record<PageId, string> = {
-  overview:     'Rechercher membre, action, workspace…',
-  users:        'Rechercher un membre, email, rôle…',
-  workspaces:   'Rechercher un workspace…',
-  integrations: 'Rechercher une intégration…',
-  reports:      'Rechercher un rapport…',
-  logs:         'Rechercher dans le journal…',
-  settings:     'Rechercher dans les paramètres…',
+const SEARCH_PLACEHOLDERS: Record<PageId, DictKey> = {
+  overview:     'shell.search.overview',
+  users:        'shell.search.users',
+  workspaces:   'shell.search.workspaces',
+  integrations: 'shell.search.integrations',
+  reports:      'shell.search.reports',
+  logs:         'shell.search.logs',
+  settings:     'shell.search.settings',
 };
 
 const NAV_TO_PAGE: Record<string, PageId> = {
@@ -108,6 +111,7 @@ export default function AdminWsShell({
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
 }: AdminWsShellProps) {
+  const t = useT();
   const [page, setPage] = useState<PageId>(defaultPage);
 
   const LIVE_COUNTS: Record<string, number> = {
@@ -142,7 +146,7 @@ export default function AdminWsShell({
       <main className={styles.main}>
         {/* Topbar */}
         <header className={styles.topbar}>
-          <button type="button" className={styles.iconBtn} onClick={onSwitchWorkspace} aria-label="Retour aux espaces">
+          <button type="button" className={styles.iconBtn} onClick={onSwitchWorkspace} aria-label={t('shell.aria.back')}>
             <ChevLeftIcon size={16} />
           </button>
           <div className={styles.crumbs}>
@@ -150,12 +154,12 @@ export default function AdminWsShell({
             <span className={styles.sep}>/</span>
             <span>Admin</span>
             {page !== 'overview' && (
-              <><span className={styles.sep}>/</span><span className={styles.here}>{PAGE_LABELS[page]}</span></>
+              <><span className={styles.sep}>/</span><span className={styles.here}>{t(PAGE_LABELS[page])}</span></>
             )}
           </div>
           <div className={styles.search}>
             <SearchIcon size={14} />
-            <input placeholder={SEARCH_PLACEHOLDERS[page]} />
+            <input placeholder={t(SEARCH_PLACEHOLDERS[page])} />
             <span className={styles.kbd}>⌘K</span>
           </div>
           <button type="button" className={styles.iconBtn} aria-label="Notifications">

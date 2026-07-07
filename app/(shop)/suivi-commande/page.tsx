@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, Package, CheckCircle2, Truck, Clock, XCircle, CreditCard, ArrowLeft } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 import { clsx } from "clsx";
 
 interface Tranche {
@@ -72,9 +73,7 @@ function OrderCard({ order }: { order: TrackedOrder }) {
           <p className="font-mono text-xs text-slate-400 mb-0.5">{order.reference}</p>
           <p className="font-bold text-slate-900">{order.nom || "Client"}</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            {new Date(order.created_at).toLocaleDateString("fr-FR", {
-              day: "2-digit", month: "long", year: "numeric",
-            })}
+            {formatDate(order.created_at)}
           </p>
         </div>
         <div className={clsx("flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border", cfg.color)}>
@@ -165,7 +164,7 @@ function OrderCard({ order }: { order: TrackedOrder }) {
                   Tranche {t.numero}
                   {t.statut !== "payee" && (
                     <span className="text-slate-400 font-normal ml-1">
-                      · {new Date(t.date_echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                      · {formatDate(t.date_echeance)}
                     </span>
                   )}
                 </span>

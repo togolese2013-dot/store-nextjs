@@ -1,4 +1,5 @@
 import { CheckCircle2, Clock, Truck, XCircle, Circle } from "lucide-react";
+import { formatDateTime, DEFAULT_DATE_PREFS, type DatePrefs } from "@/lib/format-date";
 
 export interface OrderEvent {
   id: number;
@@ -12,6 +13,7 @@ export interface OrderEvent {
 interface Props {
   events: OrderEvent[];
   currentStatus: string;
+  datePrefs?: DatePrefs;
 }
 
 const STEPS = [
@@ -36,13 +38,11 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Annulée",
 };
 
-function fmtDate(d: string | Date) {
-  const date = new Date(d);
-  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) +
-    " · " + date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function fmtDate(d: string | Date, prefs: DatePrefs) {
+  return formatDateTime(d, prefs);
 }
 
-export default function OrderTimeline({ events, currentStatus }: Props) {
+export default function OrderTimeline({ events, currentStatus, datePrefs = DEFAULT_DATE_PREFS }: Props) {
   const normalizedStatus = currentStatus === "shipped" ? "confirmed" : currentStatus;
   const isCancelled = normalizedStatus === "cancelled";
 
@@ -116,7 +116,7 @@ export default function OrderTimeline({ events, currentStatus }: Props) {
                         <span className={`text-sm font-bold ${idx === 0 ? colors.text : "text-slate-600"}`}>
                           {STATUS_LABELS[ev.status] ?? ev.status}
                         </span>
-                        <span className="text-xs text-slate-400">{fmtDate(ev.created_at)}</span>
+                        <span className="text-xs text-slate-400">{fmtDate(ev.created_at, datePrefs)}</span>
                       </div>
                       {ev.note && (
                         <p className="text-xs text-slate-500 mt-1">{ev.note}</p>

@@ -1,4 +1,6 @@
 import { getAdminSession } from "@/lib/auth";
+import { getSettings } from "@/lib/admin-db";
+import { formatDateTime, toDatePrefs, type DatePrefs } from "@/lib/format-date";
 import { redirect, notFound } from "next/navigation";
 import PageHeader from "@/components/admin/PageHeader";
 import Link from "next/link";
@@ -24,11 +26,8 @@ async function fetchConversation(telefono: string): Promise<Message[]> {
   }
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR", {
-    day: "2-digit", month: "short",
-    hour: "2-digit", minute: "2-digit",
-  });
+function formatTime(iso: string, prefs: DatePrefs): string {
+  return formatDateTime(iso, prefs);
 }
 
 export default async function ConversationPage({
@@ -38,6 +37,9 @@ export default async function ConversationPage({
 }) {
   const session = await getAdminSession();
   if (!session) redirect("/admin/login");
+
+  const settings  = await getSettings(session.shop_id ?? 1);
+  const datePrefs = toDatePrefs({ pref_format_date: settings.pref_format_date, pref_fuseau: settings.pref_fuseau });
 
   const { telefono } = await params;
   const decoded = decodeURIComponent(telefono);
@@ -76,7 +78,7 @@ export default async function ConversationPage({
             >
               <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
               <p className={`text-[10px] mt-1.5 ${msg.role === "user" ? "text-slate-400" : "text-indigo-200"}`}>
-                {msg.role === "user" ? "Client" : "Séréna"} · {formatTime(msg.timestamp)}
+                {msg.role === "user" ? "Client" : "Séréna"} · {formatTime(msg.timestamp, datePrefs)}
               </p>
             </div>
           </div>

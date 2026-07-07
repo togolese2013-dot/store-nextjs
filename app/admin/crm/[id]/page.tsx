@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
-import { getClientById, getClientOrders, getClientStats } from "@/lib/admin-db";
+import { getClientById, getClientOrders, getClientStats, getSettings } from "@/lib/admin-db";
+import { getAdminSession } from "@/lib/auth";
+import { formatDate, toDatePrefs } from "@/lib/format-date";
 import Link from "next/link";
 import { ChevronLeft, Phone, MapPin, Crown, Ban, User, ShoppingCart, TrendingUp, Calendar, FileText } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
@@ -14,10 +16,13 @@ export default async function ClientPage({ params }: PageProps) {
   const client = await getClientById(Number(id));
   if (!client) notFound();
 
-  const [orders, stats] = await Promise.all([
+  const [orders, stats, session] = await Promise.all([
     getClientOrders(client.telephone),
     getClientStats(client.telephone),
+    getAdminSession(),
   ]);
+  const settings   = await getSettings(session?.shop_id ?? 1);
+  const datePrefs  = toDatePrefs({ pref_format_date: settings.pref_format_date, pref_fuseau: settings.pref_fuseau });
 
   const STATUS_ICON = {
     normal:    <User className="w-4 h-4" />,
@@ -77,7 +82,7 @@ export default async function ClientPage({ params }: PageProps) {
           { icon: TrendingUp,   label: "CA total",        value: formatPrice(stats.total_spent),  color: "bg-green-50 text-green-700" },
           { icon: FileText,     label: "Panier moyen",    value: formatPrice(stats.avg_basket),   color: "bg-accent-50 text-accent-700" },
           { icon: Calendar,     label: "Dernière commande",
-            value: stats.last_order_at ? new Date(stats.last_order_at).toLocaleDateString("fr-FR") : "—",
+            value: stats.last_order_at ? formatDate(stats.last_order_at, datePrefs) : "—",
             color: "bg-slate-50 text-slate-600" },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4">
@@ -113,7 +118,7 @@ export default async function ClientPage({ params }: PageProps) {
                   <div key={o.id} className="px-5 py-4 flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-slate-900 text-sm">{o.reference}</p>
-                      <p className="text-xs text-slate-400">{o.zone_livraison} · {new Date(o.created_at).toLocaleDateString("fr-FR")}</p>
+                      <p className="text-xs text-slate-400">{o.zone_livraison} · {formatDate(o.created_at, datePrefs)}</p>
                       {o.note && <p className="text-xs text-slate-500 mt-0.5 italic">"{o.note}"</p>}
                     </div>
                     <div className="text-right shrink-0">

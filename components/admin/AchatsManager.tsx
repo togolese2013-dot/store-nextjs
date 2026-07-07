@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { Achat, AchatItem, Fournisseur } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 import PageHeader from "@/components/admin/PageHeader";
 
 interface AdminProduct {
@@ -363,7 +364,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
                       {a.fournisseur_nom ?? <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-5 py-4 text-slate-500 hidden sm:table-cell text-xs">
-                      {new Date(a.date_achat).toLocaleDateString("fr-FR")}
+                      {formatDate(a.date_achat)}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <span className="font-bold text-slate-900">{formatPrice(a.montant_total)}</span>
@@ -459,7 +460,7 @@ export default function AchatsManager({ initialAchats, total, stats, fournisseur
               </div>
               <div className="bg-slate-50 rounded-xl px-4 py-3">
                 <p className="text-xs text-slate-400 font-semibold mb-0.5">Date</p>
-                <p className="font-semibold text-slate-800">{new Date(detailAchat.date_achat).toLocaleDateString("fr-FR")}</p>
+                <p className="font-semibold text-slate-800">{formatDate(detailAchat.date_achat)}</p>
               </div>
               <div className="bg-slate-50 rounded-xl px-4 py-3">
                 <p className="text-xs text-slate-400 font-semibold mb-0.5">Transport</p>

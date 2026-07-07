@@ -7,6 +7,7 @@ import {
   Clock, CheckCircle, Truck, XCircle, Loader2, RefreshCw,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 
 interface OrderItem {
   nom:           string;
@@ -176,9 +177,7 @@ export default function CommandesPage() {
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Passée le</p>
                       <p className="text-sm font-semibold text-slate-800">
-                        {new Date(order.created_at).toLocaleDateString("fr-FR", {
-                          day: "numeric", month: "long", year: "numeric",
-                        })}
+                        {formatDate(order.created_at)}
                       </p>
                     </div>
                     <div>

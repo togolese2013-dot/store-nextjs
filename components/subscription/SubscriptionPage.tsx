@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import type { BillingCycle, PlanId, PayMethodId } from './types'
 import { PLANS, PAY_METHODS, fmtFCFA } from './data'
 import styles from './subscription-page.module.css'
+import { formatDate as sharedFormatDate } from '@/lib/format-date'
 
 interface BillingInfo {
   shop_id:             number
@@ -31,7 +32,7 @@ interface Props {
 
 function fmtDate(d: string | null): string {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return sharedFormatDate(d)
 }
 
 export function SubscriptionPage({ onBack }: Props) {

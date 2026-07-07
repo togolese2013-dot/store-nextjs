@@ -11,6 +11,7 @@ import { DownloadIcon, FilterIcon, ArrowRightIcon, TrendIcon } from './icons';
 import MouvementDrawer from './MouvementDrawer';
 import { injectKeyframes } from './drawerUtils';
 import styles from './Magasin.module.css';
+import { formatDateTime } from '@/lib/format-date';
 
 function SparklesIcon({ size = 14 }: { size?: number }) {
   return (
@@ -71,10 +72,7 @@ function mapType(t: ApiMouvement['type']): MovementType {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit', month: '2-digit', year: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  });
+  return formatDateTime(iso);
 }
 
 // Pulsing "Nouveau mouvement" button (impl 8 design)

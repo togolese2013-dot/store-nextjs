@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import AdminWsShell from './AdminWsShell';
 import type { Member, ActivityLog } from './types';
 import { SAMPLE_WORKSPACES, SAMPLE_INTEGRATIONS, SAMPLE_REPORTS, SAMPLE_ROLES } from './sample-data';
+import { formatDateTime as sharedFormatDateTime } from '@/lib/format-date';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
+import type { DictKey } from '@/lib/i18n/admin-ws';
 
 const SWATCHES = [
   '#14110E', '#3B6A8F', '#2D6A4F', '#5C4A88',
@@ -33,27 +36,20 @@ function mapRole(role: string): Member['role'] {
   return map[role] ?? 'Vendeur';
 }
 
-function relativeTime(dateStr: string | null): string {
-  if (!dateStr) return 'Jamais';
+function relativeTime(dateStr: string | null, t: (k: DictKey) => string): string {
+  if (!dateStr) return t('common.time.never');
   try {
     const diff = Date.now() - new Date(dateStr).getTime();
     const h = Math.floor(diff / 3_600_000);
-    if (h < 1)  return "À l'instant";
-    if (h < 24) return `il y a ${h}h`;
+    if (h < 1)  return t('common.time.just_now');
+    if (h < 24) return t('common.time.hours_ago').replace('{n}', String(h));
     const d = Math.floor(h / 24);
-    return d === 1 ? 'hier' : `il y a ${d}j`;
+    return d === 1 ? t('common.time.yesterday') : t('common.time.days_ago_abbr').replace('{n}', String(d));
   } catch { return '—'; }
 }
 
 function formatDateTime(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    return (
-      d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) +
-      ', ' +
-      d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    );
-  } catch { return dateStr; }
+  return sharedFormatDateTime(dateStr);
 }
 
 interface ApiAdminUser {
@@ -83,7 +79,7 @@ interface ApiSecurityLog {
   created_at: string;
 }
 
-function mapAdminUser(u: ApiAdminUser): Member {
+function mapAdminUser(u: ApiAdminUser, t: (k: DictKey) => string): Member {
   return {
     name:       u.nom,
     init:       initials(u.nom),
@@ -91,12 +87,12 @@ function mapAdminUser(u: ApiAdminUser): Member {
     email:      u.email ?? `${u.username}@admin`,
     role:       mapRole(u.role),
     workspaces: ['super_admin', 'admin'].includes(u.role) ? 'Tous' : 'Boutique · Store',
-    last:       relativeTime(u.last_login),
+    last:       relativeTime(u.last_login, t),
     status:     (u.actif === 1 || u.actif === true) ? 'Actif' : 'Inactif',
   };
 }
 
-function mapUtilisateur(u: ApiUtilisateur): Member {
+function mapUtilisateur(u: ApiUtilisateur, t: (k: DictKey) => string): Member {
   const roleFromPoste = u.poste === 'Comptable' ? 'Comptable' : 'Vendeur';
   return {
     name:       u.nom,
@@ -105,13 +101,13 @@ function mapUtilisateur(u: ApiUtilisateur): Member {
     email:      u.email ?? '—',
     role:       roleFromPoste,
     workspaces: u.poste === 'Livreur' ? 'Livraisons' : 'Boutique',
-    last:       relativeTime(u.date_creation),
+    last:       relativeTime(u.date_creation, t),
     status:     (u.actif === 1 || u.actif === true) ? 'Actif' : 'Inactif',
   };
 }
 
-function mapLog(l: ApiSecurityLog): ActivityLog {
-  const who = l.admin_nom || 'Système';
+function mapLog(l: ApiSecurityLog, t: (k: DictKey) => string): ActivityLog {
+  const who = l.admin_nom || t('common.time.system');
   return {
     date:    formatDateTime(l.created_at),
     who,
@@ -138,6 +134,7 @@ export default function AdminWsDataLoader({
   userRole,
   shopName,
 }: Props) {
+  const t = useT();
   const router = useRouter();
   const [members,  setMembers]  = useState<Member[]>([]);
   const [log,      setLog]      = useState<ActivityLog[]>([]);
@@ -149,19 +146,20 @@ export default function AdminWsDataLoader({
       fetch('/api/admin/team', { credentials: 'include' }).then(r => r.json()).catch(() => ({ utilisateurs: [] })),
     ]).then(([usersRes, teamRes]) => {
       const admins: Member[] = Array.isArray(usersRes.users)
-        ? (usersRes.users as ApiAdminUser[]).map(mapAdminUser)
+        ? (usersRes.users as ApiAdminUser[]).map(u => mapAdminUser(u, t))
         : [];
       const team: Member[] = Array.isArray(teamRes.utilisateurs)
-        ? (teamRes.utilisateurs as ApiUtilisateur[]).map(mapUtilisateur)
+        ? (teamRes.utilisateurs as ApiUtilisateur[]).map(u => mapUtilisateur(u, t))
         : [];
       const all = [...admins, ...team];
       // Inject current user as Propriétaire if not already in list
       if (userName && !all.some(m => m.name === userName)) {
         const init = userName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-        all.unshift({ name: userName, email: '', init, color: SWATCHES[0], role: 'Propriétaire', workspaces: 'Tous', last: "Maintenant", status: 'Actif' });
+        all.unshift({ name: userName, email: '', init, color: SWATCHES[0], role: 'Propriétaire', workspaces: 'Tous', last: t('common.time.now'), status: 'Actif' });
       }
       setMembers(all);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -175,9 +173,10 @@ export default function AdminWsDataLoader({
     fetch('/api/admin/security-logs?limit=20')
       .then(r => r.json())
       .then(d => {
-        if (Array.isArray(d.logs)) setLog((d.logs as ApiSecurityLog[]).map(mapLog));
+        if (Array.isArray(d.logs)) setLog((d.logs as ApiSecurityLog[]).map(l => mapLog(l, t)));
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

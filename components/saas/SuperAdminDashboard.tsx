@@ -6,6 +6,7 @@ import {
   RefreshCw, Shield, CreditCard, Clock, Search,
 } from 'lucide-react';
 import s from './SuperAdmin.module.css';
+import { formatDate as sharedFormatDate, formatDateTime as sharedFormatDateTime } from '@/lib/format-date';
 
 const API = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4001';
 
@@ -55,15 +56,10 @@ function formatPrice(n: number) {
   return n.toLocaleString('fr-FR') + ' FCFA';
 }
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
+  return sharedFormatDate(d);
 }
 function fmtDatetime(d: string) {
-  return new Date(d).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  return sharedFormatDateTime(d);
 }
 function initials(nom: string) {
   return nom.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();

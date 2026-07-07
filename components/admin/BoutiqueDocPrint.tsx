@@ -1,6 +1,7 @@
 "use client";
 
 import { X, Printer } from "lucide-react";
+import { formatDate as sharedFormatDate } from "@/lib/format-date";
 
 export interface PrintItem {
   nom: string;
@@ -44,9 +45,7 @@ function fmt(n: number) {
 }
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", {
-    day: "2-digit", month: "long", year: "numeric",
-  });
+  return sharedFormatDate(d);
 }
 
 function triggerPrint(format: "A5" | "A4") {

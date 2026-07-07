@@ -9,6 +9,7 @@ import {
   Users, Eye, Wifi, Smartphone, Monitor, Tablet,
   Globe, TrendingUp, RotateCcw, Clock, UserCheck, UserPlus, MapPin,
 } from "lucide-react";
+import { formatDate as sharedFormatDate } from "@/lib/format-date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ function DeviceIcon({ d }: { d: string }) {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+  return sharedFormatDate(iso);
 }
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });

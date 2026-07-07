@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Trophy, Plus, Trash2, Settings, Users, RotateCcw, Send, ChevronDown, ChevronUp, Check, Loader2 } from "lucide-react";
+import { formatDate } from "@/lib/format-date";
 
 interface TombolaSession {
   id: number;
@@ -700,7 +701,7 @@ export default function TombolaManager() {
                             <td className="py-2 pr-3 text-slate-500 text-xs">{p.reference}</td>
                             <td className="py-2 pr-3 text-right font-semibold text-slate-800">{formatPrice(p.total)}</td>
                             <td className="py-2 text-slate-400 text-xs whitespace-nowrap">
-                              {new Date(p.created_at).toLocaleDateString("fr-FR")}
+                              {formatDate(p.created_at)}
                             </td>
                           </tr>
                         ))}

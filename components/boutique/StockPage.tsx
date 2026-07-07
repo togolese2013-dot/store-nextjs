@@ -13,6 +13,7 @@ import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons'
 import type { StockMouvement } from './BoutiqueDataLoader';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtAmount } from './BoutiqueSettingsContext';
+import { formatDateTime } from '@/lib/format-date';
 import TransferRequestModal from '@/components/admin/TransferRequestModal';
 import { TransferConfirmation } from './TransferConfirmation';
 
@@ -223,9 +224,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
                   const isRetrait = mv.type === 'retrait';
                   const date = (() => {
                     try {
-                      const d = new Date(mv.created_at);
-                      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' ' +
-                             d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                      return formatDateTime(mv.created_at);
                     } catch { return mv.created_at; }
                   })();
                   return (

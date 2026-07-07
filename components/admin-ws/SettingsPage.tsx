@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import styles from './Admin.module.css';
+import { formatDate, setDatePrefs } from '@/lib/format-date';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
+import type { DictKey } from '@/lib/i18n/admin-ws';
 
 // ── Types ──────────────────────────────────────────────────────────
 type NotifCanal = 'Email' | 'WhatsApp' | 'SMS';
@@ -26,10 +29,11 @@ const INIT: S = {
   langue: 'Français', fuseau: 'Africa/Abidjan', format_date: 'JJ/MM/AAAA',
 };
 
-const DANGER_ACTIONS = [
-  { label: 'Réinitialiser les données de démonstration', desc: "Remet les données d'exemple de tous les workspaces à leur état initial.", btn: 'Réinitialiser', isDanger: false },
-  { label: "Suspendre l'organisation", desc: 'Tous les workspaces seront mis en pause. Les données sont conservées.', btn: 'Suspendre', isDanger: false },
-  { label: 'Supprimer définitivement le compte', desc: "Suppression irréversible de l'organisation, tous workspaces et données inclus.", btn: 'Supprimer', isDanger: true },
+// `label`/`desc`/`btn` below are i18n dictionary KEYS, resolved via t() at render time.
+const DANGER_ACTIONS: { label: DictKey; desc: DictKey; btn: DictKey; isDanger: boolean }[] = [
+  { label: 'settings.danger.reset_demo_label', desc: 'settings.danger.reset_demo_desc', btn: 'settings.danger.reset_demo_btn', isDanger: false },
+  { label: 'settings.danger.suspend_label', desc: 'settings.danger.suspend_desc', btn: 'settings.danger.suspend_btn', isDanger: false },
+  { label: 'settings.danger.delete_label', desc: 'settings.danger.delete_desc', btn: 'settings.danger.delete_btn', isDanger: true },
 ];
 
 // ── Primitives UI (mêmes classes que Store · Réglages boutique) ────
@@ -38,6 +42,7 @@ function Section({ id, title, desc, children, onSave, saving }: {
   id: string; title: string; desc?: string; children: React.ReactNode;
   onSave?: () => void; saving?: boolean;
 }) {
+  const t = useT();
   return (
     <div id={`ss-${id}`} className={styles.settingsSection}>
       <div className={styles.settingsSectionHead}>
@@ -49,7 +54,7 @@ function Section({ id, title, desc, children, onSave, saving }: {
         {onSave && (
           <div style={{ padding: '12px 22px', borderTop: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', justifyContent: 'flex-end' }}>
             <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onSave} disabled={saving}>
-              {saving ? 'Enregistrement…' : 'Enregistrer'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         )}
@@ -170,19 +175,20 @@ function Tag({ children, color, bg }: { children: React.ReactNode; color?: strin
 // ── Sections ───────────────────────────────────────────────────────
 
 function ProfilSection({ s, u, onSave, saving }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void; saving: boolean }) {
+  const t = useT();
   return (
-    <Section id="profil" title="Profil de l'entreprise" desc="Informations légales et coordonnées de votre organisation." onSave={onSave} saving={saving}>
-      <Field label="Nom de l'entreprise"><In value={s.nom_ent} onChange={v => u('nom_ent', v)} placeholder="Maison Diallo" /></Field>
-      <Field label="Email principal"><In value={s.email_ent} onChange={v => u('email_ent', v)} placeholder="contact@entreprise.tg" type="email" /></Field>
-      <Field label="Secteur d'activité">
+    <Section id="profil" title={t('settings.profil.title')} desc={t('settings.profil.desc')} onSave={onSave} saving={saving}>
+      <Field label={t('settings.profil.company_name_label')}><In value={s.nom_ent} onChange={v => u('nom_ent', v)} placeholder="Maison Diallo" /></Field>
+      <Field label={t('settings.profil.email_label')}><In value={s.email_ent} onChange={v => u('email_ent', v)} placeholder="contact@entreprise.tg" type="email" /></Field>
+      <Field label={t('settings.profil.sector_label')}>
         <Sel value={s.secteur} onChange={v => u('secteur', v)} options={['Commerce & Distribution', 'Mode & Artisanat', 'Restauration', 'Services', 'Technologie', 'Agriculture', 'Autre']} />
       </Field>
-      <Field label="Taille de l'équipe">
+      <Field label={t('settings.profil.team_size_label')}>
         <Sel value={s.taille} onChange={v => u('taille', v)} options={['1 employé', '2–10 employés', '11–50 employés', '51–200 employés', '200+ employés']} />
       </Field>
-      <Field label="Adresse physique"><In value={s.adresse} onChange={v => u('adresse', v)} placeholder="Lomé, Togo" /></Field>
-      <Field label="Téléphone"><In value={s.tel} onChange={v => u('tel', v)} placeholder="+228 90 00 00 00" mono /></Field>
-      <Field label="Site web" hint="Optionnel — affiché sur les rapports et communications">
+      <Field label={t('settings.profil.address_label')}><In value={s.adresse} onChange={v => u('adresse', v)} placeholder="Lomé, Togo" /></Field>
+      <Field label={t('settings.profil.phone_label')}><In value={s.tel} onChange={v => u('tel', v)} placeholder="+228 90 00 00 00" mono /></Field>
+      <Field label={t('settings.profil.website_label')} hint={t('settings.profil.website_hint')}>
         <In value={s.site} onChange={v => u('site', v)} placeholder="maisondiallo.tg" />
       </Field>
     </Section>
@@ -197,21 +203,20 @@ interface SubData {
 }
 
 function AbonnementSection({ toast, sub }: { toast: (m: string) => void; sub: SubData | null }) {
+  const t = useT();
   const TOTAL_WS = 4;
   const NEXT_PLAN: Record<string, string> = { free: 'Basic', basic: 'Pro', pro: 'Business', business: 'Enterprise' };
 
-  const fmtPrice = (p: number) => p === 0 ? 'Gratuit' : `${p.toLocaleString('fr-FR')} FCFA / mois`;
-  const fmtDate  = (d: string | null) => d
-    ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-    : null;
+  const fmtPrice = (p: number) => p === 0 ? t('settings.sub.free') : `${p.toLocaleString('fr-FR')} ${t('settings.sub.price_suffix')}`;
+  const fmtDate  = (d: string | null) => d ? formatDate(d) : null;
   const statusStyle = (s: string) =>
     s === 'active'  ? { color: 'var(--ok)',     bg: 'var(--ok-bg)' } :
     s === 'trial'   ? { color: '#C9601E',        bg: 'rgba(201,96,30,.1)' } :
                       { color: 'var(--danger)',   bg: 'rgba(220,60,60,.1)' };
 
   if (!sub) return (
-    <Section id="abonnement" title="Abonnement" desc="Votre plan actuel, limites d'utilisation et renouvellement.">
-      <div style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>Chargement…</div>
+    <Section id="abonnement" title={t('settings.sub.title')} desc={t('settings.sub.desc')}>
+      <div style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>{t('common.loading')}</div>
     </Section>
   );
 
@@ -222,12 +227,12 @@ function AbonnementSection({ toast, sub }: { toast: (m: string) => void; sub: Su
   const maxM  = sub.limits.max_users     === 0 ? null : sub.limits.max_users;
 
   const rows = [
-    { label: 'Workspaces actifs',   val: sub.usage.workspaces, max: maxW  ?? TOTAL_WS, pct: (sub.usage.workspaces / TOTAL_WS) * 100, unlimited: false },
-    { label: "Membres de l'équipe", val: sub.usage.membres,    max: maxM,               pct: maxM ? (sub.usage.membres / maxM) * 100 : 20, unlimited: maxM === null },
+    { label: t('settings.sub.row_workspaces'), val: sub.usage.workspaces, max: maxW  ?? TOTAL_WS, pct: (sub.usage.workspaces / TOTAL_WS) * 100, unlimited: false },
+    { label: t('settings.sub.row_members'), val: sub.usage.membres,    max: maxM,               pct: maxM ? (sub.usage.membres / maxM) * 100 : 20, unlimited: maxM === null },
   ];
 
   return (
-    <Section id="abonnement" title="Abonnement" desc="Votre plan actuel, limites d'utilisation et renouvellement.">
+    <Section id="abonnement" title={t('settings.sub.title')} desc={t('settings.sub.desc')}>
       <div style={{ border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'flex-start', gap: 16, background: 'linear-gradient(135deg, var(--bg-2) 0%, var(--surface) 100%)' }}>
         <div style={{ width: 46, height: 46, borderRadius: 13, background: 'var(--ink)', color: 'white', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 20 }}>🧾</div>
         <div style={{ flex: 1 }}>
@@ -237,12 +242,12 @@ function AbonnementSection({ toast, sub }: { toast: (m: string) => void; sub: Su
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
             {date
-              ? <>Renouvellement le <strong style={{ color: 'var(--ink)' }}>{date}</strong> · {fmtPrice(sub.prix_mensuel)}</>
+              ? <>{t('settings.sub.renewal_prefix')} <strong style={{ color: 'var(--ink)' }}>{date}</strong> · {fmtPrice(sub.prix_mensuel)}</>
               : fmtPrice(sub.prix_mensuel)
             }
           </div>
         </div>
-        <Btn variant="sm" onClick={() => toast('Changement de plan')}>Changer</Btn>
+        <Btn variant="sm" onClick={() => toast(t('settings.sub.change_plan_toast'))}>{t('settings.sub.change_btn')}</Btn>
       </div>
 
       <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
@@ -264,8 +269,8 @@ function AbonnementSection({ toast, sub }: { toast: (m: string) => void; sub: Su
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <a href="/admin/billing" className={`${styles.btn} ${styles.primary}`} style={{ textDecoration: 'none' }}>Passer à {nextP}</a>
-        <a href="/admin/billing" className={styles.btn} style={{ textDecoration: 'none' }}>Gérer l'abonnement</a>
+        <a href="/admin/billing" className={`${styles.btn} ${styles.primary}`} style={{ textDecoration: 'none' }}>{t('settings.sub.upgrade_prefix')} {nextP}</a>
+        <a href="/admin/billing" className={styles.btn} style={{ textDecoration: 'none' }}>{t('settings.sub.manage_subscription')}</a>
       </div>
     </Section>
   );
@@ -284,14 +289,16 @@ interface BillingData {
 }
 
 const OPERATOR_LABELS: Record<string, string> = { moov: 'Moov Money', yas: 'Yas (Togocel)' };
-const PAY_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  paid:      { label: 'Payé',     color: 'var(--ok)',     bg: 'var(--ok-bg)' },
-  pending:   { label: 'En attente', color: 'var(--warn)', bg: 'var(--warn-bg)' },
-  failed:    { label: 'Échoué',   color: 'var(--danger)', bg: 'var(--danger-bg)' },
-  cancelled: { label: 'Annulé',   color: 'var(--muted)',  bg: 'rgba(20,17,14,.06)' },
+// `label` values below are i18n dictionary KEYS, resolved via t() at render time.
+const PAY_STATUS: Record<string, { label: DictKey; color: string; bg: string }> = {
+  paid:      { label: 'settings.billing.status.paid',      color: 'var(--ok)',     bg: 'var(--ok-bg)' },
+  pending:   { label: 'settings.billing.status.pending',   color: 'var(--warn)',   bg: 'var(--warn-bg)' },
+  failed:    { label: 'settings.billing.status.failed',    color: 'var(--danger)', bg: 'var(--danger-bg)' },
+  cancelled: { label: 'settings.billing.status.cancelled', color: 'var(--muted)',  bg: 'rgba(20,17,14,.06)' },
 };
 
 function FacturationSection() {
+  const t = useT();
   const [billing, setBilling] = useState<BillingData | null>(null);
 
   useEffect(() => {
@@ -302,35 +309,34 @@ function FacturationSection() {
   }, []);
 
   const fmtAmount = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`;
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 
   const payments = billing?.payments ?? [];
   const lastPaid = payments.find(p => p.status === 'paid' && p.operator);
 
   return (
-    <Section id="facturation" title="Facturation" desc="Moyen de paiement et historique des transactions.">
+    <Section id="facturation" title={t('settings.billing.title')} desc={t('settings.billing.desc')}>
       <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ width: 40, height: 26, borderRadius: 6, background: 'var(--ink)', display: 'grid', placeItems: 'center', flexShrink: 0, color: 'white', fontSize: 14 }}>📱</div>
         <div style={{ flex: 1 }}>
           {lastPaid ? (
             <>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{OPERATOR_LABELS[lastPaid.operator!] ?? lastPaid.operator} · réf. {lastPaid.mm_reference}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Dernier paiement le {fmtDate(lastPaid.paid_at ?? lastPaid.created_at)}</div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{OPERATOR_LABELS[lastPaid.operator!] ?? lastPaid.operator} · {t('settings.billing.ref_abbr')} {lastPaid.mm_reference}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>{t('settings.billing.last_payment_prefix')} {formatDate(lastPaid.paid_at ?? lastPaid.created_at)}</div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>Aucun moyen de paiement enregistré</div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Le paiement se fait par mobile money (Moov ou Yas) lors du changement de plan.</div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{t('settings.billing.no_method')}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>{t('settings.billing.no_method_desc')}</div>
             </>
           )}
         </div>
-        <a href="/admin/billing" className={`${styles.btn} ${styles.sm}`} style={{ textDecoration: 'none' }}>Gérer</a>
+        <a href="/admin/billing" className={`${styles.btn} ${styles.sm}`} style={{ textDecoration: 'none' }}>{t('common.manage')}</a>
       </div>
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--muted-2)', marginBottom: 10 }}>Transactions récentes</div>
+        <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--muted-2)', marginBottom: 10 }}>{t('settings.billing.recent_transactions')}</div>
         {payments.length === 0 && (
-          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '10px 0' }}>Aucune facture pour le moment.</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '10px 0' }}>{t('settings.billing.no_invoices')}</div>
         )}
         {payments.map(p => {
           const st = PAY_STATUS[p.status];
@@ -339,10 +345,10 @@ function FacturationSection() {
               <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--bg-2)', display: 'grid', placeItems: 'center', flexShrink: 0, color: 'var(--muted)' }}>🧾</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{p.transaction_id}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 1 }}>{fmtDate(p.paid_at ?? p.created_at)} · {p.plan} · {p.duration_months} mois</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 1 }}>{formatDate(p.paid_at ?? p.created_at)} · {p.plan} · {p.duration_months} {t('settings.billing.months_suffix')}</div>
               </div>
               <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12.5, fontWeight: 500 }}>{fmtAmount(p.amount)}</span>
-              <Tag color={st.color} bg={st.bg}>{st.label}</Tag>
+              <Tag color={st.color} bg={st.bg}>{t(st.label)}</Tag>
             </div>
           );
         })}
@@ -352,107 +358,174 @@ function FacturationSection() {
 }
 
 function SecuriteSection({ s, u, onSave, saving, toast }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void; saving: boolean; toast: (m: string) => void }) {
+  const t = useT();
   return (
-    <Section id="securite" title="Sécurité & authentification" desc="Protégez l'accès à votre compte avec une double vérification." onSave={onSave} saving={saving}>
-      <ToggleRow label="Authentification à deux facteurs (2FA)" desc="Un code temporaire sera demandé à chaque connexion, en plus du mot de passe." on={s.two_fa} onChange={v => u('two_fa', v)}>
+    <Section id="securite" title={t('settings.sec.title')} desc={t('settings.sec.desc')} onSave={onSave} saving={saving}>
+      <ToggleRow label={t('settings.sec.twofa_label')} desc={t('settings.sec.twofa_desc')} on={s.two_fa} onChange={v => u('two_fa', v)}>
         {s.two_fa && (
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Btn variant="ghost-ok" onClick={() => toast("Configuration de l'app authenticator")}>📱 Configurer l'app authenticator</Btn>
-            <Btn variant="sm" onClick={() => toast('Codes de secours')}>Codes de secours</Btn>
+            <Btn variant="ghost-ok" onClick={() => toast(t('settings.sec.configure_app_toast'))}>{t('settings.sec.configure_app_btn')}</Btn>
+            <Btn variant="sm" onClick={() => toast(t('settings.sec.backup_codes_btn'))}>{t('settings.sec.backup_codes_btn')}</Btn>
           </div>
         )}
       </ToggleRow>
-      <Field label="Code PIN administrateur" hint="Requis pour les actions sensibles : suppression, export de données, modifications critiques.">
+      <Field label={t('settings.sec.pin_label')} hint={t('settings.sec.pin_hint')}>
         <div style={{ display: 'flex', gap: 8 }}>
           <In value={s.pin_admin} onChange={v => u('pin_admin', v)} placeholder="••••••" type={s.pin_visible ? 'text' : 'password'} mono style={{ letterSpacing: '0.2em', width: 160 }} />
           <Btn variant="sm" onClick={() => u('pin_visible', !s.pin_visible)}>
-            {s.pin_visible ? 'Masquer' : 'Afficher'}
+            {s.pin_visible ? t('settings.sec.hide_btn') : t('settings.sec.show_btn')}
           </Btn>
         </div>
       </Field>
-      <Field label="Délai d'expiration de session" hint="Déconnexion automatique après cette durée d'inactivité.">
+      <Field label={t('settings.sec.session_timeout_label')} hint={t('settings.sec.session_timeout_hint')}>
         <Sel value={s.session_timeout} onChange={v => u('session_timeout', v)} options={['30 minutes', '1 heure', '2 heures', '4 heures', '8 heures', '24 heures', 'Jamais']} />
       </Field>
       <div className={styles.settingsRow} style={{ background: 'var(--bg-2)', borderRadius: 11, border: '1px solid var(--border)' }}>
         <div className={styles.settingsRowLabel}>
-          <div className={styles.settingsRowLabelText}>Mot de passe du compte</div>
-          <div className={styles.settingsRowLabelHint}>Modifié il y a 45 jours</div>
+          <div className={styles.settingsRowLabelText}>{t('settings.sec.password_label')}</div>
+          <div className={styles.settingsRowLabelHint}>{t('settings.sec.password_hint')}</div>
         </div>
-        <Btn variant="sm" onClick={() => toast('Email de réinitialisation envoyé')}>🔑 Modifier</Btn>
+        <Btn variant="sm" onClick={() => toast(t('settings.sec.reset_email_toast'))}>{t('settings.sec.change_password_btn')}</Btn>
       </div>
     </Section>
   );
 }
 
+interface SessionRow {
+  id: number; device_label: string | null; ip: string;
+  created_at: string; last_seen_at: string; current: boolean;
+}
+
+function relativeTime(iso: string, t: (k: DictKey) => string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return t('common.time.just_now');
+  if (min < 60) return t('common.time.min_ago').replace('{n}', String(min));
+  const h = Math.floor(min / 60);
+  if (h < 24) return t('common.time.hours_ago').replace('{n}', String(h));
+  const d = Math.floor(h / 24);
+  return t('common.time.days_ago').replace('{n}', String(d)).replace('{s}', d > 1 ? 's' : '');
+}
+
 function SessionsSection({ toast }: { toast: (m: string) => void }) {
-  const sessions = [
-    { label: 'MacBook Pro · Chrome',   sub: "Lomé, Togo · À l'instant",         mobile: false, current: true  },
-    { label: 'iPhone 15 Pro · Safari', sub: 'Lomé, Togo · il y a 2h',            mobile: true,  current: false },
-    { label: 'MacBook Air · Firefox',  sub: 'Accra, Ghana · il y a 3 jours',     mobile: false, current: false },
-  ];
+  const t = useT();
+  const [sessions, setSessions] = useState<SessionRow[] | null>(null);
+
+  const load = useCallback(() => {
+    fetch('/api/admin/settings/sessions', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (!d.error) setSessions(d.sessions); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const revoke = async (id: number) => {
+    await fetch(`/api/admin/settings/sessions/${id}/revoke`, { method: 'POST', credentials: 'include' });
+    toast(t('settings.sessions.revoked_toast'));
+    load();
+  };
+
+  const revokeOthers = async () => {
+    await fetch('/api/admin/settings/sessions/revoke-others', { method: 'POST', credentials: 'include' });
+    toast(t('settings.sessions.revoked_others_toast'));
+    load();
+  };
+
   return (
-    <Section id="sessions" title="Sessions actives" desc="Appareils et navigateurs actuellement connectés à votre compte.">
-      {sessions.map((sess, i) => (
-        <div key={i} className={styles.settingsRow}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-2)', display: 'grid', placeItems: 'center', flexShrink: 0, color: 'var(--muted)', fontSize: 18 }}>
-              {sess.mobile ? '📱' : '🖥'}
-            </div>
-            <div className={styles.settingsRowLabel}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className={styles.settingsRowLabelText}>{sess.label}</span>
-                {sess.current && <Tag color="var(--ok)" bg="var(--ok-bg)">Session actuelle</Tag>}
+    <Section id="sessions" title={t('settings.sessions.title')} desc={t('settings.sessions.desc')}>
+      {sessions === null && <div style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>{t('common.loading')}</div>}
+      {sessions?.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>{t('settings.sessions.empty')}</div>}
+      {sessions?.map(sess => {
+        const mobile = /ios|android/i.test(sess.device_label ?? '');
+        return (
+          <div key={sess.id} className={styles.settingsRow}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-2)', display: 'grid', placeItems: 'center', flexShrink: 0, color: 'var(--muted)', fontSize: 18 }}>
+                {mobile ? '📱' : '🖥'}
               </div>
-              <div className={styles.settingsRowLabelHint}>{sess.sub}</div>
+              <div className={styles.settingsRowLabel}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className={styles.settingsRowLabelText}>{sess.device_label ?? t('settings.sessions.unknown_device')}</span>
+                  {sess.current && <Tag color="var(--ok)" bg="var(--ok-bg)">{t('settings.sessions.current_tag')}</Tag>}
+                </div>
+                <div className={styles.settingsRowLabelHint}>{sess.ip} · {relativeTime(sess.last_seen_at, t)}</div>
+              </div>
             </div>
+            {!sess.current && <Btn variant="sm" onClick={() => revoke(sess.id)} style={{ color: 'var(--danger)' }}>{t('settings.sessions.revoke_btn')}</Btn>}
           </div>
-          {!sess.current && <Btn variant="sm" onClick={() => toast('Session révoquée')} style={{ color: 'var(--danger)' }}>Révoquer</Btn>}
+        );
+      })}
+      {sessions && sessions.length > 1 && (
+        <div style={{ paddingTop: 4 }}>
+          <Btn onClick={revokeOthers} style={{ color: 'var(--danger)' }}>
+            {t('settings.sessions.revoke_others_btn')}
+          </Btn>
         </div>
-      ))}
-      <div style={{ paddingTop: 4 }}>
-        <Btn onClick={() => toast('Toutes les autres sessions révoquées')} style={{ color: 'var(--danger)' }}>
-          ↩ Révoquer toutes les autres sessions
-        </Btn>
-      </div>
+      )}
     </Section>
   );
 }
 
 function NotificationsSection({ s, u, onSave, saving }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void; saving: boolean }) {
+  const t = useT();
   return (
-    <Section id="notifications" title="Notifications" desc="Alertes système, rapports automatiques et communications de sécurité." onSave={onSave} saving={saving}>
-      <ToggleRow label="Alertes d'anomalie critique" desc="Erreur système, paiement échoué, dépassement de seuil sur un workspace" on={s.notif_anomalie} onChange={v => u('notif_anomalie', v)} />
-      <ToggleRow label="Confirmation de paiement" desc="Notification à chaque renouvellement ou changement de plan" on={s.notif_paiement} onChange={v => u('notif_paiement', v)} />
-      <ToggleRow label="Rapport hebdomadaire consolidé" desc="Synthèse CA, équipe et performances tous workspaces — envoyé le lundi" on={s.notif_rapport_hebdo} onChange={v => u('notif_rapport_hebdo', v)} />
-      <ToggleRow label="Rapport mensuel" desc="Bilan complet du mois avec export PDF joint" on={s.notif_rapport_mensuel} onChange={v => u('notif_rapport_mensuel', v)} />
-      <ToggleRow label="Alertes de sécurité" desc="Nouvelle connexion depuis un appareil inconnu, tentatives d'accès suspectes" on={s.notif_alerte_secu} onChange={v => u('notif_alerte_secu', v)} />
-      <Field label="Canal principal">
+    <Section id="notifications" title={t('settings.notif.title')} desc={t('settings.notif.desc')} onSave={onSave} saving={saving}>
+      <ToggleRow label={t('settings.notif.anomalie_label')} desc={t('settings.notif.anomalie_desc')} on={s.notif_anomalie} onChange={v => u('notif_anomalie', v)} />
+      <ToggleRow label={t('settings.notif.paiement_label')} desc={t('settings.notif.paiement_desc')} on={s.notif_paiement} onChange={v => u('notif_paiement', v)} />
+      <ToggleRow label={t('settings.notif.hebdo_label')} desc={t('settings.notif.hebdo_desc')} on={s.notif_rapport_hebdo} onChange={v => u('notif_rapport_hebdo', v)} />
+      <ToggleRow label={t('settings.notif.mensuel_label')} desc={t('settings.notif.mensuel_desc')} on={s.notif_rapport_mensuel} onChange={v => u('notif_rapport_mensuel', v)} />
+      <ToggleRow label={t('settings.notif.secu_label')} desc={t('settings.notif.secu_desc')} on={s.notif_alerte_secu} onChange={v => u('notif_alerte_secu', v)} />
+      <Field label={t('settings.notif.canal_label')}>
         <Seg value={s.notif_canal} onChange={v => u('notif_canal', v as NotifCanal)} options={['Email', 'WhatsApp', 'SMS']} />
       </Field>
-      <Field label="Email de réception" hint="Par défaut : l'adresse principale du compte">
+      <Field label={t('settings.notif.email_label')} hint={t('settings.notif.email_hint')}>
         <In value={s.email_ent} onChange={v => u('email_ent', v)} placeholder="admin@entreprise.tg" type="email" />
       </Field>
     </Section>
   );
 }
 
+const TIMEZONE_LABELS: Record<string, string> = {
+  'Africa/Abidjan':    'Abidjan / Lomé (UTC+0)',
+  'Africa/Accra':      'Accra (UTC+0)',
+  'Africa/Lagos':      'Lagos (UTC+1)',
+  'Africa/Dakar':      'Dakar (UTC+0)',
+  'Africa/Nairobi':    'Nairobi (UTC+3)',
+  'Europe/Paris':      'Paris (UTC+1/+2)',
+  'America/New_York':  'New York (UTC-5/-4)',
+};
+
 function PreferencesSection({ s, u, onSave, saving }: { s: S; u: <K extends keyof S>(k: K, v: S[K]) => void; onSave: () => void; saving: boolean }) {
-  const datePreview = s.format_date === 'JJ/MM/AAAA' ? '29/06/2026' : s.format_date === 'MM/JJ/AAAA' ? '06/29/2026' : '2026-06-29';
+  const t = useT();
+  // Live preview of the CURRENT (unsaved) selection — separate from the app-wide saved formatDate().
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('fr-FR', { timeZone: s.fuseau, day: '2-digit', month: '2-digit', year: 'numeric' }).formatToParts(now);
+  const day = parts.find(p => p.type === 'day')?.value ?? '--';
+  const month = parts.find(p => p.type === 'month')?.value ?? '--';
+  const year = parts.find(p => p.type === 'year')?.value ?? '----';
+  const datePreview =
+    s.format_date === 'MM/JJ/AAAA' ? `${month}/${day}/${year}` :
+    s.format_date === 'AAAA-MM-JJ' ? `${year}-${month}-${day}` :
+    `${day}/${month}/${year}`;
+
   return (
-    <Section id="preferences" title="Préférences" desc="Langue de l'interface, fuseau horaire et formats d'affichage." onSave={onSave} saving={saving}>
-      <Field label="Langue de l'interface">
+    <Section id="preferences" title={t('settings.pref.title')} desc={t('settings.pref.desc')} onSave={onSave} saving={saving}>
+      <Field label={t('settings.pref.langue_label')} hint={t('settings.pref.langue_hint')}>
+        {/* NOTE: option values are the actual persisted pref_langue setting (drives this
+            translation feature) — kept literal 'Français'/'English', never translated. */}
         <Seg value={s.langue} onChange={v => u('langue', v as Langue)} options={['Français', 'English']} />
       </Field>
-      <Field label="Fuseau horaire">
+      <Field label={t('settings.pref.timezone_label')}>
         <Sel value={s.fuseau} onChange={v => u('fuseau', v)} options={['Africa/Abidjan', 'Africa/Accra', 'Africa/Lagos', 'Africa/Dakar', 'Africa/Nairobi', 'Europe/Paris', 'America/New_York']} />
       </Field>
-      <Field label="Format de date">
+      <Field label={t('settings.pref.date_format_label')}>
         <Seg value={s.format_date} onChange={v => u('format_date', v as FormatDate)} options={['JJ/MM/AAAA', 'MM/JJ/AAAA', 'AAAA-MM-JJ']} />
       </Field>
       <div className={styles.settingsRow} style={{ background: 'var(--bg-2)', borderRadius: 11, border: '1px solid var(--border)' }}>
         <div>
-          <div className={styles.settingsRowLabelText}>Aperçu</div>
-          <div className={styles.settingsRowLabelHint}>UTC+0 (Lomé, Togo)</div>
+          <div className={styles.settingsRowLabelText}>{t('settings.pref.preview_label')}</div>
+          <div className={styles.settingsRowLabelHint}>{TIMEZONE_LABELS[s.fuseau] ?? s.fuseau}</div>
         </div>
         <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>{datePreview}</span>
       </div>
@@ -461,40 +534,52 @@ function PreferencesSection({ s, u, onSave, saving }: { s: S; u: <K extends keyo
 }
 
 function DonneesSection({ toast }: { toast: (m: string) => void }) {
-  const actions = [
-    { label: 'Exporter toutes les données',     desc: "Archive ZIP incluant ventes, clients, stocks et journaux d'activité.",   btn: 'Exporter' },
-    { label: 'Exporter les données comptables', desc: 'Fichier CSV/Excel compatible avec les outils comptables.',                btn: 'Exporter' },
-    { label: 'Rapport de conformité RGPD',      desc: 'Liste des données personnelles détenues et politique de traitement.',    btn: 'Générer'  },
+  const t = useT();
+  const actions: { label: DictKey; desc: DictKey; btn: DictKey }[] = [
+    { label: 'settings.data.export_all_label',        desc: 'settings.data.export_all_desc',        btn: 'common.export' },
+    { label: 'settings.data.export_accounting_label',  desc: 'settings.data.export_accounting_desc', btn: 'common.export' },
+    { label: 'settings.data.gdpr_label',               desc: 'settings.data.gdpr_desc',               btn: 'common.generate' },
   ];
   return (
-    <Section id="donnees" title="Données & confidentialité" desc="Export de vos données, conformité et politique de rétention.">
+    <Section id="donnees" title={t('settings.data.title')} desc={t('settings.data.desc')}>
       {actions.map(it => (
         <div key={it.label} className={styles.settingsRow}>
           <div className={styles.settingsRowLabel}>
-            <div className={styles.settingsRowLabelText}>{it.label}</div>
-            <div className={styles.settingsRowLabelHint}>{it.desc}</div>
+            <div className={styles.settingsRowLabelText}>{t(it.label)}</div>
+            <div className={styles.settingsRowLabelHint}>{t(it.desc)}</div>
           </div>
-          <Btn onClick={() => toast(it.btn + ' en cours…')}>↓ {it.btn}</Btn>
+          <Btn onClick={() => toast(`${t(it.btn)} ${t('settings.data.in_progress_suffix')}`)}>↓ {t(it.btn)}</Btn>
         </div>
       ))}
-      <Field label="Durée de conservation des journaux d'activité" hint="Au-delà de cette période, les logs anciens sont archivés.">
-        <Sel value="12 mois" onChange={() => {}} options={['3 mois', '6 mois', '12 mois', '24 mois', 'Indéfinie']} />
+      <Field label={t('settings.data.retention.label')} hint={t('settings.data.retention.hint')}>
+        <Sel
+          value={t('settings.data.retention.12m')}
+          onChange={() => {}}
+          options={[
+            t('settings.data.retention.3m'),
+            t('settings.data.retention.6m'),
+            t('settings.data.retention.12m'),
+            t('settings.data.retention.24m'),
+            t('settings.data.retention.indefinite'),
+          ]}
+        />
       </Field>
     </Section>
   );
 }
 
 function DangerSection({ onConfirm }: { onConfirm: (a: typeof DANGER_ACTIONS[number]) => void }) {
+  const t = useT();
   return (
-    <Section id="danger" title="Zone danger" desc="Actions irréversibles — réservées au propriétaire du compte.">
+    <Section id="danger" title={t('settings.danger.title')} desc={t('settings.danger.desc')}>
       {DANGER_ACTIONS.map(it => (
         <div key={it.label} className={styles.settingsRow}>
           <div className={styles.settingsRowLabel}>
-            <div className={styles.settingsRowLabelText} style={{ color: it.isDanger ? 'var(--danger)' : undefined }}>{it.label}</div>
-            <div className={styles.settingsRowLabelHint}>{it.desc}</div>
+            <div className={styles.settingsRowLabelText} style={{ color: it.isDanger ? 'var(--danger)' : undefined }}>{t(it.label)}</div>
+            <div className={styles.settingsRowLabelHint}>{t(it.desc)}</div>
           </div>
           <button type="button" className={`${styles.btn} ${it.isDanger ? styles.danger : ''}`} onClick={() => onConfirm(it)}>
-            {it.btn}
+            {t(it.btn)}
           </button>
         </div>
       ))}
@@ -509,16 +594,17 @@ function ConfirmModal({ action, onClose, onConfirm }: {
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const t = useT();
   return (
     <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'grid', placeItems: 'center', padding: 24, background: 'rgba(20,17,14,.32)', backdropFilter: 'saturate(120%) blur(4px)' }}
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ width: 440, maxWidth: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, padding: 24 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 8px' }}>{action.label}</h2>
-        <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, margin: '0 0 16px' }}>{action.desc}</p>
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 8px' }}>{t(action.label)}</h2>
+        <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, margin: '0 0 16px' }}>{t(action.desc)}</p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button type="button" className={styles.btn} onClick={onClose}>Annuler</button>
+          <button type="button" className={styles.btn} onClick={onClose}>{t('common.cancel')}</button>
           <button type="button" className={`${styles.btn} ${action.isDanger ? styles.danger : styles.primary}`} onClick={onConfirm}>
-            {action.btn}
+            {t(action.btn)}
           </button>
         </div>
       </div>
@@ -539,6 +625,7 @@ function Toast({ message }: { message: string }) {
 // ── Main export ────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const t = useT();
   const [s, setS] = useState<S>(INIT);
   const [sub, setSub] = useState<SubData | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -610,7 +697,7 @@ export default function SettingsPage() {
         }),
         post({ shop_secteur: s.secteur, shop_taille: s.taille, shop_site: s.site }),
       ]);
-      flash('Profil enregistré');
+      flash(t('settings.toast.profil_saved'));
     } finally { setSavingKey(null); }
   };
 
@@ -618,7 +705,7 @@ export default function SettingsPage() {
     setSavingKey('securite');
     try {
       await post({ security_2fa: String(s.two_fa), security_pin_admin: s.pin_admin, security_session_timeout: s.session_timeout });
-      flash('Paramètres de sécurité enregistrés');
+      flash(t('settings.toast.securite_saved'));
     } finally { setSavingKey(null); }
   };
 
@@ -630,7 +717,7 @@ export default function SettingsPage() {
         notif_rapport_hebdo: String(s.notif_rapport_hebdo), notif_rapport_mensuel: String(s.notif_rapport_mensuel),
         notif_alerte_secu: String(s.notif_alerte_secu), notif_canal: s.notif_canal,
       });
-      flash('Notifications enregistrées');
+      flash(t('settings.toast.notifs_saved'));
     } finally { setSavingKey(null); }
   };
 
@@ -638,7 +725,8 @@ export default function SettingsPage() {
     setSavingKey('preferences');
     try {
       await post({ pref_langue: s.langue, pref_fuseau: s.fuseau, pref_format_date: s.format_date });
-      flash('Préférences enregistrées');
+      setDatePrefs({ format: s.format_date, timezone: s.fuseau }); // apply app-wide immediately, no reload needed
+      flash(t('settings.toast.prefs_saved'));
     } finally { setSavingKey(null); }
   };
 
@@ -646,9 +734,9 @@ export default function SettingsPage() {
     <div style={{ flex: 1, overflowY: 'auto' }}>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.eyebrow}>Admin · Paramètres</div>
-          <h1 className={styles.title}>Paramètres <span className={styles.serif}>compte</span></h1>
-          <p className={styles.subtitle}>Profil de l'entreprise, abonnement, sécurité et préférences du compte administrateur.</p>
+          <div className={styles.eyebrow}>{t('settings.header.eyebrow')}</div>
+          <h1 className={styles.title}>{t('settings.header.title_main')} <span className={styles.serif}>{t('settings.header.title_serif')}</span></h1>
+          <p className={styles.subtitle}>{t('settings.header.subtitle')}</p>
         </div>
       </div>
 
@@ -670,7 +758,7 @@ export default function SettingsPage() {
         <ConfirmModal
           action={confirmAction}
           onClose={() => setConfirmAction(null)}
-          onConfirm={() => { flash(confirmAction.btn + ' effectué'); setConfirmAction(null); }}
+          onConfirm={() => { flash(`${t(confirmAction.btn)} ${t('settings.danger.done_suffix')}`); setConfirmAction(null); }}
         />
       )}
     </div>

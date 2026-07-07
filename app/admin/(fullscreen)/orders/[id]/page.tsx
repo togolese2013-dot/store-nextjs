@@ -1,5 +1,7 @@
-import { getOrderById, getOrderEvents, getProductEntrepotsForRefs } from "@/lib/admin-db";
+import { getOrderById, getOrderEvents, getProductEntrepotsForRefs, getSettings } from "@/lib/admin-db";
 import { formatPrice } from "@/lib/utils";
+import { formatDateLong, toDatePrefs } from "@/lib/format-date";
+import { getAdminSession } from "@/lib/auth";
 import OrderTimeline from "@/components/admin/OrderTimeline";
 import OrderConfirmButton from "@/components/admin/OrderConfirmButton";
 import OrderDetailActions from "@/components/admin/OrderDetailActions";
@@ -26,10 +28,13 @@ interface PageProps { params: Promise<{ id: string }> }
 
 export default async function OrderDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [order, events] = await Promise.all([
+  const session = await getAdminSession();
+  const [order, events, settings] = await Promise.all([
     getOrderById(Number(id)),
     getOrderEvents(Number(id)),
+    getSettings(session?.shop_id ?? 1),
   ]);
+  const datePrefs = toDatePrefs({ pref_format_date: settings.pref_format_date, pref_fuseau: settings.pref_fuseau });
 
   if (!order) notFound();
 
@@ -81,7 +86,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
               </span>
             </div>
             <p className="text-slate-500 text-sm mt-0.5">
-              {new Date(order.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+              {formatDateLong(order.created_at, datePrefs)}
             </p>
           </div>
         </div>
@@ -177,7 +182,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           {/* Timeline */}
           <div className="bg-white rounded-2xl border border-slate-100 p-5">
             <h2 className="font-bold text-slate-700 mb-5">Suivi de la livraison</h2>
-            <OrderTimeline events={events} currentStatus={order.status} />
+            <OrderTimeline events={events} currentStatus={order.status} datePrefs={datePrefs} />
           </div>
         </div>
 

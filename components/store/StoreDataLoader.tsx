@@ -10,6 +10,7 @@ import { createStoreConfig, setStoreData } from './store.config';
 import StoreShell from './StoreShell';
 import type { Order, Coupon, DeliveryZone, Payment } from './types';
 import { SAMPLE_PAYMENTS } from './sample-data';
+import { formatDate } from '@/lib/format-date';
 
 /* ── Status mapping API → FR ── */
 const STATUS_MAP: Record<string, Order['status']> = {
@@ -34,7 +35,7 @@ function mapApiOrder(o: any, idx: number): Order {
     client:         name,
     init:           name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
     color:          SWATCHES[hashStr(name) % SWATCHES.length],
-    date:           o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—',
+    date:           o.created_at ? formatDate(o.created_at) : '—',
     products:       Array.isArray(o.items) ? o.items.reduce((s: number, i: any) => s + (i.quantity ?? i.qty ?? 1), 0) : (o.items_count ?? 1),
     amount:         Number(o.total ?? o.montant ?? 0),
     status:         STATUS_MAP[o.status ?? ''] ?? 'En attente',
@@ -54,7 +55,7 @@ function mapApiOrder(o: any, idx: number): Order {
 }
 
 function mapApiCoupon(c: any): Coupon {
-  const expires = c.expires_at ? new Date(c.expires_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const expires = c.expires_at ? formatDate(c.expires_at) : '—';
   const isExpired = c.expires_at ? new Date(c.expires_at) < new Date() : false;
   return {
     code:   c.code,

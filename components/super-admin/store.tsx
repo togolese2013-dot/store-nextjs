@@ -6,6 +6,7 @@ import type {
 import { initials } from './icons';
 import { PLANS0, AUDIT, PALETTE } from './data';
 import { fmt } from './primitives';
+import { formatDate } from '@/lib/format-date';
 
 const UICtx = createContext<UIStore | null>(null);
 export const useUI = (): UIStore => {
@@ -39,7 +40,7 @@ function shopToTenant(s: Record<string, unknown>): Tenant {
     plan,
     mrr: PLAN_PRICE[plan] ?? 0,
     city: String(s.pays ?? '—'),
-    joined: s.created_at ? new Date(String(s.created_at)).toLocaleDateString('fr-FR') : '—',
+    joined: s.created_at ? formatDate(String(s.created_at)) : '—',
     last: '—',
     status: statusFromDB(String(s.subscription_status ?? 'trial')),
   };
@@ -51,7 +52,7 @@ function paymentToInvoice(p: Record<string, unknown>): Invoice {
     tenant: String(p.shop_nom ?? ''),
     plan: PLAN_MAP[String(p.plan)] ?? 'Basic',
     amount: Number(p.amount ?? 0),
-    date: p.created_at ? new Date(String(p.created_at)).toLocaleDateString('fr-FR') : '—',
+    date: p.created_at ? formatDate(String(p.created_at)) : '—',
     method: String(p.operator ?? 'Mobile Money'),
     status: p.status === 'paid' ? 'Payée' : p.status === 'failed' ? 'Échouée' : 'En attente',
   };

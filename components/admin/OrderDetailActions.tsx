@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 import {
   Edit2, Trash2, X, Check, Loader2, AlertTriangle,
   Plus, Minus, Search, Link2, Smartphone, CreditCard,
@@ -505,7 +506,7 @@ function PaymentPlanBlock({ orderId, orderStatus }: { orderId: number; orderStat
                 <div>
                   <p className="text-sm font-bold text-slate-900">{formatPrice(t.montant)}</p>
                   <p className="text-[10px] text-slate-400">
-                    Échéance : {new Date(t.date_echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                    Échéance : {formatDate(t.date_echeance)}
                   </p>
                 </div>
               </div>

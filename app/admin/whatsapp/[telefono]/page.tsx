@@ -7,6 +7,7 @@ import {
   ArrowLeft, Send, RefreshCw, Phone, Trash2, X,
   Image as ImageIcon, Mic, MicOff, Play, Square,
 } from "lucide-react";
+import { formatDateTime } from "@/lib/format-date";
 
 type Message = {
   id:           number;
@@ -22,9 +23,7 @@ type Message = {
 };
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR", {
-    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-  });
+  return formatDateTime(iso);
 }
 
 /* ── Bulle image ────────────────────────────────────────────────────────── */

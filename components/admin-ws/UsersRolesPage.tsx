@@ -18,6 +18,8 @@ import {
   AddMemberModal, RowMenu, ConfirmModal, RoleChangeModal, RolesModal, Toast,
   type ConfirmConfig,
 } from './UsersModals';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
+import type { DictKey } from '@/lib/i18n/admin-ws';
 
 export interface UsersRolesPageProps {
   initialMembers?: Member[];
@@ -32,20 +34,21 @@ const DB_ROLE_MAP: Record<string, RoleName> = {
   comptable:   'Comptable',
 };
 
-function formatLastLogin(ts: string | null): string {
+// `t` is threaded through since this is a plain helper (not a component/hook itself).
+function formatLastLogin(ts: string | null, t: (k: DictKey) => string): string {
   if (!ts) return '—';
   const diff = Date.now() - new Date(ts).getTime();
   const min = Math.floor(diff / 60000);
-  if (min < 2) return "À l'instant";
-  if (min < 60) return `il y a ${min} min`;
+  if (min < 2) return t('common.time.just_now');
+  if (min < 60) return t('common.time.min_ago').replace('{n}', String(min));
   const h = Math.floor(min / 60);
-  if (h < 24) return `il y a ${h}h`;
+  if (h < 24) return t('common.time.hours_ago').replace('{n}', String(h));
   const d = Math.floor(h / 24);
-  if (d === 1) return 'hier';
-  return `il y a ${d}j`;
+  if (d === 1) return t('common.time.yesterday');
+  return t('common.time.days_ago_abbr').replace('{n}', String(d));
 }
 
-function apiUserToMember(u: Record<string, unknown>): Member {
+function apiUserToMember(u: Record<string, unknown>, t: (k: DictKey) => string): Member {
   const role: RoleName = DB_ROLE_MAP[u.role as string] ?? 'Vendeur';
   let workspaces = 'Tous';
   if (u.permissions) {
@@ -61,7 +64,7 @@ function apiUserToMember(u: Record<string, unknown>): Member {
     email:      (u.email as string) || (u.username as string),
     role,
     workspaces,
-    last:       formatLastLogin(u.last_login as string | null),
+    last:       formatLastLogin(u.last_login as string | null, t),
     status:     (u.actif as number) === 1 ? 'Actif' : 'Inactif',
   };
 }
@@ -70,6 +73,7 @@ const statusClass = (s: Member['status']) =>
   s === 'Actif' ? 'actif' : s === 'Invitation' ? 'attente' : 'inactif';
 
 export default function UsersRolesPage({ initialMembers, onMembersChange }: UsersRolesPageProps) {
+  const t = useT();
   const [members, setMembers] = useState<Member[]>(initialMembers ?? []);
   const [loading, setLoading] = useState(true);
   const localFetchDone = React.useRef(false);
@@ -88,11 +92,12 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
       .then(data => {
         if (Array.isArray(data.users) && data.users.length > 0) {
           localFetchDone.current = true;
-          setMembers(data.users.map(apiUserToMember));
+          setMembers(data.users.map((u: Record<string, unknown>) => apiUserToMember(u, t)));
         }
       })
       .catch(e => console.error('[UsersRolesPage]', e))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // modales
@@ -165,12 +170,12 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
         }),
       });
       const data = await res.json();
-      if (!res.ok) { flash(`Erreur : ${data.error ?? res.status}`); return; }
+      if (!res.ok) { flash(`${t('usersroles.toast.error_prefix')} ${data.error ?? res.status}`); return; }
       setMembers((prev) => [...prev, m]);
       setAddOpen(false);
-      flash(`${m.name} ajouté — mot de passe temp : ${tempPassword}`);
+      flash(`${m.name} ${t('usersroles.toast.member_added_suffix')} ${tempPassword}`);
     } catch {
-      flash('Erreur réseau, membre non sauvegardé');
+      flash(t('usersroles.toast.network_error'));
     }
   };
 
@@ -178,13 +183,13 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
     if (!editMember) return;
     patch(editMember.email, m);
     setEditMember(null);
-    flash(`Les informations de ${m.name} ont été mises à jour`);
+    flash(`${t('usersroles.toast.info_updated_prefix')} ${m.name} ${t('usersroles.toast.info_updated_suffix')}`);
   };
 
   const changeRole = (newRole: RoleName) => {
     if (!roleMember) return;
     patch(roleMember.email, { role: newRole, color: ROLE_COLOR[newRole] });
-    flash(`${roleMember.name} est maintenant ${newRole}`);
+    flash(`${roleMember.name} ${t('usersroles.toast.now_role_suffix')} ${newRole}`);
     setRoleMember(null);
   };
 
@@ -192,26 +197,26 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
     switch (action) {
       case 'edit': setEditMember(m); break;
       case 'role': setRoleMember(m); break;
-      case 'reset': flash(`Lien de réinitialisation envoyé à ${m.email}`); break;
-      case 'resend': flash(`Invitation renvoyée à ${m.email}`); break;
+      case 'reset': flash(`${t('usersroles.toast.reset_link_prefix')} ${m.email}`); break;
+      case 'resend': flash(`${t('usersroles.toast.invite_resent_prefix')} ${m.email}`); break;
       case 'reactivate':
-        patch(m.email, { status: 'Actif', last: "À l'instant" });
-        flash(`${m.name} a été réactivé`);
+        patch(m.email, { status: 'Actif', last: t('common.time.just_now') });
+        flash(`${m.name} ${t('usersroles.toast.reactivated_suffix')}`);
         break;
       case 'deactivate':
         setConfirm({
-          tone: 'warn', icon: I.userX, title: 'Désactiver', serif: m.name.split(' ')[0],
-          body: `${m.name} ne pourra plus se connecter ni accéder aux espaces de travail. Vous pourrez réactiver le compte à tout moment.`,
-          confirmLabel: 'Désactiver',
-          run: () => { patch(m.email, { status: 'Inactif' }); flash(`${m.name} a été désactivé`); },
+          tone: 'warn', icon: I.userX, title: t('usersroles.confirm.deactivate_title'), serif: m.name.split(' ')[0],
+          body: `${m.name} ${t('usersroles.confirm.deactivate_body_suffix')}`,
+          confirmLabel: t('usersroles.confirm.deactivate_title'),
+          run: () => { patch(m.email, { status: 'Inactif' }); flash(`${m.name} ${t('usersroles.toast.deactivated_suffix')}`); },
         });
         break;
       case 'delete':
         setConfirm({
-          tone: 'danger', icon: I.trash, title: 'Supprimer', serif: m.name.split(' ')[0],
-          body: `Cette action est irréversible. ${m.name} sera définitivement retiré de l'équipe et perdra tout accès.`,
-          confirmLabel: 'Supprimer définitivement',
-          run: () => { setMembers((prev) => prev.filter((x) => x.email !== m.email)); flash(`${m.name} a été supprimé de l'équipe`); },
+          tone: 'danger', icon: I.trash, title: t('usersroles.confirm.delete_title'), serif: m.name.split(' ')[0],
+          body: `${t('usersroles.confirm.delete_body_prefix')} ${m.name} ${t('usersroles.confirm.delete_body_suffix')}`,
+          confirmLabel: t('usersroles.confirm.delete_confirm'),
+          run: () => { setMembers((prev) => prev.filter((x) => x.email !== m.email)); flash(`${m.name} ${t('usersroles.toast.deleted_suffix')}`); },
         });
         break;
     }
@@ -220,7 +225,7 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
   const pending = members.filter((m) => m.status === 'Invitation').length;
 
   if (loading) return (
-    <div className="admin-users" style={{ padding: '2rem', color: 'var(--muted)' }}>Chargement…</div>
+    <div className="admin-users" style={{ padding: '2rem', color: 'var(--muted)' }}>{t('common.loading')}</div>
   );
 
   return (
@@ -228,13 +233,13 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
       {/* En-tête */}
       <div className="head">
         <div className="head-l">
-          <div className="eyb">Admin · Équipe</div>
-          <h1 className="t1">Utilisateurs & <span className="serif">rôles</span></h1>
-          <p className="sub">{members.length} membre{members.length > 1 ? 's' : ''} · 4 rôles · {pending} invitation{pending > 1 ? 's' : ''} en attente</p>
+          <div className="eyb">{t('users.eyebrow')}</div>
+          <h1 className="t1">{t('users.title.main')} <span className="serif">{t('users.title.serif')}</span></h1>
+          <p className="sub">{members.length} {t('common.word.member')}{members.length > 1 ? 's' : ''} · 4 {t('usersroles.subtitle_roles_word')} · {pending} {t('common.word.invitation')}{pending > 1 ? 's' : ''} {t('common.pending_suffix')}</p>
         </div>
         <div className="actions">
-          <button className="btn" onClick={() => setRolesOpen(true)}><I.shield size={14} /> Gérer les rôles</button>
-          <button className="btn pri" onClick={() => setAddOpen(true)}><I.userPlus size={14} /> Ajouter un membre</button>
+          <button className="btn" onClick={() => setRolesOpen(true)}><I.shield size={14} /> {t('common.manage_roles')}</button>
+          <button className="btn pri" onClick={() => setAddOpen(true)}><I.userPlus size={14} /> {t('common.add_member')}</button>
         </div>
       </div>
 
@@ -245,7 +250,7 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
           return (
             <div key={r.name} className="role-card">
               <div className="role-name"><span className="role-dot" style={{ background: r.color }} />{r.name}</div>
-              <div className="role-count">{count} <span style={{ fontSize: 13, color: 'var(--muted-2)', fontWeight: 400 }}>membre{count > 1 ? 's' : ''}</span></div>
+              <div className="role-count">{count} <span style={{ fontSize: 13, color: 'var(--muted-2)', fontWeight: 400 }}>{t('common.word.member')}{count > 1 ? 's' : ''}</span></div>
               <div className="role-perms">{r.perms}</div>
             </div>
           );
@@ -258,7 +263,7 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
           <table>
             <thead>
               <tr>
-                <th>Membre</th><th>Rôle</th><th>Workspaces</th><th>Dernière activité</th><th>Statut</th><th />
+                <th>{t('users.table.member')}</th><th>{t('users.table.role')}</th><th>{t('users.table.workspaces')}</th><th>{t('users.table.last_activity')}</th><th>{t('users.table.status')}</th><th />
               </tr>
             </thead>
             <tbody>
@@ -298,7 +303,7 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
           </table>
         </div>
         <div className="tfoot">
-          <span>{members.length} membres · {pending} invitation{pending > 1 ? 's' : ''} en attente</span>
+          <span>{members.length} {t('common.word.member')}s · {pending} {t('common.word.invitation')}{pending > 1 ? 's' : ''} {t('common.pending_suffix')}</span>
           <div className="pgr"><button>‹</button><button className="on">1</button><button>›</button></div>
         </div>
       </div>
@@ -314,7 +319,7 @@ export default function UsersRolesPage({ initialMembers, onMembersChange }: User
           onConfirm={() => { confirm.run(); setConfirm(null); }}
         />
       )}
-      {rolesOpen && <RolesModal onClose={() => setRolesOpen(false)} onSave={(name) => { setRolesOpen(false); flash(`Permissions du rôle « ${name} » enregistrées`); }} />}
+      {rolesOpen && <RolesModal onClose={() => setRolesOpen(false)} onSave={(name) => { setRolesOpen(false); flash(`${t('usersroles.toast.role_perms_saved_prefix')} ${name} ${t('usersroles.toast.role_perms_saved_suffix')}`); }} />}
       {toast && <Toast msg={toast} />}
     </div>
   );

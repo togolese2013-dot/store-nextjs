@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Star } from "lucide-react";
 import ReviewActions from "./ReviewActions";
 import type { Review } from "@/lib/admin-db";
+import { formatDate } from "@/lib/format-date";
 
 interface ReviewWithProduct extends Review {
   product_nom?: string;
@@ -109,7 +110,7 @@ export default function ReviewsClient({ reviews }: Props) {
                     <p className="font-bold text-slate-900">{review.nom}</p>
                     <p className="text-xs text-slate-400">
                       {review.product_nom ?? "Produit supprimé"} ·{" "}
-                      {new Date(review.created_at).toLocaleDateString("fr-FR")}
+                      {formatDate(review.created_at)}
                     </p>
                   </div>
                   <div className="flex gap-0.5 shrink-0">

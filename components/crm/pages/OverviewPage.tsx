@@ -4,6 +4,7 @@ import type { Kpi } from '../types';
 import { DownloadIcon } from '../icons';
 import { PageHead, KpiRow, fmt } from '../primitives';
 import styles from '../Crm.module.css';
+import { formatDate } from '@/lib/format-date';
 
 interface Stats {
   total: number;
@@ -119,7 +120,7 @@ export default function OverviewPage() {
                       </div>
                     </td>
                     <td style={{ textAlign: 'right', fontSize: 12, color: 'var(--muted-2)' }}>
-                      {new Date(c.created_at).toLocaleDateString('fr-FR')}
+                      {formatDate(c.created_at)}
                     </td>
                   </tr>
                 ))

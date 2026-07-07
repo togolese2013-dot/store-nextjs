@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Search, Plus, Minus, X, Gift, ChevronDown, ChevronUp } from "lucide-react";
+import { formatDate } from "@/lib/format-date";
 
 interface LoyaltyClient {
   telephone:       string;
@@ -133,7 +134,7 @@ export default function FideliteManager({ clients }: Props) {
                   </td>
                   <td className="px-5 py-4 text-right text-slate-500 hidden sm:table-cell">{c.nb_transactions}</td>
                   <td className="px-5 py-4 text-right text-slate-400 text-xs hidden md:table-cell">
-                    {new Date(c.last_date).toLocaleDateString("fr-FR")}
+                    {formatDate(c.last_date)}
                   </td>
                   <td className="px-5 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">

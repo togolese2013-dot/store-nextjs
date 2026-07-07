@@ -15,6 +15,7 @@ import {
   ROLES, WORKSPACES, ROLE_COLOR, PERM_GROUPS, DEFAULT_PERMS, getInitials,
 } from './users-data';
 import type { Member, RoleName, RowAction, PermMatrix } from './users-types';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
 
 /* ── ADD / EDIT MEMBER ──────────────────────────────── */
 export function AddMemberModal({
@@ -24,6 +25,7 @@ export function AddMemberModal({
   onAdd: (m: Member) => void;
   member?: Member;
 }) {
+  const t = useT();
   const editing = !!member;
   const [name, setName] = useState(member?.name || '');
   const [email, setEmail] = useState(member?.email || '');
@@ -59,44 +61,44 @@ export function AddMemberModal({
           <div className="md-head-ic"><I.userPlus size={20} /></div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 className="md-title">
-              {editing ? <>Modifier le <span className="serif">membre</span></>
-                       : <>Ajouter un <span className="serif">membre</span></>}
+              {editing ? <>{t('usersmodals.edit_title_main')} <span className="serif">{t('usersmodals.member_serif')}</span></>
+                       : <>{t('usersmodals.add_title_main')} <span className="serif">{t('usersmodals.member_serif')}</span></>}
             </h2>
             <p className="md-sub">
-              {editing ? 'Mettez à jour ses informations et ses accès.'
-                       : "Donnez-lui un rôle et l'accès aux espaces de travail concernés."}
+              {editing ? t('usersmodals.edit_sub')
+                       : t('usersmodals.add_sub')}
             </p>
           </div>
-          <button className="md-x" onClick={onClose} aria-label="Fermer"><I.x size={18} /></button>
+          <button className="md-x" onClick={onClose} aria-label={t('common.close')}><I.x size={18} /></button>
         </div>
 
         <div className="md-body">
           <div className="avp">
             <div className="avp-av" style={{ background: name.trim() ? color : 'var(--border-strong)' }}>{init}</div>
             <div style={{ minWidth: 0 }}>
-              <div className="avp-n">{name.trim() || 'Nouveau membre'}</div>
+              <div className="avp-n">{name.trim() || t('usersmodals.new_member_placeholder')}</div>
               <div className="avp-e">{email.trim() || 'adresse@email.com'} · {role}</div>
             </div>
           </div>
 
           <div className="fld-row">
             <div className="fld">
-              <label className="lbl">Nom complet</label>
-              <input className="inp" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Amadou Traoré" autoFocus />
+              <label className="lbl">{t('usersmodals.field.full_name')}</label>
+              <input className="inp" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('usersmodals.field.full_name_placeholder')} autoFocus />
             </div>
             <div className="fld">
-              <label className="lbl">Numéro de téléphone</label>
+              <label className="lbl">{t('usersmodals.field.phone')}</label>
               <input className="inp" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+228 90 00 00 00" />
             </div>
           </div>
 
           <div className="fld">
-            <label className="lbl">Adresse email</label>
+            <label className="lbl">{t('usersmodals.field.email')}</label>
             <input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="amadou@maisondiallo.tg" />
           </div>
 
           <div className="fld">
-            <label className="lbl">Rôle</label>
+            <label className="lbl">{t('usersmodals.field.role')}</label>
             <div className="role-pick">
               {ROLES.map((r) => (
                 <button key={r.name} type="button" className={`rp ${role === r.name ? 'on' : ''}`} onClick={() => setRole(r.name)}>
@@ -108,7 +110,7 @@ export function AddMemberModal({
           </div>
 
           <div className="fld">
-            <label className="lbl">Accès aux workspaces</label>
+            <label className="lbl">{t('usersmodals.field.workspaces_access')}</label>
             <div className="ws-pick">
               {WORKSPACES.map((w) => (
                 <button key={w.id} type="button" className={`wsc ${wss.includes(w.name) ? 'on' : ''}`} onClick={() => toggleWs(w.name)}>
@@ -120,10 +122,10 @@ export function AddMemberModal({
         </div>
 
         <div className="md-foot">
-          <span className="left">{wss.length} workspace{wss.length > 1 ? 's' : ''} sélectionné{wss.length > 1 ? 's' : ''}</span>
-          <button className="btn" onClick={onClose}>Annuler</button>
+          <span className="left">{wss.length} workspace{wss.length > 1 ? 's' : ''} {wss.length > 1 ? t('usersmodals.selected_plural') : t('usersmodals.selected_singular')}</span>
+          <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
           <button className="btn pri" disabled={!ok} onClick={submit} style={{ opacity: ok ? 1 : .5, cursor: ok ? 'pointer' : 'not-allowed' }}>
-            <I.check size={14} /> Enregistrer
+            <I.check size={14} /> {t('common.save')}
           </button>
         </div>
       </div>
@@ -139,6 +141,7 @@ export function RowMenu({
   onPick: (a: RowAction) => void;
   anchor: DOMRect | null;
 }) {
+  const t = useT();
   const isOwner = member.role === 'Propriétaire';
   const isInvite = member.status === 'Invitation';
   const isInactive = member.status === 'Inactif';
@@ -149,19 +152,19 @@ export function RowMenu({
 
   return (
     <div className="amenu" style={pos} onClick={(e) => e.stopPropagation()}>
-      <div className="ami-h">Gérer</div>
-      <button className="ami" onClick={() => onPick('edit')}><I.pencil size={15} /> Modifier le membre</button>
-      {!isOwner && <button className="ami" onClick={() => onPick('role')}><I.shield size={15} /> Changer de rôle</button>}
+      <div className="ami-h">{t('usersmodals.menu.header')}</div>
+      <button className="ami" onClick={() => onPick('edit')}><I.pencil size={15} /> {t('usersmodals.menu.edit_member')}</button>
+      {!isOwner && <button className="ami" onClick={() => onPick('role')}><I.shield size={15} /> {t('usersmodals.menu.change_role')}</button>}
       {isInvite
-        ? <button className="ami" onClick={() => onPick('resend')}><I.mail size={15} /> Renvoyer l'invitation</button>
-        : <button className="ami" onClick={() => onPick('reset')}><I.key size={15} /> Réinitialiser le mot de passe</button>}
+        ? <button className="ami" onClick={() => onPick('resend')}><I.mail size={15} /> {t('usersmodals.menu.resend_invite')}</button>
+        : <button className="ami" onClick={() => onPick('reset')}><I.key size={15} /> {t('usersmodals.menu.reset_password')}</button>}
       {!isOwner && (
         <>
           <div className="ami-sep" />
           {isInactive
-            ? <button className="ami" onClick={() => onPick('reactivate')}><I.userCheck size={15} /> Réactiver le compte</button>
-            : !isInvite && <button className="ami" onClick={() => onPick('deactivate')}><I.userX size={15} /> Désactiver le compte</button>}
-          <button className="ami danger" onClick={() => onPick('delete')}><I.trash size={15} /> Supprimer le membre</button>
+            ? <button className="ami" onClick={() => onPick('reactivate')}><I.userCheck size={15} /> {t('usersmodals.menu.reactivate')}</button>
+            : !isInvite && <button className="ami" onClick={() => onPick('deactivate')}><I.userX size={15} /> {t('usersmodals.menu.deactivate')}</button>}
+          <button className="ami danger" onClick={() => onPick('delete')}><I.trash size={15} /> {t('usersmodals.menu.delete_member')}</button>
         </>
       )}
     </div>
@@ -182,6 +185,7 @@ export interface ConfirmConfig {
 export function ConfirmModal({
   title, serif, body, confirmLabel, tone = 'danger', icon, onClose, onConfirm,
 }: Omit<ConfirmConfig, 'run'> & { onClose: () => void; onConfirm: () => void }) {
+  const t = useT();
   const Icon = icon || I.alert;
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -191,13 +195,13 @@ export function ConfirmModal({
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 className="md-title">{title} {serif && <span className="serif">{serif}</span>}</h2>
           </div>
-          <button className="md-x" onClick={onClose} aria-label="Fermer"><I.x size={18} /></button>
+          <button className="md-x" onClick={onClose} aria-label={t('common.close')}><I.x size={18} /></button>
         </div>
         <div className="md-body" style={{ paddingTop: 14 }}>
           <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--muted)', margin: 0 }}>{body}</p>
         </div>
         <div className="md-foot">
-          <button className="btn" onClick={onClose}>Annuler</button>
+          <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
           <button className={`btn ${tone === 'danger' ? 'danger' : 'pri'}`} onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>
@@ -213,6 +217,7 @@ export function RoleChangeModal({
   onClose: () => void;
   onConfirm: (role: RoleName) => void;
 }) {
+  const t = useT();
   const [role, setRole] = useState<RoleName>(member.role);
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -220,10 +225,10 @@ export function RoleChangeModal({
         <div className="md-head">
           <div className="md-head-ic"><I.shield size={20} /></div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 className="md-title">Changer de <span className="serif">rôle</span></h2>
-            <p className="md-sub">{member.name} · actuellement {member.role}</p>
+            <h2 className="md-title">{t('usersmodals.role_change.title_main')} <span className="serif">{t('usersmodals.role_change.title_serif')}</span></h2>
+            <p className="md-sub">{member.name} · {t('usersmodals.currently')} {member.role}</p>
           </div>
-          <button className="md-x" onClick={onClose} aria-label="Fermer"><I.x size={18} /></button>
+          <button className="md-x" onClick={onClose} aria-label={t('common.close')}><I.x size={18} /></button>
         </div>
         <div className="md-body">
           <div className="role-pick">
@@ -236,10 +241,10 @@ export function RoleChangeModal({
           </div>
         </div>
         <div className="md-foot">
-          <button className="btn" onClick={onClose}>Annuler</button>
+          <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
           <button className="btn pri" disabled={role === member.role} onClick={() => onConfirm(role)}
             style={{ opacity: role === member.role ? .5 : 1, cursor: role === member.role ? 'not-allowed' : 'pointer' }}>
-            <I.check size={14} /> Appliquer
+            <I.check size={14} /> {t('common.apply')}
           </button>
         </div>
       </div>
@@ -254,6 +259,7 @@ export function RolesModal({
   onClose: () => void;
   onSave: (role: RoleName) => void;
 }) {
+  const t = useT();
   const [sel, setSel] = useState<RoleName>('Propriétaire');
   const [perms, setPerms] = useState<PermMatrix>(() => JSON.parse(JSON.stringify(DEFAULT_PERMS)));
   const role = ROLES.find((r) => r.name === sel)!;
@@ -270,10 +276,10 @@ export function RolesModal({
         <div className="md-head">
           <div className="md-head-ic"><I.shield size={20} /></div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 className="md-title">Gérer les <span className="serif">rôles</span></h2>
-            <p className="md-sub">Définissez les permissions de chaque rôle de l'équipe.</p>
+            <h2 className="md-title">{t('usersmodals.roles.title_main')} <span className="serif">{t('usersmodals.roles.title_serif')}</span></h2>
+            <p className="md-sub">{t('usersmodals.roles.sub')}</p>
           </div>
-          <button className="md-x" onClick={onClose} aria-label="Fermer"><I.x size={18} /></button>
+          <button className="md-x" onClick={onClose} aria-label={t('common.close')}><I.x size={18} /></button>
         </div>
 
         <div className="rm-body">
@@ -288,7 +294,7 @@ export function RolesModal({
                 <span className="cnt">{r.count}</span>
               </button>
             ))}
-            <button className="rm-add"><I.plus size={13} /> Nouveau rôle</button>
+            <button className="rm-add"><I.plus size={13} /> {t('usersmodals.roles.new_role_btn')}</button>
           </div>
 
           <div className="rm-detail">
@@ -296,9 +302,9 @@ export function RolesModal({
               <div className="rm-d-ic" style={{ background: role.color }}><I.shield size={18} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="rm-d-n">{role.name}</div>
-                <div className="rm-d-s">{role.count} membre{role.count > 1 ? 's' : ''} · {activeCount} permission{activeCount > 1 ? 's' : ''} actives</div>
+                <div className="rm-d-s">{role.count} {t('common.word.member')}{role.count > 1 ? 's' : ''} · {activeCount} permission{activeCount > 1 ? 's' : ''} {t('usersmodals.active_suffix')}</div>
               </div>
-              {locked && <span className="rm-locked">Rôle système · non modifiable</span>}
+              {locked && <span className="rm-locked">{t('usersmodals.roles.locked_badge')}</span>}
             </div>
 
             {PERM_GROUPS.map((g) => (
@@ -327,9 +333,9 @@ export function RolesModal({
         </div>
 
         <div className="md-foot">
-          <span className="left">4 rôles · les modifications s'appliquent immédiatement</span>
-          <button className="btn" onClick={onClose}>Annuler</button>
-          <button className="btn pri" onClick={() => onSave(sel)}><I.check size={14} /> Enregistrer</button>
+          <span className="left">{t('usersmodals.roles.footer_note')}</span>
+          <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn pri" onClick={() => onSave(sel)}><I.check size={14} /> {t('common.save')}</button>
         </div>
       </div>
     </div>

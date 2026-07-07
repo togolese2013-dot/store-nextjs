@@ -46,6 +46,7 @@ import mobileMoneyRoutes    from "./routes/mobile-money";
 import { ensureAdminUsersCols, ensureUtilisateursCols, ensureOrderLivreurCols, ensureLivraisonCols, ensureTokenVersionCols, ensureIndexes, fixSiteOrderFinanceEntries, ensureShopIdCols, backfillAllShopsEntrepots } from "@/lib/admin-db";
 import adminSecurityLogsRoutes from "./routes/admin/security-logs";
 import { ensureSecurityLogsTable } from "./lib/security-log";
+import { ensureAdminSessionsTable } from "./lib/sessions";
 import adminRapportsRoutes  from "./routes/admin/rapports";
 import adminTendancesRoutes        from "./routes/admin/tendances";
 import adminPerfProduitsRoutes     from "./routes/admin/performance-produits";
@@ -264,6 +265,12 @@ try {
     console.log("[backend] security_logs table OK");
   } catch (e) {
     console.error("[backend] ensureSecurityLogsTable failed:", e);
+  }
+  try {
+    await ensureAdminSessionsTable();
+    console.log("[backend] admin_sessions table OK");
+  } catch (e) {
+    console.error("[backend] ensureAdminSessionsTable failed:", e);
   }
   try {
     await ensureActivityLogsTable();

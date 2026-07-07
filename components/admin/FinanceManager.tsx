@@ -9,6 +9,7 @@ import {
 import type { FinanceEntry, FinanceStats } from "@/lib/admin-db";
 import PageHeader from "@/components/admin/PageHeader";
 import TabBar     from "@/components/admin/TabBar";
+import { formatDate as sharedFormatDate } from "@/lib/format-date";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ function fmtNum(n: number) {
 function fmtDate(dateEntree: string, createdAt?: string) {
   const dateOnly = new Date(dateEntree + (dateEntree.includes("T") || dateEntree.includes(" ") ? "" : "T12:00:00"));
   const timeRef  = createdAt ? new Date(createdAt.includes("T") ? createdAt : createdAt.replace(" ", "T")) : null;
-  const date = dateOnly.toLocaleDateString("fr-FR");
+  const date = sharedFormatDate(dateOnly);
   const time = timeRef ? timeRef.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
   return time ? `${date} ${time}` : date;
 }

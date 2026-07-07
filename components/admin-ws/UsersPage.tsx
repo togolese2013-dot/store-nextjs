@@ -7,6 +7,7 @@ import type { Member, Role } from './types';
 import { SAMPLE_MEMBERS, SAMPLE_ROLES, ROLE_STYLE } from './sample-data';
 import { ShieldIcon, PlusIcon, MoreIcon } from './icons';
 import styles from './Admin.module.css';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
 
 export interface UsersPageProps {
   members?: Member[];
@@ -15,18 +16,20 @@ export interface UsersPageProps {
 }
 
 export default function UsersPage({ members = SAMPLE_MEMBERS, roles = SAMPLE_ROLES, onInvite }: UsersPageProps) {
+  const t = useT();
+  const pendingCount = members.filter(m => m.status === 'Invitation').length;
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.eyebrow}>Admin · Équipe</div>
-          <h1 className={styles.title}>Utilisateurs &amp; <span className={styles.serif}>rôles</span></h1>
-          <p className={styles.subtitle}>{members.length} membre{members.length !== 1 ? 's' : ''} · {roles.filter(r => r.count > 0).length} rôle{roles.filter(r => r.count > 0).length !== 1 ? 's' : ''}{members.filter(m => m.status === 'Invitation').length > 0 ? ` · ${members.filter(m => m.status === 'Invitation').length} invitation en attente` : ''}</p>
+          <div className={styles.eyebrow}>{t('users.eyebrow')}</div>
+          <h1 className={styles.title}>{t('users.title.main')} <span className={styles.serif}>{t('users.title.serif')}</span></h1>
+          <p className={styles.subtitle}>{members.length} {t('common.word.member')}{members.length !== 1 ? 's' : ''} · {roles.filter(r => r.count > 0).length} {t('common.word.role')}{roles.filter(r => r.count > 0).length !== 1 ? 's' : ''}{pendingCount > 0 ? ` · ${pendingCount} ${t('common.word.invitation')} ${t('common.pending_suffix')}` : ''}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><ShieldIcon size={14} /> Gérer les rôles</button>
+          <button type="button" className={styles.btn}><ShieldIcon size={14} /> {t('common.manage_roles')}</button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onInvite}>
-            <PlusIcon size={14} /> Ajouter un membre
+            <PlusIcon size={14} /> {t('common.add_member')}
           </button>
         </div>
       </div>
@@ -36,7 +39,7 @@ export default function UsersPage({ members = SAMPLE_MEMBERS, roles = SAMPLE_ROL
         {roles.map(r => (
           <div key={r.name} className={styles.roleCard}>
             <div className={styles.roleName}><span className={styles.roleDot} style={{ background: r.color }} />{r.name}</div>
-            <div className={styles.roleCount}>{r.count} <span style={{ fontSize: 13, color: 'var(--muted-2)', fontWeight: 400 }}>membre{r.count > 1 ? 's' : ''}</span></div>
+            <div className={styles.roleCount}>{r.count} <span style={{ fontSize: 13, color: 'var(--muted-2)', fontWeight: 400 }}>{t('common.word.member')}{r.count > 1 ? 's' : ''}</span></div>
             <div className={styles.rolePerms}>{r.perms}</div>
           </div>
         ))}
@@ -48,11 +51,11 @@ export default function UsersPage({ members = SAMPLE_MEMBERS, roles = SAMPLE_ROL
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Membre</th>
-                <th>Rôle</th>
-                <th>Workspaces</th>
-                <th>Dernière activité</th>
-                <th>Statut</th>
+                <th>{t('users.table.member')}</th>
+                <th>{t('users.table.role')}</th>
+                <th>{t('users.table.workspaces')}</th>
+                <th>{t('users.table.last_activity')}</th>
+                <th>{t('users.table.status')}</th>
                 <th />
               </tr>
             </thead>
@@ -82,7 +85,7 @@ export default function UsersPage({ members = SAMPLE_MEMBERS, roles = SAMPLE_ROL
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>{members.length} membre{members.length !== 1 ? 's' : ''}{members.filter(m => m.status === 'Invitation').length > 0 ? ` · ${members.filter(m => m.status === 'Invitation').length} invitation en attente` : ''}</span>
+          <span>{members.length} {t('common.word.member')}{members.length !== 1 ? 's' : ''}{pendingCount > 0 ? ` · ${pendingCount} ${t('common.word.invitation')} ${t('common.pending_suffix')}` : ''}</span>
           <div className={styles.pager}>
             <button type="button">‹</button>
             <button type="button" className={styles.on}>1</button>

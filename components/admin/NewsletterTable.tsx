@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Search, Trash2, Download, Mail } from "lucide-react";
+import { formatDate } from "@/lib/format-date";
 
 interface Subscriber {
   id:            number;
@@ -45,7 +46,7 @@ export default function NewsletterTable({ initialSubscribers }: Props) {
   function exportCSV() {
     const header = "email,date_inscription\n";
     const rows   = subscribers.map(s =>
-      `${s.email},${new Date(s.subscribed_at).toLocaleDateString("fr-FR")}`
+      `${s.email},${formatDate(s.subscribed_at)}`
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
     const url  = URL.createObjectURL(blob);
@@ -99,7 +100,7 @@ export default function NewsletterTable({ initialSubscribers }: Props) {
                   <p className="text-slate-800 font-medium">{s.email}</p>
                 </td>
                 <td className="px-5 py-4 text-right text-slate-400 text-xs hidden sm:table-cell">
-                  {new Date(s.subscribed_at).toLocaleDateString("fr-FR")}
+                  {formatDate(s.subscribed_at)}
                 </td>
                 <td className="px-5 py-4 text-right">
                   <button

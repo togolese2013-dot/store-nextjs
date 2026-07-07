@@ -7,6 +7,7 @@ import {
   Package, RefreshCw, User, Link as LinkIcon,
 } from "lucide-react";
 import type { LivraisonAdmin, Livreur } from "@/lib/admin-db";
+import { formatDateTime } from "@/lib/format-date";
 
 const STATUTS_LABELS: Record<string, { label: string; color: string }> = {
   en_attente: { label: "En attente",  color: "bg-slate-100 text-slate-600" },
@@ -17,7 +18,7 @@ const STATUTS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return formatDateTime(d);
 }
 
 export default function LivreurPage() {

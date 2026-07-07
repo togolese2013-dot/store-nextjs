@@ -9,6 +9,7 @@ import { SAMPLE_INTEGRATIONS, INTEGRATIONS_KPIS } from './sample-data';
 import Sparkline from './Sparkline';
 import { SearchIcon, TrendIcon } from './icons';
 import styles from './Admin.module.css';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
 
 export interface IntegrationsPageProps {
   integrations?: Integration[];
@@ -16,6 +17,7 @@ export interface IntegrationsPageProps {
 }
 
 export default function IntegrationsPage({ integrations = SAMPLE_INTEGRATIONS, onToggle }: IntegrationsPageProps) {
+  const t = useT();
   const [ints, setInts] = useState(integrations);
   const connected = ints.filter(i => i.connected).length;
 
@@ -29,12 +31,12 @@ export default function IntegrationsPage({ integrations = SAMPLE_INTEGRATIONS, o
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.eyebrow}>Admin · Intégrations</div>
-          <h1 className={styles.title}>Applications <span className={styles.serif}>connectées</span></h1>
-          <p className={styles.subtitle}>{connected} intégrations actives · paiement, messagerie, livraison, marketing</p>
+          <div className={styles.eyebrow}>{t('integrations.eyebrow')}</div>
+          <h1 className={styles.title}>{t('integrations.title.main')} <span className={styles.serif}>{t('integrations.title.serif')}</span></h1>
+          <p className={styles.subtitle}>{t('integrations.subtitle').replace('{n}', String(connected))}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><SearchIcon size={14} /> Explorer le marketplace</button>
+          <button type="button" className={styles.btn}><SearchIcon size={14} /> {t('integrations.explore_btn')}</button>
         </div>
       </div>
 
@@ -83,7 +85,7 @@ export default function IntegrationsPage({ integrations = SAMPLE_INTEGRATIONS, o
             <div className={styles.intFoot}>
               <span className={styles.status} style={{ color: it.connected ? 'var(--ok)' : 'var(--muted)' }}>
                 <span className={styles.d} style={{ background: it.connected ? 'var(--ok)' : 'var(--muted-2)' }} />
-                {it.connected ? 'Connecté' : 'Non connecté'}
+                {it.connected ? t('integrations.status.connected') : t('integrations.status.disconnected')}
               </span>
             </div>
           </div>

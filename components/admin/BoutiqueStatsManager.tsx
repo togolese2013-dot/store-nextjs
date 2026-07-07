@@ -13,6 +13,7 @@ import {
   RotateCcw, Filter,
 } from "lucide-react";
 import PageHeader from "./PageHeader";
+import { formatDate as sharedFormatDate, formatDateTime as sharedFormatDateTime } from "@/lib/format-date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,12 +124,7 @@ function formatPrice(n: number, type: string) {
 }
 
 function formatDate(s: string) {
-  const d = new Date(s);
-  return (
-    d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " +
-    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-  );
+  return sharedFormatDateTime(s);
 }
 
 function StatutBadge({ statut, statut_paiement }: { statut: string; statut_paiement: string | null }) {
@@ -607,8 +603,7 @@ function firstOfMonthStr() {
 }
 
 function fmtDateLabel(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  return sharedFormatDate(iso);
 }
 
 function PerformanceProduitTab() {

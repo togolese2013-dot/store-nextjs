@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/format-date";
 import {
   Check, Clock, XCircle, ChevronDown, ChevronUp,
   Loader2, RefreshCw, CreditCard, AlertTriangle,
@@ -228,10 +229,10 @@ export default function PaymentPlansManager() {
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-slate-800">Tranche {t.numero}</p>
                                 <p className="text-[11px] text-slate-400">
-                                  Échéance : {new Date(t.date_echeance).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                                  Échéance : {formatDate(t.date_echeance)}
                                   {t.date_paiement && (
                                     <span className="text-emerald-600 ml-1">
-                                      · Payée le {new Date(t.date_paiement).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                                      · Payée le {formatDate(t.date_paiement)}
                                     </span>
                                   )}
                                   {t.note && <span className="text-slate-500 ml-1">· {t.note}</span>}

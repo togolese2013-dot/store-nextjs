@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Users, TrendingUp, TrendingDown, Minus, Loader2, MapPin, Phone } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import type { BoutiqueClientStats } from "@/lib/admin-db";
+import { formatDate } from "@/lib/format-date";
 
 // ─── Donut Chart SVG ──────────────────────────────────────────────────────────
 
@@ -366,7 +367,7 @@ export default function BoutiqueSegmentation() {
               <div className="min-w-0">
                 <p className="font-semibold text-slate-900 text-sm truncate">{c.nom}</p>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {new Date(c.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                  {formatDate(c.created_at)}
                 </p>
               </div>
               <div className="text-right ml-3 shrink-0">

@@ -9,6 +9,7 @@ import {
   Check, ExternalLink, CreditCard,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/format-date";
 
 interface OrderItem {
   nom:           string;
@@ -137,10 +138,7 @@ export default function CommandeDetailPage() {
               Commande <span className="text-brand-700">#{order.reference}</span>
             </h1>
             <p className="text-xs text-slate-400">
-              {new Date(order.created_at).toLocaleDateString("fr-FR", {
-                day: "numeric", month: "long", year: "numeric",
-                hour: "2-digit", minute: "2-digit",
-              })}
+              {formatDateTime(order.created_at)}
             </p>
           </div>
         </div>
@@ -252,10 +250,10 @@ export default function CommandeDetailPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800">Tranche {t.numero}</p>
                     <p className="text-[11px] text-slate-400">
-                      Échéance : {new Date(t.date_echeance).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                      Échéance : {formatDate(t.date_echeance)}
                       {t.date_paiement && (
                         <span className="text-emerald-600 ml-1">
-                          · Payée le {new Date(t.date_paiement).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                          · Payée le {formatDate(t.date_paiement)}
                         </span>
                       )}
                     </p>
@@ -380,10 +378,7 @@ export default function CommandeDetailPage() {
                         <p className="text-xs font-semibold text-slate-800 capitalize">{ev.status}</p>
                         {ev.note && <p className="text-xs text-slate-500 mt-0.5">{ev.note}</p>}
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          {new Date(ev.created_at).toLocaleDateString("fr-FR", {
-                            day: "numeric", month: "short",
-                            hour: "2-digit", minute: "2-digit",
-                          })}
+                          {formatDateTime(ev.created_at)}
                         </p>
                       </div>
                     </div>

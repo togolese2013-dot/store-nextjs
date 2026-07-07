@@ -8,6 +8,7 @@ import { SAMPLE_WORKSPACES, SAMPLE_LOG, CA_BREAKDOWN } from './sample-data';
 import Sparkline from './Sparkline';
 import { DownloadIcon, PlusIcon, TrendIcon } from './icons';
 import styles from './Admin.module.css';
+import { useT } from '@/lib/i18n/use-admin-ws-lang';
 
 interface OverviewPageProps {
   onInvite?: () => void;
@@ -24,26 +25,27 @@ export default function OverviewPage({
   workspaces = SAMPLE_WORKSPACES,
   log = SAMPLE_LOG,
 }: OverviewPageProps) {
+  const t = useT();
   const activeWs = workspaces.filter(w => w.active).length;
   const activeMembers = members.filter(m => m.status === 'Actif').length;
   const kpis: KpiItem[] = [
-    { label: 'CA consolidé · mois', value: '—', sub: 'tous workspaces' },
-    { label: 'Équipiers actifs',    value: String(activeMembers), sub: 'membres actifs' },
-    { label: 'Workspaces actifs',   value: String(activeWs), unit: `/ ${workspaces.length}`, sub: 'espaces configurés' },
-    { label: 'Abonnement',          value: '—', serif: true, sub: '—' },
+    { label: t('overview.kpi.revenue_label'), value: '—', sub: t('overview.kpi.revenue_sub') },
+    { label: t('overview.kpi.active_members_label'),    value: String(activeMembers), sub: t('overview.kpi.active_members_sub') },
+    { label: t('overview.kpi.active_workspaces_label'), value: String(activeWs), unit: `/ ${workspaces.length}`, sub: t('overview.kpi.active_workspaces_sub') },
+    { label: t('overview.kpi.subscription_label'), value: '—', serif: true, sub: '—' },
   ];
   return (
     <>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.eyebrow}>Admin · Aperçu</div>
-          <h1 className={styles.title}>Tableau de bord <span className={styles.serif}>administrateur</span></h1>
-          <p className={styles.subtitle}>{shopName} · vue consolidée de tous les espaces de travail</p>
+          <div className={styles.eyebrow}>{t('overview.eyebrow')}</div>
+          <h1 className={styles.title}>{t('overview.title.main')} <span className={styles.serif}>{t('overview.title.serif')}</span></h1>
+          <p className={styles.subtitle}>{shopName} · {t('overview.subtitle_suffix')}</p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}><DownloadIcon size={14} /> Rapport global</button>
+          <button type="button" className={styles.btn}><DownloadIcon size={14} /> {t('overview.global_report_btn')}</button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onInvite}>
-            <PlusIcon size={14} /> Ajouter un membre
+            <PlusIcon size={14} /> {t('common.add_member')}
           </button>
         </div>
       </div>
@@ -72,8 +74,8 @@ export default function OverviewPage({
         {/* Workspace health */}
         <div className={styles.ovCard}>
           <div className={styles.ovCardHead}>
-            Santé des workspaces
-            <button type="button" className={`${styles.btn} ${styles.sm}`}>Gérer</button>
+            {t('overview.workspace_health_title')}
+            <button type="button" className={`${styles.btn} ${styles.sm}`}>{t('common.manage')}</button>
           </div>
           <div className={styles.wsGrid}>
             {workspaces.map(w => {
@@ -87,7 +89,7 @@ export default function OverviewPage({
                       <div className={styles.wsCardTag}>{w.tag}</div>
                     </div>
                     <span className={`${styles.status} ${w.active ? styles.actif : styles.inactif}`}>
-                      <span className={styles.d} />{w.active ? 'Actif' : 'Inactif'}
+                      <span className={styles.d} />{w.active ? t('common.status_active') : t('common.status_inactive')}
                     </span>
                   </div>
                   <div className={styles.wsCardStat}>
@@ -103,7 +105,7 @@ export default function OverviewPage({
         {/* Activity */}
         <div className={styles.ovSide}>
           <div className={styles.ovCard}>
-            <div className={styles.ovCardHead}>Activité récente</div>
+            <div className={styles.ovCardHead}>{t('overview.recent_activity_title')}</div>
             {log.slice(0, 5).map((l, i) => (
               <div key={i} className={styles.eventItem}>
                 <div style={{ width: 24, height: 24, borderRadius: 99, background: l.color, color: 'white', display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{l.init}</div>
@@ -120,13 +122,13 @@ export default function OverviewPage({
       {/* CA breakdown */}
       <div className={styles.ovBot}>
         <div className={styles.ovCard}>
-          <div className={styles.ovCardHead}>Répartition du CA par workspace · ce mois</div>
+          <div className={styles.ovCardHead}>{t('overview.ca_breakdown_title')}</div>
           <table className={styles.miniTable}>
             <thead>
               <tr>
-                <th>Workspace</th>
-                <th style={{ textAlign: 'right' }}>CA</th>
-                <th style={{ textAlign: 'right' }}>Part</th>
+                <th>{t('overview.table.workspace')}</th>
+                <th style={{ textAlign: 'right' }}>{t('overview.table.revenue')}</th>
+                <th style={{ textAlign: 'right' }}>{t('overview.table.share')}</th>
                 <th style={{ width: '40%' }} />
               </tr>
             </thead>

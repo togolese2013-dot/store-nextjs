@@ -1,6 +1,7 @@
 'use client'
 import React from 'react'
 import styles from './subscription.module.css'
+import { formatDate as sharedFormatDate } from '@/lib/format-date'
 
 interface Props {
   plan: string
@@ -15,7 +16,7 @@ function daysUntil(d: string | null | undefined): number | null {
   return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000)
 }
 function fmtDate(d: string): string {
-  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return sharedFormatDate(d)
 }
 function planLabel(p: string): string {
   if (p === 'business') return 'Business'

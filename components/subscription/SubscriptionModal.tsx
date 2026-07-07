@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import type { BillingCycle, PlanId, PayMethodId, InvoiceEntry } from './types'
 import { PLANS, PAY_METHODS, fmtFCFA } from './data'
 import styles from './subscription.module.css'
+import { formatDate } from '@/lib/format-date'
 
 interface BillingInfo {
   nom:                 string
@@ -156,7 +157,7 @@ export function SubscriptionModal({ open, onClose, shopPlan = 'basic' }: Props) 
   /* ── History entries ─── */
   const history: InvoiceEntry[] = (info?.payments ?? []).map(p => ({
     id:     p.id,
-    date:   new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }),
+    date:   formatDate(p.created_at),
     plan:   `Plan ${p.plan.charAt(0).toUpperCase() + p.plan.slice(1)} · ${p.duration_months} mois`,
     amount: p.amount,
     status: p.status as InvoiceEntry['status'],
@@ -208,7 +209,7 @@ export function SubscriptionModal({ open, onClose, shopPlan = 'basic' }: Props) 
                     <div className={styles.subPlanMeta}>
                       {activePlan.priceM === 0
                         ? 'Gratuit · sans engagement'
-                        : `${fmtFCFA(price(activePlan))} · Renouvellement${info?.current_period_end ? ` le ${new Date(info.current_period_end).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}`
+                        : `${fmtFCFA(price(activePlan))} · Renouvellement${info?.current_period_end ? ` le ${formatDate(info.current_period_end)}` : ''}`
                       }
                     </div>
                   </div>

@@ -6,6 +6,7 @@ import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import styles from './Boutique.module.css';
 import '@/components/admin/sale-modal.css';
 import { useBoutiqueConfig, fmtNum, type BoutiqueConfig } from './BoutiqueSettingsContext';
+import { formatDateTime as sharedFormatDateTime } from '@/lib/format-date';
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
@@ -79,9 +80,7 @@ function entrySign(type: string): number {
 }
 
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-    + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return sharedFormatDateTime(iso);
 }
 
 /* ─── WalletStrip ───────────────────────────────────────────── */

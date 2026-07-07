@@ -12,6 +12,7 @@ import { formatPrice } from "@/lib/utils";
 import PageHeader from "@/components/admin/PageHeader";
 import TabBar     from "@/components/admin/TabBar";
 import TransferRequestModal from "@/components/admin/TransferRequestModal";
+import { formatDateTime } from "@/lib/format-date";
 
 /* ─── Props ─── */
 interface Props {
@@ -422,7 +423,7 @@ export default function StockBoutiqueManager({
                       </td>
                       <td className="px-5 py-4 text-slate-500 text-xs hidden md:table-cell">{e.motif ?? "—"}</td>
                       <td className="px-5 py-4 text-slate-500 text-xs hidden sm:table-cell">
-                        {new Date(e.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {formatDateTime(e.created_at)}
                       </td>
                     </tr>
                   ))}
@@ -601,9 +602,7 @@ export default function StockBoutiqueManager({
                   {mv.type === "entree" ? "+" : "−"}{mv.quantite} u.
                 </div>
                 <div className="text-xs text-slate-400 shrink-0 hidden sm:block">
-                  {new Date(mv.created_at).toLocaleDateString("fr-FR", {
-                    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-                  })}
+                  {formatDateTime(mv.created_at)}
                 </div>
               </div>
             ))}

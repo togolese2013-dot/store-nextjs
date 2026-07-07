@@ -4,6 +4,7 @@ import type { Kpi } from '../types';
 import { DownloadIcon, PlusIcon, FilterIcon, MoreIcon } from '../icons';
 import { PageHead, KpiRow, fmt } from '../primitives';
 import styles from '../Crm.module.css';
+import { formatDate } from '@/lib/format-date';
 
 interface BoutiqueClient {
   id: number;
@@ -144,7 +145,7 @@ export default function ClientsPage() {
                       {c.solde > 0 ? '+' : ''}{fmt(c.solde)} F
                     </td>
                     <td className={styles.dimCell} style={{ textAlign: 'right', fontSize: 12 }}>
-                      {new Date(c.created_at).toLocaleDateString('fr-FR')}
+                      {formatDate(c.created_at)}
                     </td>
                     <td className={styles.actCol}>
                       <button type="button" className={styles.rm}><MoreIcon size={16} /></button>

@@ -7,6 +7,7 @@ import AdminSidebar from "./AdminSidebar";
 import OrderNotifier from "./OrderNotifier";
 import MessageNotifier from "./MessageNotifier";
 import { AdminSSEProvider, useAdminSSE } from "./useAdminSSE";
+import { setDatePrefs } from "@/lib/format-date";
 
 import type { AdminPermissions } from "@/lib/admin-permissions";
 
@@ -28,6 +29,14 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
 
   useEffect(() => {
     fetch("/api/admin/auth/refresh", { method: "POST", credentials: "include" }).catch(() => {});
+  }, []);
+
+  // Apply the saved date/timezone preference (Paramètres compte → Préférences) app-wide.
+  useEffect(() => {
+    fetch("/api/admin/settings", { credentials: "include" })
+      .then(r => r.json())
+      .then(cfg => setDatePrefs({ format: cfg.pref_format_date, timezone: cfg.pref_fuseau }))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

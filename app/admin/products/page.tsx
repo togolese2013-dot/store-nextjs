@@ -15,6 +15,9 @@ import PageHeader from "@/components/admin/PageHeader";
 import ExportProductsButton from "@/components/admin/ExportProductsButton";
 import GenerateSlugsButton  from "@/components/admin/GenerateSlugsButton";
 import { adminCan }         from "@/lib/admin-session";
+import { getSettings } from "@/lib/admin-db";
+import { getAdminSession } from "@/lib/auth";
+import { formatDate, toDatePrefs } from "@/lib/format-date";
 
 export const metadata = { title: "Tous les produits" };
 
@@ -58,6 +61,9 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
   const statut = (sp.statut as Statut) || "all";
   const limit  = 20;
   const offset = (page - 1) * limit;
+  const session  = await getAdminSession();
+  const settings = await getSettings(session?.shop_id ?? 1);
+  const datePrefs = toDatePrefs({ pref_format_date: settings.pref_format_date, pref_fuseau: settings.pref_fuseau });
 
   const activeFilter = catId   ? `cat:${catId}`     :
                        brandId ? `brand:${brandId}` : undefined;
@@ -499,7 +505,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps) {
                   {movements.map(m => (
                     <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-5 py-3 text-slate-500 whitespace-nowrap text-xs">
-                        {new Date(m.created_at).toLocaleDateString("fr-FR")}
+                        {formatDate(m.created_at, datePrefs)}
                         <span className="block text-slate-300">{new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-800">{m.nom_produit ?? "—"}</td>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import PageHeader from "./PageHeader";
 import { FileText, FileSpreadsheet, Printer } from "lucide-react";
+import { formatDateTime as sharedFormatDateTime } from "@/lib/format-date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,12 +52,7 @@ function formatPrice(n: number) {
 }
 
 function formatDate(s: string) {
-  const d = new Date(s);
-  return (
-    d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " +
-    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-  );
+  return sharedFormatDateTime(s);
 }
 
 function StatutBadge({ statut, statut_paiement }: { statut: string; statut_paiement: string | null }) {
