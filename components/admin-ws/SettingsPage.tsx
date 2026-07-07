@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styles from './Admin.module.css';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -25,18 +25,6 @@ const INIT: S = {
   notif_rapport_mensuel: true, notif_alerte_secu: true, notif_canal: 'Email',
   langue: 'Français', fuseau: 'Africa/Abidjan', format_date: 'JJ/MM/AAAA',
 };
-
-const NAV = [
-  { id: 'profil',        label: 'Profil entreprise' },
-  { id: 'abonnement',    label: 'Abonnement' },
-  { id: 'facturation',   label: 'Facturation' },
-  { id: 'securite',      label: 'Sécurité' },
-  { id: 'sessions',      label: 'Sessions actives' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'preferences',   label: 'Préférences' },
-  { id: 'donnees',       label: 'Données & export' },
-  { id: 'danger',        label: 'Zone danger', danger: true },
-];
 
 const DANGER_ACTIONS = [
   { label: 'Réinitialiser les données de démonstration', desc: "Remet les données d'exemple de tous les workspaces à leur état initial.", btn: 'Réinitialiser', isDanger: false },
@@ -548,44 +536,14 @@ function Toast({ message }: { message: string }) {
   );
 }
 
-// ── Settings Nav ───────────────────────────────────────────────────
-
-function SettingsNav({ active, onNav }: { active: string; onNav: (id: string) => void }) {
-  return (
-    <div>
-      {NAV.map((sec, i) => {
-        const isSep = i === NAV.length - 1;
-        return (
-          <React.Fragment key={sec.id}>
-            {isSep && <div style={{ height: 1, background: 'var(--border)', margin: '8px 2px' }} />}
-            <button type="button" onClick={() => onNav(sec.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', borderRadius: 9,
-              fontSize: 13, color: sec.danger ? 'var(--danger)' : (active === sec.id ? 'var(--ink)' : 'var(--ink-2)'),
-              fontWeight: active === sec.id ? 500 : 400,
-              background: active === sec.id ? 'var(--surface)' : 'transparent',
-              border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
-              boxShadow: active === sec.id ? '0 1px 3px rgba(20,17,14,.06)' : 'none',
-              marginBottom: 1, transition: 'background .15s', fontFamily: 'inherit',
-            }}>
-              {sec.label}
-            </button>
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Main export ────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const [s, setS] = useState<S>(INIT);
   const [sub, setSub] = useState<SubData | null>(null);
-  const [active, setActive] = useState('profil');
   const [toast, setToast] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<typeof DANGER_ACTIONS[number] | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   const u = useCallback(<K extends keyof S>(k: K, v: S[K]) => {
     setS(prev => ({ ...prev, [k]: v }));
@@ -684,44 +642,17 @@ export default function SettingsPage() {
     } finally { setSavingKey(null); }
   };
 
-  const onNav = (id: string) => {
-    setActive(id);
-    const el = document.getElementById(`ss-${id}`);
-    const c = contentRef.current;
-    if (el && c) c.scrollTop = el.offsetTop - 24;
-  };
-
-  useEffect(() => {
-    const c = contentRef.current;
-    if (!c) return;
-    const handler = () => {
-      for (const sec of [...NAV].reverse()) {
-        const el = document.getElementById(`ss-${sec.id}`);
-        if (el && el.offsetTop <= c.scrollTop + 120) { setActive(sec.id); break; }
-      }
-    };
-    c.addEventListener('scroll', handler, { passive: true });
-    return () => c.removeEventListener('scroll', handler);
-  }, []);
-
   return (
-    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '196px 1fr', overflow: 'hidden' }}>
-      {/* Left settings nav */}
-      <div style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-2)', overflowY: 'auto', padding: '16px 10px' }}>
-        <SettingsNav active={active} onNav={onNav} />
+    <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <div className={styles.eyebrow}>Admin · Paramètres</div>
+          <h1 className={styles.title}>Paramètres <span className={styles.serif}>compte</span></h1>
+          <p className={styles.subtitle}>Profil de l'entreprise, abonnement, sécurité et préférences du compte administrateur.</p>
+        </div>
       </div>
 
-      {/* Content */}
-      <div ref={contentRef} style={{ overflowY: 'auto' }}>
-        <div className={styles.header}>
-          <div className={styles.headerLeft}>
-            <div className={styles.eyebrow}>Admin · Paramètres</div>
-            <h1 className={styles.title}>Paramètres <span className={styles.serif}>compte</span></h1>
-            <p className={styles.subtitle}>Profil de l'entreprise, abonnement, sécurité et préférences du compte administrateur.</p>
-          </div>
-        </div>
-
-        <div className={styles.settingsBody}>
+      <div className={styles.settingsBody}>
           <ProfilSection        s={s} u={u} onSave={saveProfil} saving={savingKey === 'profil'} />
           <AbonnementSection    toast={flash} sub={sub} />
           <FacturationSection />
@@ -732,7 +663,6 @@ export default function SettingsPage() {
           <DonneesSection       toast={flash} />
           <DangerSection        onConfirm={a => setConfirmAction(a)} />
         </div>
-      </div>
 
       {toast && <Toast message={toast} />}
 
