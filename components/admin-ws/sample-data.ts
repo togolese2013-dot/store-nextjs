@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Member, Role, WorkspaceHealth, Integration, Report, ActivityLog, KpiItem } from './types';
+import type { Member, Role, WorkspaceHealth, Report, ActivityLog, KpiItem } from './types';
 import {
   PackageIcon, ReceiptIcon, StoreIcon, HeartIcon,
   ChartIcon, UsersIcon, CardIcon, FileTextIcon,
@@ -31,16 +31,6 @@ export const SAMPLE_WORKSPACES: WorkspaceHealth[] = [
   { id: 'crm',      name: 'CRM',      tag: 'Relation client',    icon: HeartIcon,   tint: '#5C4A88', bg: '#E6E0F0', count: '—', activity: '—', active: true  },
 ];
 
-/* ─── Integrations ──────────────────────────────── */
-export const SAMPLE_INTEGRATIONS: Integration[] = [
-  { name: 'Wave',             cat: 'Paiement',     init: 'W', logoBg: '#E8F0F7', logoColor: '#1A73E8', desc: 'Encaissement mobile money via Wave Sénégal & Togo',       connected: true  },
-  { name: 'Orange Money',     cat: 'Paiement',     init: 'O', logoBg: '#FBE9D6', logoColor: '#E07A2C', desc: "Paiement Orange Money multi-pays Afrique de l'Ouest",     connected: true  },
-  { name: 'WhatsApp Business',cat: 'Messagerie',   init: 'W', logoBg: '#DDEBE2', logoColor: '#2D6A4F', desc: 'Notifications commandes & support client via WhatsApp',   connected: true  },
-  { name: 'DHL Express',      cat: 'Livraison',    init: 'D', logoBg: '#FBE9D6', logoColor: '#C9601E', desc: 'Expédition internationale et suivi de colis',             connected: false },
-  { name: 'Mailchimp',        cat: 'Marketing',    init: 'M', logoBg: '#EBE4D6', logoColor: '#2A2522', desc: 'Campagnes email et newsletters automatisées',             connected: false },
-  { name: 'QuickBooks',       cat: 'Comptabilité', init: 'Q', logoBg: '#DDEBE2', logoColor: '#2D6A4F', desc: 'Synchronisation comptable et export des écritures',       connected: false },
-];
-
 /* ─── Reports ───────────────────────────────────── */
 export const SAMPLE_REPORTS: Report[] = [
   { name: 'Rapport de ventes consolidé', desc: 'CA, marges et volumes — tous workspaces confondus',  icon: ChartIcon,    tint: '#3B6A8F', bg: '#E8F0F7' },
@@ -62,7 +52,6 @@ export const CA_BREAKDOWN = [
 ];
 
 const activeWorkspaces = SAMPLE_WORKSPACES.filter(w => w.active).length;
-const connectedIntegrations = SAMPLE_INTEGRATIONS.filter(i => i.connected).length;
 
 /* ─── KPI sets ──────────────────────────────────── */
 export const OVERVIEW_KPIS: KpiItem[] = [
@@ -70,10 +59,4 @@ export const OVERVIEW_KPIS: KpiItem[] = [
   { label: 'Équipiers actifs',    value: '—',                                                        sub: 'membres actifs' },
   { label: 'Workspaces actifs',   value: String(activeWorkspaces), unit: `/ ${SAMPLE_WORKSPACES.length}`, sub: 'espaces configurés' },
   { label: 'Abonnement',          value: '—',        serif: true,                                    sub: '—' },
-];
-
-export const INTEGRATIONS_KPIS: KpiItem[] = [
-  { label: 'Intégrations actives', value: String(connectedIntegrations),                              sub: `sur ${SAMPLE_INTEGRATIONS.length} disponibles` },
-  { label: 'Catégorie principale', value: '—',       serif: true,                                    sub: '—' },
-  { label: 'Appels API · mois',    value: '—',                                                       sub: 'toutes intégrations' },
 ];

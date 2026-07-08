@@ -24,11 +24,11 @@
 
 import React, { useMemo, useState } from 'react';
 import type {
-  Member, Role, WorkspaceHealth, Integration, Report, ActivityLog,
+  Member, Role, WorkspaceHealth, Report, ActivityLog,
 } from './types';
 import {
   SAMPLE_MEMBERS, SAMPLE_ROLES, SAMPLE_WORKSPACES,
-  SAMPLE_INTEGRATIONS, SAMPLE_REPORTS, SAMPLE_LOG,
+  SAMPLE_REPORTS, SAMPLE_LOG,
 } from './sample-data';
 import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import OverviewPage from './OverviewPage';
@@ -84,7 +84,6 @@ export interface AdminWsShellProps {
   members?: Member[];
   roles?: Role[];
   workspaces?: WorkspaceHealth[];
-  integrations?: Integration[];
   reports?: Report[];
   log?: ActivityLog[];
   onSwitchWorkspace?: () => void;
@@ -101,7 +100,6 @@ export default function AdminWsShell({
   members      = SAMPLE_MEMBERS,
   roles        = SAMPLE_ROLES,
   workspaces   = SAMPLE_WORKSPACES,
-  integrations = SAMPLE_INTEGRATIONS,
   reports      = SAMPLE_REPORTS,
   log          = SAMPLE_LOG,
   onSwitchWorkspace,
@@ -117,7 +115,6 @@ export default function AdminWsShell({
   const LIVE_COUNTS: Record<string, number> = {
     users:        members.length,
     workspaces:   workspaces.length,
-    integrations: integrations.length,
   };
 
   const groups = useMemo(() =>
@@ -130,7 +127,7 @@ export default function AdminWsShell({
       })),
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, members.length, workspaces.length, integrations.length],
+    [page, members.length, workspaces.length],
   );
 
   return (
@@ -172,7 +169,7 @@ export default function AdminWsShell({
         {page === 'overview'     && <OverviewPage onInvite={onInvite} shopName={shopName} members={members} workspaces={workspaces} log={log} />}
         {page === 'users'        && <UsersRolesPage initialMembers={members as unknown as UsersRolesMember[]} />}
         {page === 'workspaces'   && <WorkspacesPage workspaces={workspaces} onToggle={onToggleWorkspace} />}
-        {page === 'integrations' && <IntegrationsPage integrations={integrations} />}
+        {page === 'integrations' && <IntegrationsPage />}
         {page === 'reports'      && <ReportsPage reports={reports} />}
         {page === 'logs'         && <LogsPage />}
         {page === 'settings'     && <SettingsPage />}

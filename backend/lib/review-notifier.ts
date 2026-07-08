@@ -35,7 +35,7 @@ export async function ensureReviewNotifierCols(): Promise<void> {
 export async function runReviewNotifier(): Promise<void> {
   try {
     const [rows] = await db.query<mysql.RowDataPacket[]>(
-      `SELECT id, reference, nom, client_tel, items
+      `SELECT id, reference, nom, client_tel, items, shop_id
        FROM orders
        WHERE status = 'delivered'
          AND delivered_at IS NOT NULL
@@ -74,7 +74,7 @@ export async function runReviewNotifier(): Promise<void> {
         `Merci pour votre confiance — Togolese Shop 🛍️`;
 
       try {
-        await sendWaText({ to: tel, body });
+        await sendWaText({ to: tel, body, shopId: Number(row.shop_id ?? 1) });
         await db.execute(
           "UPDATE orders SET review_wa_sent = 1 WHERE id = ?",
           [row.id]

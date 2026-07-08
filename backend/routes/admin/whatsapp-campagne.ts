@@ -17,9 +17,10 @@ function formatTgPhone(num: string): string {
 router.get("/api/admin/whatsapp-campagne/test-credentials", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const shopId = session.shop_id ?? 1;
   const { getSetting } = await import("@/lib/admin-db");
-  const phoneId = await getSetting("wa_phone_number_id");
-  const token   = await getSetting("wa_access_token");
+  const phoneId = await getSetting("wa_phone_number_id", shopId);
+  const token   = await getSetting("wa_access_token", shopId);
   if (!phoneId || !token) return res.json({ ok: false, error: "Credentials manquants en DB" });
   const r = await fetch(`https://graph.facebook.com/v19.0/${phoneId}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -32,6 +33,7 @@ router.get("/api/admin/whatsapp-campagne/test-credentials", async (req, res) => 
 router.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const shopId = session.shop_id ?? 1;
 
   const clientIds = (req.query.ids as string) ?? "";
 
@@ -42,13 +44,14 @@ router.get("/api/admin/whatsapp-campagne/preview", async (req, res) => {
       if (ids.length === 0) return res.json({ count: 0 });
       const placeholders = ids.map(() => "?").join(",");
       const [[row]] = await pool.execute<any[]>(
-        `SELECT COUNT(*) AS cnt FROM boutique_clients WHERE id IN (${placeholders}) AND telephone IS NOT NULL AND telephone != ''`,
-        ids
+        `SELECT COUNT(*) AS cnt FROM boutique_clients WHERE id IN (${placeholders}) AND shop_id = ? AND telephone IS NOT NULL AND telephone != ''`,
+        [...ids, shopId]
       );
       count = Number(row?.cnt ?? 0);
     } else {
       const [[row]] = await pool.execute<any[]>(
-        `SELECT COUNT(*) AS cnt FROM boutique_clients WHERE telephone IS NOT NULL AND telephone != ''`
+        `SELECT COUNT(*) AS cnt FROM boutique_clients WHERE shop_id = ? AND telephone IS NOT NULL AND telephone != ''`,
+        [shopId]
       );
       count = Number(row?.cnt ?? 0);
     }
@@ -63,6 +66,7 @@ router.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
   console.log("[campagne] POST /send received, body:", JSON.stringify(req.body).slice(0, 200));
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const shopId = session.shop_id ?? 1;
 
   const { message, client_ids, image_url } = req.body as {
     message:     string;
@@ -77,12 +81,13 @@ router.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
     if (client_ids && client_ids.length > 0) {
       const placeholders = client_ids.map(() => "?").join(",");
       [rows] = await pool.execute<any[]>(
-        `SELECT id, nom, telephone FROM boutique_clients WHERE id IN (${placeholders}) AND telephone IS NOT NULL AND telephone != '' ORDER BY id ASC`,
-        client_ids
+        `SELECT id, nom, telephone FROM boutique_clients WHERE id IN (${placeholders}) AND shop_id = ? AND telephone IS NOT NULL AND telephone != '' ORDER BY id ASC`,
+        [...client_ids, shopId]
       );
     } else {
       [rows] = await pool.execute<any[]>(
-        `SELECT id, nom, telephone FROM boutique_clients WHERE telephone IS NOT NULL AND telephone != '' ORDER BY id ASC`
+        `SELECT id, nom, telephone FROM boutique_clients WHERE shop_id = ? AND telephone IS NOT NULL AND telephone != '' ORDER BY id ASC`,
+        [shopId]
       );
     }
 
@@ -97,7 +102,7 @@ router.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
         const mime     = imgRes.headers.get("content-type") ?? "image/jpeg";
         const filename = image_url.split("/").pop()?.split("?")[0] ?? "product.jpg";
         console.log("[campagne] uploading to WA media, mime:", mime, "size:", buffer.length);
-        const upload   = await uploadWaMedia(buffer, mime, filename);
+        const upload   = await uploadWaMedia(buffer, mime, filename, shopId);
         console.log("[campagne] upload result:", JSON.stringify(upload));
         if (upload.success && upload.mediaId) mediaId = upload.mediaId;
       }
@@ -112,8 +117,8 @@ router.post("/api/admin/whatsapp-campagne/send", async (req, res) => {
       await new Promise(r => setTimeout(r, 600));
       const to = formatTgPhone(String(client.telephone));
       const result = mediaId
-        ? await sendWaImage({ to, mediaId, caption: message })
-        : await sendWaText({ to, body: message });
+        ? await sendWaImage({ to, mediaId, caption: message, shopId })
+        : await sendWaText({ to, body: message, shopId });
       if (result.success) sent++;
       else {
         failed++;

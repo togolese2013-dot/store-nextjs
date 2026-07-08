@@ -4,6 +4,7 @@ import { createOrder, addOrderEvent, createPaymentPlan, ensureOrderVente } from 
 import { sendOrderNotifications } from "../lib/whatsapp";
 import { db } from "@/lib/db";
 import { getClientSession } from "../lib/client-auth";
+import { getShopBySlug } from "@/lib/shops";
 import { ensurePaymentTables } from "./admin/payment-plans";
 import type mysql from "mysql2/promise";
 
@@ -63,6 +64,12 @@ router.post("/api/orders", async (req, res) => {
     const isEchelonne = ["2x", "3x", "4x"].includes(payment_mode);
     const tranches    = isEchelonne ? Math.max(2, Math.min(4, Number(nb_tranches) || 4)) : null;
 
+    // Resolve the shop from the subdomain/custom-domain header (set by middleware.ts) —
+    // never default silently, otherwise every tenant's orders land in shop #1's data.
+    const shopSlug = (req.headers["x-shop-slug"] as string | undefined) ?? "default";
+    const shop     = await getShopBySlug(shopSlug);
+    const shopId   = shop?.id ?? 1;
+
     const id = await createOrder({
       nom:            nom          ?? "",
       telephone:      cleanTelephone,
@@ -73,6 +80,7 @@ router.post("/api/orders", async (req, res) => {
       items,
       subtotal:       Number(subtotal ?? 0),
       total:          Number(total   ?? 0),
+      shop_id:        shopId,
     });
 
     const pool = db as mysql.Pool;
@@ -192,6 +200,7 @@ router.post("/api/orders", async (req, res) => {
       telephone: cleanTelephone,
       items:     items ?? [],
       total:     Number(total ?? 0),
+      shopId,
     }).catch(console.error);
 
     return res.json({ success: true, id, reference, payment_mode: payment_mode ?? "comptant" });

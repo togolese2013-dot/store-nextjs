@@ -154,7 +154,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
       invalidateVentesStats();
       // WhatsApp delivery confirmation
       const [[orderRow]] = await (db as mysql.Pool).execute<mysql.RowDataPacket[]>(
-        "SELECT nom, telephone, reference, items, zone_livraison, delivery_fee, total FROM orders WHERE id = ? LIMIT 1",
+        "SELECT nom, telephone, reference, items, zone_livraison, delivery_fee, total, shop_id FROM orders WHERE id = ? LIMIT 1",
         [id]
       );
       if (orderRow) {
@@ -166,6 +166,7 @@ router.patch("/api/admin/orders/:id", async (req, res) => {
           zone_livraison: orderRow.zone_livraison,
           delivery_fee:   Number(orderRow.delivery_fee ?? 0),
           total:          Number(orderRow.total ?? 0),
+          shopId:         Number(orderRow.shop_id ?? 1),
         }).catch(() => {});
       }
       emitAdminEvent("stock");

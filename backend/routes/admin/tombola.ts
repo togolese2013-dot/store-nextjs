@@ -104,6 +104,7 @@ router.post("/api/admin/tombola/:id/notify", async (req, res) => {
     await sendWaText({
       to:   tombola.winner_tel,
       body: `🎉 Félicitations ${tombola.winner_nom} ! Vous avez gagné la tombola Togolese Shop et remportez ${prize} ! Contactez-nous pour récupérer votre lot. 📞 +22890527912`,
+      shopId: session.shop_id ?? 1,
     });
     await markTombolaNotified(Number(req.params.id));
     res.json({ ok: true });

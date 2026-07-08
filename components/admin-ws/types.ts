@@ -36,16 +36,6 @@ export interface WorkspaceHealth {
   active: boolean;
 }
 
-export interface Integration {
-  name: string;
-  cat: string;
-  init: string;
-  logoBg: string;
-  logoColor: string;
-  desc: string;
-  connected: boolean;
-}
-
 export interface Report {
   name: string;
   desc: string;

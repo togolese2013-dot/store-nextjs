@@ -101,6 +101,7 @@ router.post("/api/admin/ventes/factures", async (req, res) => {
           qty:   i.qty ?? 1,
           total: i.total ?? 0,
         })),
+        shopId,
       }).catch(console.error);
     }
     res.json({ ok: true, id });

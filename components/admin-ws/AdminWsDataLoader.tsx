@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminWsShell from './AdminWsShell';
 import type { Member, ActivityLog } from './types';
-import { SAMPLE_WORKSPACES, SAMPLE_INTEGRATIONS, SAMPLE_REPORTS, SAMPLE_ROLES } from './sample-data';
+import { SAMPLE_WORKSPACES, SAMPLE_REPORTS, SAMPLE_ROLES } from './sample-data';
 import { formatDateTime as sharedFormatDateTime } from '@/lib/format-date';
 import { useT } from '@/lib/i18n/use-admin-ws-lang';
 import type { DictKey } from '@/lib/i18n/admin-ws';
@@ -197,7 +197,6 @@ export default function AdminWsDataLoader({
         });
         router.refresh();
       }}
-      integrations={SAMPLE_INTEGRATIONS}
       reports={SAMPLE_REPORTS}
       log={log}
       onSwitchWorkspace={onSwitchWorkspace}

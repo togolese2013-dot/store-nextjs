@@ -1,5 +1,11 @@
 import { getSetting } from "@/lib/admin-db";
 
+/**
+ * Every function below takes a required `shopId` — WhatsApp credentials/templates
+ * are stored per-shop (settings table, shop_id-scoped). Never default this silently:
+ * that was the pre-existing bug where every tenant's messages used shop #1's credentials.
+ */
+
 const WA_API = "https://graph.facebook.com/v19.0";
 
 function cleanPhone(num: string): string {
@@ -8,16 +14,17 @@ function cleanPhone(num: string): string {
 
 /* ── Send a template message ──────────────────────────────────────────────── */
 export async function sendWaTemplate({
-  to, templateName, languageCode = "fr", bodyParams,
+  to, templateName, languageCode = "fr", bodyParams, shopId,
 }: {
   to:           string;
   templateName: string;
   languageCode?: string;
   bodyParams:   string[];
+  shopId:       number;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token   = await getSetting("wa_access_token");
+    const phoneId = await getSetting("wa_phone_number_id", shopId);
+    const token   = await getSetting("wa_access_token", shopId);
 
     if (!phoneId || !token) {
       return { success: false, error: "Credentials WhatsApp non configurés" };
@@ -58,14 +65,15 @@ export async function sendWaTemplate({
 
 /* ── Send a free-form text message (24h session window) ───────────────────── */
 export async function sendWaText({
-  to, body,
+  to, body, shopId,
 }: {
-  to:   string;
-  body: string;
+  to:     string;
+  body:   string;
+  shopId: number;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token   = await getSetting("wa_access_token");
+    const phoneId = await getSetting("wa_phone_number_id", shopId);
+    const token   = await getSetting("wa_access_token", shopId);
 
     if (!phoneId || !token) {
       return { success: false, error: "Credentials WhatsApp non configurés" };
@@ -97,9 +105,9 @@ export async function sendWaText({
 }
 
 /* ── Get temporary download URL for a media ID ───────────────────────────── */
-export async function getWaMediaUrl(mediaId: string): Promise<string | null> {
+export async function getWaMediaUrl(mediaId: string, shopId: number): Promise<string | null> {
   try {
-    const token = await getSetting("wa_access_token");
+    const token = await getSetting("wa_access_token", shopId);
     const res   = await fetch(`${WA_API}/${mediaId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -116,10 +124,11 @@ export async function uploadWaMedia(
   buffer: Buffer,
   mimeType: string,
   filename: string,
+  shopId: number,
 ): Promise<{ success: boolean; mediaId?: string; error?: string }> {
   try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token   = await getSetting("wa_access_token");
+    const phoneId = await getSetting("wa_phone_number_id", shopId);
+    const token   = await getSetting("wa_access_token", shopId);
     if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
 
     const form = new FormData();
@@ -146,15 +155,16 @@ export async function uploadWaMedia(
 
 /* ── Send an image message by media_id ───────────────────────────────────── */
 export async function sendWaImage({
-  to, mediaId, caption = "",
+  to, mediaId, caption = "", shopId,
 }: {
   to:      string;
   mediaId: string;
   caption?: string;
+  shopId:  number;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token   = await getSetting("wa_access_token");
+    const phoneId = await getSetting("wa_phone_number_id", shopId);
+    const token   = await getSetting("wa_access_token", shopId);
     if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
 
     const res = await fetch(`${WA_API}/${phoneId}/messages`, {
@@ -181,14 +191,15 @@ export async function sendWaImage({
 
 /* ── Send an audio message by media_id ───────────────────────────────────── */
 export async function sendWaAudio({
-  to, mediaId,
+  to, mediaId, shopId,
 }: {
   to:      string;
   mediaId: string;
+  shopId:  number;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const phoneId = await getSetting("wa_phone_number_id");
-    const token   = await getSetting("wa_access_token");
+    const phoneId = await getSetting("wa_phone_number_id", shopId);
+    const token   = await getSetting("wa_access_token", shopId);
     if (!phoneId || !token) return { success: false, error: "Credentials manquants" };
 
     const res = await fetch(`${WA_API}/${phoneId}/messages`, {
@@ -214,7 +225,7 @@ export async function sendWaAudio({
 
 /* ── Boutique vente notification ─────────────────────────────────────────── */
 export async function sendBoutiqueVenteNotif({
-  telephone, nom, reference, total, montant_acompte, statut_paiement, items,
+  telephone, nom, reference, total, montant_acompte, statut_paiement, items, shopId,
 }: {
   telephone:        string;
   nom:              string;
@@ -223,14 +234,15 @@ export async function sendBoutiqueVenteNotif({
   montant_acompte:  number | null;
   statut_paiement:  string | null;
   items:            Array<{ nom: string; qty: number; total: number }>;
+  shopId:           number;
 }): Promise<void> {
   try {
     const [enabled, templateFull, templateAcompte, lang, siteUrl] = await Promise.all([
-      getSetting("wa_boutique_vente_enabled"),
-      getSetting("wa_boutique_vente_template_full"),
-      getSetting("wa_boutique_vente_template_acompte"),
-      getSetting("wa_order_lang"),
-      getSetting("site_url"),
+      getSetting("wa_boutique_vente_enabled", shopId),
+      getSetting("wa_boutique_vente_template_full", shopId),
+      getSetting("wa_boutique_vente_template_acompte", shopId),
+      getSetting("wa_order_lang", shopId),
+      getSetting("site_url", shopId),
     ]);
 
     if (enabled !== "1" || !telephone) return;
@@ -248,6 +260,7 @@ export async function sendBoutiqueVenteNotif({
         templateName: templateAcompte,
         languageCode,
         bodyParams:   [nom, reference, articlesList, fmt(acompte), fmt(resteAPayer), baseUrl],
+        shopId,
       });
     } else if (templateFull) {
       await sendWaTemplate({
@@ -255,6 +268,7 @@ export async function sendBoutiqueVenteNotif({
         templateName: templateFull,
         languageCode,
         bodyParams:   [nom, reference, articlesList, fmt(total), baseUrl],
+        shopId,
       });
     }
   } catch (e) {
@@ -264,7 +278,7 @@ export async function sendBoutiqueVenteNotif({
 
 /* ── Order notifications ──────────────────────────────────────────────────── */
 export async function sendOrderNotifications({
-  id, reference, nom, telephone, items, total,
+  id, reference, nom, telephone, items, total, shopId,
 }: {
   id:        number;
   reference: string;
@@ -272,6 +286,7 @@ export async function sendOrderNotifications({
   telephone: string;
   items:     Array<{ nom?: string; nom_produit?: string; qty?: number; quantite?: number; prix?: number; total?: number }>;
   total:     number;
+  shopId:    number;
 }): Promise<void> {
   try {
     const [
@@ -279,14 +294,14 @@ export async function sendOrderNotifications({
       clientTemplate, adminTemplate,
       adminNumber, adminNumber2, lang, siteUrl,
     ] = await Promise.all([
-      getSetting("wa_order_client_enabled"),
-      getSetting("wa_order_admin_enabled"),
-      getSetting("wa_order_client_template"),
-      getSetting("wa_order_admin_template"),
-      getSetting("wa_order_admin_number"),
-      getSetting("wa_order_admin_number_2"),
-      getSetting("wa_order_lang"),
-      getSetting("site_url"),
+      getSetting("wa_order_client_enabled", shopId),
+      getSetting("wa_order_admin_enabled", shopId),
+      getSetting("wa_order_client_template", shopId),
+      getSetting("wa_order_admin_template", shopId),
+      getSetting("wa_order_admin_number", shopId),
+      getSetting("wa_order_admin_number_2", shopId),
+      getSetting("wa_order_lang", shopId),
+      getSetting("site_url", shopId),
     ]);
 
     if (process.env.NODE_ENV !== "production") console.log(`[WA] sendOrderNotifications — ref=${reference} tel=${telephone}`);
@@ -313,6 +328,7 @@ export async function sendOrderNotifications({
         templateName: clientTemplate,
         languageCode,
         bodyParams:   [nom, reference, articlesStr, totalStr, trackingUrl],
+        shopId,
       });
       if (process.env.NODE_ENV !== "production") console.log(`[WA] Client notif result (${reference}):`, result);
     }
@@ -324,6 +340,7 @@ export async function sendOrderNotifications({
         templateName: adminTemplate,
         languageCode,
         bodyParams:   [reference, nom, telephone, articlesStr, totalStr, adminUrl],
+        shopId,
       });
       if (process.env.NODE_ENV !== "production") console.log(`[WA] Admin notif result (${reference}):`, result);
 
@@ -333,6 +350,7 @@ export async function sendOrderNotifications({
           templateName: adminTemplate,
           languageCode,
           bodyParams:   [reference, nom, telephone, articlesStr, totalStr, adminUrl],
+          shopId,
         }).catch(e => console.error(`[WA] Admin notif #2 error (${reference}):`, e));
       }
     }
@@ -350,12 +368,13 @@ export async function sendWaDeliveryConfirmation(order: {
   zone_livraison: string | null;
   delivery_fee:   number;
   total:          number;
+  shopId:         number;
 }): Promise<void> {
   try {
     const [enabled, templateName, lang] = await Promise.all([
-      getSetting("wa_delivery_template_enabled"),
-      getSetting("wa_delivery_template"),
-      getSetting("wa_order_lang"),
+      getSetting("wa_delivery_template_enabled", order.shopId),
+      getSetting("wa_delivery_template", order.shopId),
+      getSetting("wa_order_lang", order.shopId),
     ]);
 
     if (enabled !== "1" || !templateName || !order.telephone) return;
@@ -391,6 +410,7 @@ export async function sendWaDeliveryConfirmation(order: {
         livraisonStr,
         fmt(order.total),
       ],
+      shopId: order.shopId,
     });
 
     if (!result.success) console.error("[WA] delivery confirmation failed:", result.error);

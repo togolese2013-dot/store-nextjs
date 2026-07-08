@@ -311,7 +311,7 @@ Sois direct, encourageant et concis.`,
     const phone = admins[0]?.telephone as string | undefined;
     if (phone) {
       const { sendWaText } = await import("../../lib/whatsapp");
-      await sendWaText({ to: phone, body: report });
+      await sendWaText({ to: phone, body: report, shopId });
       waSent = true;
     }
   } catch (e) {

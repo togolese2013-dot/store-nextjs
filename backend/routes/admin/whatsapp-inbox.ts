@@ -199,7 +199,7 @@ router.post("/api/admin/whatsapp/threads/:phone/send", async (req, res) => {
   const { body }  = req.body as { body?: string };
   if (!body?.trim()) return res.status(400).json({ error: "Message vide" });
 
-  const result = await sendWaText({ to: phone, body: body.trim() });
+  const result = await sendWaText({ to: phone, body: body.trim(), shopId: session.shop_id ?? 1 });
   if (!result.success) return res.status(502).json({ error: result.error });
 
   await db.execute(
@@ -228,10 +228,10 @@ router.post("/api/admin/whatsapp/threads/:phone/send-image", async (req, res) =>
   if (buffer.length === 0) return res.status(400).json({ error: "Fichier vide" });
   if (buffer.length > 5 * 1024 * 1024) return res.status(413).json({ error: "Image > 5 Mo" });
 
-  const up = await uploadWaMedia(buffer, mimeType, `image.${mimeType.split("/")[1] ?? "jpg"}`);
+  const up = await uploadWaMedia(buffer, mimeType, `image.${mimeType.split("/")[1] ?? "jpg"}`, session.shop_id ?? 1);
   if (!up.success || !up.mediaId) return res.status(502).json({ error: up.error });
 
-  const send = await sendWaImage({ to: phone, mediaId: up.mediaId, caption });
+  const send = await sendWaImage({ to: phone, mediaId: up.mediaId, caption, shopId: session.shop_id ?? 1 });
   if (!send.success) return res.status(502).json({ error: send.error });
 
   await db.execute(
@@ -257,10 +257,10 @@ router.post("/api/admin/whatsapp/threads/:phone/send-audio", async (req, res) =>
   if (buffer.length === 0) return res.status(400).json({ error: "Audio vide" });
   if (buffer.length > 16 * 1024 * 1024) return res.status(413).json({ error: "Audio > 16 Mo" });
 
-  const up = await uploadWaMedia(buffer, mimeType, `voice.${mimeType.split("/")[1] ?? "ogg"}`);
+  const up = await uploadWaMedia(buffer, mimeType, `voice.${mimeType.split("/")[1] ?? "ogg"}`, session.shop_id ?? 1);
   if (!up.success || !up.mediaId) return res.status(502).json({ error: up.error });
 
-  const send = await sendWaAudio({ to: phone, mediaId: up.mediaId });
+  const send = await sendWaAudio({ to: phone, mediaId: up.mediaId, shopId: session.shop_id ?? 1 });
   if (!send.success) return res.status(502).json({ error: send.error });
 
   await db.execute(
