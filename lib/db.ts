@@ -619,9 +619,9 @@ export async function getProductStatusCounts(shopId = 1): Promise<{
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total,
-       SUM(COALESCE(stock_boutique, 0) > 5)             AS disponible,
-       SUM(COALESCE(stock_boutique, 0) BETWEEN 1 AND 5) AS faible,
-       SUM(COALESCE(stock_boutique, 0) = 0)             AS epuise
+       SUM(COALESCE(stock_magasin, 0) > 5)             AS disponible,
+       SUM(COALESCE(stock_magasin, 0) BETWEEN 1 AND 5) AS faible,
+       SUM(COALESCE(stock_magasin, 0) = 0)             AS epuise
      FROM produits WHERE shop_id = ?`,
     [shopId]
   );
