@@ -265,6 +265,17 @@ async function produitCols() {
     } catch {
     }
   }
+  if (!names.has("prod_condition")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN prod_condition ENUM('neuf','occasion','reconditionne') NOT NULL DEFAULT 'neuf'`);
+      names.add("prod_condition");
+    } catch (e) {
+      const err = e;
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("prod_condition");
+      }
+    }
+  }
   _cols = {
     remise: names.has("remise"),
     neuf: names.has("neuf"),
@@ -282,7 +293,8 @@ async function produitCols() {
     entrepot_id: names.has("entrepot_id"),
     prix_entrepot: names.has("prix_entrepot"),
     shop_id: names.has("shop_id"),
-    canal_vente: names.has("canal_vente")
+    canal_vente: names.has("canal_vente"),
+    prod_condition: names.has("prod_condition")
   };
   return _cols;
 }
@@ -335,7 +347,8 @@ async function getProducts(opts) {
     includeInactive = false,
     entrepotId,
     shopId = 1,
-    storefrontOnly = false
+    storefrontOnly = false,
+    occasionOnly = false
   } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
@@ -393,6 +406,9 @@ async function getProducts(opts) {
   if (storefrontOnly && cols.canal_vente) {
     conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))");
   }
+  if (occasionOnly && cols.prod_condition) {
+    conditions.push("p.prod_condition IN ('occasion','reconditionne')");
+  }
   const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
   const orderCol = cols.date_creation ? "p.date_creation" : cols.created_at ? "p.created_at" : "p.id";
@@ -417,6 +433,7 @@ async function getProducts(opts) {
        ${cols.prix_entrepot ? "p.prix_entrepot" : "NULL"} AS prix_entrepot,
        ${cols.entrepot_id ? "e.nom" : "NULL"} AS entrepot_nom,
        ${cols.entrepot_id ? "e.telephone" : "NULL"} AS entrepot_telephone,
+       ${cols.prod_condition ? "p.prod_condition" : "NULL"} AS prod_condition,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom,
        p.actif
@@ -454,7 +471,8 @@ async function getProducts(opts) {
     entrepot_id: r.entrepot_id ? Number(r.entrepot_id) : null,
     prix_entrepot: r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
     entrepot_nom: r.entrepot_nom ?? null,
-    entrepot_telephone: r.entrepot_telephone ?? null
+    entrepot_telephone: r.entrepot_telephone ?? null,
+    prod_condition: r.prod_condition ?? null
   }));
 }
 async function getProductsByIds(ids) {
@@ -525,6 +543,7 @@ async function getProductBySlug(slugOrRef, shopId = 1, storefrontOnly = false) {
        ${cols.images_json ? "p.images_json" : "NULL"} AS images_json,
        ${cols.marque_id ? "p.marque_id" : "NULL"} AS marque_id,
        ${cols.marque_id ? "m.nom" : "NULL"} AS marque_nom,
+       ${cols.prod_condition ? "p.prod_condition" : "NULL"} AS prod_condition,
        p.options_config,
        ${orderCol}                                                                      AS sort_col,
        c.nom AS categorie_nom
@@ -570,11 +589,12 @@ async function getProductBySlug(slugOrRef, shopId = 1, storefrontOnly = false) {
     date_creation: r.sort_col ?? "",
     marque_id: r.marque_id ? Number(r.marque_id) : null,
     marque_nom: r.marque_nom ?? null,
+    prod_condition: r.prod_condition ?? null,
     options_config: r.options_config != null ? typeof r.options_config === "string" ? r.options_config : JSON.stringify(r.options_config) : null
   };
 }
 async function getProductCount(opts) {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1, storefrontOnly = false } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1, storefrontOnly = false, occasionOnly = false } = opts ?? {};
   const cols = await produitCols();
   const conditions = includeInactive ? [] : ["p.actif = 1"];
   const params = [];
@@ -626,6 +646,9 @@ async function getProductCount(opts) {
   }
   if (storefrontOnly && cols.canal_vente) {
     conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))");
+  }
+  if (occasionOnly && cols.prod_condition) {
+    conditions.push("p.prod_condition IN ('occasion','reconditionne')");
   }
   const [rows] = await db.execute(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,
@@ -3741,7 +3764,8 @@ async function getVentesStats(shopId = 1) {
       [shopId]
     ),
     db.execute(
-      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE shop_id = ? AND status = 'delivered' AND DATE(delivered_at) = CURDATE()`,
+      [shopId]
     ).catch(() => [[{ montant: 0, cnt: 0 }]])
   ]);
   let depenses_jour = 0;
@@ -5660,7 +5684,9 @@ __export(whatsapp_exports, {
   uploadWaMedia: () => uploadWaMedia
 });
 function cleanPhone(num) {
-  return num.replace(/[\s+\-()]/g, "");
+  const digits = num.replace(/[\s+\-()]/g, "");
+  if (/^\d{8}$/.test(digits)) return `228${digits}`;
+  return digits;
 }
 async function sendWaTemplate({
   to,
@@ -5857,10 +5883,11 @@ async function sendBoutiqueVenteNotif({
     const baseUrl = (siteUrl || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://togolese.tg").replace(/\/$/, "");
     const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
     const articlesList = items.map((i) => `${i.qty}x ${i.nom} - ${fmt(i.total)}`).join("\n");
+    let result;
     if (statut_paiement === "acompte" && templateAcompte) {
       const acompte = montant_acompte ?? 0;
       const resteAPayer = total - acompte;
-      await sendWaTemplate({
+      result = await sendWaTemplate({
         to: telephone,
         templateName: templateAcompte,
         languageCode,
@@ -5868,13 +5895,16 @@ async function sendBoutiqueVenteNotif({
         shopId
       });
     } else if (templateFull) {
-      await sendWaTemplate({
+      result = await sendWaTemplate({
         to: telephone,
         templateName: templateFull,
         languageCode,
         bodyParams: [nom, reference, articlesList, fmt(total), baseUrl],
         shopId
       });
+    }
+    if (result && !result.success) {
+      console.error("[WA] sendBoutiqueVenteNotif failed:", reference, telephone, result.error);
     }
   } catch (e) {
     console.error("[WA] sendBoutiqueVenteNotif error:", e);
@@ -7371,7 +7401,7 @@ router2.get("/api/admin/products/export", async (req, res) => {
     const rows = products.map((p) => {
       const prix = Number(p.prix_unitaire ?? 0);
       const remise = Number(p.remise ?? 0);
-      const promo = remise > 0 ? Math.round(prix * (1 - remise / 100)) : "";
+      const promo = remise > 0 ? Math.max(0, prix - remise) : "";
       const stMag = Number(p.stock_magasin ?? 0);
       const stBout = Number(p.stock_boutique ?? p.stock ?? 0);
       const stMin = Number(p.stock_minimum ?? 0);
@@ -10860,6 +10890,7 @@ router29.get("/api/products", async (req, res) => {
     const newOnly = req.query.new === "true";
     const bestOnly = req.query.best === "true";
     const inStock = req.query.inStock === "true";
+    const occasionOnly = req.query.occasion === "true";
     const minPrice = req.query.minPrice ? Number(req.query.minPrice) : void 0;
     const maxPrice = req.query.maxPrice ? Number(req.query.maxPrice) : void 0;
     const limit = req.query.limit ? Number(req.query.limit) : 60;
@@ -10874,8 +10905,8 @@ router29.get("/api/products", async (req, res) => {
       return res.json({ success: true, data: product ? [product] : [], total: product ? 1 : 0 });
     }
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId, storefrontOnly: true }),
-      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId, storefrontOnly: true })
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId, storefrontOnly: true, occasionOnly }),
+      referenceExact ? Promise.resolve(1) : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId, storefrontOnly: true, occasionOnly })
     ]);
     const isFiltered = search || categoryId || promoOnly || newOnly || inStock || minPrice != null || maxPrice != null || referenceExact;
     const data = isFiltered ? products : seededShuffle(products, Math.floor(Date.now() / (1e3 * 60 * 60)));
@@ -11621,7 +11652,7 @@ async function ensureOrderCols() {
   for (const ddl of [
     "ALTER TABLE orders ADD COLUMN lien_localisation VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN client_user_id INT NULL",
-    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(100) NULL",
+    "ALTER TABLE orders ADD COLUMN mm_transaction_ref VARCHAR(500) NULL",
     "ALTER TABLE orders ADD COLUMN payment_mode VARCHAR(30) NULL",
     "ALTER TABLE orders ADD COLUMN ref_code VARCHAR(20) NULL",
     "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) NULL",
@@ -11633,7 +11664,123 @@ async function ensureOrderCols() {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
     }
   }
+  try {
+    await pool2.execute("ALTER TABLE orders MODIFY COLUMN mm_transaction_ref VARCHAR(500) NULL");
+  } catch {
+  }
   _orderColsReady = true;
+}
+var PRICE_TOLERANCE = 100;
+async function validateOrderPricing(shopId, items, zone_livraison, delivery_fee_claimed, coupon_code, coupon_remise_claimed, total_claimed, ref_code) {
+  try {
+    const pool2 = db;
+    const productIds = items.map((i) => Number(i.id ?? i.produit_id)).filter((id) => id > 0);
+    if (productIds.length === 0) return { ok: false, error: "Aucun article valide." };
+    const ph = productIds.map(() => "?").join(",");
+    const [products] = await pool2.execute(
+      `SELECT id, prix_unitaire, COALESCE(remise, 0) AS remise FROM produits WHERE id IN (${ph}) AND shop_id = ? AND actif = 1`,
+      [...productIds, shopId]
+    );
+    const priceMap = /* @__PURE__ */ new Map();
+    for (const p of products) priceMap.set(Number(p.id), { prix: Number(p.prix_unitaire), remise: Number(p.remise) });
+    const variantIds = items.map((i) => Number(i.variantId)).filter((v) => v > 0);
+    const variantPriceMap = /* @__PURE__ */ new Map();
+    if (variantIds.length > 0) {
+      try {
+        const vph = variantIds.map(() => "?").join(",");
+        const [vrows] = await pool2.execute(
+          `SELECT pv.id, pv.prix FROM product_variants pv
+           JOIN produits p ON p.id = pv.produit_id
+           WHERE pv.id IN (${vph}) AND p.shop_id = ?`,
+          [...variantIds, shopId]
+        );
+        for (const v of vrows) variantPriceMap.set(Number(v.id), Number(v.prix));
+      } catch {
+      }
+    }
+    let serverSubtotal = 0;
+    for (const item of items) {
+      const qty = Math.max(1, Number(item.qty ?? item.quantite ?? 1));
+      if (item.variantId) {
+        const vPrice = variantPriceMap.get(Number(item.variantId));
+        if (vPrice === void 0) return { ok: false, error: `Variante introuvable : ID ${item.variantId}` };
+        serverSubtotal += vPrice * qty;
+        continue;
+      }
+      const pid = Number(item.id ?? item.produit_id);
+      const prod = priceMap.get(pid);
+      if (!prod) return { ok: false, error: `Produit introuvable ou inactif : ID ${pid}` };
+      const unitPrice = prod.remise > 0 ? Math.max(0, prod.prix - prod.remise) : prod.prix;
+      serverSubtotal += unitPrice * qty;
+    }
+    let serverFee = 0;
+    if (zone_livraison) {
+      try {
+        const [zones] = await pool2.execute(
+          "SELECT fee, prix_libre FROM delivery_zones WHERE nom = ? AND shop_id = ? AND actif = 1 LIMIT 1",
+          [zone_livraison, shopId]
+        );
+        const zone = zones[0];
+        if (zone) {
+          if (zone.prix_libre) {
+            serverFee = Math.min(Number(delivery_fee_claimed), 2e4);
+          } else {
+            serverFee = Number(zone.fee ?? 0);
+            if (Math.abs(Number(delivery_fee_claimed) - serverFee) > PRICE_TOLERANCE) {
+              return { ok: false, error: "Frais de livraison invalides." };
+            }
+          }
+        } else {
+          serverFee = Number(delivery_fee_claimed ?? 0);
+        }
+      } catch {
+        serverFee = Number(delivery_fee_claimed ?? 0);
+      }
+    }
+    let filleulPct = 10;
+    try {
+      const v = await getSetting("referral_filleul_pct", shopId);
+      if (v) filleulPct = Math.max(0, Math.min(100, Number(v)));
+    } catch {
+    }
+    const referralDiscount = ref_code ? Math.round(serverSubtotal * filleulPct / 100) : 0;
+    let serverRemise = 0;
+    if (coupon_code) {
+      try {
+        const [coupons] = await pool2.execute(
+          `SELECT type, valeur, min_order, max_uses, uses_count, expires_at
+           FROM coupons WHERE code = ? AND shop_id = ? AND actif = 1 LIMIT 1`,
+          [String(coupon_code).trim().toUpperCase(), shopId]
+        );
+        const coupon = coupons[0];
+        if (coupon) {
+          const expired = coupon.expires_at && new Date(coupon.expires_at) < /* @__PURE__ */ new Date();
+          const maxedOut = Number(coupon.max_uses) > 0 && Number(coupon.uses_count) >= Number(coupon.max_uses);
+          const underMin = serverSubtotal < Number(coupon.min_order);
+          if (!expired && !maxedOut && !underMin) {
+            serverRemise = coupon.type === "fixed" ? Math.min(Number(coupon.valeur), serverSubtotal) : Math.round(serverSubtotal * Number(coupon.valeur) / 100);
+          }
+        }
+        if (Number(coupon_remise_claimed) > serverRemise + PRICE_TOLERANCE) {
+          return { ok: false, error: "Remise coupon invalide." };
+        }
+      } catch {
+        serverRemise = Number(coupon_remise_claimed ?? 0);
+      }
+    }
+    const expectedTotal = serverSubtotal - referralDiscount - serverRemise + serverFee;
+    if (Math.abs(total_claimed - expectedTotal) > PRICE_TOLERANCE) {
+      console.warn(
+        `[orders] Price mismatch shop=${shopId}: claimed=${total_claimed}, expected=${expectedTotal}`,
+        `(sub=${serverSubtotal}, fee=${serverFee}, remise=${serverRemise}, referral=${referralDiscount})`
+      );
+      return { ok: false, error: `Total invalide. Attendu : ${expectedTotal} FCFA, re\xE7u : ${total_claimed} FCFA.` };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[orders] price validation error (non-blocking):", err);
+    return { ok: true };
+  }
 }
 router31.post("/api/orders", async (req, res) => {
   try {
@@ -11652,10 +11799,10 @@ router31.post("/api/orders", async (req, res) => {
       total,
       payment_mode,
       nb_tranches,
-      mm_transaction_ref,
       ref_code,
       coupon_code,
-      coupon_remise
+      coupon_remise,
+      mm_screenshot_b64
     } = req.body;
     if (!telephone?.trim() || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "T\xE9l\xE9phone et articles requis." });
@@ -11664,14 +11811,37 @@ router31.post("/api/orders", async (req, res) => {
     if (!cleanTelephone) {
       return res.status(400).json({ error: "Le num\xE9ro WhatsApp doit contenir exactement 8 chiffres togolais." });
     }
-    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !String(mm_transaction_ref ?? "").trim()) {
-      return res.status(400).json({ error: "La r\xE9f\xE9rence de transaction est obligatoire pour ce paiement." });
+    if ((payment_mode === "moov_direct" || payment_mode === "yas_direct") && !mm_screenshot_b64) {
+      return res.status(400).json({ error: "La capture d'\xE9cran de confirmation est obligatoire." });
     }
-    const isEchelonne = ["2x", "3x", "4x"].includes(payment_mode);
-    const tranches = isEchelonne ? Math.max(2, Math.min(4, Number(nb_tranches) || 4)) : null;
     const shopSlug = req.headers["x-shop-slug"] ?? "default";
     const shop = await getShopBySlug(shopSlug);
     const shopId = shop?.id ?? 1;
+    let mm_transaction_ref = null;
+    if (mm_screenshot_b64) {
+      try {
+        const buffer = Buffer.from(String(mm_screenshot_b64).replace(/^data:[^;]+;base64,/, ""), "base64");
+        mm_transaction_ref = await uploadToCloudinary(buffer, "image/jpeg");
+      } catch (uploadErr) {
+        console.error("[orders] screenshot upload failed:", uploadErr);
+        return res.status(500).json({ error: "\xC9chec de l'upload de la capture d'\xE9cran. R\xE9essayez." });
+      }
+    }
+    const priceCheck = await validateOrderPricing(
+      shopId,
+      items,
+      zone_livraison,
+      Number(delivery_fee ?? 0),
+      coupon_code,
+      Number(coupon_remise ?? 0),
+      Number(total ?? 0),
+      ref_code
+    );
+    if (!priceCheck.ok) {
+      return res.status(400).json({ error: priceCheck.error });
+    }
+    const isEchelonne = ["2x", "3x", "4x"].includes(payment_mode);
+    const tranches = isEchelonne ? Math.max(2, Math.min(4, Number(nb_tranches) || 4)) : null;
     const id = await createOrder({
       nom: nom ?? "",
       telephone: cleanTelephone,
@@ -12755,13 +12925,27 @@ router37.get("/api/admin/whatsapp/webhook", async (req, res) => {
   }
   return res.status(403).end();
 });
+async function resolveShopIdFromPhoneNumberId(phoneNumberId) {
+  if (!phoneNumberId) return 1;
+  try {
+    const [[row]] = await db.execute(
+      "SELECT shop_id FROM settings WHERE `key` = 'wa_phone_number_id' AND `value` = ? LIMIT 1",
+      [phoneNumberId]
+    );
+    return row ? Number(row.shop_id) : 1;
+  } catch {
+    return 1;
+  }
+}
 router37.post("/api/admin/whatsapp/webhook", async (req, res) => {
   res.sendStatus(200);
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
     if (!value?.messages?.length) return;
     const contactName = value.contacts?.[0]?.profile?.name ?? null;
-    const notreNumero = value.metadata?.display_phone_number ? String(value.metadata.display_phone_number) : null;
+    const metadata = value.metadata;
+    const notreNumero = metadata?.display_phone_number ? String(metadata.display_phone_number) : null;
+    const shopId = await resolveShopIdFromPhoneNumberId(metadata?.phone_number_id ? String(metadata.phone_number_id) : null);
     for (const msg of value.messages) {
       const from = String(msg.from ?? "");
       const waId = String(msg.id ?? "");
@@ -12793,9 +12977,9 @@ router37.post("/api/admin/whatsapp/webhook", async (req, res) => {
       }
       await db.execute(
         `INSERT IGNORE INTO wa_messages
-           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type, notre_numero)
-         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?)`,
-        [from, body, waId, contactName, mediaId || null, type, mimeType || null, notreNumero]
+           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type, notre_numero, shop_id)
+         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [from, body, waId, contactName, mediaId || null, type, mimeType || null, notreNumero, shopId]
       );
       emitAdminEvent("message", { from, body, nom: contactName ?? from });
     }
@@ -12972,8 +13156,9 @@ var whatsapp_inbox_default = router37;
 // routes/whatsapp-webhook.ts
 var import_express38 = __toESM(require("express"));
 init_db();
+init_admin_db();
 var router38 = import_express38.default.Router();
-var VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN ?? "togolese_webhook";
+var FALLBACK_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN ?? "togolese_webhook";
 async function ensureWaMessagesTable() {
   try {
     await db.execute(`
@@ -12995,11 +13180,12 @@ async function ensureWaMessagesTable() {
     console.error("[ensureWaMessagesTable]", err);
   }
 }
-router38.get("/api/webhooks/whatsapp", (req, res) => {
+router38.get("/api/webhooks/whatsapp", async (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+  const verifyToken2 = await getSetting("wa_webhook_verify_token", 1).catch(() => "") || FALLBACK_VERIFY_TOKEN;
+  if (mode === "subscribe" && token === verifyToken2) {
     return res.status(200).send(challenge);
   }
   return res.status(403).end();
@@ -14853,14 +15039,14 @@ async function ensureReviewNotifierCols() {
 async function runReviewNotifier() {
   try {
     const [rows] = await db.query(
-      `SELECT id, reference, nom, client_tel, items, shop_id
+      `SELECT id, reference, nom, telephone, items, shop_id
        FROM orders
        WHERE status = 'delivered'
          AND delivered_at IS NOT NULL
          AND delivered_at <= NOW() - INTERVAL ${DELAY_HOURS} HOUR
          AND review_wa_sent = 0
-         AND client_tel IS NOT NULL
-         AND client_tel != ''
+         AND telephone IS NOT NULL
+         AND telephone != ''
        LIMIT 50`
     );
     if (rows.length === 0) return;
@@ -14868,7 +15054,7 @@ async function runReviewNotifier() {
     for (const row of rows) {
       const nom = String(row.nom || "Client");
       const ref = String(row.reference);
-      const tel = String(row.client_tel);
+      const tel = String(row.telephone);
       const trackUrl = `${SITE_URL}/suivi-commande?ref=${encodeURIComponent(ref)}`;
       let reviewUrl = trackUrl;
       try {
