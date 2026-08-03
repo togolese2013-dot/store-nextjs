@@ -446,16 +446,19 @@ export interface StockMouvement {
   created_at:  string;
 }
 
-export async function getStockMovementCounts(): Promise<{
+export async function getStockMovementCounts(shopId = 1): Promise<{
   total: number; entrees: number; sorties: number; ajustements: number;
 }> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total,
-       SUM(type = 'entree')              AS entrees,
-       SUM(type IN ('retrait','vente'))  AS sorties,
-       SUM(type NOT IN ('entree','retrait','vente')) AS ajustements
-     FROM stock_mouvements`
+       SUM(sm.type = 'entree')              AS entrees,
+       SUM(sm.type IN ('retrait','vente'))  AS sorties,
+       SUM(sm.type NOT IN ('entree','retrait','vente')) AS ajustements
+     FROM stock_mouvements sm
+     JOIN produits p ON p.id = sm.produit_id
+     WHERE p.shop_id = ?`,
+    [shopId]
   );
   const r = (rows as mysql.RowDataPacket[])[0];
   return {
@@ -471,10 +474,11 @@ export async function getStockMovements(opts: {
   search?: string;
   limit?:  number;
   offset?: number;
+  shopId?: number;
 } = {}): Promise<{ items: StockMouvement[]; total: number }> {
-  const { limit = 50, offset = 0, type, search } = opts;
-  const conditions: string[] = [];
-  const params: (string | number | boolean | null | Buffer)[] = [];
+  const { limit = 50, offset = 0, type, search, shopId = 1 } = opts;
+  const conditions: string[] = ["p.shop_id = ?"];
+  const params: (string | number | boolean | null | Buffer)[] = [shopId];
 
   if (type && type !== "tous") {
     if (type === "sortie") {
@@ -485,18 +489,18 @@ export async function getStockMovements(opts: {
   }
   if (search) { conditions.push("(p.nom LIKE ? OR sm.reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT sm.*, p.nom AS nom_produit
      FROM stock_mouvements sm
-     LEFT JOIN produits p ON p.id = sm.produit_id
+     JOIN produits p ON p.id = sm.produit_id
      ${where}
      ORDER BY sm.created_at DESC
      LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
     params
   );
   const [cnt] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT COUNT(*) AS cnt FROM stock_mouvements sm LEFT JOIN produits p ON p.id = sm.produit_id ${where}`,
+    `SELECT COUNT(*) AS cnt FROM stock_mouvements sm JOIN produits p ON p.id = sm.produit_id ${where}`,
     params
   );
   return { items: rows as StockMouvement[], total: Number(cnt[0]?.cnt ?? 0) };

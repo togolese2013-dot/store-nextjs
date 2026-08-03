@@ -32,8 +32,8 @@ router.get("/api/admin/stock/mouvements", async (req, res) => {
     const limit  = Math.min(100, Number(req.query.limit)  || 50);
     const offset = Math.max(0,   Number(req.query.offset) || 0);
     const [{ items, total }, counts] = await Promise.all([
-      getStockMovements({ type: type as "entree"|"retrait"|"vente"|"sortie"|"tous"|"ajustement", search, limit, offset }),
-      getStockMovementCounts(),
+      getStockMovements({ type: type as "entree"|"retrait"|"vente"|"sortie"|"tous"|"ajustement", search, limit, offset, shopId: session.shop_id }),
+      getStockMovementCounts(session.shop_id),
     ]);
     res.json({ items, total, counts });
   } catch (err) {

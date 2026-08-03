@@ -1259,14 +1259,17 @@ async function resetBoutiqueDemoData(shopId) {
     conn.release();
   }
 }
-async function getStockMovementCounts() {
+async function getStockMovementCounts(shopId = 1) {
   const [rows] = await db.query(
     `SELECT
        COUNT(*) AS total,
-       SUM(type = 'entree')              AS entrees,
-       SUM(type IN ('retrait','vente'))  AS sorties,
-       SUM(type NOT IN ('entree','retrait','vente')) AS ajustements
-     FROM stock_mouvements`
+       SUM(sm.type = 'entree')              AS entrees,
+       SUM(sm.type IN ('retrait','vente'))  AS sorties,
+       SUM(sm.type NOT IN ('entree','retrait','vente')) AS ajustements
+     FROM stock_mouvements sm
+     JOIN produits p ON p.id = sm.produit_id
+     WHERE p.shop_id = ?`,
+    [shopId]
   );
   const r = rows[0];
   return {
@@ -1277,9 +1280,9 @@ async function getStockMovementCounts() {
   };
 }
 async function getStockMovements(opts = {}) {
-  const { limit = 50, offset = 0, type, search } = opts;
-  const conditions = [];
-  const params = [];
+  const { limit = 50, offset = 0, type, search, shopId = 1 } = opts;
+  const conditions = ["p.shop_id = ?"];
+  const params = [shopId];
   if (type && type !== "tous") {
     if (type === "sortie") {
       conditions.push("sm.type IN ('retrait','vente')");
@@ -1292,18 +1295,18 @@ async function getStockMovements(opts = {}) {
     conditions.push("(p.nom LIKE ? OR sm.reference LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
   }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
     `SELECT sm.*, p.nom AS nom_produit
      FROM stock_mouvements sm
-     LEFT JOIN produits p ON p.id = sm.produit_id
+     JOIN produits p ON p.id = sm.produit_id
      ${where}
      ORDER BY sm.created_at DESC
      LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
     params
   );
   const [cnt] = await db.query(
-    `SELECT COUNT(*) AS cnt FROM stock_mouvements sm LEFT JOIN produits p ON p.id = sm.produit_id ${where}`,
+    `SELECT COUNT(*) AS cnt FROM stock_mouvements sm JOIN produits p ON p.id = sm.produit_id ${where}`,
     params
   );
   return { items: rows, total: Number(cnt[0]?.cnt ?? 0) };
@@ -7824,8 +7827,8 @@ router4.get("/api/admin/stock/mouvements", async (req, res) => {
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const [{ items, total }, counts] = await Promise.all([
-      getStockMovements({ type, search, limit, offset }),
-      getStockMovementCounts()
+      getStockMovements({ type, search, limit, offset, shopId: session.shop_id }),
+      getStockMovementCounts(session.shop_id)
     ]);
     res.json({ items, total, counts });
   } catch (err) {
