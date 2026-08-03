@@ -103,9 +103,7 @@ function mapProduct(p: ApiProduct, idx: number): MagasinProduct {
 }
 
 function formatStockValue(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
-  if (n >= 1_000)     return n.toLocaleString('fr-FR');
-  return String(n);
+  return n.toLocaleString('fr-FR');
 }
 
 function buildKpis(stats: StatsResponse): KpiCard[] {
@@ -113,7 +111,7 @@ function buildKpis(stats: StatsResponse): KpiCard[] {
   const stockBas = (stockStats.stock_faible ?? 0) + (stockStats.en_rupture ?? 0);
   return [
     { label: 'Total produits', value: String(stockStats.en_stock), delta: `${statusCounts.disponible} actifs`, deltaColor: '#2D6A4F', sub: 'en catalogue', spark: [18,20,19,22,21,25,24,26,25,28,stockStats.en_stock % 32 || 30], color: ACCENT },
-    { label: 'Valeur stock', value: formatStockValue(stockStats.valeur_totale), unit: 'F', delta: 'stock magasin', deltaColor: '#2D6A4F', sub: 'prix × quantité', spark: [120,128,132,140,136,148,156,168,172,180,194], color: '#2D6A4F' },
+    { label: 'Valeur stock', value: formatStockValue(stockStats.valeur_totale), unit: 'FCFA', delta: 'stock magasin', deltaColor: '#2D6A4F', sub: 'prix × quantité', spark: [120,128,132,140,136,148,156,168,172,180,194], color: '#2D6A4F' },
     { label: 'Stock bas', value: String(stockBas), delta: stockBas > 0 ? 'urgent' : 'OK', deltaColor: stockBas > 0 ? '#9C3A14' : '#2D6A4F', sub: '≤ 5 unités ou rupture', spark: [3,2,4,5,4,6,5,6,7,6,stockBas%10], color: '#C9601E' },
     { label: 'Ruptures', value: String(statusCounts.epuise ?? 0), delta: (statusCounts.epuise ?? 0) > 0 ? 'urgent' : 'OK', deltaColor: (statusCounts.epuise ?? 0) > 0 ? '#9C3A14' : '#2D6A4F', sub: 'stock = 0', spark: [1,0,2,1,2,3,2,3,2,3,(statusCounts.epuise??0)%8], color: '#9C3A14' },
   ];
