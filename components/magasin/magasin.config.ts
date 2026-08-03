@@ -44,6 +44,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
             { k: "target",   l: "Stock cible",         t: "number" },
             { k: "supplier", l: "Fournisseur",         t: "select",   options: suppliers, full: true },
             { k: "image",           l: "Visuel produit",      t: "image",           full: true },
+            { k: "images",          l: "Photos secondaires",  t: "images",          full: true },
             { k: "desc",            l: "Description",         t: "textarea",        ph: "Notes internes, composition…", full: true },
             { k: "variant_options", l: "Variantes",           t: "variant-options", full: true },
           ],
@@ -168,6 +169,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
           marque_id:      brandObj?.id ? Number(brandObj.id) : undefined,
           categorie_id:   catObj?.id   ? Number(catObj.id)   : undefined,
           image_url:      values.image || undefined,
+          images:         Array.isArray(values.images) ? values.images : undefined,
           options_config: vo?.selectedOptions?.length
             ? JSON.stringify(vo.selectedOptions.map((o: any) => ({ nom: o.nom, valeurs: o.valeurs })))
             : null,

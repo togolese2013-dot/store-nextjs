@@ -33,6 +33,8 @@ export interface Product {
   initial: string;
   /** Optional image URL — when present, replaces the swatch+initial thumbnail */
   imageUrl?: string;
+  /** Secondary photos (beyond the main imageUrl) */
+  images?: string[];
 }
 
 export interface KpiCard {

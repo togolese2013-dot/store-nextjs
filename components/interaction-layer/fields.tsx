@@ -247,6 +247,116 @@ export function ImageDrop({ value, onChange, label }: ImageDropProps) {
   );
 }
 
+/* ---- Drag-and-drop MULTI image upload (secondary photos) --- */
+interface ImageDropMultiProps {
+  value?: string[];
+  onChange?: (urls: string[]) => void;
+  label?: string;
+  max?: number;
+}
+export function ImageDropMulti({ value = [], onChange, label, max = 8 }: ImageDropMultiProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError]     = React.useState('');
+
+  async function uploadFiles(files: File[]) {
+    const room = max - value.length;
+    if (room <= 0) return;
+    const toUpload = files.slice(0, room).filter(f => f.type.startsWith('image/'));
+    if (toUpload.length === 0) {
+      setError('Fichier non supporté. JPEG, PNG, WebP uniquement.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      const encoded = await Promise.all(toUpload.map(file => new Promise<{ data: string; type: string; name: string }>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve({ data: reader.result as string, type: file.type, name: file.name });
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      })));
+      const res  = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: encoded }),
+      });
+      const json = await res.json();
+      const urls: string[] = (json.urls ?? []).filter((u: string) => !!u);
+      if (urls.length > 0) onChange?.([...value, ...urls]);
+      if (json.errors?.length) setError(json.errors[0]);
+    } catch {
+      setError('Erreur réseau. Réessayez.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length) uploadFiles(files);
+    e.target.value = '';
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length) uploadFiles(files);
+  }
+
+  function removeAt(i: number) {
+    onChange?.(value.filter((_, j) => j !== i));
+  }
+
+  const canAddMore = value.length < max;
+
+  return (
+    <div>
+      {value.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: canAddMore ? 8 : 0 }}>
+          {value.map((url, i) => (
+            <div key={url + i} style={{ position: 'relative', display: 'inline-block' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={`Photo ${i + 1}`} style={{ width: 72, height: 72, borderRadius: 8, border: '1px solid var(--border)', objectFit: 'cover', display: 'block' }} />
+              <button
+                type="button"
+                onClick={() => removeAt(i)}
+                style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: '50%', background: 'var(--danger,#c0392b)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canAddMore && (
+        <>
+          <button
+            type="button"
+            className="ux-drop"
+            onClick={() => inputRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={onDrop}
+            disabled={loading}
+            style={{ width: '100%', cursor: 'pointer' }}
+          >
+            {loading ? (
+              <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Upload en cours…</div>
+            ) : (
+              <>
+                <Icons.upload size={20} />
+                <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink-2)" }}>Cliquez ou glissez une ou plusieurs images</div>
+                <div style={{ fontSize: 11 }}>{label ?? `PNG, JPG · ${max - value.length} restante(s) · 10 Mo max`}</div>
+              </>
+            )}
+          </button>
+          <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple style={{ display: 'none' }} onChange={onFileChange} />
+        </>
+      )}
+      {error && <div style={{ color: 'var(--danger,#c0392b)', fontSize: 12, marginTop: 4 }}>{error}</div>}
+    </div>
+  );
+}
+
 /* ---- Order-line list (product + qty rows) ----------------- */
 export interface OrderLine { product: string; qty: number | string; }
 interface LinesProps { value: OrderLine[]; onChange: (v: OrderLine[]) => void; productOptions: string[]; }

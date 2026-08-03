@@ -47,6 +47,7 @@ interface ApiProduct {
   stock_boutique?: number | null;
   actif?: number | boolean | null;
   image_url?: string | null;
+  images?: string[] | null;
   prix_entrepot?: number | null;
 }
 
@@ -95,6 +96,7 @@ function mapProduct(p: ApiProduct, idx: number): MagasinProduct {
     swatch,
     initial:  (p.nom?.[0] ?? 'P').toUpperCase(),
     imageUrl: resolveImage(p.image_url),
+    images:   Array.isArray(p.images) ? p.images : [],
   };
 }
 
