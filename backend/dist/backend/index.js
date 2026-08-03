@@ -11958,14 +11958,14 @@ async function ensureReviewNotifierCols() {
 async function runReviewNotifier() {
   try {
     const [rows] = await db.query(
-      `SELECT id, reference, nom, client_tel, items
+      `SELECT id, reference, nom, telephone, items
        FROM orders
        WHERE status = 'delivered'
          AND delivered_at IS NOT NULL
          AND delivered_at <= NOW() - INTERVAL ${DELAY_HOURS} HOUR
          AND review_wa_sent = 0
-         AND client_tel IS NOT NULL
-         AND client_tel != ''
+         AND telephone IS NOT NULL
+         AND telephone != ''
        LIMIT 50`
     );
     if (rows.length === 0) return;
@@ -11973,7 +11973,7 @@ async function runReviewNotifier() {
     for (const row of rows) {
       const nom = String(row.nom || "Client");
       const ref = String(row.reference);
-      const tel = String(row.client_tel);
+      const tel = String(row.telephone);
       const trackUrl = `${SITE_URL}/suivi-commande?ref=${encodeURIComponent(ref)}`;
       let reviewUrl = trackUrl;
       try {
