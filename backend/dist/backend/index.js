@@ -3364,7 +3364,7 @@ async function getVentesStats() {
        WHERE type = 'vente' AND DATE(date_entree) = CURDATE()`
     ),
     db.execute(
-      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(delivered_at) = CURDATE()`
     ).catch(() => [[{ montant: 0, cnt: 0 }]])
   ]);
   let depenses_jour = 0;
