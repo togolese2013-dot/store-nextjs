@@ -10483,6 +10483,11 @@ router34.post("/api/webhooks/whatsapp", async (req, res) => {
   res.sendStatus(200);
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
+    if (value?.statuses?.length) {
+      for (const s of value.statuses) {
+        console.log("[WA][status]", JSON.stringify(s));
+      }
+    }
     if (!value?.messages?.length) return;
     const contactName = value.contacts?.[0]?.profile?.name ?? null;
     for (const msg of value.messages) {
