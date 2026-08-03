@@ -243,6 +243,19 @@ export async function produitCols() {
     try { await db.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_shop_slug (shop_id, slug)`); } catch { /* already exists */ }
   }
 
+  // Auto-migrate: add prod_condition column if missing
+  if (!names.has("prod_condition")) {
+    try {
+      await db.execute(`ALTER TABLE produits ADD COLUMN prod_condition ENUM('neuf','occasion','reconditionne') NOT NULL DEFAULT 'neuf'`);
+      names.add("prod_condition");
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "ER_DUP_FIELDNAME" || (err?.message ?? "").includes("Duplicate column")) {
+        names.add("prod_condition");
+      }
+    }
+  }
+
   _cols = {
     remise:          names.has("remise"),
     neuf:            names.has("neuf"),
@@ -261,6 +274,7 @@ export async function produitCols() {
     prix_entrepot:   names.has("prix_entrepot"),
     shop_id:         names.has("shop_id"),
     canal_vente:     names.has("canal_vente"),
+    prod_condition:  names.has("prod_condition"),
   };
   return _cols;
 }
@@ -316,12 +330,13 @@ export async function getProducts(opts?: {
   entrepotId?: number;
   shopId?: number;
   storefrontOnly?: boolean;
+  occasionOnly?: boolean;
 }): Promise<Product[]> {
   const {
     categoryId, marqueId, search, referenceExact, promoOnly, newOnly,
     inStock, minPrice, maxPrice,
     limit = 60, offset = 0, statut, includeInactive = false, entrepotId,
-    shopId = 1, storefrontOnly = false,
+    shopId = 1, storefrontOnly = false, occasionOnly = false,
   } = opts ?? {};
 
   const cols = await produitCols();
@@ -344,6 +359,7 @@ export async function getProducts(opts?: {
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
   if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
   if (storefrontOnly && cols.canal_vente) { conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))"); }
+  if (occasionOnly && cols.prod_condition) { conditions.push("p.prod_condition IN ('occasion','reconditionne')"); }
 
   const where    = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const imageCol = cols.image_url ? "p.image_url" : cols.image ? "p.image" : "NULL";
@@ -374,6 +390,7 @@ export async function getProducts(opts?: {
        ${cols.prix_entrepot   ? "p.prix_entrepot"                              : "NULL" } AS prix_entrepot,
        ${cols.entrepot_id     ? "e.nom"                                        : "NULL" } AS entrepot_nom,
        ${cols.entrepot_id     ? "e.telephone"                                  : "NULL" } AS entrepot_telephone,
+       ${cols.prod_condition  ? "p.prod_condition"                             : "NULL" } AS prod_condition,
        ${orderCol}                                                                          AS sort_col,
        c.nom AS categorie_nom,
        p.actif
@@ -413,6 +430,7 @@ export async function getProducts(opts?: {
     prix_entrepot:       r.prix_entrepot != null ? Number(r.prix_entrepot) : null,
     entrepot_nom:        (r.entrepot_nom ?? null) as string | null,
     entrepot_telephone:  (r.entrepot_telephone ?? null) as string | null,
+    prod_condition:      (r.prod_condition ?? null) as 'neuf' | 'occasion' | 'reconditionne' | null,
   })) as Product[];
 }
 
@@ -492,6 +510,7 @@ export async function getProductBySlug(slugOrRef: string, shopId = 1, storefront
        ${cols.images_json     ? "p.images_json"                             : "NULL"} AS images_json,
        ${cols.marque_id       ? "p.marque_id"                               : "NULL"} AS marque_id,
        ${cols.marque_id       ? "m.nom"                                     : "NULL"} AS marque_nom,
+       ${cols.prod_condition  ? "p.prod_condition"                          : "NULL"} AS prod_condition,
        p.options_config,
        ${orderCol}                                                                      AS sort_col,
        c.nom AS categorie_nom
@@ -542,6 +561,7 @@ export async function getProductBySlug(slugOrRef: string, shopId = 1, storefront
     date_creation:  (r.sort_col ?? "") as string,
     marque_id:      r.marque_id ? Number(r.marque_id) : null,
     marque_nom:     (r.marque_nom ?? null) as string | null,
+    prod_condition: (r.prod_condition ?? null) as 'neuf' | 'occasion' | 'reconditionne' | null,
     options_config: (r.options_config != null
       ? (typeof r.options_config === "string" ? r.options_config : JSON.stringify(r.options_config))
       : null) as string | null,
@@ -562,8 +582,9 @@ export async function getProductCount(opts?: {
   entrepotId?: number;
   shopId?: number;
   storefrontOnly?: boolean;
+  occasionOnly?: boolean;
 }): Promise<number> {
-  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1, storefrontOnly = false } = opts ?? {};
+  const { categoryId, marqueId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, statut, includeInactive = false, entrepotId, shopId = 1, storefrontOnly = false, occasionOnly = false } = opts ?? {};
   const cols = await produitCols();
 
   const conditions: string[] = includeInactive ? [] : ["p.actif = 1"];
@@ -583,6 +604,7 @@ export async function getProductCount(opts?: {
   if (maxPrice != null && !isNaN(maxPrice)) { conditions.push("(CAST(p.prix_unitaire AS SIGNED) - COALESCE(CAST(p.remise AS DECIMAL(10,2)), 0)) <= ?"); params.push(maxPrice); }
   if (entrepotId != null) { conditions.push("p.entrepot_id = ?"); params.push(entrepotId); }
   if (storefrontOnly && cols.canal_vente) { conditions.push("(p.canal_vente IS NULL OR p.canal_vente IN ('tous','en_ligne'))"); }
+  if (occasionOnly && cols.prod_condition) { conditions.push("p.prod_condition IN ('occasion','reconditionne')"); }
 
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) as cnt FROM produits p WHERE ${conditions.length > 0 ? conditions.join(" AND ") : "1=1"}`,

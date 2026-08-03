@@ -192,6 +192,7 @@ router.get("/api/products", async (req, res) => {
     const newOnly        = req.query.new     === "true";
     const bestOnly       = req.query.best    === "true";
     const inStock        = req.query.inStock === "true";
+    const occasionOnly   = req.query.occasion === "true";
     const minPrice       = req.query.minPrice ? Number(req.query.minPrice) : undefined;
     const maxPrice       = req.query.maxPrice ? Number(req.query.maxPrice) : undefined;
     const limit          = req.query.limit  ? Number(req.query.limit)  : 60;
@@ -210,10 +211,10 @@ router.get("/api/products", async (req, res) => {
     }
 
     const [products, total] = await Promise.all([
-      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId, storefrontOnly: true }),
+      getProducts({ categoryId, search, referenceExact, promoOnly, newOnly, inStock, minPrice, maxPrice, limit, offset, shopId, storefrontOnly: true, occasionOnly }),
       referenceExact
         ? Promise.resolve(1)
-        : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId, storefrontOnly: true }),
+        : getProductCount({ categoryId, search, promoOnly, newOnly, inStock, minPrice, maxPrice, shopId, storefrontOnly: true, occasionOnly }),
     ]);
 
     // Shuffle when no active filter — order changes every hour
