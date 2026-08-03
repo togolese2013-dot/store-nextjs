@@ -161,9 +161,13 @@ export default function MagasinShell({
   const groups = useMemo(() =>
     DEFAULT_NAV_GROUPS.map(g => ({
       ...g,
-      items: g.items.map(it => ({ ...it, active: it.id === navId })),
+      items: g.items.map(it => ({
+        ...it,
+        active: it.id === navId,
+        ...(it.id === 'products' ? { count: totalCount } : {}),
+      })),
     })),
-    [navId],
+    [navId, totalCount],
   );
 
   return (
