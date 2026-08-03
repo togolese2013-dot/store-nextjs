@@ -3,7 +3,10 @@ import { getSetting } from "@/lib/admin-db";
 const WA_API = "https://graph.facebook.com/v19.0";
 
 function cleanPhone(num: string): string {
-  return num.replace(/[\s+\-()]/g, "");
+  const digits = num.replace(/[\s+\-()]/g, "");
+  // Local Togo numbers are 8 digits without the 228 country code — Meta rejects those as-is.
+  if (/^\d{8}$/.test(digits)) return `228${digits}`;
+  return digits;
 }
 
 /* ── Send a template message ──────────────────────────────────────────────── */
@@ -240,22 +243,26 @@ export async function sendBoutiqueVenteNotif({
     const fmt          = (n: number) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
     const articlesList = items.map(i => `${i.qty}x ${i.nom} - ${fmt(i.total)}`).join("\n");
 
+    let result: { success: boolean; error?: string } | undefined;
     if (statut_paiement === "acompte" && templateAcompte) {
       const acompte     = montant_acompte ?? 0;
       const resteAPayer = total - acompte;
-      await sendWaTemplate({
+      result = await sendWaTemplate({
         to:           telephone,
         templateName: templateAcompte,
         languageCode,
         bodyParams:   [nom, reference, articlesList, fmt(acompte), fmt(resteAPayer), baseUrl],
       });
     } else if (templateFull) {
-      await sendWaTemplate({
+      result = await sendWaTemplate({
         to:           telephone,
         templateName: templateFull,
         languageCode,
         bodyParams:   [nom, reference, articlesList, fmt(total), baseUrl],
       });
+    }
+    if (result && !result.success) {
+      console.error("[WA] sendBoutiqueVenteNotif failed:", reference, telephone, result.error);
     }
   } catch (e) {
     console.error("[WA] sendBoutiqueVenteNotif error:", e);

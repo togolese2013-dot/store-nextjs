@@ -967,6 +967,11 @@ async function createStockSortie(data) {
         [data.quantite, data.quantite, data.variant_id]
       );
       stockApres = available - data.quantite;
+      await conn.execute(
+        `INSERT INTO boutique_mouvements (produit_id, type, quantite, motif, ref_commande, admin_id)
+         VALUES (?, 'entree', ?, 'Depuis magasin', ?, ?)`,
+        [data.produit_id, data.quantite, data.reference ?? null, data.user_id ?? null]
+      );
     } else {
       const [[row]] = await conn.execute(
         `SELECT COALESCE(stock_magasin, 0) AS stock FROM produits WHERE id = ?`,
@@ -5820,7 +5825,9 @@ var import_express6 = __toESM(require("express"));
 init_admin_db();
 var WA_API = "https://graph.facebook.com/v19.0";
 function cleanPhone(num) {
-  return num.replace(/[\s+\-()]/g, "");
+  const digits = num.replace(/[\s+\-()]/g, "");
+  if (/^\d{8}$/.test(digits)) return `228${digits}`;
+  return digits;
 }
 async function sendWaTemplate({
   to,
@@ -5999,22 +6006,26 @@ async function sendBoutiqueVenteNotif({
     const baseUrl = (siteUrl || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://togolese.tg").replace(/\/$/, "");
     const fmt = (n) => new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
     const articlesList = items.map((i) => `${i.qty}x ${i.nom} - ${fmt(i.total)}`).join("\n");
+    let result;
     if (statut_paiement === "acompte" && templateAcompte) {
       const acompte = montant_acompte ?? 0;
       const resteAPayer = total - acompte;
-      await sendWaTemplate({
+      result = await sendWaTemplate({
         to: telephone,
         templateName: templateAcompte,
         languageCode,
         bodyParams: [nom, reference, articlesList, fmt(acompte), fmt(resteAPayer), baseUrl]
       });
     } else if (templateFull) {
-      await sendWaTemplate({
+      result = await sendWaTemplate({
         to: telephone,
         templateName: templateFull,
         languageCode,
         bodyParams: [nom, reference, articlesList, fmt(total), baseUrl]
       });
+    }
+    if (result && !result.success) {
+      console.error("[WA] sendBoutiqueVenteNotif failed:", reference, telephone, result.error);
     }
   } catch (e) {
     console.error("[WA] sendBoutiqueVenteNotif error:", e);
