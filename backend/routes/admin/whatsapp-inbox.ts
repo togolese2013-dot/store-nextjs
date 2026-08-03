@@ -37,6 +37,20 @@ router.get("/api/admin/whatsapp/webhook", async (req, res) => {
   return res.status(403).end();
 });
 
+/* ── Résout le shop propriétaire du numéro WhatsApp qui a reçu le message ── */
+async function resolveShopIdFromPhoneNumberId(phoneNumberId: string | null): Promise<number> {
+  if (!phoneNumberId) return 1;
+  try {
+    const [[row]] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT shop_id FROM settings WHERE `key` = 'wa_phone_number_id' AND `value` = ? LIMIT 1",
+      [phoneNumberId]
+    );
+    return row ? Number(row.shop_id) : 1;
+  } catch {
+    return 1;
+  }
+}
+
 /* ── POST /api/admin/whatsapp/webhook — réception messages entrants ───── */
 router.post("/api/admin/whatsapp/webhook", async (req, res) => {
   res.sendStatus(200);
@@ -44,9 +58,11 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
     if (!value?.messages?.length) return;
     const contactName: string | null = value.contacts?.[0]?.profile?.name ?? null;
-    const notreNumero: string | null = (value.metadata as Record<string,unknown>)?.display_phone_number
-      ? String((value.metadata as Record<string,unknown>).display_phone_number)
-      : null;
+    const metadata = value.metadata as Record<string, unknown> | undefined;
+    const notreNumero: string | null = metadata?.display_phone_number ? String(metadata.display_phone_number) : null;
+    // Chaque boutique a son propre Phone Number ID (Réglages > Intégrations) — sans ce mapping,
+    // tous les messages entrants de toutes les boutiques tombaient dans la boîte de shop_id=1.
+    const shopId = await resolveShopIdFromPhoneNumberId(metadata?.phone_number_id ? String(metadata.phone_number_id) : null);
 
     for (const msg of value.messages as Record<string, unknown>[]) {
       const from  = String(msg.from ?? "");
@@ -82,9 +98,9 @@ router.post("/api/admin/whatsapp/webhook", async (req, res) => {
 
       await db.execute(
         `INSERT IGNORE INTO wa_messages
-           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type, notre_numero)
-         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?)`,
-        [from, body, waId, contactName, mediaId || null, type, mimeType || null, notreNumero],
+           (telephone, direction, body, wa_message_id, contact_name, media_id, media_type, mime_type, notre_numero, shop_id)
+         VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [from, body, waId, contactName, mediaId || null, type, mimeType || null, notreNumero, shopId],
       );
       emitAdminEvent("message", { from, body, nom: contactName ?? from });
     }

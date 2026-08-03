@@ -252,8 +252,8 @@ async function runBackup(): Promise<{ filename: string; filepath: string; size: 
 router.post("/api/admin/backup", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (!["super_admin", "admin"].includes(session.role)) {
-    return res.status(403).json({ error: "Accès refusé." });
+  if (session.role !== "super_admin") {
+    return res.status(403).json({ error: "Accès réservé au super-admin." });
   }
 
   // Cooldown — prevent repeated heavy backups (DoS mitigation)
@@ -280,8 +280,8 @@ router.post("/api/admin/backup", async (req, res) => {
 router.get("/api/admin/backups", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (!["super_admin", "admin"].includes(session.role)) {
-    return res.status(403).json({ error: "Accès refusé." });
+  if (session.role !== "super_admin") {
+    return res.status(403).json({ error: "Accès réservé au super-admin." });
   }
 
   res.json({
@@ -295,8 +295,8 @@ router.get("/api/admin/backups", async (req, res) => {
 router.get("/api/admin/backups/:filename", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
-  if (!["super_admin", "admin"].includes(session.role)) {
-    return res.status(403).json({ error: "Accès refusé." });
+  if (session.role !== "super_admin") {
+    return res.status(403).json({ error: "Accès réservé au super-admin." });
   }
 
   const { filename } = req.params;

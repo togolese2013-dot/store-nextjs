@@ -4,6 +4,7 @@ import { useUI } from '../store';
 import { I } from '../icons';
 import { SERVICES, SYS_ST, INCIDENTS } from '../data';
 import { KpiRow, PageHead } from '../primitives';
+import BackupManager from '../BackupManager';
 
 const KPIS: Kpi[] = [
   { l: 'Uptime · 30 jours', v: '—', u: '%', sub: 'SLA 99,9% objectif', spark: [0,0,0,0,0,0,0,0,0,0,0], c: '#2D6A4F' },
@@ -33,6 +34,11 @@ export default function SystemPage() {
           <span className="tag" style={{ background: `${inc.color}1A`, color: inc.color, flexShrink: 0, marginTop: 1 }}>{inc.sev}</span>
           <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3 }}>{inc.title}</div><div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.4 }}>{inc.desc}</div></div>
           <div style={{ fontSize: 11, color: 'var(--muted-2)', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}>{inc.time}</div></div>)}
+      </div></div>
+
+      <div className="ov-bot" style={{ paddingTop: 20 }}><div className="ov-card">
+        <div className="ov-card-h">Sauvegarde plateforme</div>
+        <div style={{ padding: '16px 4px 4px' }}><BackupManager /></div>
       </div></div>
     </>
   );
