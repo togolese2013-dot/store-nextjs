@@ -10447,8 +10447,9 @@ var whatsapp_inbox_default = router33;
 // routes/whatsapp-webhook.ts
 var import_express34 = __toESM(require("express"));
 init_db();
+init_admin_db();
 var router34 = import_express34.default.Router();
-var VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN ?? "togolese_webhook";
+var FALLBACK_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN ?? "togolese_webhook";
 async function ensureWaMessagesTable() {
   try {
     await db.execute(`
@@ -10470,11 +10471,12 @@ async function ensureWaMessagesTable() {
     console.error("[ensureWaMessagesTable]", err);
   }
 }
-router34.get("/api/webhooks/whatsapp", (req, res) => {
+router34.get("/api/webhooks/whatsapp", async (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+  const verifyToken2 = await getSetting("wa_webhook_verify_token") || FALLBACK_VERIFY_TOKEN;
+  if (mode === "subscribe" && token === verifyToken2) {
     return res.status(200).send(challenge);
   }
   return res.status(403).end();
