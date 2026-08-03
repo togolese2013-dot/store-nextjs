@@ -3373,7 +3373,7 @@ export async function getVentesStats(shopId = 1): Promise<{
        WHERE f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
          AND (lv.id IS NULL OR lv.statut = 'livre')`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE status = 'delivered' AND DATE(updated_at) = CURDATE()`
+      `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE shop_id = ? AND status = 'delivered' AND DATE(delivered_at) = CURDATE()`, [shopId]
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
   ]);
 

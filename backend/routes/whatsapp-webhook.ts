@@ -1,10 +1,11 @@
 import express from "express";
 import { db } from "@/lib/db";
+import { getSetting } from "@/lib/admin-db";
 import { emitAdminEvent } from "../lib/admin-events";
 
 const router = express.Router();
 
-const VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN ?? "togolese_webhook";
+const FALLBACK_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN ?? "togolese_webhook";
 
 export async function ensureWaMessagesTable() {
   try {
@@ -29,11 +30,12 @@ export async function ensureWaMessagesTable() {
 }
 
 /* ── Vérification webhook Meta ─────────────────────────────────────────── */
-router.get("/api/webhooks/whatsapp", (req, res) => {
+router.get("/api/webhooks/whatsapp", async (req, res) => {
   const mode      = req.query["hub.mode"];
   const token     = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+  const verifyToken = (await getSetting("wa_webhook_verify_token", 1).catch(() => "")) || FALLBACK_VERIFY_TOKEN;
+  if (mode === "subscribe" && token === verifyToken) {
     return res.status(200).send(challenge);
   }
   return res.status(403).end();

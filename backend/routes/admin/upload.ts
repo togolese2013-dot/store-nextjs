@@ -22,7 +22,7 @@ function detectMimeFromBuffer(buf: Buffer): string | null {
 
 const router = express.Router();
 
-async function uploadToCloudinary(buffer: Buffer, _clientType: string): Promise<string> {
+export async function uploadToCloudinary(buffer: Buffer, _clientType: string): Promise<string> {
   // Configure lazily so dotenv has already populated env vars at call time
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

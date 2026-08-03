@@ -122,7 +122,7 @@ export default function MouvementModal() {
     if (produits.length > 0) return;
     setLoadingProds(true);
     try {
-      const res  = await fetch("/api/admin/stock/produits");
+      const res  = await fetch("/api/admin/stock/produits", { credentials: "include" });
       const data = await res.json();
       setProduits(data.produits ?? []);
     } finally {

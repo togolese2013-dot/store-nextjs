@@ -312,7 +312,7 @@ router.get("/api/admin/products/export", async (req, res) => {
     const rows = products.map((p: any) => {
       const prix     = Number(p.prix_unitaire ?? 0);
       const remise   = Number(p.remise ?? 0);
-      const promo    = remise > 0 ? Math.round(prix * (1 - remise / 100)) : "";
+      const promo    = remise > 0 ? Math.max(0, prix - remise) : ""; // remise en FCFA, pas en %
       const stMag    = Number(p.stock_magasin ?? 0);
       const stBout   = Number(p.stock_boutique ?? p.stock ?? 0);
       const stMin    = Number(p.stock_minimum ?? 0);
