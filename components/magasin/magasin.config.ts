@@ -45,7 +45,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
             { k: "supplier", l: "Fournisseur",         t: "select",   options: suppliers, full: true },
             { k: "image",           l: "Visuel produit",      t: "image",           full: true },
             { k: "images",          l: "Photos secondaires",  t: "images",          full: true },
-            { k: "desc",            l: "Description",         t: "textarea",        ph: "Notes internes, composition…", full: true },
+            { k: "desc",            l: "Description (visible sur le site)", t: "textarea", ph: "Description affichée sur la fiche produit du site vitrine…", full: true },
             { k: "variant_options", l: "Variantes",           t: "variant-options", full: true },
           ],
         },
@@ -149,6 +149,34 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
       { t: "Niveau de stock", opts: ["En stock", "Stock bas", "Rupture"] },
     ],
 
+    buildDetail: (kind, row) => {
+      if (kind !== "product") return null;
+      return {
+        header: {
+          color:  row.swatch,
+          initial: row.initial,
+          name:   row.name,
+          sub:    row.sku,
+          status: row.status,
+          imageUrl: row.imageUrl,
+        },
+        stats: [
+          ["Stock",   `${row.stock}/${row.target}`],
+          ["Prix HT", `${row.price?.toLocaleString?.("fr-FR") ?? row.price} F`],
+          ["Marge",   `${row.margin ?? 0}%`],
+        ],
+        rows: [
+          ["Catégorie",       row.cat ?? "—"],
+          ["Marque",          row.brand ?? "—"],
+          ["Prix d'achat",    row.cost != null ? `${row.cost.toLocaleString("fr-FR")} F` : "—"],
+          ["Valeur en stock", `${((row.price ?? 0) * (row.stock ?? 0)).toLocaleString("fr-FR")} F`],
+          ["Référence",       row.sku],
+        ],
+        gallery:     row.images,
+        description: row.description || undefined,
+      };
+    },
+
     /* ── Real API callbacks ── */
 
     onSubmit: async (kind, mode, values) => {
@@ -170,6 +198,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
           categorie_id:   catObj?.id   ? Number(catObj.id)   : undefined,
           image_url:      values.image || undefined,
           images:         Array.isArray(values.images) ? values.images : undefined,
+          description:    values.desc || null,
           options_config: vo?.selectedOptions?.length
             ? JSON.stringify(vo.selectedOptions.map((o: any) => ({ nom: o.nom, valeurs: o.valeurs })))
             : null,

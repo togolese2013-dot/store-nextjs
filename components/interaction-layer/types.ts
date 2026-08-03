@@ -46,11 +46,17 @@ export interface DetailHeader {
   name: string;
   sub?: string;
   status?: string | null;
+  /** When present, replaces the color+initial avatar with the real photo */
+  imageUrl?: string;
 }
 export interface DetailModel {
   header: DetailHeader;
   stats: Array<[string, string | number]>;
   rows: Array<[string, string | number]>;
+  /** Secondary photos, shown as a thumbnail strip */
+  gallery?: string[];
+  /** Free-text block (e.g. product description) */
+  description?: string;
 }
 
 /* ---- Config-supplied content ------------------------------ */

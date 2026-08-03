@@ -63,7 +63,7 @@ interface DetailDrawerProps { kind: string; row: any; onClose: () => void; ui: U
 export function DetailDrawer({ kind, row, onClose, ui }: DetailDrawerProps) {
   const config = useConfig();
   const detail = config.buildDetail?.(kind, row) ?? defaultBuildDetail(kind, row);
-  const { header, stats, rows } = detail;
+  const { header, stats, rows, gallery, description } = detail;
 
   const labels = config.detailLabels ?? {
     product: "produit", supplier: "fournisseur", brand: "marque",
@@ -91,9 +91,18 @@ export function DetailDrawer({ kind, row, onClose, ui }: DetailDrawerProps) {
       }
     >
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <div className="thumb" style={{ background: header.color, width: 52, height: 52, borderRadius: 12, fontSize: 18 }}>
-          {header.initial}
-        </div>
+        {header.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={header.imageUrl}
+            alt={header.name}
+            style={{ width: 52, height: 52, borderRadius: 12, objectFit: "cover", border: "1px solid var(--border)", flexShrink: 0 }}
+          />
+        ) : (
+          <div className="thumb" style={{ background: header.color, width: 52, height: 52, borderRadius: 12, fontSize: 18 }}>
+            {header.initial}
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-.01em" }}>{header.name}</div>
           <div style={{ fontSize: 12.5, color: "var(--muted-2)", fontFamily: "Geist Mono, monospace", marginTop: 3 }}>{header.sub}</div>
@@ -111,6 +120,26 @@ export function DetailDrawer({ kind, row, onClose, ui }: DetailDrawerProps) {
               <div style={{ fontSize: 10.5, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--muted-2)", marginTop: 3 }}>{l}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {gallery && gallery.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {gallery.map((url, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={url + i}
+              src={url}
+              alt={`Photo ${i + 1}`}
+              style={{ width: 64, height: 64, borderRadius: 10, objectFit: "cover", border: "1px solid var(--border)" }}
+            />
+          ))}
+        </div>
+      )}
+
+      {description && (
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px", fontSize: 13, lineHeight: 1.5, color: "var(--ink-2)" }}>
+          {description}
         </div>
       )}
 

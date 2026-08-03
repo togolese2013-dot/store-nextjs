@@ -35,6 +35,8 @@ export interface Product {
   imageUrl?: string;
   /** Secondary photos (beyond the main imageUrl) */
   images?: string[];
+  /** Description shown on the storefront product page */
+  description?: string;
 }
 
 export interface KpiCard {
