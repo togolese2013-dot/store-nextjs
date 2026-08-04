@@ -48,14 +48,6 @@ export function usePendingTransfers(): TransferRequest[] {
   return list;
 }
 
-// ── PendingBadge ──────────────────────────────────────────────────────────────
-
-export function PendingBadge({ pipClass }: { pipClass: string }) {
-  const pending = usePendingTransfers();
-  if (pending.length === 0) return <span className={pipClass} />;
-  return <span className={styles.pendingBadge}>{pending.length}</span>;
-}
-
 // ── TransferBanner ────────────────────────────────────────────────────────────
 
 interface TransferBannerProps {

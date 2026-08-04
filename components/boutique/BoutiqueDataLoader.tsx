@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import BoutiqueShell from './BoutiqueShell';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
+import { UIProvider } from '@/components/interaction-layer';
+import { createBoutiqueConfig, setBoutiqueData } from './boutique.config';
 import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
 import { BoutiqueSettingsProvider, buildConfig, type BoutiqueConfig } from './BoutiqueSettingsContext';
 import type { StoreState } from './settings/types';
@@ -296,25 +298,30 @@ export default function BoutiqueDataLoader({
   }, []);
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
+  useEffect(() => { setBoutiqueData({ STOCK: stock }); }, [stock]);
+  const uiConfig = useMemo(() => createBoutiqueConfig(), []);
+
   return (
-    <BoutiqueSettingsProvider cfg={boutiqueConfig} refresh={fetchBoutiqueSettings}>
-      <BoutiqueShell
-        sales={sales}
-        stock={stock}
-        movements={movements}
-        stockMovements={stockMovements}
-        clients={clients}
-        clientsTotal={clientsTotal}
-        onRefreshClients={fetchClients}
-        overviewStats={overviewStats}
-        onSwitchWorkspace={onSwitchWorkspace}
-        onNewSale={onNewSale}
-        onRequestTransfer={onRequestTransfer}
-        onRefreshStock={fetchStock}
-        userName={userName}
-        userRole={userRole}
-        shopName={shopName}
-      />
-    </BoutiqueSettingsProvider>
+    <UIProvider config={uiConfig} onNavigate={() => {}}>
+      <BoutiqueSettingsProvider cfg={boutiqueConfig} refresh={fetchBoutiqueSettings}>
+        <BoutiqueShell
+          sales={sales}
+          stock={stock}
+          movements={movements}
+          stockMovements={stockMovements}
+          clients={clients}
+          clientsTotal={clientsTotal}
+          onRefreshClients={fetchClients}
+          overviewStats={overviewStats}
+          onSwitchWorkspace={onSwitchWorkspace}
+          onNewSale={onNewSale}
+          onRequestTransfer={onRequestTransfer}
+          onRefreshStock={fetchStock}
+          userName={userName}
+          userRole={userRole}
+          shopName={shopName}
+        />
+      </BoutiqueSettingsProvider>
+    </UIProvider>
   );
 }

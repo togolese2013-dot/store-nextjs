@@ -13,6 +13,7 @@ import type { StockMouvement } from './BoutiqueDataLoader';
 import FinancePage from './FinancePage';
 import ClientsPage from './ClientsPage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
+import { useUI, useConfig } from '@/components/interaction-layer';
 import styles from './Boutique.module.css';
 
 type PageId = 'overview' | 'ventes' | 'stock' | 'finance' | 'clients';
@@ -78,6 +79,8 @@ export default function BoutiqueShell({
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
 }: BoutiqueShellProps) {
+  const ui = useUI();
+  const notifCount = useConfig().notifs?.().length ?? 0;
   const [page, setPage] = useState<PageId>(defaultPage);
 
   const groups = useMemo(() =>
@@ -117,9 +120,9 @@ export default function BoutiqueShell({
             <input placeholder={SEARCH_PLACEHOLDERS[page]} />
             <span className={styles.kbd}>⌘K</span>
           </div>
-          <button type="button" className={styles.iconBtn} aria-label="Notifications">
+          <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={(e) => ui.notifications(e)}>
             <BellIcon size={16} />
-            <span className={styles.pip} />
+            {notifCount > 0 && <span className={styles.pip} />}
           </button>
         </header>
 

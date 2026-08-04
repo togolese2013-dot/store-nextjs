@@ -1,7 +1,7 @@
 /* ============================================================
    Store AppConfig — connects the interaction layer to real APIs.
    ============================================================ */
-import type { AppConfig } from "@/components/interaction-layer";
+import type { AppConfig, NotifItem } from "@/components/interaction-layer";
 
 interface StoreConfigOpts {
   onRefresh?: () => void;
@@ -25,6 +25,16 @@ export function createStoreConfig({ onRefresh }: StoreConfigOpts = {}): AppConfi
   return {
     name: "Store",
     data: () => _data,
+
+    notifs: (): NotifItem[] => {
+      const pending = (_data.ORDERS ?? []).filter((o: any) => o.status === "En attente");
+      return pending.map((o: any) => ({
+        dot:  "var(--accent)",
+        t:    `Commande en attente — ${o.ref ?? o.client ?? ""}`,
+        d:    `${o.client ?? "Client"} · ${o.products ?? 0} article${(o.products ?? 0) > 1 ? "s" : ""}`,
+        time: o.date ?? "",
+      }));
+    },
 
     schemas: () => {
       const zones  = (_data.ZONES  ?? []).map((z: any) => z.name ?? z.nom ?? "");

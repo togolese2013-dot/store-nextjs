@@ -14,7 +14,7 @@
  * The data in `data.ts` is illustrative — replace the exported arrays with
  * your API results (the shapes are typed in `types.ts`).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { CrmPageId } from './types';
 import { NAV, PAGE_LABELS, SEARCH_PLACEHOLDER } from './data';
 import {
@@ -26,7 +26,18 @@ import ClientsPage from './pages/ClientsPage';
 import LoyaltyPage from './pages/LoyaltyPage';
 import ReferralPage from './pages/ReferralPage';
 import CampaignsPage from './pages/CampaignsPage';
+import { UIProvider, useUI, useConfig } from '@/components/interaction-layer';
+import type { AppConfig, NotifItem } from '@/components/interaction-layer';
+import { formatDateTime } from '@/lib/format-date';
 import styles from './Crm.module.css';
+
+interface WaThread {
+  telephone:    string;
+  contact_name: string | null;
+  dernier_message: string | null;
+  unread:       number;
+  last_at:      string;
+}
 
 const PAGES: Record<CrmPageId, React.ComponentType> = {
   overview:  OverviewPage,
@@ -68,6 +79,55 @@ export default function Crm({
 
   const Page = PAGES[page];
   const userInitial = userName.charAt(0).toUpperCase();
+
+  /* ── Messages WhatsApp non lus — vraie source, /api/admin/whatsapp/threads ── */
+  const [threads, setThreads] = useState<WaThread[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/whatsapp/threads', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (!cancelled && Array.isArray(d.threads)) setThreads(d.threads); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const config = useMemo<AppConfig>(() => ({
+    name: 'CRM',
+    notifs: (): NotifItem[] =>
+      threads
+        .filter(t => Number(t.unread) > 0)
+        .map(t => ({
+          dot:  'var(--accent)',
+          t:    `Message — ${t.contact_name || t.telephone}`,
+          d:    t.dernier_message ?? '',
+          time: t.last_at ? formatDateTime(t.last_at) : '',
+        })),
+  }), [threads]);
+
+  return (
+    <UIProvider config={config} onNavigate={() => {}}>
+      <CrmBody
+        shopName={shopName} userName={userName} userRole={userRole}
+        page={page} go={go} onBack={onBack} Page={Page} userInitial={userInitial}
+      />
+    </UIProvider>
+  );
+}
+
+interface CrmBodyProps {
+  shopName: string;
+  userName: string;
+  userRole: string;
+  page: CrmPageId;
+  go: (p: CrmPageId) => void;
+  onBack?: () => void;
+  Page: React.ComponentType;
+  userInitial: string;
+}
+
+function CrmBody({ shopName, userName, userRole, page, go, onBack, Page, userInitial }: CrmBodyProps) {
+  const ui = useUI();
+  const notifCount = useConfig().notifs?.().length ?? 0;
 
   return (
     <div className={styles.page}>
@@ -144,9 +204,9 @@ export default function Crm({
             <input placeholder={SEARCH_PLACEHOLDER[page]} />
             <span className={styles.k}>⌘K</span>
           </div>
-          <button type="button" className={styles.ibtn}>
+          <button type="button" className={styles.ibtn} aria-label="Notifications" onClick={(e) => ui.notifications(e)}>
             <BellIcon size={16} />
-            <span className={styles.pip} />
+            {notifCount > 0 && <span className={styles.pip} />}
           </button>
         </header>
 

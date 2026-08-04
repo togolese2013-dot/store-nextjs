@@ -2,7 +2,7 @@
    Magasin AppConfig — connects the interaction layer to real APIs.
    Pass the result of createMagasinConfig() to <UIProvider config={...}>.
    ============================================================ */
-import type { AppConfig } from "@/components/interaction-layer";
+import type { AppConfig, NotifItem } from "@/components/interaction-layer";
 
 interface MagasinConfigOpts {
   onRefresh?: () => void;
@@ -21,6 +21,29 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
   return {
     name: "Magasin",
     data: () => _data,
+
+    notifs: () => {
+      const items: NotifItem[] = [];
+      const transfers = (_data.PENDING_TRANSFERS ?? []) as { product: string; qty: number; timeLabel?: string }[];
+      for (const t of transfers) {
+        items.push({
+          dot:  "var(--accent)",
+          t:    `Transfert en attente — ${t.product}`,
+          d:    `${t.qty} unité${t.qty > 1 ? "s" : ""} demandée${t.qty > 1 ? "s" : ""}`,
+          time: t.timeLabel ?? "",
+        });
+      }
+      const ruptures = (_data.PRODUCTS ?? []).filter((p: any) => Number(p.stock) === 0);
+      for (const p of ruptures) {
+        items.push({
+          dot:  "var(--danger)",
+          t:    `Rupture de stock — ${p.name ?? p.nom ?? "Produit"}`,
+          d:    "Stock à 0. Réapprovisionnement requis.",
+          time: "",
+        });
+      }
+      return items;
+    },
 
     schemas: () => {
       const cats      = (_data.CATEGORIES  ?? []).map((c: any) => c.name ?? c.nom ?? "");

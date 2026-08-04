@@ -42,7 +42,7 @@ import PaiementsPage from './PaiementsPage';
 import ReglagesPage from './ReglagesPage';
 import ContenuVitrinePage from './ContenuVitrinePage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
-import { useUI } from '@/components/interaction-layer';
+import { useUI, useConfig } from '@/components/interaction-layer';
 import styles from './Store.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
@@ -104,6 +104,7 @@ export default function StoreShell({
   userRole = 'Propriétaire',
 }: StoreShellProps) {
   const ui = useUI();
+  const notifCount = useConfig().notifs?.().length ?? 0;
   const [page, setPage] = useState<PageId>(defaultPage);
 
   const groups = useMemo(() =>
@@ -145,7 +146,7 @@ export default function StoreShell({
           </div>
           <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={(e) => ui.notifications(e)}>
             <BellIcon size={16} />
-            <span className={styles.pip} />
+            {notifCount > 0 && <span className={styles.pip} />}
           </button>
         </header>
 

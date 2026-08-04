@@ -13,6 +13,7 @@ import type { Product as MagasinProduct, KpiCard, TabSpec, Variant } from './typ
 import { SAMPLE_PRODUCTS, SAMPLE_KPIS, DEFAULT_TABS, ACCENT } from './sample-data';
 import { UIProvider, useUI } from '@/components/interaction-layer';
 import { createMagasinConfig, setMagasinData } from './magasin.config';
+import { usePendingTransfers } from './TransferBanner';
 
 /* ── Constants ── */
 const PAGE_SIZE = 20;
@@ -169,6 +170,7 @@ export default function MagasinDataLoader({
   const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
   const [variants,    setVariants]    = useState<Variant[]>([]);
   const [formatPrice, setFormatPrice] = useState<(n: number) => string>(() => DEFAULT_FORMAT_PRICE);
+  const pendingTransfers = usePendingTransfers();
 
   /* UI state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -310,8 +312,9 @@ export default function MagasinDataLoader({
     setMagasinData({
       PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands, SUPPLIERS: suppliers,
       VARIANT_GROUPS: variants.map(v => ({ id: Number(v.id), nom: v.name, valeurs: v.values })),
+      PENDING_TRANSFERS: pendingTransfers,
     });
-  }, [allProducts, categories, brands, suppliers, variants]);
+  }, [allProducts, categories, brands, suppliers, variants, pendingTransfers]);
 
   /* ── Build config (stable ref — onRefresh triggers re-fetch) ── */
   const config = useMemo(() => createMagasinConfig({

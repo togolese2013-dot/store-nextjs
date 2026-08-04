@@ -28,10 +28,8 @@ import {
   DownloadIcon, UploadIcon, SparklesIcon, PlusIcon,
   FilterIcon, ChevDownIcon,
 } from './icons';
-import { useUI, Icons } from '@/components/interaction-layer';
-import { TransferBanner, PendingBadge } from './TransferBanner';
-import type { Forecast } from './forecast';
-import { URGENCE_STYLE } from './forecast';
+import { useUI, useConfig, Icons } from '@/components/interaction-layer';
+import { TransferBanner } from './TransferBanner';
 import { injectKeyframes } from './drawerUtils';
 import styles from './Magasin.module.css';
 
@@ -155,6 +153,7 @@ export default function MagasinShell({
   shopName = 'Ma boutique',
 }: MagasinShellProps) {
   const ui = useUI();
+  const notifCount = useConfig().notifs?.().length ?? 0;
   const [activePage, setActivePage] = useState<PageId>(defaultPage);
 
   function navigate(p: PageId) {
@@ -215,7 +214,7 @@ export default function MagasinShell({
           </div>
           <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={(e) => ui.notifications(e)}>
             <BellIcon size={16} />
-            <PendingBadge pipClass={styles.pip} />
+            {notifCount > 0 && <span className={styles.pip} />}
           </button>
         </header>
 
@@ -312,29 +311,6 @@ function ProductsContent({
   const [brandFilter, setBrandFilter] = useState<string>('');
   const [stockFilter, setStockFilter] = useState<string>('');
   const [showImport,  setShowImport]  = useState(false);
-  const [forecasts,       setForecasts]       = useState<Forecast[]>([]);
-  const [forecastLoading, setForecastLoading] = useState(false);
-  const [forecastError,   setForecastError]   = useState('');
-  const [forecastMsg,     setForecastMsg]     = useState('');
-  const [showForecast,    setShowForecast]    = useState(false);
-
-  const loadForecast = async () => {
-    setForecastLoading(true);
-    setForecastError('');
-    setForecastMsg('');
-    setShowForecast(true);
-    try {
-      const res  = await fetch('/api/admin/ai/stock-forecast', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok) { setForecastError(data.error ?? 'Erreur serveur'); return; }
-      if (data.message) { setForecastMsg(data.message); setForecasts([]); return; }
-      setForecasts(Array.isArray(data.forecasts) ? data.forecasts : []);
-    } catch { setForecastError('Erreur réseau'); }
-    finally { setForecastLoading(false); }
-  };
 
   const visible = useMemo(() => {
     let list = products;
@@ -378,94 +354,11 @@ function ProductsContent({
           <button type="button" className={styles.btn} onClick={onExport}><DownloadIcon size={14} /> Exporter</button>
           <button type="button" className={styles.btn} onClick={() => setShowImport(true)}><UploadIcon size={14} /> Importer</button>
           <button type="button" className={styles.btn} onClick={() => ui.openAI()}><SparklesIcon size={14} /> Suggestions IA</button>
-          <button type="button" className={styles.btn} onClick={loadForecast} disabled={forecastLoading}
-            title="Analyse IA des prévisions de rupture de stock">
-            <SparklesIcon size={14} /> {forecastLoading ? 'Analyse…' : 'Prévisions IA'}
-          </button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onCreateProduct}>
             <PlusIcon size={14} /> Nouveau produit
           </button>
         </div>
       </div>
-
-      {showForecast && (
-        <div style={{ margin: '16px 0 0', borderTop: '1px solid var(--border)', paddingTop: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <SparklesIcon size={15} />
-              <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>Prévisions IA — Risques de rupture</span>
-            </div>
-            <button className={styles.btn} style={{ fontSize: 12, padding: '4px 10px' }}
-              onClick={() => setShowForecast(false)}>Fermer</button>
-          </div>
-
-          {forecastLoading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[1,2,3].map(i => (
-                <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--bg-2)', opacity: 0.6 + i * 0.1,
-                  backgroundImage: 'linear-gradient(90deg, var(--bg-2) 0%, var(--border) 50%, var(--bg-2) 100%)',
-                  backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite' }} />
-              ))}
-            </div>
-          )}
-
-          {forecastError && (
-            <div style={{ padding: '10px 14px', background: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: 9, fontSize: 13 }}>
-              {forecastError}
-            </div>
-          )}
-
-          {forecastMsg && (
-            <div style={{ padding: '10px 14px', background: 'var(--ok-bg)', color: 'var(--ok)', borderRadius: 9, fontSize: 13, fontWeight: 500 }}>
-              ✓ {forecastMsg}
-            </div>
-          )}
-
-          {!forecastLoading && forecasts.length > 0 && (
-            <div className={styles.tableWrap}>
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Produit</th>
-                      <th style={{ textAlign: 'right' }}>Stock</th>
-                      <th style={{ textAlign: 'right' }}>Ventes 30j</th>
-                      <th style={{ textAlign: 'right' }}>Jours restants</th>
-                      <th>Urgence</th>
-                      <th>Recommandation</th>
-                      <th style={{ textAlign: 'right' }}>Qté à commander</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {forecasts.map((f, i) => {
-                      const urg = URGENCE_STYLE[f.urgence] ?? URGENCE_STYLE.ok;
-                      return (
-                        <tr key={i}>
-                          <td><div className={styles.productName}>{f.nom}</div></td>
-                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13, fontWeight: 600 }}>{f.stock}</td>
-                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13 }}>{f.ventes_30j}</td>
-                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13, fontWeight: 600, color: f.jours_restants !== null && f.jours_restants < 7 ? 'var(--danger)' : f.jours_restants !== null && f.jours_restants < 20 ? 'var(--warn)' : 'var(--ink)' }}>
-                            {f.jours_restants !== null ? `${f.jours_restants}j` : '—'}
-                          </td>
-                          <td>
-                            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600, background: urg.bg, color: urg.color }}>
-                              {urg.label}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: 12.5, color: 'var(--muted)', maxWidth: 200 }}>{f.recommandation}</td>
-                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
-                            {f.qte_a_commander > 0 ? `+${f.qte_a_commander}` : '—'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <KpiStrip kpis={kpis} onKpiClick={(label) => {
         if (label === 'Stock bas') setStockFilter('bas');

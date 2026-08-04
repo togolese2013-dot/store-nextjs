@@ -17,12 +17,6 @@ const DEFAULT_AI: AiSuggestion[] = [
   { ic: "folder",   tone: "ok",     t: "5 produits non classés",                    d: "Classer automatiquement par similarité de nom et de marque.",                           cta: "Classer" },
   { ic: "sparkles", tone: "accent", t: "Descriptions manquantes",                   d: "18 produits sans description. Rédiger automatiquement à partir des attributs.",         cta: "Rédiger" },
 ];
-const DEFAULT_NOTIFS: NotifItem[] = [
-  { dot: "var(--danger)", t: "Rupture de stock — Savon noir",  d: "Stock à 0. Réapprovisionnement requis.", time: "il y a 12 min" },
-  { dot: "var(--warn)",   t: "Stock bas — Bissap séché",        d: "4 unités restantes (seuil 10).",         time: "il y a 1 h" },
-  { dot: "var(--ok)",     t: "Bon d'achat reçu — BC-2026-039", d: "9 produits ajoutés au stock.",           time: "il y a 3 h" },
-  { dot: "var(--accent)", t: "Nouveau fournisseur validé",      d: "Lomé Négoce est désormais actif.",       time: "hier" },
-];
 const DEFAULT_HISTORY: HistoryEvent[] = [
   { label: "+156 Karité Pure · stock importé",     time: "Aujourd'hui, 10h14", author: "K. Diallo",  dot: "#2D6A4F" },
   { label: "Kente Royal passé en brouillon",        time: "Aujourd'hui, 09h02", author: "A. Mensah",  dot: "#8A8278" },
@@ -326,25 +320,29 @@ export function HistoryDrawer({ title, events, onClose }: HistoryDrawerProps) {
 }
 
 /* ── NOTIFICATIONS PANEL (rendered in a popover) ─────────── */
-interface NotifPanelProps { onClose: () => void; toast: (m: string) => void; }
-export function NotifPanel({ onClose, toast }: NotifPanelProps) {
+interface NotifPanelProps { onClose: () => void; }
+export function NotifPanel({ onClose }: NotifPanelProps) {
   const config = useConfig();
-  const list = config.notifs ?? DEFAULT_NOTIFS;
+  const list = config.notifs?.() ?? [];
   return (
     <div style={{ width: 360, maxWidth: "92vw" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
+      <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
         <span style={{ fontSize: 14, fontWeight: 600 }}>Notifications</span>
-        <button onClick={() => { onClose(); toast("Tout marqué comme lu"); }} style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500 }}>Tout lire</button>
       </div>
       <div style={{ maxHeight: 380, overflowY: "auto" }}>
+        {list.length === 0 && (
+          <div style={{ padding: "28px 16px", textAlign: "center", fontSize: 13, color: "var(--muted)" }}>
+            Aucune notification
+          </div>
+        )}
         {list.map((n, i) => (
-          <div key={i} style={{ display: "flex", gap: 11, padding: "13px 16px", borderBottom: "1px solid var(--border)", cursor: "pointer" }}
-            onClick={() => { onClose(); toast("Notification ouverte"); }}>
+          <div key={i} style={{ display: "flex", gap: 11, padding: "13px 16px", borderBottom: "1px solid var(--border)" }}
+            onClick={onClose}>
             <div style={{ width: 8, height: 8, borderRadius: 99, background: n.dot, marginTop: 5, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{n.t}</div>
               <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, lineHeight: 1.45 }}>{n.d}</div>
-              <div style={{ fontSize: 11, color: "var(--muted-2)", marginTop: 4 }}>{n.time}</div>
+              {n.time && <div style={{ fontSize: 11, color: "var(--muted-2)", marginTop: 4 }}>{n.time}</div>}
             </div>
           </div>
         ))}

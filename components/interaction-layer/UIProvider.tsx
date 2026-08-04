@@ -111,7 +111,7 @@ export function UIProvider({ config, onNavigate, children }: UIProviderProps) {
       setPop({
         rect:  e.currentTarget.getBoundingClientRect(),
         align: "right", width: 360,
-        render: (close) => <NotifPanel onClose={close} toast={toast} />,
+        render: (close) => <NotifPanel onClose={close} />,
       });
     },
     filters: (e) => {

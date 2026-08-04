@@ -86,7 +86,8 @@ export interface AppConfig {
   paletteNav?: PaletteNavItem[];
   paletteActions?: (ui: UIApi) => PaletteAction[];
   searchGroup?: (ui: UIApi) => SearchGroup;
-  notifs?: NotifItem[];
+  /** Called fresh each time the bell is read — return the current real notifications. */
+  notifs?: () => NotifItem[];
   ai?: AiSuggestion[];
   history?: HistoryEvent[];
   filters?: FilterGroup[];
