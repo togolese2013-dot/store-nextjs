@@ -48,6 +48,13 @@ router.post("/api/webhooks/whatsapp", async (req, res) => {
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
 
+    // Same Meta app receives webhooks for other WhatsApp Business Accounts on this
+    // Business Manager (e.g. "Hamid Cargo") — ignore anything not addressed to our number.
+    const ourPhoneNumberId = await getSetting("wa_phone_number_id");
+    if (ourPhoneNumberId && value?.metadata?.phone_number_id && value.metadata.phone_number_id !== ourPhoneNumberId) {
+      return;
+    }
+
     if (value?.statuses?.length) {
       for (const s of value.statuses as Record<string, unknown>[]) {
         console.log("[WA][status]", JSON.stringify(s));

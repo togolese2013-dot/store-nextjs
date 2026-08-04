@@ -10485,6 +10485,10 @@ router34.post("/api/webhooks/whatsapp", async (req, res) => {
   res.sendStatus(200);
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
+    const ourPhoneNumberId = await getSetting("wa_phone_number_id");
+    if (ourPhoneNumberId && value?.metadata?.phone_number_id && value.metadata.phone_number_id !== ourPhoneNumberId) {
+      return;
+    }
     if (value?.statuses?.length) {
       for (const s of value.statuses) {
         console.log("[WA][status]", JSON.stringify(s));
