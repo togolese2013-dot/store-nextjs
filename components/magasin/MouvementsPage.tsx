@@ -12,6 +12,8 @@ import MouvementDrawer from './MouvementDrawer';
 import { injectKeyframes } from './drawerUtils';
 import styles from './Magasin.module.css';
 import { formatDateTime } from '@/lib/format-date';
+import type { Forecast } from './forecast';
+import { URGENCE_STYLE } from './forecast';
 
 function SparklesIcon({ size = 14 }: { size?: number }) {
   return (
@@ -22,23 +24,6 @@ function SparklesIcon({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
-
-interface Forecast {
-  produit_id:     number;
-  nom:            string;
-  stock:          number;
-  ventes_30j:     number;
-  jours_restants: number | null;
-  urgence:        'critique' | 'attention' | 'ok';
-  recommandation: string;
-  qte_a_commander: number;
-}
-
-const URGENCE_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  critique: { bg: 'var(--danger-bg)', color: 'var(--danger)',  label: 'Critique' },
-  attention:{ bg: 'var(--warn-bg)',   color: 'var(--warn)',    label: 'Attention' },
-  ok:       { bg: 'var(--ok-bg)',     color: 'var(--ok)',      label: 'OK' },
-};
 
 // ── API types ─────────────────────────────────────────────────────────────────
 

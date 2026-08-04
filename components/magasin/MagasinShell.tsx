@@ -22,13 +22,17 @@ import VariantesPage from './VariantesPage';
 import FournisseursPage from './FournisseursPage';
 import AchatsPage from './AchatsPage';
 import MouvementsPage from './MouvementsPage';
+import ImportProductsModal from './ImportProductsModal';
 import {
   SearchIcon, BellIcon, ChevLeftIcon,
   DownloadIcon, UploadIcon, SparklesIcon, PlusIcon,
   FilterIcon, ChevDownIcon,
 } from './icons';
-import { useUI } from '@/components/interaction-layer';
+import { useUI, Icons } from '@/components/interaction-layer';
 import { TransferBanner, PendingBadge } from './TransferBanner';
+import type { Forecast } from './forecast';
+import { URGENCE_STYLE } from './forecast';
+import { injectKeyframes } from './drawerUtils';
 import styles from './Magasin.module.css';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
@@ -244,6 +248,7 @@ export default function MagasinShell({
             onDelete={onDelete} onArchive={onArchive}
             totalCount={totalCount} page={page} pageSize={pageSize}
             onPageChange={onPageChange} onExport={onExport} formatPrice={formatPrice}
+            onStockChange={onStockChange}
           />
         )}
         {activePage === 'categories'   && <CategoriesPage categories={categories} />}
@@ -255,6 +260,23 @@ export default function MagasinShell({
       </main>
     </div>
   );
+}
+
+/* ─── Export CSV d'une sélection (client-side, mêmes colonnes que l'export complet) ─── */
+function exportSelectionCsv(rows: Product[]) {
+  const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = ['Référence', 'Nom', 'Catégorie', 'Marque', 'Prix', 'Stock magasin', 'Statut'];
+  const lines = [headers.map(escape).join(',')];
+  for (const p of rows) {
+    lines.push([p.sku, p.name, p.cat, p.brand, p.price, p.stock, p.status].map(escape).join(','));
+  }
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `produits-selection-${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ─── ProductsContent ───────────────────────────────────────────── */
@@ -273,13 +295,15 @@ interface ProductsContentProps {
   onPageChange?:  (p: number) => void;
   onExport?:      () => void;
   formatPrice?:   (n: number) => string;
+  onStockChange?: () => void;
 }
 
 function ProductsContent({
   products, categories, brands, kpis, tabs,
   onCreateProduct, onDelete, onArchive, formatPrice,
-  totalCount, page, pageSize, onPageChange, onExport,
+  totalCount, page, pageSize, onPageChange, onExport, onStockChange,
 }: ProductsContentProps) {
+  injectKeyframes();
   const ui = useUI();
   const [activeTab,   setActiveTab]   = useState<string>(tabs[0]?.id ?? 'all');
   const [view,        setView]        = useState<'table' | 'grid'>('table');
@@ -287,6 +311,30 @@ function ProductsContent({
   const [catFilter,   setCatFilter]   = useState<string>('');
   const [brandFilter, setBrandFilter] = useState<string>('');
   const [stockFilter, setStockFilter] = useState<string>('');
+  const [showImport,  setShowImport]  = useState(false);
+  const [forecasts,       setForecasts]       = useState<Forecast[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastError,   setForecastError]   = useState('');
+  const [forecastMsg,     setForecastMsg]     = useState('');
+  const [showForecast,    setShowForecast]    = useState(false);
+
+  const loadForecast = async () => {
+    setForecastLoading(true);
+    setForecastError('');
+    setForecastMsg('');
+    setShowForecast(true);
+    try {
+      const res  = await fetch('/api/admin/ai/stock-forecast', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) { setForecastError(data.error ?? 'Erreur serveur'); return; }
+      if (data.message) { setForecastMsg(data.message); setForecasts([]); return; }
+      setForecasts(Array.isArray(data.forecasts) ? data.forecasts : []);
+    } catch { setForecastError('Erreur réseau'); }
+    finally { setForecastLoading(false); }
+  };
 
   const visible = useMemo(() => {
     let list = products;
@@ -328,15 +376,101 @@ function ProductsContent({
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn} onClick={onExport}><DownloadIcon size={14} /> Exporter</button>
-          <button type="button" className={styles.btn} onClick={() => ui.openImport('Produits')}><UploadIcon size={14} /> Importer</button>
+          <button type="button" className={styles.btn} onClick={() => setShowImport(true)}><UploadIcon size={14} /> Importer</button>
           <button type="button" className={styles.btn} onClick={() => ui.openAI()}><SparklesIcon size={14} /> Suggestions IA</button>
+          <button type="button" className={styles.btn} onClick={loadForecast} disabled={forecastLoading}
+            title="Analyse IA des prévisions de rupture de stock">
+            <SparklesIcon size={14} /> {forecastLoading ? 'Analyse…' : 'Prévisions IA'}
+          </button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={onCreateProduct}>
             <PlusIcon size={14} /> Nouveau produit
           </button>
         </div>
       </div>
 
-      <KpiStrip kpis={kpis} />
+      {showForecast && (
+        <div style={{ margin: '16px 0 0', borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SparklesIcon size={15} />
+              <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>Prévisions IA — Risques de rupture</span>
+            </div>
+            <button className={styles.btn} style={{ fontSize: 12, padding: '4px 10px' }}
+              onClick={() => setShowForecast(false)}>Fermer</button>
+          </div>
+
+          {forecastLoading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[1,2,3].map(i => (
+                <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--bg-2)', opacity: 0.6 + i * 0.1,
+                  backgroundImage: 'linear-gradient(90deg, var(--bg-2) 0%, var(--border) 50%, var(--bg-2) 100%)',
+                  backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite' }} />
+              ))}
+            </div>
+          )}
+
+          {forecastError && (
+            <div style={{ padding: '10px 14px', background: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: 9, fontSize: 13 }}>
+              {forecastError}
+            </div>
+          )}
+
+          {forecastMsg && (
+            <div style={{ padding: '10px 14px', background: 'var(--ok-bg)', color: 'var(--ok)', borderRadius: 9, fontSize: 13, fontWeight: 500 }}>
+              ✓ {forecastMsg}
+            </div>
+          )}
+
+          {!forecastLoading && forecasts.length > 0 && (
+            <div className={styles.tableWrap}>
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Produit</th>
+                      <th style={{ textAlign: 'right' }}>Stock</th>
+                      <th style={{ textAlign: 'right' }}>Ventes 30j</th>
+                      <th style={{ textAlign: 'right' }}>Jours restants</th>
+                      <th>Urgence</th>
+                      <th>Recommandation</th>
+                      <th style={{ textAlign: 'right' }}>Qté à commander</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forecasts.map((f, i) => {
+                      const urg = URGENCE_STYLE[f.urgence] ?? URGENCE_STYLE.ok;
+                      return (
+                        <tr key={i}>
+                          <td><div className={styles.productName}>{f.nom}</div></td>
+                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13, fontWeight: 600 }}>{f.stock}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13 }}>{f.ventes_30j}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13, fontWeight: 600, color: f.jours_restants !== null && f.jours_restants < 7 ? 'var(--danger)' : f.jours_restants !== null && f.jours_restants < 20 ? 'var(--warn)' : 'var(--ink)' }}>
+                            {f.jours_restants !== null ? `${f.jours_restants}j` : '—'}
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600, background: urg.bg, color: urg.color }}>
+                              {urg.label}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 12.5, color: 'var(--muted)', maxWidth: 200 }}>{f.recommandation}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono,monospace', fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
+                            {f.qte_a_commander > 0 ? `+${f.qte_a_commander}` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <KpiStrip kpis={kpis} onKpiClick={(label) => {
+        if (label === 'Stock bas') setStockFilter('bas');
+        else if (label === 'Ruptures') setStockFilter('rupture');
+      }} />
 
       <div className={styles.tabsRow}>
         {tabs.map(t => (
@@ -389,6 +523,49 @@ function ProductsContent({
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className={styles.bulkBar}>
+          <span>{selected.size} produit{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}</span>
+          <div className={styles.bulkActions}>
+            <button type="button" className={styles.btn}
+              onClick={() => exportSelectionCsv(products.filter(p => selected.has(p.sku)))}>
+              <DownloadIcon size={14} /> Exporter
+            </button>
+            <button type="button" className={styles.btn}
+              onClick={() => {
+                const items = products.filter(p => selected.has(p.sku));
+                ui.confirm({
+                  title: `Archiver ${items.length} produit${items.length > 1 ? 's' : ''} ?`,
+                  sub: 'Ces produits seront déplacés vers les archives. Vous pourrez les restaurer.',
+                  confirmLabel: 'Archiver',
+                  onConfirm: () => {
+                    items.forEach(p => ui.config.onArchiveRow?.('product', p));
+                    setSelected(new Set());
+                  },
+                });
+              }}>
+              <Icons.archive size={14} /> Archiver
+            </button>
+            <button type="button" className={`${styles.btn} ${styles.danger}`}
+              onClick={() => {
+                const items = products.filter(p => selected.has(p.sku));
+                ui.confirm({
+                  tone: 'danger',
+                  title: `Supprimer ${items.length} produit${items.length > 1 ? 's' : ''} ?`,
+                  sub: 'Cette action est irréversible.',
+                  confirmLabel: 'Supprimer',
+                  onConfirm: () => {
+                    items.forEach(p => ui.config.onDeleteRow?.('product', p));
+                    setSelected(new Set());
+                  },
+                });
+              }}>
+              <Icons.trash size={14} /> Supprimer
+            </button>
+          </div>
+        </div>
+      )}
+
       <ProductTable
         products={visible}
         view={view}
@@ -403,6 +580,13 @@ function ProductsContent({
         onPageChange={onPageChange}
         formatPrice={formatPrice}
       />
+
+      {showImport && (
+        <ImportProductsModal
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); onStockChange?.(); }}
+        />
+      )}
     </>
   );
 }

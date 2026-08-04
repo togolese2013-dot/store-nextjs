@@ -7,6 +7,7 @@ import { getProducts, getProductCount, getProductStatusCounts, getCategories, db
 import { getStockStats, getPrincipalEntrepot } from "@/lib/admin-db";
 import { getShopById } from "@/lib/shops";
 import { planLimit } from "../../lib/plan-limits";
+import { parse as parseCsv } from "csv-parse/sync";
 import type mysql from "mysql2/promise";
 
 const router = express.Router();
@@ -274,6 +275,199 @@ router.post("/api/admin/products/generate-slugs", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
+});
+
+// ── Import CSV — aperçu (parse + résolution, aucune écriture) ─────────────────
+interface ImportRow {
+  line:           number;
+  action:         "create" | "update";
+  existing_id:    number | null;
+  reference:      string;
+  nom:            string;
+  categorie_id:   number | null;
+  categorie_nom:  string;
+  marque_id:      number | null;
+  marque_nom:     string;
+  prix_unitaire:  number;
+  remise:         number;
+  stock_magasin:  number;
+  stock_boutique: number;
+  stock_minimum:  number;
+  actif:          number;
+}
+
+function parseImportBool(v: string | undefined): number {
+  const s = (v ?? "").trim().toLowerCase();
+  if (s === "") return 1; // par défaut actif si colonne absente/vide
+  return ["1", "oui", "true", "actif", "yes"].includes(s) ? 1 : 0;
+}
+
+async function resolveImportRows(csvText: string, shopId: number) {
+  const pool = db as import("mysql2/promise").Pool;
+  let records: Record<string, string>[];
+  try {
+    records = parseCsv(csvText, { columns: true, skip_empty_lines: true, trim: true, bom: true });
+  } catch (e) {
+    throw new Error("Fichier CSV invalide : " + (e instanceof Error ? e.message : "erreur de lecture"));
+  }
+
+  const [catRows]  = await pool.execute<mysql.RowDataPacket[]>("SELECT id, nom FROM categories WHERE shop_id = ?", [shopId]);
+  const [marqRows] = await pool.execute<mysql.RowDataPacket[]>("SELECT id, nom FROM marques WHERE shop_id = ?", [shopId]);
+  const [prodRows] = await pool.execute<mysql.RowDataPacket[]>("SELECT id, reference FROM produits WHERE shop_id = ?", [shopId]);
+  const catByName  = new Map((catRows as mysql.RowDataPacket[]).map(c => [String(c.nom).trim().toLowerCase(), c.id as number]));
+  const marqByName = new Map((marqRows as mysql.RowDataPacket[]).map(m => [String(m.nom).trim().toLowerCase(), m.id as number]));
+  const prodByRef  = new Map((prodRows as mysql.RowDataPacket[]).map(p => [String(p.reference).trim().toLowerCase(), p.id as number]));
+
+  const rows: ImportRow[] = [];
+  const errors: { line: number; reason: string }[] = [];
+
+  records.forEach((r, i) => {
+    const line = i + 2; // ligne 1 = en-têtes
+    const nom     = (r["Nom"] ?? "").trim();
+    const prixRaw = (r["Prix"] ?? "").trim().replace(",", ".");
+    const prix    = Number(prixRaw);
+
+    if (!nom)     { errors.push({ line, reason: "Nom manquant" }); return; }
+    if (!prixRaw || Number.isNaN(prix) || prix < 0) { errors.push({ line, reason: "Prix invalide" }); return; }
+
+    const reference = (r["Référence"] ?? r["Reference"] ?? "").trim();
+    const existingId = reference ? (prodByRef.get(reference.toLowerCase()) ?? null) : null;
+    const catNom  = (r["Catégorie"] ?? r["Categorie"] ?? "").trim();
+    const marqNom = (r["Marque"] ?? "").trim();
+
+    const promoRaw = (r["Prix promo"] ?? "").trim().replace(",", ".");
+    const promo    = promoRaw ? Number(promoRaw) : NaN;
+    const remise   = !Number.isNaN(promo) && promo > 0 && promo < prix ? Math.round((prix - promo) * 100) / 100 : 0;
+
+    rows.push({
+      line,
+      action:        existingId ? "update" : "create",
+      existing_id:   existingId,
+      reference,
+      nom,
+      categorie_id:  catNom ? (catByName.get(catNom.toLowerCase()) ?? null) : null,
+      categorie_nom: catNom,
+      marque_id:     marqNom ? (marqByName.get(marqNom.toLowerCase()) ?? null) : null,
+      marque_nom:    marqNom,
+      prix_unitaire: prix,
+      remise,
+      stock_magasin:  Number((r["Stock magasin"]  ?? "0").trim()) || 0,
+      stock_boutique: Number((r["Stock boutique"] ?? "0").trim()) || 0,
+      stock_minimum:  Number((r["Stock minimum"]  ?? "5").trim()) || 5,
+      actif: parseImportBool(r["Actif"]),
+    });
+  });
+
+  return { rows, errors };
+}
+
+router.post("/api/admin/products/import/preview", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "products")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
+  const csvText = (req.body?.csv as string | undefined) ?? "";
+  if (!csvText.trim()) return res.status(400).json({ error: "Fichier vide." });
+
+  try {
+    const shopId = session.shop_id ?? 1;
+    const { rows, errors } = await resolveImportRows(csvText, shopId);
+
+    const createCount = rows.filter(r => r.action === "create").length;
+    if (createCount > 0) {
+      const shop  = await getShopById(shopId);
+      const limit = planLimit(shop?.plan ?? "free");
+      if (limit !== Infinity) {
+        const pool = db as import("mysql2/promise").Pool;
+        const [[countRow]] = await pool.execute<mysql.RowDataPacket[]>(
+          "SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId]
+        );
+        const current = Number((countRow as mysql.RowDataPacket).cnt ?? 0);
+        if (current + createCount > limit) {
+          return res.status(403).json({
+            error: `Cet import créerait ${createCount} nouveaux produits, ce qui dépasse la limite de votre plan (${limit} max, ${current} actuels). Réduisez le fichier ou passez à un plan supérieur.`,
+          });
+        }
+      }
+    }
+
+    res.json({ rows, errors, created: createCount, updated: rows.length - createCount });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : "Erreur de lecture du fichier." });
+  }
+});
+
+// ── Import CSV — commit (écrit les lignes validées par /preview) ──────────────
+router.post("/api/admin/products/import/commit", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  if (!["super_admin", "admin"].includes(session.role) &&
+      !hasPageAccess(session.role, session.permissions, "magasin", "products")) {
+    return res.status(403).json({ error: "Accès refusé." });
+  }
+  const rows = req.body?.rows as ImportRow[] | undefined;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: "Aucune ligne à importer." });
+  }
+
+  const shopId = session.shop_id ?? 1;
+  const pool   = db as import("mysql2/promise").Pool;
+  invalidateProduitColsCache();
+  const cols = await produitCols();
+
+  let created = 0, updated = 0;
+  const errors: { line: number; reason: string }[] = [];
+
+  for (const r of rows) {
+    try {
+      if (r.action === "update" && r.existing_id) {
+        const [owned] = await pool.execute<mysql.RowDataPacket[]>(
+          "SELECT id FROM produits WHERE id = ? AND shop_id = ? LIMIT 1", [r.existing_id, shopId]
+        );
+        if (!(owned as mysql.RowDataPacket[]).length) {
+          errors.push({ line: r.line, reason: "Produit introuvable pour cette boutique" });
+          continue;
+        }
+        await pool.execute(
+          `UPDATE produits SET nom=?, categorie_id=?, marque_id=?, prix_unitaire=?, remise=?,
+             stock_magasin=?, stock_boutique=?, stock_minimum=?, actif=? WHERE id = ? AND shop_id = ?`,
+          [r.nom, r.categorie_id, r.marque_id, r.prix_unitaire, r.remise,
+           r.stock_magasin, r.stock_boutique, r.stock_minimum, r.actif, r.existing_id, shopId]
+        );
+        updated++;
+      } else {
+        const slug = toSlug(r.nom);
+        const columns: string[] = ["reference", "nom", "categorie_id", "prix_unitaire", "remise", "stock_magasin", "actif", "shop_id"];
+        const values: (string | number | null)[] = [
+          r.reference || "PROD-TMP", r.nom, r.categorie_id, r.prix_unitaire, r.remise, r.stock_magasin, r.actif, shopId,
+        ];
+        if (cols.stock_boutique) { columns.push("stock_boutique"); values.push(r.stock_boutique); }
+        if (cols.stock_minimum)  { columns.push("stock_minimum");  values.push(r.stock_minimum); }
+        if (cols.marque_id && r.marque_id) { columns.push("marque_id"); values.push(r.marque_id); }
+        columns.push("slug"); values.push(slug || null);
+        const [result] = await pool.execute<mysql.ResultSetHeader>(
+          `INSERT INTO produits (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(",")})`, values
+        );
+        if (!r.reference) {
+          await pool.execute("UPDATE produits SET reference = ? WHERE id = ?", [`PROD-${result.insertId}`, result.insertId]);
+        }
+        created++;
+      }
+    } catch (e) {
+      errors.push({ line: r.line, reason: e instanceof Error ? e.message : "Erreur" });
+    }
+  }
+
+  emitAdminEvent("produit");
+  logActivity({
+    shopId, username: session.nom ?? session.username ?? "Admin",
+    actionType: "produit_créé", entity: "produit",
+    label: `Import CSV : ${created} créé${created > 1 ? "s" : ""}, ${updated} modifié${updated > 1 ? "s" : ""}`,
+    workspace: "Magasin",
+  });
+  res.json({ ok: true, created, updated, errors });
 });
 
 // ── Export CSV ────────────────────────────────────────────────────────────────

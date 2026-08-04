@@ -9,13 +9,19 @@ import styles from './Magasin.module.css';
 
 interface KpiStripProps {
   kpis: KpiCard[];
+  onKpiClick?: (label: string) => void;
 }
 
-export default function KpiStrip({ kpis }: KpiStripProps) {
+export default function KpiStrip({ kpis, onKpiClick }: KpiStripProps) {
   return (
     <div className={styles.kpis}>
       {kpis.map((k) => (
-        <div key={k.label} className={styles.kpi}>
+        <div
+          key={k.label}
+          className={styles.kpi}
+          onClick={onKpiClick ? () => onKpiClick(k.label) : undefined}
+          style={onKpiClick ? { cursor: 'pointer' } : undefined}
+        >
           <div className={styles.kpiHead}>
             <div className={styles.kpiLabel}>{k.label}</div>
             <div className={styles.kpiDelta} style={{ color: k.deltaColor }}>

@@ -130,7 +130,7 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
       { l: "Créer un produit",           ic: "plus",     run: () => { window.location.href = "/admin/products/new"; } },
       { l: "Créer un bon d'achat",       ic: "plus",     run: () => ui.openForm("po") },
       { l: "Exporter le catalogue",      ic: "download", run: () => ui.openExport("Produits") },
-      { l: "Importer des produits",      ic: "upload",   run: () => ui.openImport("Produits") },
+      { l: "Importer des produits",      ic: "upload",   run: () => { window.location.href = "/admin/magasin?page=products"; } },
       { l: "Suggestions IA",             ic: "sparkles", run: () => ui.openAI() },
     ],
 
