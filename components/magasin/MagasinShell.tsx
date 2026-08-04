@@ -375,9 +375,11 @@ function ProductsContent({
           ])}>
           Stock{stockFilter ? ` : ${stockFilter === 'ok' ? 'En stock' : stockFilter === 'bas' ? 'Stock bas' : 'Rupture'}` : ''} <ChevDownIcon size={10} />
         </button>
-        <button type="button" className={`${styles.chip} ${styles.add}`} onClick={() => { setCatFilter(''); setBrandFilter(''); setStockFilter(''); }}>
-          {(catFilter || brandFilter || stockFilter) ? '× Réinitialiser' : '+ Ajouter un filtre'}
-        </button>
+        {(catFilter || brandFilter || stockFilter) && (
+          <button type="button" className={`${styles.chip} ${styles.add}`} onClick={() => { setCatFilter(''); setBrandFilter(''); setStockFilter(''); }}>
+            × Réinitialiser
+          </button>
+        )}
         <div className={styles.viewSwitch}>
           <button type="button" className={view === 'table' ? styles.on : ''} onClick={() => setView('table')}>Tableau</button>
           <button type="button" className={view === 'grid'  ? styles.on : ''} onClick={() => setView('grid')}>Grille</button>
