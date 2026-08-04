@@ -8,7 +8,7 @@ export type IconName =
   | "close" | "check" | "chevD" | "eye" | "edit" | "copy" | "archive"
   | "trash" | "download" | "upload" | "file" | "sparkles" | "search"
   | "arrowR" | "cog" | "user" | "logout" | "store" | "swap" | "alert"
-  | "bell" | "plus" | "box" | "adj" | "folder" | "pin" | "more";
+  | "bell" | "plus" | "box" | "adj" | "folder" | "pin" | "more" | "qrcode";
 
 export interface IconProps { size?: number; }
 export type IconComponent = (props: IconProps) => React.ReactElement;
@@ -127,6 +127,7 @@ export interface UIApi {
   openHistory: (title?: string, events?: HistoryEvent[]) => void;
   openExport: (scope: string) => void;
   openImport: (scope: string) => void;
+  openShareQR: (opts: { title: string; subtitle?: string; url: string }) => void;
   openPalette: () => void;
   menu: (e: React.MouseEvent, items: MenuItem[], align?: Align) => void;
   popover: (

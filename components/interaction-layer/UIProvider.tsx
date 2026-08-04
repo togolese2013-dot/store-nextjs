@@ -9,7 +9,7 @@ import React, {
 
 import { SchemaForm }    from "./SchemaForm";
 import { DetailDrawer }  from "./DetailDrawer";
-import { ExportModal, ImportModal, AIDrawer, HistoryDrawer,
+import { ExportModal, ImportModal, ShareQRModal, AIDrawer, HistoryDrawer,
          NotifPanel, FilterPanel, CommandPalette }  from "./overlays";
 import { Modal }         from "./shell";
 import { MenuLayer, PopLayer, Toasts } from "./layers";
@@ -41,6 +41,7 @@ type DrawerState =
 type ModalState =
   | { type: "export"; scope: string }
   | { type: "import"; scope: string }
+  | { type: "qr"; title: string; subtitle?: string; url: string }
   | ({ type: "confirm" } & ConfirmOptions);
 
 interface MenuState { rect: DOMRect; items: MenuItem[]; align: Align; }
@@ -94,6 +95,7 @@ export function UIProvider({ config, onNavigate, children }: UIProviderProps) {
     openHistory: (title, events)               => setDrawer({ type: "history", title, events }),
     openExport:  (scope) => setModal({ type: "export", scope }),
     openImport:  (scope) => setModal({ type: "import", scope }),
+    openShareQR: (opts)  => setModal({ type: "qr", ...opts }),
     openPalette: ()      => setPalette(true),
 
     menu: (e, items, align = "left") => {
@@ -191,6 +193,9 @@ export function UIProvider({ config, onNavigate, children }: UIProviderProps) {
         )}
         {modal?.type === "import" && (
           <ImportModal scope={modal.scope} onClose={() => setModal(null)} toast={toast} />
+        )}
+        {modal?.type === "qr" && (
+          <ShareQRModal title={modal.title} subtitle={modal.subtitle} url={modal.url} onClose={() => setModal(null)} />
         )}
         {modal?.type === "confirm" && (
           <Modal

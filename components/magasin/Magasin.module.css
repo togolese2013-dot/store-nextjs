@@ -425,14 +425,17 @@
 .stockBar > div { height: 100%; border-radius: inherit; transition: width .3s ease; }
 
 .priceCell { font-family: "Geist Mono", monospace; font-size: 13px; text-align: right; min-width: 100px; }
-.marginCell { font-family: "Geist Mono", monospace; font-size: 13px; text-align: right; color: var(--muted); min-width: 70px; }
-.actionsCell { width: 40px; text-align: right; }
+.actionsCell { width: 1%; white-space: nowrap; text-align: right; }
+.rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .rowMenu {
   width: 28px; height: 28px; border-radius: 7px;
   display: grid; place-items: center;
   color: var(--muted); border: 0; background: transparent; cursor: pointer;
 }
 .rowMenu:hover { background: rgba(20,17,14,0.06); color: var(--ink); }
+.rowMenu:disabled { opacity: .4; cursor: default; pointer-events: none; }
+.rowMenuDanger:hover { background: rgba(156,58,20,0.1); color: #9C3A14; }
+.rowMenuMore { color: var(--muted-2); }
 
 /* ─── Footer ───────────────────────────────────────────────────── */
 .tableFoot {

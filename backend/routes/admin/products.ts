@@ -244,8 +244,10 @@ router.post("/api/admin/products/generate-slugs", async (req, res) => {
     try { await pool.execute(`ALTER TABLE produits ADD COLUMN slug VARCHAR(255) NULL`); } catch { /* exists */ }
     try { await pool.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_slug (slug)`); } catch { /* exists */ }
 
+    const shopId = session.shop_id ?? 1;
     const [rows] = await pool.query<mysql.RowDataPacket[]>(
-      "SELECT id, nom, reference FROM produits WHERE slug IS NULL OR slug = ''"
+      "SELECT id, nom, reference FROM produits WHERE shop_id = ? AND (slug IS NULL OR slug = '')",
+      [shopId]
     );
 
     let updated = 0;

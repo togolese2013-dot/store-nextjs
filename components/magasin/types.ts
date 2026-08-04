@@ -37,6 +37,8 @@ export interface Product {
   images?: string[];
   /** Description shown on the storefront product page */
   description?: string;
+  /** URL slug — used to build the public storefront link (/products/[slug]) */
+  slug?: string | null;
 }
 
 export interface KpiCard {

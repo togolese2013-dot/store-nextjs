@@ -50,6 +50,7 @@ interface ApiProduct {
   images?: string[] | null;
   description?: string | null;
   prix_entrepot?: number | null;
+  slug?: string | null;
 }
 
 interface StatsResponse {
@@ -99,6 +100,7 @@ function mapProduct(p: ApiProduct, idx: number): MagasinProduct {
     imageUrl:    resolveImage(p.image_url),
     images:      Array.isArray(p.images) ? p.images : [],
     description: p.description ?? '',
+    slug:        p.slug ?? null,
   };
 }
 

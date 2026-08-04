@@ -58,6 +58,15 @@ export const Icons: Record<IconName, IconComponent> = {
   folder: (p) => <Glyph size={p.size} d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />,
   pin: (p) => <Glyph size={p.size} d={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>} />,
   more: (p) => <Glyph size={p.size} d={<><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="19" r="1.5" /></>} />,
+  qrcode: (p) => <Glyph size={p.size} d={<>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="18" y="14" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="14" y="18" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="18" y="18" width="3" height="3" fill="currentColor" stroke="none" />
+  </>} />,
 };
 
 /** Render an icon by name, e.g. <Icon name="trash" size={16} /> */

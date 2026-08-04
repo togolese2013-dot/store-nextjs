@@ -2,11 +2,11 @@
  * Products table — selectable rows, status pills, stock bars, row actions.
  */
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import type { Product } from './types';
-import { MoreIcon, ChevDownIcon } from './icons';
+import { ChevDownIcon } from './icons';
 import styles from './Magasin.module.css';
-import { useUI } from '@/components/interaction-layer';
+import { useUI, Icons } from '@/components/interaction-layer';
 
 interface ProductTableProps {
   products: Product[];
@@ -40,37 +40,72 @@ function stockColor(pct: number): string {
   return '#2D6A4F';
 }
 
-/* ── Row menu (interaction-layer) ── */
-function RowMenuUI({ product, onDelete, onArchive }: {
+/* ── Row actions (inline icons) ── */
+function RowActions({ product, formatPrice, onDelete, onArchive }: {
   product: Product;
+  formatPrice: (n: number) => string;
   onDelete?: (p: Product) => void;
   onArchive?: (p: Product) => void;
 }) {
   const ui = useUI();
+  const [qrBusy, setQrBusy] = useState(false);
+
+  async function handleShareQR(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!product.id || qrBusy) return;
+    setQrBusy(true);
+    try {
+      let slug = product.slug;
+      if (!slug) {
+        // Slug manquant (produit créé avant l'ajout de la colonne) — génération auto silencieuse.
+        await fetch('/api/admin/products/generate-slugs', { method: 'POST', credentials: 'include' }).catch(() => {});
+        const res  = await fetch(`/api/admin/products/${product.id}`, { credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        slug = data.product?.slug ?? null;
+      }
+      if (!slug) return;
+
+      let base = typeof window !== 'undefined' ? window.location.origin : '';
+      const domainRes = await fetch('/api/admin/settings/domain', { credentials: 'include' }).catch(() => null);
+      if (domainRes?.ok) {
+        const d = await domainRes.json();
+        base = d.custom_domain ? `https://${d.custom_domain}` : d.slug ? `https://${d.slug}.afrisika.com` : base;
+      }
+
+      ui.openShareQR({ title: product.name, subtitle: formatPrice(product.price), url: `${base}/products/${slug}` });
+    } finally {
+      setQrBusy(false);
+    }
+  }
+
   return (
-    <button
-      type="button"
-      className={styles.rowMenu}
-      aria-label="Actions"
-      onClick={(e) => {
-        e.stopPropagation();
-        ui.menu(e, [
-          { label: 'Voir les détails', icon: 'eye',  onClick: () => ui.openDetail('product', product) },
-          { label: 'Modifier',         icon: 'edit', onClick: () => ui.openForm('product', 'edit', product) },
-          { sep: true },
-          { label: product.status === 'Archivé' ? 'Réactiver' : 'Archiver', icon: 'archive',
-            onClick: () => ui.confirmArchive('le produit', product.name, {
-              onConfirm: () => onArchive?.(product),
-            }) },
-          { label: 'Supprimer', icon: 'trash', danger: true,
-            onClick: () => ui.confirmDelete('le produit', product.name, {
-              onConfirm: () => onDelete?.(product),
-            }) },
-        ], 'right');
-      }}
-    >
-      <MoreIcon size={16} />
-    </button>
+    <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className={styles.rowMenu} aria-label="Voir les détails"
+        onClick={() => ui.openDetail('product', product)}>
+        <Icons.eye size={15} />
+      </button>
+      <button type="button" className={styles.rowMenu} aria-label="Modifier"
+        onClick={() => ui.openForm('product', 'edit', product)}>
+        <Icons.edit size={15} />
+      </button>
+      <button type="button" className={styles.rowMenu} aria-label="Code QR" disabled={qrBusy}
+        onClick={handleShareQR}>
+        <Icons.qrcode size={15} />
+      </button>
+      <button type="button" className={`${styles.rowMenu} ${styles.rowMenuMore}`}
+        aria-label={product.status === 'Archivé' ? 'Réactiver' : 'Archiver'}
+        onClick={() => ui.confirmArchive('le produit', product.name, {
+          onConfirm: () => onArchive?.(product),
+        })}>
+        <Icons.archive size={14} />
+      </button>
+      <button type="button" className={`${styles.rowMenu} ${styles.rowMenuDanger}`} aria-label="Supprimer"
+        onClick={() => ui.confirmDelete('le produit', product.name, {
+          onConfirm: () => onDelete?.(product),
+        })}>
+        <Icons.trash size={15} />
+      </button>
+    </div>
   );
 }
 
@@ -206,8 +241,7 @@ export default function ProductTable({
                 <th>Catégorie</th>
                 <th>Marque</th>
                 <th>Stock</th>
-                <th style={{ textAlign: 'right' }}>Prix HT</th>
-                <th style={{ textAlign: 'right' }}>Marge</th>
+                <th style={{ textAlign: 'right' }}>Prix unitaire</th>
                 <th />
               </tr>
             </thead>
@@ -255,23 +289,22 @@ export default function ProductTable({
                     <td style={{ color: 'var(--muted)' }}>{p.brand}</td>
                     <td className={styles.stockCell}>
                       <div className={styles.stockNum}>
-                        {p.stock} <span className="of">/ {p.target}</span>
+                        {p.stock}
                       </div>
                       <div className={styles.stockBar}>
                         <div style={{ width: `${pct * 100}%`, background: stockColor(pct) }} />
                       </div>
                     </td>
                     <td className={styles.priceCell}>{formatPrice(p.price)}</td>
-                    <td className={styles.marginCell}>{p.margin > 0 ? `${p.margin}%` : '—'}</td>
                     <td className={styles.actionsCell}>
-                      <RowMenuUI product={p} onDelete={onDelete} onArchive={onArchive} />
+                      <RowActions product={p} formatPrice={formatPrice} onDelete={onDelete} onArchive={onArchive} />
                     </td>
                   </tr>
                 );
               })}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--muted-2)', fontSize: '13px' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--muted-2)', fontSize: '13px' }}>
                     Aucun produit dans cette vue.
                   </td>
                 </tr>

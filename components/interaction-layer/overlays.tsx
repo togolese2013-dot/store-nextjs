@@ -101,6 +101,66 @@ export function ImportModal({ scope, onClose, toast }: ImportModalProps) {
   );
 }
 
+/* ── SHARE QR MODAL ───────────────────────────────────────── */
+interface ShareQRModalProps { title: string; subtitle?: string; url: string; onClose: () => void; }
+export function ShareQRModal({ title, subtitle, url, onClose }: ShareQRModalProps) {
+  const printRef = useRef<HTMLDivElement>(null);
+  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}&format=png&margin=10`;
+
+  async function handleDownload() {
+    const res  = await fetch(qrImgUrl);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = `qr-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.png`;
+    a.click();
+    URL.revokeObjectURL(objUrl);
+  }
+
+  function handlePrint() {
+    const content = printRef.current?.innerHTML ?? "";
+    const win = window.open("", "_blank", "width=600,height=800");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8" /><title>QR — ${title}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
+        .qrlabel { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px; border: 2px solid #e2e8f0; border-radius: 16px; width: 260px; }
+        .qrlabel img { width: 180px; height: 180px; }
+        .qrlabel .t { font-size: 14px; font-weight: 700; color: #1e293b; text-align: center; }
+        .qrlabel .s { font-size: 12px; color: #64748b; text-align: center; }
+        @media print { @page { margin: 0; size: 9cm 12cm; } body { min-height: unset; } }
+      </style></head><body>${content}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 400);
+  }
+
+  return (
+    <Modal
+      icon={<Icons.qrcode size={18} />}
+      title="Code QR"
+      sub="À scanner pour ouvrir la fiche sur la boutique en ligne."
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={handlePrint}><Icons.file size={14} /> Imprimer</button>
+          <button className="btn pri" onClick={handleDownload}><Icons.download size={14} /> Télécharger</button>
+        </>
+      }
+    >
+      <div ref={printRef} className="qrlabel" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: 20, border: "1px solid var(--border)", borderRadius: 14 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={qrImgUrl} alt={`QR ${title}`} width={180} height={180} style={{ borderRadius: 8 }} />
+        <div className="t" style={{ fontSize: 13.5, fontWeight: 600, textAlign: "center", color: "var(--ink)" }}>{title}</div>
+        {subtitle && <div className="s" style={{ fontSize: 12, color: "var(--muted)", textAlign: "center" }}>{subtitle}</div>}
+      </div>
+      <p style={{ fontSize: 11, color: "var(--muted-2)", textAlign: "center", wordBreak: "break-all", marginTop: 12 }}>{url}</p>
+    </Modal>
+  );
+}
+
 /* ── AI SUGGESTIONS DRAWER ───────────────────────────────── */
 interface AIDrawerProps { onClose: () => void; toast: (m: string) => void; }
 export function AIDrawer({ onClose, toast }: AIDrawerProps) {
@@ -108,6 +168,8 @@ export function AIDrawer({ onClose, toast }: AIDrawerProps) {
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState("");
+  const [sansSlug, setSansSlug]       = useState(0);
+  const [slugBusy, setSlugBusy]       = useState(false);
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
@@ -119,6 +181,7 @@ export function AIDrawer({ onClose, toast }: AIDrawerProps) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Erreur serveur"); return; }
+      setSansSlug(Number(data.context?.sans_slug ?? 0));
       if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
         setSuggestions(data.suggestions as AiSuggestion[]);
       } else {
@@ -131,6 +194,22 @@ export function AIDrawer({ onClose, toast }: AIDrawerProps) {
   }, [config.ai]);
 
   useEffect(() => { fetchSuggestions(); }, [fetchSuggestions]);
+
+  async function handleGenerateSlugs() {
+    setSlugBusy(true);
+    try {
+      const res  = await fetch("/api/admin/products/generate-slugs", { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error ?? "Erreur lors de la génération"); return; }
+      setSansSlug(0);
+      const n = Number(data.updated ?? 0);
+      toast(n > 0 ? `${n} URL${n > 1 ? "s" : ""} de partage généré${n > 1 ? "s" : ""}` : "Aucune URL à générer");
+    } catch {
+      toast("Erreur réseau");
+    } finally {
+      setSlugBusy(false);
+    }
+  }
 
   const tones: Record<string, [string, string]> = {
     danger: ["var(--danger-bg)", "var(--danger)"],
@@ -189,6 +268,26 @@ export function AIDrawer({ onClose, toast }: AIDrawerProps) {
               </div>
             );
           })}
+          {sansSlug > 0 && (
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 13, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: "grid", placeItems: "center", background: "var(--accent-bg)", color: "var(--accent)" }}><Icons.qrcode size={17} /></div>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "-.01em" }}>
+                    {sansSlug} produit{sansSlug > 1 ? "s" : ""} sans URL de partage
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>
+                    Nécessaire pour le code QR et le lien boutique. Génération automatique à partir du nom du produit.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, paddingLeft: 45 }}>
+                <button className="btn sm pri" disabled={slugBusy} onClick={handleGenerateSlugs}>
+                  {slugBusy ? "Génération…" : "Générer maintenant"}
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </Drawer>

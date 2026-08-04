@@ -64,6 +64,13 @@ router.post("/api/admin/ai/suggestions", async (req, res) => {
       FROM factures WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
     `, [shopId]).catch(() => [[{ nb: 0, ca: 0 }]] as any);
 
+    // Requête séparée + catch dédié : la colonne slug est ajoutée à la volée par
+    // /api/admin/products/generate-slugs, ne doit jamais faire échouer les suggestions.
+    const [[slugStats]] = await pool.execute<mysql.RowDataPacket[]>(`
+      SELECT COUNT(*) AS sans_slug FROM produits
+      WHERE actif = 1 AND shop_id = ? AND (slug IS NULL OR slug = '')
+    `, [shopId]).catch(() => [[{ sans_slug: 0 }]] as any);
+
     const context = {
       total_produits:    Number(stats.total),
       stock_bas:         Number(stats.stock_bas),
@@ -71,6 +78,7 @@ router.post("/api/admin/ai/suggestions", async (req, res) => {
       sans_categorie:    Number(stats.sans_categorie),
       marge_faible:      Number(stats.marge_faible),
       sans_image:        Number(stats.sans_image),
+      sans_slug:         Number(slugStats.sans_slug),
       produits_critiques: prodsStockBas.map((p: any) => ({ nom: p.nom, stock: Number(p.stock_magasin) })),
       ventes_7j:  Number(ventes.nb),
       ca_7j_fcfa: Number(ventes.ca),

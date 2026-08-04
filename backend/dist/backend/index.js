@@ -6408,6 +6408,10 @@ var init_ai = __esm({
       SELECT COUNT(*) AS nb, COALESCE(SUM(total), 0) AS ca
       FROM factures WHERE shop_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
     `, [shopId]).catch(() => [[{ nb: 0, ca: 0 }]]);
+        const [[slugStats]] = await pool2.execute(`
+      SELECT COUNT(*) AS sans_slug FROM produits
+      WHERE actif = 1 AND shop_id = ? AND (slug IS NULL OR slug = '')
+    `, [shopId]).catch(() => [[{ sans_slug: 0 }]]);
         const context = {
           total_produits: Number(stats.total),
           stock_bas: Number(stats.stock_bas),
@@ -6415,6 +6419,7 @@ var init_ai = __esm({
           sans_categorie: Number(stats.sans_categorie),
           marge_faible: Number(stats.marge_faible),
           sans_image: Number(stats.sans_image),
+          sans_slug: Number(slugStats.sans_slug),
           produits_critiques: prodsStockBas.map((p) => ({ nom: p.nom, stock: Number(p.stock_magasin) })),
           ventes_7j: Number(ventes.nb),
           ca_7j_fcfa: Number(ventes.ca)
@@ -7330,8 +7335,10 @@ router2.post("/api/admin/products/generate-slugs", async (req, res) => {
       await pool2.execute(`ALTER TABLE produits ADD UNIQUE INDEX idx_produits_slug (slug)`);
     } catch {
     }
+    const shopId = session.shop_id ?? 1;
     const [rows] = await pool2.query(
-      "SELECT id, nom, reference FROM produits WHERE slug IS NULL OR slug = ''"
+      "SELECT id, nom, reference FROM produits WHERE shop_id = ? AND (slug IS NULL OR slug = '')",
+      [shopId]
     );
     let updated = 0;
     for (const row of rows) {
