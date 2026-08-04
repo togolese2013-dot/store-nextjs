@@ -94,14 +94,18 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await api('GET', '/api/admin/saas/shops');
       setTenants((data.shops ?? []).map(shopToTenant));
-    } catch { /* silencieux */ }
+    } catch (e) {
+      setToast(e instanceof Error ? `Boutiques : ${e.message}` : 'Erreur de chargement des boutiques');
+    }
   }, []);
 
   const refreshInvoices = useCallback(async () => {
     try {
       const data = await api('GET', '/api/admin/saas/payments');
       setInvoices((data.payments ?? []).map(paymentToInvoice));
-    } catch { /* silencieux */ }
+    } catch (e) {
+      setToast(e instanceof Error ? `Paiements : ${e.message}` : 'Erreur de chargement des paiements');
+    }
   }, []);
 
   useEffect(() => {
