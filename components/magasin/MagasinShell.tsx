@@ -291,7 +291,7 @@ function ProductsContent({
     switch (activeTab) {
       case 'active':   list = list.filter(p => p.status === 'Actif'); break;
       case 'draft':    list = list.filter(p => p.status === 'Brouillon'); break;
-      case 'low':      list = list.filter(p => p.target > 0 && p.stock / p.target < 0.4); break;
+      case 'low':      list = list.filter(p => p.stock > 0 && p.target > 0 && p.stock / p.target < 0.4); break;
       case 'archived': list = list.filter(p => p.status === 'Archivé'); break;
     }
     // Dropdown filters
@@ -349,9 +349,9 @@ function ProductsContent({
       </div>
 
       <div className={styles.toolbar}>
-        <button type="button" className={styles.chip} onClick={() => { setCatFilter(''); setBrandFilter(''); setStockFilter(''); }}>
-          <FilterIcon size={12} /> Filtres{(catFilter || brandFilter || stockFilter) ? ' ×' : ''}
-        </button>
+        <span className={styles.chip}>
+          <FilterIcon size={12} /> Filtres{(catFilter || brandFilter || stockFilter) ? ' actifs' : ''}
+        </span>
         <button type="button" className={`${styles.chip} ${catFilter ? styles.active : ''}`}
           onClick={e => ui.menu(e, [
             { label: 'Toutes les catégories', onClick: () => setCatFilter('') },

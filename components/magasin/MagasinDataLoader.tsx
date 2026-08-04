@@ -118,7 +118,7 @@ function buildKpis(stats: StatsResponse): KpiCard[] {
 }
 
 function buildTabs(products: MagasinProduct[]): TabSpec[] {
-  const lowCount      = products.filter(p => p.target > 0 && p.stock / p.target < 0.4).length;
+  const lowCount      = products.filter(p => p.stock > 0 && p.target > 0 && p.stock / p.target < 0.4).length;
   const archivedCount = products.filter(p => p.status === 'Archivé').length;
   const activeCount   = products.filter(p => p.status === 'Actif').length;
   return [
