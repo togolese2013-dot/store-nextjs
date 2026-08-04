@@ -420,9 +420,6 @@
 
 .stockCell { min-width: 140px; }
 .stockNum { display: flex; align-items: baseline; gap: 4px; font-family: "Geist Mono", monospace; font-size: 13px; }
-.stockNum .of { color: var(--muted-2); font-size: 11px; }
-.stockBar { margin-top: 6px; height: 4px; background: var(--bg-2); border-radius: 99px; overflow: hidden; }
-.stockBar > div { height: 100%; border-radius: inherit; transition: width .3s ease; }
 
 .priceCell { font-family: "Geist Mono", monospace; font-size: 13px; text-align: right; min-width: 100px; }
 .actionsCell { width: 1%; white-space: nowrap; text-align: right; }

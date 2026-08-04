@@ -113,6 +113,7 @@ export interface MagasinShellProps {
   onPageChange?: (p: number) => void;
 
   onExport?: () => void;
+  formatPrice?: (n: number) => string;
 
   userName?: string;
   userRole?: string;
@@ -142,6 +143,7 @@ export default function MagasinShell({
   pageSize,
   onPageChange,
   onExport,
+  formatPrice,
   onActivePageChange,
   onStockChange,
   userName = 'Kent Diallo',
@@ -241,7 +243,7 @@ export default function MagasinShell({
             onCreateProduct={() => ui.openForm('product')}
             onDelete={onDelete} onArchive={onArchive}
             totalCount={totalCount} page={page} pageSize={pageSize}
-            onPageChange={onPageChange} onExport={onExport}
+            onPageChange={onPageChange} onExport={onExport} formatPrice={formatPrice}
           />
         )}
         {activePage === 'categories'   && <CategoriesPage categories={categories} />}
@@ -270,11 +272,12 @@ interface ProductsContentProps {
   pageSize?:      number;
   onPageChange?:  (p: number) => void;
   onExport?:      () => void;
+  formatPrice?:   (n: number) => string;
 }
 
 function ProductsContent({
   products, categories, brands, kpis, tabs,
-  onCreateProduct, onDelete, onArchive,
+  onCreateProduct, onDelete, onArchive, formatPrice,
   totalCount, page, pageSize, onPageChange, onExport,
 }: ProductsContentProps) {
   const ui = useUI();
@@ -398,6 +401,7 @@ function ProductsContent({
         page={page}
         pageSize={pageSize}
         onPageChange={onPageChange}
+        formatPrice={formatPrice}
       />
     </>
   );

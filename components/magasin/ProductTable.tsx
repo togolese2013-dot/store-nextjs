@@ -80,26 +80,27 @@ function RowActions({ product, formatPrice, onDelete, onArchive }: {
 
   return (
     <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-      <button type="button" className={styles.rowMenu} aria-label="Voir les détails"
+      <button type="button" className={styles.rowMenu} aria-label="Voir les détails" title="Voir les détails"
         onClick={() => ui.openDetail('product', product)}>
         <Icons.eye size={15} />
       </button>
-      <button type="button" className={styles.rowMenu} aria-label="Modifier"
+      <button type="button" className={styles.rowMenu} aria-label="Modifier" title="Modifier"
         onClick={() => ui.openForm('product', 'edit', product)}>
         <Icons.edit size={15} />
       </button>
-      <button type="button" className={styles.rowMenu} aria-label="Code QR" disabled={qrBusy}
+      <button type="button" className={styles.rowMenu} aria-label="Code QR" title="Code QR" disabled={qrBusy}
         onClick={handleShareQR}>
         <Icons.qrcode size={15} />
       </button>
       <button type="button" className={`${styles.rowMenu} ${styles.rowMenuMore}`}
         aria-label={product.status === 'Archivé' ? 'Réactiver' : 'Archiver'}
+        title={product.status === 'Archivé' ? 'Réactiver' : 'Archiver'}
         onClick={() => ui.confirmArchive('le produit', product.name, {
           onConfirm: () => onArchive?.(product),
         })}>
         <Icons.archive size={14} />
       </button>
-      <button type="button" className={`${styles.rowMenu} ${styles.rowMenuDanger}`} aria-label="Supprimer"
+      <button type="button" className={`${styles.rowMenu} ${styles.rowMenuDanger}`} aria-label="Supprimer" title="Supprimer"
         onClick={() => ui.confirmDelete('le produit', product.name, {
           onConfirm: () => onDelete?.(product),
         })}>
@@ -242,12 +243,11 @@ export default function ProductTable({
                 <th>Marque</th>
                 <th>Stock</th>
                 <th style={{ textAlign: 'right' }}>Prix unitaire</th>
-                <th />
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {products.map((p) => {
-                const pct = p.target > 0 ? Math.min(1, p.stock / p.target) : 0;
                 const isSel = selected.has(p.sku);
                 return (
                   <tr key={p.sku} className={isSel ? styles.selected : ''}>
@@ -290,9 +290,6 @@ export default function ProductTable({
                     <td className={styles.stockCell}>
                       <div className={styles.stockNum}>
                         {p.stock}
-                      </div>
-                      <div className={styles.stockBar}>
-                        <div style={{ width: `${pct * 100}%`, background: stockColor(pct) }} />
                       </div>
                     </td>
                     <td className={styles.priceCell}>{formatPrice(p.price)}</td>

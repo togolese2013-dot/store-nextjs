@@ -108,6 +108,14 @@ function formatStockValue(n: number): string {
   return n.toLocaleString('fr-FR');
 }
 
+function buildFormatPrice(symbole: string, symPos: string): (n: number) => string {
+  return (n: number) => {
+    const num = n.toLocaleString('fr-FR').replace(/,/g, ' ');
+    return symPos === 'Avant' ? `${symbole} ${num}` : `${num} ${symbole}`;
+  };
+}
+const DEFAULT_FORMAT_PRICE = buildFormatPrice('FCFA', 'Après');
+
 function buildKpis(stats: StatsResponse): KpiCard[] {
   const { stockStats, statusCounts } = stats;
   const stockBas = (stockStats.stock_faible ?? 0) + (stockStats.en_rupture ?? 0);
@@ -160,6 +168,7 @@ export default function MagasinDataLoader({
   const [suppliers,   setSuppliers]   = useState<import('./types').Supplier[]>([]);
   const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
   const [variants,    setVariants]    = useState<Variant[]>([]);
+  const [formatPrice, setFormatPrice] = useState<(n: number) => string>(() => DEFAULT_FORMAT_PRICE);
 
   /* UI state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -265,6 +274,20 @@ export default function MagasinDataLoader({
     return () => { cancelled = true; };
   }, []);
 
+  /* ── Fetch devise (once on mount) — même réglage que Boutique > Réglages ── */
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDevise() {
+      try {
+        const res = await fetch('/api/admin/boutique/settings', { credentials: 'include' }).then(r => r.json());
+        const d = res?.devise;
+        if (!cancelled && d?.symbole) setFormatPrice(() => buildFormatPrice(d.symbole, d.symPos ?? 'Après'));
+      } catch { /* keep default FCFA */ }
+    }
+    loadDevise();
+    return () => { cancelled = true; };
+  }, []);
+
   /* ── Initial load ── */
   useEffect(() => { fetchProducts('', 1); fetchMeta(); fetchVariants(); }, [fetchProducts, fetchMeta, fetchVariants]);
 
@@ -324,6 +347,7 @@ export default function MagasinDataLoader({
         fetchProducts={fetchProducts}
         currentSearchQuery={searchQuery}
         currentPage={page}
+        formatPrice={formatPrice}
       />
     </UIProvider>
   );
@@ -349,13 +373,14 @@ interface ShellWithUIProps extends Props {
   fetchProducts: (q: string, p: number) => void;
   currentSearchQuery: string;
   currentPage: number;
+  formatPrice: (n: number) => string;
 }
 
 function MagasinShellWithUI({
   products, categories, brands, suppliers, orders, variants, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
-  fetchProducts, currentSearchQuery, currentPage,
+  fetchProducts, currentSearchQuery, currentPage, formatPrice,
 }: ShellWithUIProps) {
   const ui = useUI();
 
@@ -393,6 +418,7 @@ function MagasinShellWithUI({
       page={page}
       pageSize={pageSize}
       onPageChange={onPageChange}
+      formatPrice={formatPrice}
       userName={userName}
       userRole={userRole}
       shopName={shopName}
