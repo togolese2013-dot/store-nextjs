@@ -77,9 +77,9 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
           label: "produit", title: "produit", eyebrow: "Catalogue",
           fields: [
             { k: "name",     l: "Nom du produit",     t: "text",     ph: "Micro boya MM1", full: true },
+            { k: "isNew",    l: "Marquer nouveau",    t: "toggle",   full: true, inlineLabel: true, hint: "" },
             { k: "sku",      l: "SKU / Référence",     t: "text",     mono: true, ph: "PROD-001" },
             { k: "status",   l: "Statut",              t: "seg",      options: ["Actif", "Brouillon", "Rupture"] },
-            { k: "isNew",    l: "Nouveau",             t: "toggle",   hint: "" },
             { k: "cat",      l: "Catégorie",           t: "select",   options: cats },
             { k: "brand",    l: "Marque",              t: "select",   options: brands },
             { k: "cost",     l: "Prix d'achat (FCFA)", t: "price" },

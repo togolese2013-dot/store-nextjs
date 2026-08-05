@@ -207,9 +207,10 @@ export function SchemaForm({ kind, mode, data, onClose, toast }: SchemaFormProps
       case "channels": return <Channels value={val ?? []} onChange={(v) => set(f.k, v)} />;
       case "toggle":
         return (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: f.inlineLabel ? "space-between" : "flex-start", gap: 10 }}>
+            {f.inlineLabel && <span className="ux-label" style={{ margin: 0 }}>{f.l}</span>}
             <Toggle value={!!val} onChange={(v) => set(f.k, v)} />
-            {f.hint !== "" && (
+            {!f.inlineLabel && f.hint !== "" && (
               <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
                 {f.hint ?? (val ? "La règle sera active dès sa création" : "La règle restera en pause")}
               </span>
@@ -257,7 +258,7 @@ export function SchemaForm({ kind, mode, data, onClose, toast }: SchemaFormProps
     >
       <div className="ux-grid2">
         {sc.fields.map((f) => (
-          <Field key={f.k} label={f.l} hint={f.t === "toggle" ? undefined : f.hint} full={f.full}>
+          <Field key={f.k} label={f.t === "toggle" && f.inlineLabel ? undefined : f.l} hint={f.t === "toggle" ? undefined : f.hint} full={f.full}>
             {renderField(f)}
           </Field>
         ))}

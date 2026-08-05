@@ -28,6 +28,8 @@ export interface FieldSpec {
   full?: boolean;
   mono?: boolean;
   hint?: string;
+  /** toggle only: render label + switch inline on one row instead of label above / switch below */
+  inlineLabel?: boolean;
 }
 
 export interface EntitySchema {
