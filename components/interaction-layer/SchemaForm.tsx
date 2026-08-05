@@ -155,7 +155,7 @@ function defaultsFor(schema: EntitySchema): Record<string, any> {
 
 function mapIncoming(kind: string, data: any): Record<string, any> {
   if (!data) return {};
-  if (kind === "product")   return { name: data.name, sku: data.sku, status: data.status, cat: data.cat === '—' ? '' : (data.cat ?? ''), brand: data.brand === '—' ? '' : (data.brand ?? ''), price: data.price, cost: data.cost, stock: data.stock, target: data.target, image: data.imageUrl ?? '', images: data.images ?? [], desc: data.description ?? '', variants: [] };
+  if (kind === "product")   return { name: data.name, sku: data.sku, status: data.status, isNew: data.isNew ?? true, cat: data.cat === '—' ? '' : (data.cat ?? ''), brand: data.brand === '—' ? '' : (data.brand ?? ''), price: data.price, cost: data.cost, discount: data.discount ?? 0, stock: data.stock, target: data.target, image: data.imageUrl ?? '', images: data.images ?? [], desc: data.description ?? '', variants: [] };
   if (kind === "supplier")  return { name: data.name, country: data.country === '—' ? '' : (data.country ?? ''), status: data.status ?? 'Actif', delay: data.delay ?? 0, notes: "" };
   if (kind === "brand")     return { name: data.name, country: data.country, status: data.status, logo: data.logo };
   if (kind === "category")  return { name: data.name, subcats: data.subcats, color: data.color };
@@ -210,7 +210,7 @@ export function SchemaForm({ kind, mode, data, onClose, toast }: SchemaFormProps
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Toggle value={!!val} onChange={(v) => set(f.k, v)} />
             <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              {val ? "La règle sera active dès sa création" : "La règle restera en pause"}
+              {f.hint ?? (val ? "La règle sera active dès sa création" : "La règle restera en pause")}
             </span>
           </div>
         );
@@ -255,7 +255,7 @@ export function SchemaForm({ kind, mode, data, onClose, toast }: SchemaFormProps
     >
       <div className="ux-grid2">
         {sc.fields.map((f) => (
-          <Field key={f.k} label={f.l} hint={f.hint} full={f.full}>
+          <Field key={f.k} label={f.l} hint={f.t === "toggle" ? undefined : f.hint} full={f.full}>
             {renderField(f)}
           </Field>
         ))}

@@ -52,6 +52,8 @@ interface ApiProduct {
   description?: string | null;
   prix_entrepot?: number | null;
   slug?: string | null;
+  remise?: number | null;
+  neuf?: number | boolean | null;
 }
 
 interface StatsResponse {
@@ -93,6 +95,8 @@ function mapProduct(p: ApiProduct, idx: number): MagasinProduct {
     target:   50,
     price:    Number(p.prix_unitaire ?? 0),
     cost:     p.prix_entrepot != null ? Number(p.prix_entrepot) : undefined,
+    discount: Number(p.remise ?? 0),
+    isNew:    p.neuf == null ? true : (p.neuf === 1 || p.neuf === true),
     margin:   p.prix_entrepot && p.prix_unitaire && Number(p.prix_unitaire) > 0
                 ? Math.round((1 - Number(p.prix_entrepot) / Number(p.prix_unitaire)) * 100)
                 : 0,

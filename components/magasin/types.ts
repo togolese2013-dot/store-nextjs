@@ -25,6 +25,10 @@ export interface Product {
   price: number;
   /** Purchase / cost price */
   cost?: number;
+  /** Discount in FCFA — > 0 shows the promo badge and lists the product under Promotions on the storefront */
+  discount?: number;
+  /** Shows the "Nouveau" badge on the storefront (for 30 days after creation) */
+  isNew?: boolean;
   /** Margin in % */
   margin: number;
   /** Color used as thumbnail background */
