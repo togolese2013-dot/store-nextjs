@@ -171,10 +171,14 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
   // KPIs avec sparklines (valeurs réelles, sparklines décoratives)
   const KPIS = [
     {
-      label: 'Mouvements total',   value: String(counts.total),
-      delta: '', deltaColor: '#2D6A4F',
-      sub: 'tous types confondus',
-      spark: [40,45,48,50,52,55,58,60,62,65,counts.total || 70],
+      label: 'Mouvements ce mois', value: String(counts.moisActuel),
+      delta: (() => {
+        const d = counts.moisActuel - counts.moisPrecedent;
+        return d >= 0 ? `+${d}` : String(d);
+      })(),
+      deltaColor: counts.moisActuel - counts.moisPrecedent >= 0 ? '#2D6A4F' : '#9C3A14',
+      sub: `vs ${counts.moisPrecedent} mois dernier`,
+      spark: [40,45,48,50,52,55,58,60,62,65,counts.moisActuel || 70],
       color: '#3B6A8F',
     },
     {
@@ -197,17 +201,6 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
       sub: 'corrections de stock',
       spark: [2,3,3,4,4,5,5,5,6,6,counts.ajustements || 7],
       color: '#5C4A88',
-    },
-    {
-      label: 'Mouvements ce mois', value: String(counts.moisActuel),
-      delta: (() => {
-        const d = counts.moisActuel - counts.moisPrecedent;
-        return d >= 0 ? `+${d}` : String(d);
-      })(),
-      deltaColor: counts.moisActuel - counts.moisPrecedent >= 0 ? '#2D6A4F' : '#9C3A14',
-      sub: `vs ${counts.moisPrecedent} mois dernier`,
-      spark: [40,45,48,50,52,55,58,60,62,65,counts.moisActuel || 70],
-      color: '#3B6A8F',
     },
   ];
 
@@ -360,7 +353,7 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
       )}
 
       {/* KPIs */}
-      <div className={`${styles.kpis} ${styles.kpis5}`}>
+      <div className={styles.kpis}>
         {KPIS.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
