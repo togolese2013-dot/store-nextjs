@@ -48,9 +48,13 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
 
     renderExportModal: (scope, onClose) => {
       if (scope !== "Produits") return null;
-      const categories = (_data.CATEGORIES ?? []).map((c: any) => ({ id: String(c.id), name: c.name ?? c.nom ?? "" }));
+      const categories = (_data.CATEGORIES ?? []).map((c: any) => ({
+        id: String(c.id), name: c.name ?? c.nom ?? "", count: Number(c.products ?? 0),
+      }));
       return (
         <ProductExportModal
+          scope={scope}
+          totalCount={Number(_data.TOTAL_COUNT ?? 0)}
           categories={categories}
           onClose={onClose}
           onExport={({ categoryId }) => {

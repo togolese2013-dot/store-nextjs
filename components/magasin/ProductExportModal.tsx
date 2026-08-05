@@ -1,9 +1,11 @@
 /**
- * ProductExportModal — export du catalogue produits (CSV réel).
+ * ProductExportModal — export du catalogue produits.
  *
- * Portée "Tout" ou "Filtré par catégorie" — les deux seules options que
- * /api/admin/products/export sait vraiment traiter. Pas de format Excel/PDF
- * ni de plage de dates : le backend ne les supporte pas.
+ * Format et Portée affichent toutes les options (comme la maquette
+ * d'origine), mais seul CSV / Tout / Filtré par catégorie sont réels —
+ * le backend ne sait faire que ça. Choisir Excel/PDF ou Sélection ne
+ * ment pas silencieusement : une note explique ce qui va réellement se
+ * passer avant de cliquer "Exporter".
  */
 import React, { useState } from 'react';
 
@@ -12,10 +14,15 @@ export interface ExportPayload {
 }
 
 export interface ProductExportModalProps {
-  categories: { id: string; name: string }[];
+  scope: string;
+  totalCount: number;
+  categories: { id: string; name: string; count: number }[];
   onClose: () => void;
   onExport: (payload: ExportPayload) => void;
 }
+
+type Format = 'CSV' | 'Excel' | 'PDF';
+type Range  = 'Tout' | 'Filtré' | 'Sélection';
 
 const IconDownload = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
@@ -30,6 +37,11 @@ const IconFile = ({ size = 16 }: { size?: number }) => (
 const IconClose = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+const IconInfo = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
   </svg>
 );
 
@@ -56,16 +68,28 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function Notice({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '9px 11px', background: '#FBF0E4', border: '1px solid #EAD9BE', borderRadius: 9, fontSize: 12, color: '#8A5A24', lineHeight: 1.5 }}>
+      <IconInfo size={14} />
+      <span>{children}</span>
+    </div>
+  );
+}
+
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 11px', fontSize: 13, borderRadius: 9, border: '1px solid #E4E0D8', background: '#fff', color: '#14110E', boxSizing: 'border-box',
 };
 
-export function ProductExportModal({ categories, onClose, onExport }: ProductExportModalProps) {
-  const [range, setRange] = useState<'Tout' | 'Filtré'>('Tout');
+export function ProductExportModal({ scope, totalCount, categories, onClose, onExport }: ProductExportModalProps) {
+  const [fmt, setFmt] = useState<Format>('CSV');
+  const [range, setRange] = useState<Range>('Tout');
   const [categoryId, setCategoryId] = useState('');
 
-  const filename = categoryId
-    ? `produits_${(categories.find(c => c.id === categoryId)?.name ?? '').toLowerCase()}.csv`
+  const selectedCat = categories.find(c => c.id === categoryId);
+  const rowCount = range === 'Filtré' && selectedCat ? selectedCat.count : totalCount;
+  const filename = range === 'Filtré' && selectedCat
+    ? `produits_${selectedCat.name.toLowerCase()}.csv`
     : 'produits.csv';
 
   const handleExport = () => {
@@ -82,15 +106,18 @@ export function ProductExportModal({ categories, onClose, onExport }: ProductExp
             <IconDownload size={18} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: '-.01em' }}>Exporter — Catalogue produits</div>
-            <div style={{ fontSize: 12.5, color: '#8A8278', marginTop: 3, lineHeight: 1.5 }}>Téléchargez votre catalogue au format CSV.</div>
+            <div style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: '-.01em' }}>Exporter — {scope}</div>
+            <div style={{ fontSize: 12.5, color: '#8A8278', marginTop: 3, lineHeight: 1.5 }}>Choisissez le format et la portée des données à exporter.</div>
           </div>
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8A8278', padding: 4 }}><IconClose /></button>
         </div>
 
         <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="Format"><Segmented value="CSV" onChange={() => {}} options={['CSV']} /></Field>
-          <Field label="Portée"><Segmented value={range} onChange={setRange} options={['Tout', 'Filtré']} /></Field>
+          <Field label="Format"><Segmented value={fmt} onChange={setFmt} options={['CSV', 'Excel', 'PDF']} /></Field>
+          {fmt !== 'CSV' && <Notice>Export {fmt} bientôt disponible — un fichier CSV sera téléchargé à la place.</Notice>}
+
+          <Field label="Portée"><Segmented value={range} onChange={setRange} options={['Tout', 'Filtré', 'Sélection']} /></Field>
+          {range === 'Sélection' && <Notice>Aucune sélection possible depuis cet écran — le catalogue complet sera exporté.</Notice>}
 
           {range === 'Filtré' && (
             <Field label="Catégorie">
@@ -103,7 +130,7 @@ export function ProductExportModal({ categories, onClose, onExport }: ProductExp
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#F7F5F0', border: '1px solid #E4E0D8', borderRadius: 10, fontSize: 12.5, color: '#8A8278' }}>
             <IconFile size={16} />
-            <span>{filename}</span>
+            <span>{filename} · ~{rowCount} ligne{rowCount > 1 ? 's' : ''}</span>
           </div>
         </div>
 

@@ -319,8 +319,9 @@ export default function MagasinDataLoader({
       PRODUCTS: allProducts, CATEGORIES: categories, BRANDS: brands, SUPPLIERS: suppliers,
       VARIANT_GROUPS: variants.map(v => ({ id: Number(v.id), nom: v.name, valeurs: v.values })),
       PENDING_TRANSFERS: pendingTransfers,
+      TOTAL_COUNT: totalCount,
     });
-  }, [allProducts, categories, brands, suppliers, variants, pendingTransfers]);
+  }, [allProducts, categories, brands, suppliers, variants, pendingTransfers, totalCount]);
 
   /* ── Build config (stable ref — onRefresh triggers re-fetch) ── */
   const config = useMemo(() => createMagasinConfig({
