@@ -131,12 +131,13 @@ function Pagination({ page, totalPages, onChange }: {
 
   return (
     <div className={styles.pager}>
-      <button disabled={page === 1} onClick={() => onChange(page - 1)}>‹</button>
+      <button type="button" disabled={page === 1} onClick={() => onChange(page - 1)}>‹</button>
       {pages.map((p, i) =>
         p === '…' ? (
-          <button key={`e${i}`} disabled style={{ cursor: 'default' }}>…</button>
+          <button type="button" key={`e${i}`} disabled style={{ cursor: 'default' }}>…</button>
         ) : (
           <button
+            type="button"
             key={p}
             className={p === page ? styles.on : ''}
             onClick={() => onChange(p as number)}
@@ -145,7 +146,7 @@ function Pagination({ page, totalPages, onChange }: {
           </button>
         )
       )}
-      <button disabled={page === totalPages} onClick={() => onChange(page + 1)}>›</button>
+      <button type="button" disabled={page === totalPages} onClick={() => onChange(page + 1)}>›</button>
     </div>
   );
 }
@@ -209,11 +210,13 @@ export default function ProductTable({
             );
           })}
         </div>
-        {totalPages > 1 && (
-          <div className={styles.pagination}>
-            <button className={styles.pgBtn} disabled={page <= 1} onClick={() => onPageChange?.(page - 1)}>←</button>
-            <span className={styles.pgInfo}>{page} / {totalPages}</span>
-            <button className={styles.pgBtn} disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)}>→</button>
+        {onPageChange && (
+          <div className={styles.tableFoot}>
+            <span>
+              {selected.size > 0 ? `${selected.size} sélectionné${selected.size > 1 ? 's' : ''} · ` : ''}
+              {products.length} affiché{products.length > 1 ? 's' : ''} sur {realTotal}
+            </span>
+            <Pagination page={page} totalPages={totalPages} onChange={onPageChange} />
           </div>
         )}
       </>

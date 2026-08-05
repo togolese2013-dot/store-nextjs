@@ -170,6 +170,7 @@ export default function MagasinDataLoader({
   const [orders,      setOrders]      = useState<import('./types').PurchaseOrder[]>([]);
   const [variants,    setVariants]    = useState<Variant[]>([]);
   const [formatPrice, setFormatPrice] = useState<(n: number) => string>(() => DEFAULT_FORMAT_PRICE);
+  const [fetchError,  setFetchError]  = useState('');
   const pendingTransfers = usePendingTransfers();
 
   /* UI state */
@@ -189,8 +190,13 @@ export default function MagasinDataLoader({
         setAllProducts(mapped);
         setTotalCount(Number(r.total ?? mapped.length));
         setTabs(buildTabs(mapped));
+        setFetchError('');
+      } else {
+        setFetchError(r.error ?? 'Erreur lors du chargement des produits.');
       }
-    } catch { /* keep current */ }
+    } catch {
+      setFetchError('Erreur réseau lors du chargement des produits.');
+    }
   }, []);
 
   /* ── Fetch variant groups only ── */
@@ -351,6 +357,7 @@ export default function MagasinDataLoader({
         currentSearchQuery={searchQuery}
         currentPage={page}
         formatPrice={formatPrice}
+        fetchError={fetchError}
       />
     </UIProvider>
   );
@@ -377,15 +384,21 @@ interface ShellWithUIProps extends Props {
   currentSearchQuery: string;
   currentPage: number;
   formatPrice: (n: number) => string;
+  fetchError: string;
 }
 
 function MagasinShellWithUI({
   products, categories, brands, suppliers, orders, variants, kpis, tabs, searchQuery, onSearch,
   onSwitchWorkspace, onCreateProduct, totalCount, page, pageSize, onPageChange,
   userName, userRole, shopName, defaultPage,
-  fetchProducts, currentSearchQuery, currentPage, formatPrice,
+  fetchProducts, currentSearchQuery, currentPage, formatPrice, fetchError,
 }: ShellWithUIProps) {
   const ui = useUI();
+
+  useEffect(() => {
+    if (fetchError) ui.toast(fetchError);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchError]);
 
   function handleExport() {
     const qs = new URLSearchParams();
