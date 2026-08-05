@@ -88,6 +88,8 @@ export interface AppConfig {
   searchGroup?: (ui: UIApi) => SearchGroup;
   /** Called fresh each time the bell is read — return the current real notifications. */
   notifs?: () => NotifItem[];
+  /** Overrides the default (generic) export modal for a given scope. Return null to fall back to the generic one. */
+  renderExportModal?: (scope: string, onClose: () => void) => ReactNode | null;
   ai?: AiSuggestion[];
   history?: HistoryEvent[];
   filters?: FilterGroup[];

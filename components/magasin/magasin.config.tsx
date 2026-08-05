@@ -3,6 +3,7 @@
    Pass the result of createMagasinConfig() to <UIProvider config={...}>.
    ============================================================ */
 import type { AppConfig, NotifItem } from "@/components/interaction-layer";
+import { ProductExportModal } from "./ProductExportModal";
 
 interface MagasinConfigOpts {
   onRefresh?: () => void;
@@ -43,6 +44,21 @@ export function createMagasinConfig({ onRefresh, onRefreshMeta, onVariantChange 
         });
       }
       return items;
+    },
+
+    renderExportModal: (scope, onClose) => {
+      if (scope !== "Produits") return null;
+      const categories = (_data.CATEGORIES ?? []).map((c: any) => ({ id: String(c.id), name: c.name ?? c.nom ?? "" }));
+      return (
+        <ProductExportModal
+          categories={categories}
+          onClose={onClose}
+          onExport={({ categoryId }) => {
+            const qs = categoryId ? `?category=${encodeURIComponent(categoryId)}` : "";
+            window.location.href = `/api/admin/products/export${qs}`;
+          }}
+        />
+      );
     },
 
     schemas: () => {

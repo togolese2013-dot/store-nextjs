@@ -189,7 +189,8 @@ export function UIProvider({ config, onNavigate, children }: UIProviderProps) {
         )}
 
         {modal?.type === "export" && (
-          <ExportModal scope={modal.scope} onClose={() => setModal(null)} toast={toast} />
+          config.renderExportModal?.(modal.scope, () => setModal(null))
+            ?? <ExportModal scope={modal.scope} onClose={() => setModal(null)} toast={toast} />
         )}
         {modal?.type === "import" && (
           <ImportModal scope={modal.scope} onClose={() => setModal(null)} toast={toast} />
