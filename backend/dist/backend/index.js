@@ -1267,7 +1267,11 @@ async function getStockMovementCounts(shopId = 1) {
        SUM(sm.type IN ('retrait','vente'))  AS sorties,
        SUM(sm.type NOT IN ('entree','retrait','vente')) AS ajustements,
        SUM(YEAR(sm.created_at) = YEAR(CURDATE()) AND MONTH(sm.created_at) = MONTH(CURDATE())) AS moisActuel,
-       SUM(YEAR(sm.created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH) AND MONTH(sm.created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)) AS moisPrecedent
+       SUM(YEAR(sm.created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH) AND MONTH(sm.created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)) AS moisPrecedent,
+       SUM(sm.type = 'entree' AND DATE(sm.created_at) = CURDATE())                                       AS entreesAuj,
+       SUM(sm.type = 'entree' AND DATE(sm.created_at) = CURDATE() - INTERVAL 1 DAY)                      AS entreesHier,
+       SUM(sm.type IN ('retrait','vente') AND DATE(sm.created_at) = CURDATE())                           AS sortiesAuj,
+       SUM(sm.type IN ('retrait','vente') AND DATE(sm.created_at) = CURDATE() - INTERVAL 1 DAY)          AS sortiesHier
      FROM stock_mouvements sm
      JOIN produits p ON p.id = sm.produit_id
      WHERE p.shop_id = ?`,
@@ -1280,7 +1284,11 @@ async function getStockMovementCounts(shopId = 1) {
     sorties: Number(r?.sorties ?? 0),
     ajustements: Number(r?.ajustements ?? 0),
     moisActuel: Number(r?.moisActuel ?? 0),
-    moisPrecedent: Number(r?.moisPrecedent ?? 0)
+    moisPrecedent: Number(r?.moisPrecedent ?? 0),
+    entreesAuj: Number(r?.entreesAuj ?? 0),
+    entreesHier: Number(r?.entreesHier ?? 0),
+    sortiesAuj: Number(r?.sortiesAuj ?? 0),
+    sortiesHier: Number(r?.sortiesHier ?? 0)
   };
 }
 async function getStockMovements(opts = {}) {

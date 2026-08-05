@@ -39,7 +39,11 @@ interface ApiMouvement {
   created_at:  string;
 }
 
-interface ApiCounts { total: number; entrees: number; sorties: number; ajustements: number; moisActuel: number; moisPrecedent: number; }
+interface ApiCounts {
+  total: number; entrees: number; sorties: number; ajustements: number;
+  moisActuel: number; moisPrecedent: number;
+  entreesAuj: number; entreesHier: number; sortiesAuj: number; sortiesHier: number;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -91,7 +95,10 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
   injectKeyframes();
 
   const [items,        setItems]        = useState<ApiMouvement[]>([]);
-  const [counts,       setCounts]       = useState<ApiCounts>({ total: 0, entrees: 0, sorties: 0, ajustements: 0, moisActuel: 0, moisPrecedent: 0 });
+  const [counts,       setCounts]       = useState<ApiCounts>({
+    total: 0, entrees: 0, sorties: 0, ajustements: 0, moisActuel: 0, moisPrecedent: 0,
+    entreesAuj: 0, entreesHier: 0, sortiesAuj: 0, sortiesHier: 0,
+  });
   const [loading,      setLoading]      = useState(true);
   const [showDrawer,   setShowDrawer]   = useState(false);
   const [drawerProds,  setDrawerProds]  = useState<Array<{ produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string }>>([]);
@@ -182,17 +189,25 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
       color: '#3B6A8F',
     },
     {
-      label: 'Entrées stock',      value: String(counts.entrees),
-      delta: '', deltaColor: '#2D6A4F',
-      sub: 'réceptions fournisseurs',
-      spark: [20,22,24,25,26,28,29,30,31,32,counts.entrees || 35],
+      label: 'Entrées stock',      value: String(counts.entreesAuj),
+      delta: (() => {
+        const d = counts.entreesAuj - counts.entreesHier;
+        return d >= 0 ? `+${d}` : String(d);
+      })(),
+      deltaColor: counts.entreesAuj - counts.entreesHier >= 0 ? '#2D6A4F' : '#9C3A14',
+      sub: `vs ${counts.entreesHier} hier`,
+      spark: [20,22,24,25,26,28,29,30,31,32,counts.entreesAuj || 35],
       color: '#2D6A4F',
     },
     {
-      label: 'Sorties → boutique', value: String(counts.sorties),
-      delta: '', deltaColor: '#C9601E',
-      sub: 'transferts et ventes',
-      spark: [10,12,13,14,15,16,17,18,19,20,counts.sorties || 22],
+      label: 'Sorties → boutique', value: String(counts.sortiesAuj),
+      delta: (() => {
+        const d = counts.sortiesAuj - counts.sortiesHier;
+        return d >= 0 ? `+${d}` : String(d);
+      })(),
+      deltaColor: counts.sortiesAuj - counts.sortiesHier >= 0 ? '#2D6A4F' : '#9C3A14',
+      sub: `vs ${counts.sortiesHier} hier`,
+      spark: [10,12,13,14,15,16,17,18,19,20,counts.sortiesAuj || 22],
       color: '#C9601E',
     },
     {
