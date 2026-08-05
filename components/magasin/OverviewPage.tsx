@@ -1,9 +1,11 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import type { Product, Category, KpiCard } from './types';
 import { SAMPLE_PRODUCTS, SAMPLE_KPIS, SAMPLE_CATEGORIES } from './sample-data';
 import KpiStrip from './KpiStrip';
 import { DownloadIcon, SparklesIcon, FolderIcon, MoreIcon } from './icons';
+import { useUI } from '@/components/interaction-layer';
+import { ProductExportModal } from './ProductExportModal';
 import styles from './Magasin.module.css';
 
 function stockColor(pct: number): string {
@@ -27,6 +29,8 @@ export default function OverviewPage({
   categories = SAMPLE_CATEGORIES,
   kpis = SAMPLE_KPIS,
 }: OverviewPageProps) {
+  const ui = useUI();
+  const [showExport, setShowExport] = useState(false);
   const maxProds = Math.max(...categories.map(c => c.products), 1);
   const lowStock = products.filter(p => p.target > 0 && p.stock / p.target < 0.4);
   const topProds = [...products]
@@ -46,10 +50,10 @@ export default function OverviewPage({
           </p>
         </div>
         <div className={styles.headerActions}>
-          <button type="button" className={styles.btn}>
+          <button type="button" className={styles.btn} onClick={() => setShowExport(true)}>
             <DownloadIcon size={14} /> Rapport
           </button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`}>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => ui.openAI()}>
             <SparklesIcon size={14} /> Suggestions IA
           </button>
         </div>
@@ -198,6 +202,17 @@ export default function OverviewPage({
           </table>
         </div>
       </div>
+
+      {showExport && (
+        <ProductExportModal
+          categories={categories.map(c => ({ id: c.id, name: c.name }))}
+          onClose={() => setShowExport(false)}
+          onExport={({ categoryId }) => {
+            const qs = categoryId ? `?category=${encodeURIComponent(categoryId)}` : '';
+            window.location.href = `/api/admin/products/export${qs}`;
+          }}
+        />
+      )}
     </>
   );
 }
