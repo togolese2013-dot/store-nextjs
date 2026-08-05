@@ -448,13 +448,16 @@ export interface StockMouvement {
 
 export async function getStockMovementCounts(shopId = 1): Promise<{
   total: number; entrees: number; sorties: number; ajustements: number;
+  moisActuel: number; moisPrecedent: number;
 }> {
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total,
        SUM(sm.type = 'entree')              AS entrees,
        SUM(sm.type IN ('retrait','vente'))  AS sorties,
-       SUM(sm.type NOT IN ('entree','retrait','vente')) AS ajustements
+       SUM(sm.type NOT IN ('entree','retrait','vente')) AS ajustements,
+       SUM(YEAR(sm.created_at) = YEAR(CURDATE()) AND MONTH(sm.created_at) = MONTH(CURDATE())) AS moisActuel,
+       SUM(YEAR(sm.created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH) AND MONTH(sm.created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)) AS moisPrecedent
      FROM stock_mouvements sm
      JOIN produits p ON p.id = sm.produit_id
      WHERE p.shop_id = ?`,
@@ -462,10 +465,12 @@ export async function getStockMovementCounts(shopId = 1): Promise<{
   );
   const r = (rows as mysql.RowDataPacket[])[0];
   return {
-    total:       Number(r?.total       ?? 0),
-    entrees:     Number(r?.entrees     ?? 0),
-    sorties:     Number(r?.sorties     ?? 0),
-    ajustements: Number(r?.ajustements ?? 0),
+    total:         Number(r?.total         ?? 0),
+    entrees:       Number(r?.entrees       ?? 0),
+    sorties:       Number(r?.sorties       ?? 0),
+    ajustements:   Number(r?.ajustements   ?? 0),
+    moisActuel:    Number(r?.moisActuel    ?? 0),
+    moisPrecedent: Number(r?.moisPrecedent ?? 0),
   };
 }
 

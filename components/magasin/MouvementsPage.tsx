@@ -39,7 +39,7 @@ interface ApiMouvement {
   created_at:  string;
 }
 
-interface ApiCounts { total: number; entrees: number; sorties: number; ajustements: number; }
+interface ApiCounts { total: number; entrees: number; sorties: number; ajustements: number; moisActuel: number; moisPrecedent: number; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
   injectKeyframes();
 
   const [items,        setItems]        = useState<ApiMouvement[]>([]);
-  const [counts,       setCounts]       = useState<ApiCounts>({ total: 0, entrees: 0, sorties: 0, ajustements: 0 });
+  const [counts,       setCounts]       = useState<ApiCounts>({ total: 0, entrees: 0, sorties: 0, ajustements: 0, moisActuel: 0, moisPrecedent: 0 });
   const [loading,      setLoading]      = useState(true);
   const [showDrawer,   setShowDrawer]   = useState(false);
   const [drawerProds,  setDrawerProds]  = useState<Array<{ produit_id: number; nom: string; reference: string; stock: number; variant_id?: number; variant_nom?: string }>>([]);
@@ -197,6 +197,17 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
       sub: 'corrections de stock',
       spark: [2,3,3,4,4,5,5,5,6,6,counts.ajustements || 7],
       color: '#5C4A88',
+    },
+    {
+      label: 'Mouvements ce mois', value: String(counts.moisActuel),
+      delta: (() => {
+        const d = counts.moisActuel - counts.moisPrecedent;
+        return d >= 0 ? `+${d}` : String(d);
+      })(),
+      deltaColor: counts.moisActuel - counts.moisPrecedent >= 0 ? '#2D6A4F' : '#9C3A14',
+      sub: `vs ${counts.moisPrecedent} mois dernier`,
+      spark: [40,45,48,50,52,55,58,60,62,65,counts.moisActuel || 70],
+      color: '#3B6A8F',
     },
   ];
 
@@ -349,7 +360,7 @@ export default function MouvementsPage({ onStockChange }: MouvementsPageProps) {
       )}
 
       {/* KPIs */}
-      <div className={styles.kpis}>
+      <div className={`${styles.kpis} ${styles.kpis5}`}>
         {KPIS.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
