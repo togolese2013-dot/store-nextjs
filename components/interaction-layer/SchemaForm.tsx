@@ -209,9 +209,11 @@ export function SchemaForm({ kind, mode, data, onClose, toast }: SchemaFormProps
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Toggle value={!!val} onChange={(v) => set(f.k, v)} />
-            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              {f.hint ?? (val ? "La règle sera active dès sa création" : "La règle restera en pause")}
-            </span>
+            {f.hint !== "" && (
+              <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                {f.hint ?? (val ? "La règle sera active dès sa création" : "La règle restera en pause")}
+              </span>
+            )}
           </div>
         );
       case "image":  return <ImageDrop value={val} onChange={(v) => set(f.k, v)} />;
