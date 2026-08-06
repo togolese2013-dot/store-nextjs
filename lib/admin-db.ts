@@ -2463,12 +2463,19 @@ export interface Facture {
   paiements?:        FacturePaiement[];
 }
 
-export async function listFactures(opts: { limit?: number; offset?: number; search?: string; statut?: string; shopId?: number } = {}): Promise<{ items: Facture[]; total: number }> {
-  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+export async function listFactures(opts: {
+  limit?: number; offset?: number; search?: string; statut?: string; shopId?: number;
+  modePaiement?: string; client?: string; dateFrom?: string; dateTo?: string;
+} = {}): Promise<{ items: Facture[]; total: number }> {
+  const { limit = 50, offset = 0, search, statut, shopId = 1, modePaiement, client, dateFrom, dateTo } = opts;
   const conditions: string[] = ["f.shop_id = ?"];
   const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
+  if (modePaiement) { conditions.push("f.mode_paiement = ?"); params.push(modePaiement); }
+  if (client)       { conditions.push("f.client_nom LIKE ?"); params.push(`%${client}%`); }
+  if (dateFrom)     { conditions.push("DATE(f.created_at) >= ?"); params.push(dateFrom); }
+  if (dateTo)       { conditions.push("DATE(f.created_at) <= ?"); params.push(dateTo); }
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
   const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
@@ -2484,6 +2491,36 @@ export async function listFactures(opts: { limit?: number; offset?: number; sear
     `SELECT COUNT(*) AS cnt FROM factures f LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status IN ('confirmed','shipped','delivered') ${where}`, params
   );
   return { items: rows as Facture[], total: Number(cnt[0]?.cnt ?? 0) };
+}
+
+export async function getFacturesPeriodCounts(shopId = 1): Promise<{
+  today: number; week: number; month: number; all: number;
+}> {
+  // Monday-start week, same convention as the frontend's startOfWeek()
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() + diff);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+
+  const [[r]] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT
+       SUM(DATE(created_at) = CURDATE())                                             AS today,
+       SUM(created_at >= ?)                                                          AS week,
+       SUM(YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())) AS month,
+       COUNT(*)                                                                      AS all_count
+     FROM factures
+     WHERE shop_id = ? AND statut != 'annule'`,
+    [weekStartStr, shopId]
+  );
+  return {
+    today: Number(r?.today ?? 0),
+    week:  Number(r?.week  ?? 0),
+    month: Number(r?.month ?? 0),
+    all:   Number(r?.all_count ?? 0),
+  };
 }
 
 async function ensureFacturePaiementsTable() {
@@ -3342,8 +3379,10 @@ type VentesStatsResult = {
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
+  ventes_jour_montant_hier: number;
   commandes_livrees_jour: number; commandes_livrees_jour_count: number;
   depenses_jour: number; rentrees_jour: number; solde_jour: number;
+  depenses_hier: number; rentrees_hier: number; solde_hier: number;
   clients_servis_jour: number;
   paiements_jour: PaiementJour[];
   top_produits_jour: TopProduitJour[];
@@ -3361,7 +3400,7 @@ export async function getVentesStats(shopId = 1): Promise<VentesStatsResult> {
   const SITE_COND = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
   // Ventes du jour "réelles" (hors brouillon/annulé) — base commune pour clients servis / paiements / top produits
   const JOUR_COND = "f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut NOT IN ('annule','brouillon')";
-  const [[f], [l], [ca], [fp], [tj], [cj], [cs], pmRows, itemsRows] = await Promise.all([
+  const [[f], [l], [ca], [fp], [tj], [tjh], [cj], [cs], pmRows, itemsRows] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE f.shop_id = ? AND ${SITE_COND}`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
@@ -3388,6 +3427,19 @@ export async function getVentesStats(shopId = 1): Promise<VentesStatsResult> {
        FROM factures f
        LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
        WHERE f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
+         AND (lv.id IS NULL OR lv.statut = 'livre')`, [shopId]),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt,
+              COALESCE(SUM(
+                CASE
+                  WHEN f.statut_paiement IN ('paye','paye_total') THEN CASE WHEN f.source = 'site_order' THEN f.sous_total ELSE f.total END
+                  WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
+                  ELSE 0
+                END
+              ), 0) AS montant
+       FROM factures f
+       LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
+       WHERE f.shop_id = ? AND DATE(f.created_at) = CURDATE() - INTERVAL 1 DAY AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
          AND (lv.id IS NULL OR lv.statut = 'livre')`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE shop_id = ? AND status = 'delivered' AND DATE(delivered_at) = CURDATE()`, [shopId]
@@ -3431,28 +3483,41 @@ export async function getVentesStats(shopId = 1): Promise<VentesStatsResult> {
     .slice(0, 5);
 
   // Finance queries are optional — table may not exist yet on fresh DBs
-  let depenses_jour = 0;
-  let rentrees_jour = 0;
-  let solde_jour    = 0;
+  let depenses_jour = 0, depenses_hier = 0;
+  let rentrees_jour = 0, rentrees_hier = 0;
+  let solde_jour    = 0, solde_hier    = 0;
   try {
     const [[sj]] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(
-         CASE WHEN type IN ('vente','rentree','caisse') THEN montant
-              WHEN type = 'depense'                    THEN -montant
-              ELSE 0 END
-       ), 0) AS solde
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() THEN
+           (CASE WHEN type IN ('vente','rentree','caisse') THEN montant WHEN type = 'depense' THEN -montant ELSE 0 END)
+           ELSE 0 END), 0) AS solde_jour,
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() - INTERVAL 1 DAY THEN
+           (CASE WHEN type IN ('vente','rentree','caisse') THEN montant WHEN type = 'depense' THEN -montant ELSE 0 END)
+           ELSE 0 END), 0) AS solde_hier
        FROM finance_entries
-       WHERE shop_id = ? AND DATE(date_entree) = CURDATE() AND type != 'transfert'`, [shopId]
+       WHERE shop_id = ? AND type != 'transfert' AND DATE(date_entree) IN (CURDATE(), CURDATE() - INTERVAL 1 DAY)`, [shopId]
     );
     const [[dj]] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'depense' AND DATE(date_entree) = CURDATE()`, [shopId]
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() THEN montant ELSE 0 END), 0) AS jour,
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() - INTERVAL 1 DAY THEN montant ELSE 0 END), 0) AS hier
+       FROM finance_entries
+       WHERE shop_id = ? AND type = 'depense' AND DATE(date_entree) IN (CURDATE(), CURDATE() - INTERVAL 1 DAY)`, [shopId]
     );
     const [[rj]] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'rentree' AND DATE(date_entree) = CURDATE()`, [shopId]
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() THEN montant ELSE 0 END), 0) AS jour,
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() - INTERVAL 1 DAY THEN montant ELSE 0 END), 0) AS hier
+       FROM finance_entries
+       WHERE shop_id = ? AND type = 'rentree' AND DATE(date_entree) IN (CURDATE(), CURDATE() - INTERVAL 1 DAY)`, [shopId]
     );
-    solde_jour    = Number((sj as mysql.RowDataPacket)?.solde   ?? 0);
-    depenses_jour = Number((dj as mysql.RowDataPacket)?.montant ?? 0);
-    rentrees_jour = Number((rj as mysql.RowDataPacket)?.montant ?? 0);
+    solde_jour    = Number((sj as mysql.RowDataPacket)?.solde_jour ?? 0);
+    solde_hier    = Number((sj as mysql.RowDataPacket)?.solde_hier ?? 0);
+    depenses_jour = Number((dj as mysql.RowDataPacket)?.jour ?? 0);
+    depenses_hier = Number((dj as mysql.RowDataPacket)?.hier ?? 0);
+    rentrees_jour = Number((rj as mysql.RowDataPacket)?.jour ?? 0);
+    rentrees_hier = Number((rj as mysql.RowDataPacket)?.hier ?? 0);
   } catch { /* finance_entries table not yet created */ }
 
   const result: VentesStatsResult = {
@@ -3462,11 +3527,15 @@ export async function getVentesStats(shopId = 1): Promise<VentesStatsResult> {
     factures_payees:        Number((fp as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     ventes_jour_montant:    Number((tj as mysql.RowDataPacket[])[0]?.montant ?? 0),
     ventes_jour_count:      Number((tj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
+    ventes_jour_montant_hier: Number((tjh as mysql.RowDataPacket[])[0]?.montant ?? 0),
     commandes_livrees_jour:       Number((cj as mysql.RowDataPacket[])[0]?.montant ?? 0),
     commandes_livrees_jour_count: Number((cj as mysql.RowDataPacket[])[0]?.cnt     ?? 0),
     depenses_jour,
     rentrees_jour,
     solde_jour,
+    depenses_hier,
+    rentrees_hier,
+    solde_hier,
     clients_servis_jour: Number((cs as mysql.RowDataPacket[])[0]?.cnt ?? 0),
     paiements_jour,
     top_produits_jour,

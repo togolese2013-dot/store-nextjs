@@ -6,7 +6,7 @@ import { emitAdminEvent } from "../../lib/admin-events";
 import { sendBoutiqueVenteNotif } from "../../lib/whatsapp";
 import { logActivity } from "../../lib/activity-log";
 import {
-  listFactures, createVenteWithStock, getVentesStats,
+  listFactures, createVenteWithStock, getVentesStats, getFacturesPeriodCounts,
   updateFactureStatut, updateFacture, deleteFacture, getFactureById,
   listDevis, createDevis, listLivraisons,
   getFinanceStats, getStockBoutiqueStats, getStockBoutiqueList,
@@ -19,17 +19,22 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    const search = (req.query.q as string)      || undefined;
-    const statut = (req.query.statut as string) || undefined;
+    const search       = (req.query.q as string)             || undefined;
+    const statut       = (req.query.statut as string)        || undefined;
+    const modePaiement = (req.query.mode_paiement as string)  || undefined;
+    const client       = (req.query.client as string)        || undefined;
+    const dateFrom     = (req.query.date_from as string)      || undefined;
+    const dateTo       = (req.query.date_to as string)        || undefined;
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset)  || 0);
     const shopId = session.shop_id ?? 1;
-    const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes] = await Promise.all([
-      listFactures({ search, statut, limit, offset, shopId }),
+    const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes, periodCounts] = await Promise.all([
+      listFactures({ search, statut, modePaiement, client, dateFrom, dateTo, limit, offset, shopId }),
       getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
       getStockBoutiqueStats(shopId).catch(() => null),
       getStockBoutiqueList({ filter: "faible", limit: 5, shopId }).catch(() => ({ items: [], total: 0 })),
+      getFacturesPeriodCounts(shopId).catch(() => ({ today: 0, week: 0, month: 0, all: 0 })),
     ]);
     const stats = {
       ...ventesStats,
@@ -40,7 +45,7 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
       stock_epuises:  stockStats?.epuises          ?? 0,
       stock_alertes:  stockAlertes.items.map(i => ({ nom: i.nom, quantite: i.quantite, seuil: i.seuil_alerte })),
     };
-    res.json({ items, total, stats });
+    res.json({ items, total, stats, period_counts: periodCounts });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
     if (msg.includes("doesn't exist") || msg.includes("ER_NO_SUCH_TABLE")) {

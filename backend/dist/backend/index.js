@@ -831,6 +831,7 @@ __export(admin_db_exports, {
   getDeliveryZones: () => getDeliveryZones,
   getFactureById: () => getFactureById,
   getFacturePaiements: () => getFacturePaiements,
+  getFacturesPeriodCounts: () => getFacturesPeriodCounts,
   getFinanceDashboard: () => getFinanceDashboard,
   getFinanceStats: () => getFinanceStats,
   getLivraisonsForLivreur: () => getLivraisonsForLivreur,
@@ -2942,7 +2943,7 @@ async function getRecentBoutiqueMovements(limit = 30, shopId = 1) {
   return rows;
 }
 async function listFactures(opts = {}) {
-  const { limit = 50, offset = 0, search, statut, shopId = 1 } = opts;
+  const { limit = 50, offset = 0, search, statut, shopId = 1, modePaiement, client, dateFrom, dateTo } = opts;
   const conditions = ["f.shop_id = ?"];
   const params = [shopId];
   if (search) {
@@ -2952,6 +2953,22 @@ async function listFactures(opts = {}) {
   if (statut) {
     conditions.push("statut = ?");
     params.push(statut);
+  }
+  if (modePaiement) {
+    conditions.push("f.mode_paiement = ?");
+    params.push(modePaiement);
+  }
+  if (client) {
+    conditions.push("f.client_nom LIKE ?");
+    params.push(`%${client}%`);
+  }
+  if (dateFrom) {
+    conditions.push("DATE(f.created_at) >= ?");
+    params.push(dateFrom);
+  }
+  if (dateTo) {
+    conditions.push("DATE(f.created_at) <= ?");
+    params.push(dateTo);
   }
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");
   const where = `WHERE ${conditions.join(" AND ")}`;
@@ -2970,6 +2987,31 @@ async function listFactures(opts = {}) {
     params
   );
   return { items: rows, total: Number(cnt[0]?.cnt ?? 0) };
+}
+async function getFacturesPeriodCounts(shopId = 1) {
+  const now = /* @__PURE__ */ new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() + diff);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const [[r]] = await db.execute(
+    `SELECT
+       SUM(DATE(created_at) = CURDATE())                                             AS today,
+       SUM(created_at >= ?)                                                          AS week,
+       SUM(YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())) AS month,
+       COUNT(*)                                                                      AS all_count
+     FROM factures
+     WHERE shop_id = ? AND statut != 'annule'`,
+    [weekStartStr, shopId]
+  );
+  return {
+    today: Number(r?.today ?? 0),
+    week: Number(r?.week ?? 0),
+    month: Number(r?.month ?? 0),
+    all: Number(r?.all_count ?? 0)
+  };
 }
 async function ensureFacturePaiementsTable() {
   return runOnce("facture_paiements", () => db.execute(`
@@ -3741,7 +3783,7 @@ async function getVentesStats(shopId = 1) {
   const SITE_JOIN2 = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
   const SITE_COND2 = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
   const JOUR_COND = "f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut NOT IN ('annule','brouillon')";
-  const [[f], [l], [ca], [fp], [tj], [cj], [cs], pmRows, itemsRows] = await Promise.all([
+  const [[f], [l], [ca], [fp], [tj], [tjh], [cj], [cs], pmRows, itemsRows] = await Promise.all([
     db.execute(
       `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN2} WHERE f.shop_id = ? AND ${SITE_COND2}`,
       [shopId]
@@ -3776,6 +3818,21 @@ async function getVentesStats(shopId = 1) {
        FROM factures f
        LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
        WHERE f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
+         AND (lv.id IS NULL OR lv.statut = 'livre')`,
+      [shopId]
+    ),
+    db.execute(
+      `SELECT COUNT(*) AS cnt,
+              COALESCE(SUM(
+                CASE
+                  WHEN f.statut_paiement IN ('paye','paye_total') THEN CASE WHEN f.source = 'site_order' THEN f.sous_total ELSE f.total END
+                  WHEN f.statut_paiement = 'acompte'             THEN COALESCE(f.montant_acompte, 0)
+                  ELSE 0
+                END
+              ), 0) AS montant
+       FROM factures f
+       LEFT JOIN livraisons_ventes lv ON lv.facture_id = f.id
+       WHERE f.shop_id = ? AND DATE(f.created_at) = CURDATE() - INTERVAL 1 DAY AND f.statut_paiement IN ('paye','paye_total','acompte') AND f.statut != 'annule' AND (f.source IS NULL OR f.source != 'site_order')
          AND (lv.id IS NULL OR lv.statut = 'livre')`,
       [shopId]
     ),
@@ -3825,31 +3882,44 @@ async function getVentesStats(shopId = 1) {
     }
   }
   const top_produits_jour = [...produitTotals.entries()].map(([nom, v]) => ({ nom, qty: v.qty, ca: v.ca })).sort((a, b) => b.qty - a.qty).slice(0, 5);
-  let depenses_jour = 0;
-  let rentrees_jour = 0;
-  let solde_jour = 0;
+  let depenses_jour = 0, depenses_hier = 0;
+  let rentrees_jour = 0, rentrees_hier = 0;
+  let solde_jour = 0, solde_hier = 0;
   try {
     const [[sj]] = await db.execute(
-      `SELECT COALESCE(SUM(
-         CASE WHEN type IN ('vente','rentree','caisse') THEN montant
-              WHEN type = 'depense'                    THEN -montant
-              ELSE 0 END
-       ), 0) AS solde
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() THEN
+           (CASE WHEN type IN ('vente','rentree','caisse') THEN montant WHEN type = 'depense' THEN -montant ELSE 0 END)
+           ELSE 0 END), 0) AS solde_jour,
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() - INTERVAL 1 DAY THEN
+           (CASE WHEN type IN ('vente','rentree','caisse') THEN montant WHEN type = 'depense' THEN -montant ELSE 0 END)
+           ELSE 0 END), 0) AS solde_hier
        FROM finance_entries
-       WHERE shop_id = ? AND DATE(date_entree) = CURDATE() AND type != 'transfert'`,
+       WHERE shop_id = ? AND type != 'transfert' AND DATE(date_entree) IN (CURDATE(), CURDATE() - INTERVAL 1 DAY)`,
       [shopId]
     );
     const [[dj]] = await db.execute(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'depense' AND DATE(date_entree) = CURDATE()`,
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() THEN montant ELSE 0 END), 0) AS jour,
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() - INTERVAL 1 DAY THEN montant ELSE 0 END), 0) AS hier
+       FROM finance_entries
+       WHERE shop_id = ? AND type = 'depense' AND DATE(date_entree) IN (CURDATE(), CURDATE() - INTERVAL 1 DAY)`,
       [shopId]
     );
     const [[rj]] = await db.execute(
-      `SELECT COALESCE(SUM(montant), 0) AS montant FROM finance_entries WHERE shop_id = ? AND type = 'rentree' AND DATE(date_entree) = CURDATE()`,
+      `SELECT
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() THEN montant ELSE 0 END), 0) AS jour,
+         COALESCE(SUM(CASE WHEN DATE(date_entree) = CURDATE() - INTERVAL 1 DAY THEN montant ELSE 0 END), 0) AS hier
+       FROM finance_entries
+       WHERE shop_id = ? AND type = 'rentree' AND DATE(date_entree) IN (CURDATE(), CURDATE() - INTERVAL 1 DAY)`,
       [shopId]
     );
-    solde_jour = Number(sj?.solde ?? 0);
-    depenses_jour = Number(dj?.montant ?? 0);
-    rentrees_jour = Number(rj?.montant ?? 0);
+    solde_jour = Number(sj?.solde_jour ?? 0);
+    solde_hier = Number(sj?.solde_hier ?? 0);
+    depenses_jour = Number(dj?.jour ?? 0);
+    depenses_hier = Number(dj?.hier ?? 0);
+    rentrees_jour = Number(rj?.jour ?? 0);
+    rentrees_hier = Number(rj?.hier ?? 0);
   } catch {
   }
   const result = {
@@ -3859,11 +3929,15 @@ async function getVentesStats(shopId = 1) {
     factures_payees: Number(fp[0]?.cnt ?? 0),
     ventes_jour_montant: Number(tj[0]?.montant ?? 0),
     ventes_jour_count: Number(tj[0]?.cnt ?? 0),
+    ventes_jour_montant_hier: Number(tjh[0]?.montant ?? 0),
     commandes_livrees_jour: Number(cj[0]?.montant ?? 0),
     commandes_livrees_jour_count: Number(cj[0]?.cnt ?? 0),
     depenses_jour,
     rentrees_jour,
     solde_jour,
+    depenses_hier,
+    rentrees_hier,
+    solde_hier,
     clients_servis_jour: Number(cs[0]?.cnt ?? 0),
     paiements_jour,
     top_produits_jour
@@ -8357,15 +8431,20 @@ router7.get("/api/admin/ventes/factures", async (req, res) => {
   try {
     const search = req.query.q || void 0;
     const statut = req.query.statut || void 0;
+    const modePaiement = req.query.mode_paiement || void 0;
+    const client = req.query.client || void 0;
+    const dateFrom = req.query.date_from || void 0;
+    const dateTo = req.query.date_to || void 0;
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const shopId = session.shop_id ?? 1;
-    const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes] = await Promise.all([
-      listFactures({ search, statut, limit, offset, shopId }),
+    const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes, periodCounts] = await Promise.all([
+      listFactures({ search, statut, modePaiement, client, dateFrom, dateTo, limit, offset, shopId }),
       getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
       getStockBoutiqueStats(shopId).catch(() => null),
-      getStockBoutiqueList({ filter: "faible", limit: 5, shopId }).catch(() => ({ items: [], total: 0 }))
+      getStockBoutiqueList({ filter: "faible", limit: 5, shopId }).catch(() => ({ items: [], total: 0 })),
+      getFacturesPeriodCounts(shopId).catch(() => ({ today: 0, week: 0, month: 0, all: 0 }))
     ]);
     const stats = {
       ...ventesStats,
@@ -8376,7 +8455,7 @@ router7.get("/api/admin/ventes/factures", async (req, res) => {
       stock_epuises: stockStats?.epuises ?? 0,
       stock_alertes: stockAlertes.items.map((i) => ({ nom: i.nom, quantite: i.quantite, seuil: i.seuil_alerte }))
     };
-    res.json({ items, total, stats });
+    res.json({ items, total, stats, period_counts: periodCounts });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
     if (msg.includes("doesn't exist") || msg.includes("ER_NO_SUCH_TABLE")) {
