@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
+import type { Sale, CashMovement, BoutiqueClient, OverviewStats } from './types';
 import {
-  SAMPLE_SALES, SAMPLE_STOCK, SAMPLE_CASH, SAMPLE_CLIENTS,
+  SAMPLE_SALES, SAMPLE_CASH, SAMPLE_CLIENTS,
 } from './sample-data';
 import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import OverviewPage from './OverviewPage';
 import VentesPage from './VentesPage';
 import StockPage from './StockPage';
-import type { StockMouvement } from './BoutiqueDataLoader';
 import FinancePage from './FinancePage';
 import ClientsPage from './ClientsPage';
 import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
@@ -45,7 +44,6 @@ const NAV_TO_PAGE: Record<string, PageId> = {
 export interface BoutiqueShellProps {
   defaultPage?: PageId;
   sales?: Sale[];
-  stock?: BoutiqueStock[];
   movements?: CashMovement[];
   clients?: BoutiqueClient[];
   clientsTotal?: number;
@@ -53,9 +51,7 @@ export interface BoutiqueShellProps {
   onSwitchWorkspace?: () => void;
   onNewSale?: () => void;
   onRequestTransfer?: (sku: string) => void;
-  onRefreshStock?: () => void;
   onRefreshClients?: () => void;
-  stockMovements?: StockMouvement[];
   userName?: string;
   userRole?: string;
   shopName?: string;
@@ -64,7 +60,6 @@ export interface BoutiqueShellProps {
 export default function BoutiqueShell({
   defaultPage = 'overview',
   sales       = SAMPLE_SALES,
-  stock       = SAMPLE_STOCK,
   movements   = SAMPLE_CASH,
   clients     = SAMPLE_CLIENTS,
   clientsTotal,
@@ -72,9 +67,7 @@ export default function BoutiqueShell({
   onSwitchWorkspace,
   onNewSale,
   onRequestTransfer,
-  onRefreshStock,
   onRefreshClients,
-  stockMovements = [],
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
@@ -129,7 +122,7 @@ export default function BoutiqueShell({
         {/* Page routing */}
         {page === 'overview'  && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} onViewAllSales={() => setPage('ventes')} />}
         {page === 'ventes'    && <VentesPage onNewSale={onNewSale} />}
-        {page === 'stock'     && <StockPage stock={stock} stockMovements={stockMovements} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
+        {page === 'stock'     && <StockPage onRequestTransfer={onRequestTransfer} />}
         {page === 'finance'   && <FinancePage />}
         {page === 'clients'   && <ClientsPage clients={clients} total={clientsTotal} onRefresh={onRefreshClients} />}
       </main>

@@ -12,6 +12,7 @@ import Sparkline from './Sparkline';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtNum, fmtAmount } from './BoutiqueSettingsContext';
 import BoutiqueDocPrint, { type PrintItem } from '@/components/admin/BoutiqueDocPrint';
+import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import { formatDateTime } from '@/lib/format-date';
 
 interface ApiFactureItem { nom: string; reference?: string; qty: number; prix: number; total: number; }
@@ -202,6 +203,11 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
     return () => fetchAbortRef.current?.abort();
   }, [fetchList]);
 
+  const { subscribe } = useAdminSSE();
+  useEffect(() => subscribe(e => {
+    if (e.type === 'vente') fetchList();
+  }), [subscribe, fetchList]);
+
   async function handleExport() {
     setExporting(true);
     try {
@@ -308,10 +314,11 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
 
   function dayKpi(label: string, jour: number, hier: number, color: string, sparkBase: number[]) {
     const delta = jour - hier;
+    const pct = hier !== 0 ? Math.round((delta / hier) * 100) : (jour === 0 ? 0 : null);
     return {
       label, value: fmtNum(jour, cfg), unit: cfg.symbol,
-      delta: `${delta >= 0 ? '+' : ''}${fmtNum(delta, cfg)}`,
-      deltaColor: delta >= 0 ? '#2D6A4F' : '#9C3A14',
+      delta: pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct}%`,
+      deltaColor: (pct ?? 0) >= 0 ? '#2D6A4F' : '#9C3A14',
       sub: `vs ${fmtNum(hier, cfg)} hier`,
       spark: [...sparkBase, jour],
       color,
@@ -381,7 +388,7 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
         ))}
       </div>
 
-      <div className={styles.tableWrap}>
+      <div className={styles.tableWrap} style={{ marginTop: 16 }}>
         <div className={styles.tableScroll}>
           <table className={styles.table}>
             <thead>

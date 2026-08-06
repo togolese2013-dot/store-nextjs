@@ -2,7 +2,7 @@
  * Shared facture -> Sale mapping.
  * Used by BoutiqueDataLoader (recent sales preview) and VentesPage (full register, own fetch).
  */
-import type { Sale } from './types';
+import type { Sale, BoutiqueStock } from './types';
 import { formatDateTime } from '@/lib/format-date';
 
 export const SWATCHES = [
@@ -71,5 +71,29 @@ export function mapFacture(f: ApiFacture): Sale {
     vendeur:   f.vendeur ?? null,
     statutPaiement: f.statut_paiement ?? null,
     montantAcompte: f.montant_acompte != null ? Number(f.montant_acompte) : null,
+  };
+}
+
+export interface ApiStockItem {
+  produit_id: number;
+  nom: string;
+  reference: string;
+  categorie_nom: string;
+  quantite: number;
+  seuil_alerte: number;
+  prix_unitaire: number;
+}
+
+export function mapStockItem(item: ApiStockItem, idx: number): BoutiqueStock {
+  return {
+    produit_id: Number(item.produit_id),
+    sku:        item.reference || `PRD-${item.produit_id}`,
+    name:       item.nom,
+    cat:        item.categorie_nom || '—',
+    boutique:   Number(item.quantite),
+    seuil:      Number(item.seuil_alerte) || 5,
+    swatch:     SWATCHES[hashStr(item.nom ?? String(idx)) % SWATCHES.length],
+    init:       (item.nom?.[0] ?? 'P').toUpperCase(),
+    prix:       Number(item.prix_unitaire ?? 0),
   };
 }

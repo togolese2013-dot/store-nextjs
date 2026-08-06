@@ -1,4 +1,4 @@
-import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, KpiItem } from './types';
+import type { Sale, CashMovement, BoutiqueClient, KpiItem } from './types';
 
 /* ─── Sales ─────────────────────────────────────── */
 export const SAMPLE_SALES: Sale[] = [];
@@ -9,9 +9,6 @@ export const PAYMENT_STYLE: Record<string, React.CSSProperties> = {
   'Orange M.':  { background: 'var(--warn-bg)',  color: 'var(--warn)' },
   Carte:        { background: 'var(--accent-bg)',color: 'var(--accent)' },
 };
-
-/* ─── Boutique stock ────────────────────────────── */
-export const SAMPLE_STOCK: BoutiqueStock[] = [];
 
 /* ─── Cash movements (Finance) ──────────────────── */
 export const SAMPLE_CASH: CashMovement[] = [];

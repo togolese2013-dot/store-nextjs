@@ -2189,6 +2189,7 @@ export interface BoutiqueStockItem {
 
 export interface BoutiqueStats {
   total_produits:  number;
+  disponible:      number;
   valeur_boutique: number;
   stock_faible:    number;
   epuises:         number;
@@ -2245,20 +2246,20 @@ async function ensureBoutiqueStockPopulated(): Promise<void> {
 }
 
 export async function getStockBoutiqueStats(shopId = 1): Promise<BoutiqueStats> {
-  await ensureBoutiqueStockPopulated();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
     SELECT
-      (SELECT COUNT(*) FROM produits WHERE shop_id = ?)                                     AS total_produits,
-      COALESCE(SUM(bs.quantite * p.prix_unitaire), 0)                                      AS valeur_boutique,
-      SUM(CASE WHEN bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte THEN 1 ELSE 0 END) AS stock_faible,
-      SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
-    FROM boutique_stock bs
-    JOIN produits p ON p.id = bs.produit_id
-    WHERE p.shop_id = ?
-  `, [shopId, shopId]);
+      COUNT(*)                                                          AS total_produits,
+      SUM(COALESCE(stock_boutique, 0) > 5)                              AS disponible,
+      SUM(COALESCE(stock_boutique, 0) BETWEEN 1 AND 5)                  AS stock_faible,
+      SUM(COALESCE(stock_boutique, 0) = 0)                              AS epuises,
+      COALESCE(SUM(prix_unitaire * COALESCE(stock_boutique, 0)), 0)     AS valeur_boutique
+    FROM produits
+    WHERE shop_id = ?
+  `, [shopId]);
   const r = rows[0] ?? {};
   return {
     total_produits:  Number(r.total_produits  ?? 0),
+    disponible:      Number(r.disponible      ?? 0),
     valeur_boutique: Number(r.valeur_boutique ?? 0),
     stock_faible:    Number(r.stock_faible    ?? 0),
     epuises:         Number(r.epuises         ?? 0),
@@ -2399,7 +2400,10 @@ export async function createBoutiqueMouvement(data: {
   } catch { /* stock_boutique column may not exist */ }
 }
 
-export async function getRecentBoutiqueMovements(limit = 30, shopId = 1): Promise<BoutiqueMouvement[]> {
+export async function getRecentBoutiqueMovements(limit = 30, shopId = 1, excludeVentes = false): Promise<BoutiqueMouvement[]> {
+  const excludeClause = excludeVentes
+    ? `AND bm.motif NOT IN ('Vente', 'Annulation vente', 'Commande site livrée')`
+    : '';
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT bm.*, p.nom AS nom_produit,
             COALESCE(au.nom, u.nom) AS admin_nom
@@ -2408,6 +2412,7 @@ export async function getRecentBoutiqueMovements(limit = 30, shopId = 1): Promis
      LEFT JOIN admin_users au ON au.id = bm.admin_id
      LEFT JOIN utilisateurs u ON u.id = bm.admin_id
      WHERE p.shop_id = ?
+     ${excludeClause}
      ORDER BY bm.created_at DESC
      LIMIT ${Number(limit)}`,
     [shopId]

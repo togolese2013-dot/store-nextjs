@@ -196,6 +196,7 @@ router.delete("/api/admin/ventes/factures/:id", async (req, res) => {
   }
   const facId = Number(req.params.id);
   await deleteFacture(facId);
+  emitAdminEvent("vente");
   logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: "vente_supprimée", entity: "vente", entityId: facId, label: `Vente #${facId} supprimée`, workspace: "Boutique" });
   res.json({ ok: true });
 });

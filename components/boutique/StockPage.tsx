@@ -2,30 +2,51 @@
  * StockPage — boutique physical stock content
  * Stock here is distinct from the Magasin warehouse inventory.
  * Mount via BoutiqueShell (page id: 'stock') or standalone.
+ * Self-fetching (own pagination) — /api/admin/stock-boutique.
  */
 'use client';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { BoutiqueStock } from './types';
 import type { TransferRequest } from '@/lib/transferStore';
-import { SAMPLE_STOCK } from './sample-data';
+import { type ApiStockItem, mapStockItem } from './sale-mapping';
 import Sparkline from './Sparkline';
-import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon } from './icons';
-import type { StockMouvement } from './BoutiqueDataLoader';
+import { PlusIcon, TrendIcon, ArrowRightIcon, AlertTriangleIcon, ReceiptIcon } from './icons';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtAmount } from './BoutiqueSettingsContext';
 import { formatDateTime } from '@/lib/format-date';
 import TransferRequestModal from '@/components/admin/TransferRequestModal';
 import { TransferConfirmation } from './TransferConfirmation';
+import { useAdminSSE } from '@/components/admin/useAdminSSE';
+
+export interface StockMouvement {
+  id: number;
+  produit_id: number;
+  nom_produit: string;
+  type: 'entree' | 'retrait' | 'ajustement';
+  quantite: number;
+  motif: string | null;
+  ref_commande: string | null;
+  admin_nom: string | null;
+  created_at: string;
+}
+
+interface StockStatsData {
+  total_produits:  number;
+  disponible:      number;
+  valeur_boutique: number;
+  stock_faible:    number;
+  epuises:         number;
+}
+
+const LIMIT = 50;
+const FULL_LIMIT = 500; // hors pagination — alimente les sélecteurs produit (ajustement, transfert)
 
 export interface StockPageProps {
-  stock?: BoutiqueStock[];
-  stockMovements?: StockMouvement[];
   onRequestTransfer?: (sku: string) => void;
-  onRefresh?: () => void;
 }
 
 /* ── Modal state types ── */
-type ModalType = null | 'ajustement';
+type ModalType = null | 'ajustement' | 'mouvements';
 
 const OVERLAY: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 999,
@@ -38,19 +59,102 @@ const PANEL: React.CSSProperties = {
   boxShadow: '0 20px 48px rgba(20,17,14,.18)',
   display: 'flex', flexDirection: 'column', gap: 16,
 };
+const PANEL_WIDE: React.CSSProperties = {
+  ...PANEL, maxWidth: 720, maxHeight: '80vh', overflow: 'hidden',
+};
 const FIELD: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const LABEL: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em' };
 const ROW: React.CSSProperties = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 };
 
-export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], onRefresh }: StockPageProps) {
-  const cfg      = useBoutiqueConfig();
-  const low      = stock.filter(p => p.boutique < Math.max(p.seuil, cfg.seuilGlobal));
-  const okCount  = stock.filter(p => p.boutique >= Math.max(p.seuil, cfg.seuilGlobal)).length;
+export default function StockPage({ onRequestTransfer }: StockPageProps) {
+  const cfg = useBoutiqueConfig();
+
+  /* ── Table (paginée) ── */
+  const [page,       setPage]       = useState(1);
+  const [items,       setItems]       = useState<BoutiqueStock[]>([]);
+  const [total,       setTotal]       = useState(0);
+  const [stats,       setStats]       = useState<StockStatsData>({ total_produits: 0, disponible: 0, valeur_boutique: 0, stock_faible: 0, epuises: 0 });
+  const [movements,   setMovements]   = useState<StockMouvement[]>([]);
+
+  /* ── Liste complète (sélecteurs ajustement / transfert, hors pagination) ── */
+  const [allStock, setAllStock] = useState<BoutiqueStock[]>([]);
+
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  const fetchStock = useCallback(() => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
+    const params = new URLSearchParams();
+    params.set('limit', String(LIMIT));
+    params.set('offset', String((page - 1) * LIMIT));
+
+    fetch(`/api/admin/stock-boutique?${params}`, { signal: controller.signal })
+      .then(r => r.json())
+      .then(d => {
+        setItems(Array.isArray(d.items) ? (d.items as ApiStockItem[]).map(mapStockItem) : []);
+        setTotal(Number(d.total ?? 0));
+        if (Array.isArray(d.movements)) setMovements(d.movements as StockMouvement[]);
+        if (d.stats) setStats({
+          total_produits:  Number(d.stats.total_produits  ?? 0),
+          disponible:      Number(d.stats.disponible      ?? 0),
+          valeur_boutique: Number(d.stats.valeur_boutique  ?? 0),
+          stock_faible:    Number(d.stats.stock_faible     ?? 0),
+          epuises:         Number(d.stats.epuises          ?? 0),
+        });
+      })
+      .catch(e => { if (e?.name !== 'AbortError') setItems([]); });
+  }, [page]);
+
+  const fetchAllStock = useCallback(() => {
+    fetch(`/api/admin/stock-boutique?limit=${FULL_LIMIT}&offset=0`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.items)) setAllStock((d.items as ApiStockItem[]).map(mapStockItem)); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchStock();
+    return () => fetchAbortRef.current?.abort();
+  }, [fetchStock]);
+
+  useEffect(() => { fetchAllStock(); }, [fetchAllStock]);
+
+  const { subscribe } = useAdminSSE();
+  useEffect(() => subscribe((e) => {
+    if (e.type === 'stock_transfer') { fetchStock(); fetchAllStock(); }
+  }), [subscribe, fetchStock, fetchAllStock]);
+
+  function refreshAll() { fetchStock(); fetchAllStock(); }
+
+  const stockBas = stats.stock_faible + stats.epuises;
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
   const STOCK_KPIS: import('./types').KpiItem[] = [
-    { label: 'Références en boutique', value: String(stock.length), sub: 'du catalogue',                    sparkColor: '#3B6A8F' },
-    { label: 'Alertes stock',          value: String(low.length),   sub: '< seuil de réapprovisionnement', sparkColor: '#C9601E' },
-    { label: 'Références OK',          value: String(okCount),      sub: 'stock au-dessus du seuil',       sparkColor: '#2D6A4F' },
+    {
+      label: 'Total produits', value: String(stats.total_produits),
+      delta: `${stats.disponible} actifs`, deltaColor: '#2D6A4F',
+      sub: 'en catalogue',
+      spark: [18, 20, 19, 22, 21, 25, 24, 26, 25, 28, stats.total_produits % 32 || 30], sparkColor: '#3B6A8F',
+    },
+    {
+      label: 'Valeur stock', value: stats.valeur_boutique.toLocaleString('fr-FR'), unit: 'FCFA',
+      delta: 'stock boutique', deltaColor: '#2D6A4F',
+      sub: 'prix × quantité',
+      spark: [120, 128, 132, 140, 136, 148, 156, 168, 172, 180, 194], sparkColor: '#2D6A4F',
+    },
+    {
+      label: 'Stock bas', value: String(stockBas),
+      delta: stockBas > 0 ? 'urgent' : 'OK', deltaColor: stockBas > 0 ? '#9C3A14' : '#2D6A4F',
+      sub: '≤ 5 unités ou rupture',
+      spark: [3, 2, 4, 5, 4, 6, 5, 6, 7, 6, stockBas % 10], sparkColor: '#C9601E',
+    },
+    {
+      label: 'Ruptures', value: String(stats.epuises),
+      delta: stats.epuises > 0 ? 'urgent' : 'OK', deltaColor: stats.epuises > 0 ? '#9C3A14' : '#2D6A4F',
+      sub: 'stock = 0',
+      spark: [1, 0, 2, 1, 2, 3, 2, 3, 2, 3, stats.epuises % 8], sparkColor: '#9C3A14',
+    },
   ];
 
   /* ── Modal state ── */
@@ -71,7 +175,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
   /* ── Open modals ── */
   function openAjustement() {
     setError(''); setAQty('1'); setAType('entree'); setAMotif('');
-    setAProduitId(stock.length > 0 ? stock[0].produit_id : '');
+    setAProduitId(allStock.length > 0 ? allStock[0].produit_id : '');
     setModal('ajustement');
   }
 
@@ -89,7 +193,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? 'Erreur serveur.'); return; }
       closeModal();
-      onRefresh?.();
+      refreshAll();
     } catch { setError('Erreur réseau.'); }
     finally { setSaving(false); }
   }
@@ -106,13 +210,16 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
           <button type="button" className={styles.btn} onClick={() => setXferOpen(true)}>
             <ArrowRightIcon size={14} /> Demander transfert
           </button>
+          <button type="button" className={styles.btn} onClick={() => setModal('mouvements')}>
+            <ReceiptIcon size={14} /> Mouvements récents
+          </button>
           <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={openAjustement}>
             <PlusIcon size={14} /> Ajustement manuel
           </button>
         </div>
       </div>
 
-      <div className={styles.kpis3}>
+      <div className={styles.kpis}>
         {STOCK_KPIS.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
@@ -138,24 +245,24 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
               <tr>
                 <th>Produit</th>
                 <th>Catégorie</th>
-                <th>Stock boutique</th>
-                <th style={{ textAlign: 'right' }}>Prix unit.</th>
+                <th style={{ width: 64 }}>Stock boutique</th>
+                <th style={{ width: 150, textAlign: 'right' }}>Prix unit.</th>
                 <th>Statut</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {stock.length === 0 ? (
+              {items.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
                     Aucun produit en stock boutique. Utilisez &quot;Demander transfert&quot; pour en ajouter.
                   </td>
                 </tr>
-              ) : stock.map(p => {
+              ) : items.map(p => {
                 const seuil = Math.max(p.seuil, cfg.seuilGlobal);
-                const isLow = p.boutique < seuil;
-                const ratio = seuil > 0 ? Math.min(1, p.boutique / seuil) : 1;
-                const barColor = isLow ? 'var(--danger)' : ratio < 0.8 ? 'var(--warn)' : 'var(--ok)';
+                const isRupture = p.boutique === 0;
+                const isLow = !isRupture && p.boutique < seuil;
+                const statusColor = isRupture ? 'var(--danger)' : isLow ? 'var(--warn)' : 'var(--ink)';
                 return (
                   <tr key={p.produit_id}>
                     <td>
@@ -167,19 +274,14 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
                         </div>
                       </div>
                     </td>
-                    <td><span className={styles.tag}>{p.cat}</span></td>
-                    <td style={{ minWidth: 140 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: isLow ? 'var(--danger)' : 'var(--ink)' }}>
-                        {p.boutique} <span style={{ color: 'var(--muted-2)', fontSize: 11, fontWeight: 400 }}>/ seuil {seuil}</span>
-                      </div>
-                      <div className={styles.stockBar}>
-                        <div style={{ width: `${ratio * 100}%`, background: barColor }} />
-                      </div>
-                    </td>
-                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{fmtAmount(p.prix, cfg)}</td>
+                    <td><span className={styles.tag} style={{ textTransform: 'uppercase' }}>{p.cat}</span></td>
+                    <td style={{ textAlign: 'center', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: statusColor }}>{p.boutique}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{fmtAmount(p.prix, cfg)}</td>
                     <td>
-                      {isLow
-                        ? <span className={styles.tag} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertTriangleIcon size={11} />Stock bas</span>
+                      {isRupture
+                        ? <span className={styles.tag} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertTriangleIcon size={11} />Rupture</span>
+                        : isLow
+                        ? <span className={styles.tag} style={{ background: 'var(--warn-bg)', color: 'var(--warn)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertTriangleIcon size={11} />Faible</span>
                         : <span className={styles.tag} style={{ background: 'var(--ok-bg)', color: 'var(--ok)' }}>OK</span>
                       }
                     </td>
@@ -191,74 +293,21 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>{low.length} alerte{low.length > 1 ? 's' : ''} · {stock.length} référence{stock.length > 1 ? 's' : ''}</span>
+          <span>{stockBas} alerte{stockBas > 1 ? 's' : ''} · {total} référence{total > 1 ? 's' : ''}</span>
           <div className={styles.pager}>
-            <button type="button">‹</button>
-            <button type="button" className={styles.on}>1</button>
-            <button type="button">›</button>
+            <button type="button" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
+            <button type="button" className={styles.on}>{page}/{totalPages}</button>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
           </div>
         </div>
       </div>
 
-      {/* ── Mouvements récents ── */}
-      {stockMovements.length > 0 && (
-        <div className={styles.tableWrap} style={{ marginTop: 16 }}>
-          <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Mouvements récents — Stock boutique</span>
-          </div>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Produit</th>
-                  <th>Type</th>
-                  <th style={{ textAlign: 'right' }}>Quantité</th>
-                  <th>Motif</th>
-                  <th>Par</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stockMovements.map(mv => {
-                  const isEntree = mv.type === 'entree';
-                  const isRetrait = mv.type === 'retrait';
-                  const date = (() => {
-                    try {
-                      return formatDateTime(mv.created_at);
-                    } catch { return mv.created_at; }
-                  })();
-                  return (
-                    <tr key={mv.id}>
-                      <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: 'var(--muted)' }}>{date}</td>
-                      <td style={{ fontWeight: 500 }}>{mv.nom_produit}</td>
-                      <td>
-                        <span className={styles.tag} style={{
-                          background: isEntree ? 'var(--ok-bg)' : isRetrait ? 'var(--danger-bg)' : 'var(--bg-2,#f5f5f3)',
-                          color: isEntree ? 'var(--ok)' : isRetrait ? 'var(--danger)' : 'var(--muted)',
-                        }}>
-                          {isEntree ? '↑ Entrée' : isRetrait ? '↓ Retrait' : 'Ajust.'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 600, color: isEntree ? 'var(--ok)' : 'var(--danger)' }}>
-                        {isEntree ? '+' : '−'}{mv.quantite}
-                      </td>
-                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{mv.motif ?? '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{mv.admin_nom ?? '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* ── Drawer demande de transfert ── */}
       <TransferRequestModal
         open={xferOpen}
-        products={stock.map(p => ({ name: p.name, sku: p.sku }))}
+        products={allStock.map(p => ({ name: p.name, sku: p.sku }))}
         onClose={() => setXferOpen(false)}
-        onSubmitted={(rec) => { setXferOpen(false); setLastTransfer(rec); onRefresh?.(); }}
+        onSubmitted={(rec) => { setXferOpen(false); setLastTransfer(rec); refreshAll(); }}
       />
 
       <TransferConfirmation
@@ -282,7 +331,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
 
             <div style={FIELD}>
               <label style={LABEL}>Produit</label>
-              {stock.length === 0 ? (
+              {allStock.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '8px 0' }}>Aucun produit en stock boutique.</div>
               ) : (
                 <select
@@ -290,7 +339,7 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
                   value={aProduitId}
                   onChange={e => setAProduitId(Number(e.target.value))}
                 >
-                  {stock.map(p => (
+                  {allStock.map(p => (
                     <option key={p.produit_id} value={p.produit_id}>
                       {p.name} · Stock actuel : {p.boutique}
                     </option>
@@ -346,11 +395,79 @@ export default function StockPage({ stock = SAMPLE_STOCK, stockMovements = [], o
                 type="button"
                 className={`${styles.btn} ${styles.primary}`}
                 onClick={submitAjustement}
-                disabled={saving || !aProduitId || Number(aQty) <= 0 || stock.length === 0}
+                disabled={saving || !aProduitId || Number(aQty) <= 0 || allStock.length === 0}
               >
                 {saving ? 'En cours…' : 'Enregistrer'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Mouvements récents ── */}
+      {modal === 'mouvements' && (
+        <div style={OVERLAY} onClick={closeModal}>
+          <div style={PANEL_WIDE} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div className={styles.eyebrow}>Stock boutique</div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: 0 }}>
+                  Mouvements <span className={styles.serif}>récents</span>
+                </h3>
+              </div>
+              <button type="button" onClick={closeModal} style={{ border: 0, background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted)', lineHeight: 1 }}>✕</button>
+            </div>
+
+            {movements.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
+                Aucun mouvement récent.
+              </div>
+            ) : (
+              <div className={styles.tableScroll} style={{ overflowY: 'auto' }}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Produit</th>
+                      <th>Type</th>
+                      <th style={{ textAlign: 'right' }}>Quantité</th>
+                      <th>Motif</th>
+                      <th>Par</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movements.map(mv => {
+                      const isEntree = mv.type === 'entree';
+                      const isRetrait = mv.type === 'retrait';
+                      const date = (() => {
+                        try {
+                          return formatDateTime(mv.created_at);
+                        } catch { return mv.created_at; }
+                      })();
+                      return (
+                        <tr key={mv.id}>
+                          <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: 'var(--muted)' }}>{date}</td>
+                          <td style={{ fontWeight: 500 }}>{mv.nom_produit}</td>
+                          <td>
+                            <span className={styles.tag} style={{
+                              background: isEntree ? 'var(--ok-bg)' : isRetrait ? 'var(--danger-bg)' : 'var(--bg-2,#f5f5f3)',
+                              color: isEntree ? 'var(--ok)' : isRetrait ? 'var(--danger)' : 'var(--muted)',
+                            }}>
+                              {isEntree ? '↑ Entrée' : isRetrait ? '↓ Retrait' : 'Ajust.'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 600, color: isEntree ? 'var(--ok)' : 'var(--danger)' }}>
+                            {isEntree ? '+' : '−'}{mv.quantite}
+                          </td>
+                          <td style={{ fontSize: 12, color: 'var(--muted)' }}>{mv.motif ?? '—'}</td>
+                          <td style={{ fontSize: 12, color: 'var(--muted)' }}>{mv.admin_nom ?? '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

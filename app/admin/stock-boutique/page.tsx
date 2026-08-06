@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function StockBoutiquePage() {
   const canAjustement = await adminCan("boutique", "stock_ajustement");
 
-  let stats        = { total_produits: 0, valeur_boutique: 0, stock_faible: 0, epuises: 0 };
+  let stats        = { total_produits: 0, disponible: 0, valeur_boutique: 0, stock_faible: 0, epuises: 0 };
   let items:       Awaited<ReturnType<typeof getStockBoutiqueList>>["items"] = [];
   let total        = 0;
   let movements:   Awaited<ReturnType<typeof getRecentBoutiqueMovements>> = [];

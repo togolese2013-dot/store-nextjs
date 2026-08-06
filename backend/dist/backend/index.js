@@ -2792,20 +2792,20 @@ async function ensureBoutiqueStockPopulated() {
   });
 }
 async function getStockBoutiqueStats(shopId = 1) {
-  await ensureBoutiqueStockPopulated();
   const [rows] = await db.execute(`
     SELECT
-      (SELECT COUNT(*) FROM produits WHERE shop_id = ?)                                     AS total_produits,
-      COALESCE(SUM(bs.quantite * p.prix_unitaire), 0)                                      AS valeur_boutique,
-      SUM(CASE WHEN bs.quantite > 0 AND bs.quantite <= bs.seuil_alerte THEN 1 ELSE 0 END) AS stock_faible,
-      SUM(CASE WHEN bs.quantite = 0 THEN 1 ELSE 0 END)                                     AS epuises
-    FROM boutique_stock bs
-    JOIN produits p ON p.id = bs.produit_id
-    WHERE p.shop_id = ?
-  `, [shopId, shopId]);
+      COUNT(*)                                                          AS total_produits,
+      SUM(COALESCE(stock_boutique, 0) > 5)                              AS disponible,
+      SUM(COALESCE(stock_boutique, 0) BETWEEN 1 AND 5)                  AS stock_faible,
+      SUM(COALESCE(stock_boutique, 0) = 0)                              AS epuises,
+      COALESCE(SUM(prix_unitaire * COALESCE(stock_boutique, 0)), 0)     AS valeur_boutique
+    FROM produits
+    WHERE shop_id = ?
+  `, [shopId]);
   const r = rows[0] ?? {};
   return {
     total_produits: Number(r.total_produits ?? 0),
+    disponible: Number(r.disponible ?? 0),
     valeur_boutique: Number(r.valeur_boutique ?? 0),
     stock_faible: Number(r.stock_faible ?? 0),
     epuises: Number(r.epuises ?? 0)
@@ -2927,7 +2927,8 @@ async function createBoutiqueMouvement(data) {
   } catch {
   }
 }
-async function getRecentBoutiqueMovements(limit = 30, shopId = 1) {
+async function getRecentBoutiqueMovements(limit = 30, shopId = 1, excludeVentes = false) {
+  const excludeClause = excludeVentes ? `AND bm.motif NOT IN ('Vente', 'Annulation vente', 'Commande site livr\xE9e')` : "";
   const [rows] = await db.query(
     `SELECT bm.*, p.nom AS nom_produit,
             COALESCE(au.nom, u.nom) AS admin_nom
@@ -2936,6 +2937,7 @@ async function getRecentBoutiqueMovements(limit = 30, shopId = 1) {
      LEFT JOIN admin_users au ON au.id = bm.admin_id
      LEFT JOIN utilisateurs u ON u.id = bm.admin_id
      WHERE p.shop_id = ?
+     ${excludeClause}
      ORDER BY bm.created_at DESC
      LIMIT ${Number(limit)}`,
     [shopId]
@@ -8324,13 +8326,11 @@ router6.get("/api/admin/stock-boutique", async (req, res) => {
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const shopId = session.shop_id ?? 1;
-    const [stats, { items, total }, movements, prodCount] = await Promise.all([
+    const [stats, { items, total }, movements] = await Promise.all([
       getStockBoutiqueStats(shopId),
       getStockBoutiqueList({ search: q, filter, limit, offset, shopId }),
-      getRecentBoutiqueMovements(20, shopId),
-      db.execute("SELECT COUNT(*) AS cnt FROM produits WHERE shop_id = ?", [shopId])
+      getRecentBoutiqueMovements(20, shopId, true)
     ]);
-    stats.total_produits = Number(prodCount[0][0]?.cnt ?? stats.total_produits);
     res.json({ stats, items, total, movements });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur serveur";
@@ -8597,6 +8597,7 @@ router7.delete("/api/admin/ventes/factures/:id", async (req, res) => {
   }
   const facId = Number(req.params.id);
   await deleteFacture(facId);
+  emitAdminEvent("vente");
   logActivity({ shopId: session.shop_id ?? 1, username: session.nom ?? session.username ?? "Admin", actionType: "vente_supprim\xE9e", entity: "vente", entityId: facId, label: `Vente #${facId} supprim\xE9e`, workspace: "Boutique" });
   res.json({ ok: true });
 });

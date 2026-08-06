@@ -9,29 +9,10 @@ import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats }
 import { BoutiqueSettingsProvider, buildConfig, type BoutiqueConfig } from './BoutiqueSettingsContext';
 import type { StoreState } from './settings/types';
 import { formatDate, formatDateTime } from '@/lib/format-date';
-import { SWATCHES, hashStr, initials, type ApiFacture, mapFacture, mapPaymentMode, type ApiPaymentMode } from './sale-mapping';
-
-interface ApiStockItem {
-  produit_id: number;
-  nom: string;
-  reference: string;
-  categorie_nom: string;
-  quantite: number;
-  seuil_alerte: number;
-  prix_unitaire: number;
-}
-
-export interface StockMouvement {
-  id: number;
-  produit_id: number;
-  nom_produit: string;
-  type: 'entree' | 'retrait' | 'ajustement';
-  quantite: number;
-  motif: string | null;
-  ref_commande: string | null;
-  admin_nom: string | null;
-  created_at: string;
-}
+import {
+  SWATCHES, hashStr, initials, type ApiFacture, mapFacture, mapPaymentMode, type ApiPaymentMode,
+  type ApiStockItem, mapStockItem,
+} from './sale-mapping';
 
 interface ApiFinanceEntry {
   reference: string;
@@ -51,20 +32,6 @@ interface ApiBoutiqueClient {
   solde: number;
   notes: string | null;
   created_at: string;
-}
-
-function mapStockItem(item: ApiStockItem, idx: number): BoutiqueStock {
-  return {
-    produit_id: Number(item.produit_id),
-    sku:        item.reference || `PRD-${item.produit_id}`,
-    name:       item.nom,
-    cat:        item.categorie_nom || '—',
-    boutique:   Number(item.quantite),
-    seuil:      Number(item.seuil_alerte) || 5,
-    swatch:     SWATCHES[hashStr(item.nom ?? String(idx)) % SWATCHES.length],
-    init:       (item.nom?.[0] ?? 'P').toUpperCase(),
-    prix:       Number(item.prix_unitaire ?? 0),
-  };
 }
 
 function mapFinanceEntries(entries: ApiFinanceEntry[]): CashMovement[] {
@@ -141,7 +108,6 @@ export default function BoutiqueDataLoader({
   const [sales,            setSales]            = useState<Sale[]>([]);
   const [stock,            setStock]            = useState<BoutiqueStock[]>([]);
   const [movements,        setMovements]        = useState<CashMovement[]>([]);
-  const [stockMovements,   setStockMovements]   = useState<StockMouvement[]>([]);
   const [clients,       setClients]       = useState<BoutiqueClient[]>([]);
   const [overviewStats, setOverviewStats] = useState<OverviewStats>({
     ventes_jour_count: 0, ventes_jour_montant: 0, ca_total: 0, factures_payees: 0,
@@ -209,7 +175,6 @@ export default function BoutiqueDataLoader({
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d.items)) setStock((d.items as ApiStockItem[]).map(mapStockItem));
-        if (Array.isArray(d.movements)) setStockMovements(d.movements as StockMouvement[]);
       })
       .catch(() => {});
   }, []);
@@ -248,9 +213,7 @@ export default function BoutiqueDataLoader({
       <BoutiqueSettingsProvider cfg={boutiqueConfig} refresh={fetchBoutiqueSettings}>
         <BoutiqueShell
           sales={sales}
-          stock={stock}
           movements={movements}
-          stockMovements={stockMovements}
           clients={clients}
           clientsTotal={clientsTotal}
           onRefreshClients={fetchClients}
@@ -258,7 +221,6 @@ export default function BoutiqueDataLoader({
           onSwitchWorkspace={onSwitchWorkspace}
           onNewSale={onNewSale}
           onRequestTransfer={onRequestTransfer}
-          onRefreshStock={fetchStock}
           userName={userName}
           userRole={userRole}
           shopName={shopName}
