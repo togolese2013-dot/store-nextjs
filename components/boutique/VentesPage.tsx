@@ -4,22 +4,86 @@
  * Self-fetching (own period/filters/pagination) — /api/admin/ventes/factures.
  */
 'use client';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Sale } from './types';
-import { PAYMENT_STYLE } from './sample-data';
-import { mapFacture, type ApiFacture, type ApiPaymentMode } from './sale-mapping';
-import { DownloadIcon, PlusIcon, FilterIcon, PrinterIcon, TrendIcon } from './icons';
+import { mapFacture, type ApiFacture } from './sale-mapping';
+import { DownloadIcon, PlusIcon, PrinterIcon, TrendIcon, EyeIcon, PencilIcon, TrashIcon, CloseIcon } from './icons';
 import Sparkline from './Sparkline';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtNum, fmtAmount } from './BoutiqueSettingsContext';
 import BoutiqueDocPrint, { type PrintItem } from '@/components/admin/BoutiqueDocPrint';
+import { formatDateTime } from '@/lib/format-date';
 
 interface ApiFactureItem { nom: string; reference?: string; qty: number; prix: number; total: number; }
 interface ApiFactureDetail {
+  id: number;
   reference: string; client_nom: string; client_tel: string | null;
   items: string; sous_total: number; remise: number; total: number;
-  mode_paiement: string | null; statut_paiement: string | null;
+  mode_paiement: string | null; statut_paiement: string | null; montant_acompte: number | null;
+  statut: string; vendeur: string | null;
   adresse_livraison: string | null; created_at: string;
+}
+
+function parseFactureItems(items: string): ApiFactureItem[] {
+  try { return typeof items === 'string' ? JSON.parse(items) : (items ?? []); }
+  catch { return []; }
+}
+
+const STATUT_FACTURE = [
+  { value: 'brouillon', label: 'Brouillon' },
+  { value: 'valide',    label: 'Validé' },
+  { value: 'paye',      label: 'Payé' },
+  { value: 'annule',    label: 'Annulé' },
+];
+const STATUT_PAIEMENT_OPTIONS = [
+  { value: 'paye_total', label: 'Payé en totalité' },
+  { value: 'acompte',    label: 'Acompte' },
+  { value: 'non_paye',   label: 'Non payé' },
+];
+const MODE_PAIEMENT_OPTIONS = [
+  { value: 'especes',           label: 'Espèces' },
+  { value: 'mixx_by_yas',       label: 'Mixx by Yas' },
+  { value: 'moov_money',        label: 'Moov Money' },
+  { value: 'virement_bancaire', label: 'Virement bancaire' },
+];
+
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 9, background: 'var(--bg)' };
+
+function modePaiementLabel(mode: string | null): string {
+  return MODE_PAIEMENT_OPTIONS.find(m => m.value === mode)?.label ?? (mode ?? '—');
+}
+
+function paiementLabelColor(statutPaiement: string | null): { label: string; color: string; bg: string } {
+  if (statutPaiement === 'paye' || statutPaiement === 'paye_total') return { label: 'Payé', color: 'var(--ok)', bg: 'var(--ok-bg)' };
+  if (statutPaiement === 'acompte') return { label: 'Acompte', color: 'var(--warn)', bg: 'var(--warn-bg)' };
+  return { label: 'Non payé', color: 'var(--danger)', bg: 'var(--danger-bg)' };
+}
+
+interface EditState {
+  numericId: number;
+  reference: string;
+  statut: string;
+  statutPaiement: string;
+  montantAcompte: string;
+  modePaiement: string;
+  total: number;
+  saving: boolean;
+  error: string;
+}
+
+function toEditState(f: ApiFactureDetail): EditState {
+  return {
+    numericId:      f.id,
+    reference:      f.reference,
+    statut:         f.statut,
+    statutPaiement: f.statut_paiement ?? 'non_paye',
+    montantAcompte: f.montant_acompte != null ? String(f.montant_acompte) : '',
+    modePaiement:   f.mode_paiement ?? 'especes',
+    total:          f.total,
+    saving:         false,
+    error:          '',
+  };
 }
 
 const LIMIT = 20;
@@ -27,14 +91,6 @@ type Period = 'today' | 'week' | 'month' | 'all';
 const PERIOD_LABELS: Record<Period, string> = {
   today: "Aujourd'hui", week: 'Cette semaine', month: 'Ce mois', all: 'Tout',
 };
-const PAYMENT_OPTIONS: { value: NonNullable<ApiPaymentMode>; label: string }[] = [
-  { value: 'especes',           label: 'Espèces' },
-  { value: 'moov_money',        label: 'Moov Money' },
-  { value: 'tmoney',            label: 'T-Money' },
-  { value: 'virement_bancaire', label: 'Virement bancaire' },
-  { value: 'wave',              label: 'Wave' },
-];
-
 function isoPrefix(date: Date, unit: 'day' | 'month') {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -53,10 +109,7 @@ function startOfWeek(date: Date): Date {
 }
 
 function buildPrintProps(f: ApiFactureDetail) {
-  let items: ApiFactureItem[] = [];
-  try { items = typeof f.items === 'string' ? JSON.parse(f.items) : (f.items ?? []); }
-  catch { items = []; }
-  const printItems: PrintItem[] = items.map(i => ({
+  const printItems: PrintItem[] = parseFactureItems(f.items).map(i => ({
     nom: i.nom, reference: i.reference, qty: i.qty, prix: i.prix, total: i.total,
   }));
   return {
@@ -84,9 +137,6 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
   const cfg = useBoutiqueConfig();
   const [period, setPeriod]   = useState<Period>('today');
   const [page, setPage]       = useState(1);
-  const [modePaiement, setModePaiement] = useState('');
-  const [clientInput, setClientInput]   = useState('');
-  const [clientQuery, setClientQuery]   = useState('');
   const [items, setItems]     = useState<Sale[]>([]);
   const [total, setTotal]     = useState(0);
   const [loading, setLoading] = useState(false);
@@ -99,18 +149,15 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
   });
   const [exporting, setExporting] = useState(false);
   const [printDoc, setPrintDoc] = useState<ReturnType<typeof buildPrintProps> | null>(null);
-  const [printError, setPrintError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [detailDoc, setDetailDoc] = useState<ApiFactureDetail | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
-  // Debounce the client text filter before it triggers a fetch
-  useEffect(() => {
-    const t = setTimeout(() => { setClientQuery(clientInput); setPage(1); }, 300);
-    return () => clearTimeout(t);
-  }, [clientInput]);
-
-  useEffect(() => { setPage(1); }, [period, modePaiement]);
+  useEffect(() => { setPage(1); }, [period]);
 
   const fetchAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => {
+  const fetchList = useCallback(() => {
     fetchAbortRef.current?.abort();
     const controller = new AbortController();
     fetchAbortRef.current = controller;
@@ -119,8 +166,6 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
     const params = new URLSearchParams();
     params.set('limit', String(LIMIT));
     params.set('offset', String((page - 1) * LIMIT));
-    if (modePaiement) params.set('mode_paiement', modePaiement);
-    if (clientQuery)  params.set('client', clientQuery);
     const now = new Date();
     if (period === 'today') {
       params.set('date_from', isoPrefix(now, 'day'));
@@ -150,9 +195,12 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
       })
       .catch(e => { if (e?.name !== 'AbortError') setItems([]); })
       .finally(() => setLoading(false));
+  }, [period, page]);
 
-    return () => controller.abort();
-  }, [period, page, modePaiement, clientQuery]);
+  useEffect(() => {
+    fetchList();
+    return () => fetchAbortRef.current?.abort();
+  }, [fetchList]);
 
   async function handleExport() {
     setExporting(true);
@@ -176,20 +224,79 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
     }
   }
 
-  async function handlePrint(numericId: number) {
-    setPrintError('');
+  async function fetchFactureDetail(numericId: number): Promise<ApiFactureDetail | null> {
     try {
       const res = await fetch(`/api/admin/ventes/factures/${numericId}`);
-      if (!res.ok) { setPrintError('Facture introuvable.'); return; }
-      const f: ApiFactureDetail = await res.json();
-      setPrintDoc(buildPrintProps(f));
+      if (!res.ok) return null;
+      return await res.json();
     } catch {
-      setPrintError('Erreur réseau.');
+      return null;
+    }
+  }
+
+  async function handleViewDetail(numericId: number) {
+    setActionError('');
+    setBusyId(numericId);
+    const f = await fetchFactureDetail(numericId);
+    setBusyId(null);
+    if (!f) { setActionError('Facture introuvable.'); return; }
+    setDetailDoc(f);
+  }
+
+  async function handleOpenEdit(numericId: number) {
+    setActionError('');
+    setBusyId(numericId);
+    const f = await fetchFactureDetail(numericId);
+    setBusyId(null);
+    if (!f) { setActionError('Facture introuvable.'); return; }
+    setDetailDoc(null);
+    setEditState(toEditState(f));
+  }
+
+  async function submitEdit() {
+    if (!editState) return;
+    if (editState.statutPaiement === 'acompte') {
+      const montant = Number(editState.montantAcompte);
+      if (!editState.montantAcompte || Number.isNaN(montant) || montant <= 0 || montant >= editState.total) {
+        setEditState(s => s ? { ...s, error: 'Montant acompte invalide (entre 0 et le total).' } : s);
+        return;
+      }
+    }
+    setEditState(s => s ? { ...s, saving: true, error: '' } : s);
+    try {
+      const res = await fetch(`/api/admin/ventes/factures/${editState.numericId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          statut:           editState.statut,
+          statut_paiement:  editState.statutPaiement,
+          mode_paiement:    editState.modePaiement,
+          montant_acompte:  editState.statutPaiement === 'acompte' ? Number(editState.montantAcompte) : null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setEditState(s => s ? { ...s, saving: false, error: data.error ?? 'Erreur.' } : s); return; }
+      setEditState(null);
+      fetchList();
+    } catch {
+      setEditState(s => s ? { ...s, saving: false, error: 'Erreur réseau.' } : s);
+    }
+  }
+
+  async function handleDelete(s: Sale) {
+    if (!window.confirm(`Supprimer la vente ${s.id} ?`)) return;
+    setActionError('');
+    try {
+      const res = await fetch(`/api/admin/ventes/factures/${s.numericId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setActionError(data.error ?? 'Suppression impossible.'); return; }
+      fetchList();
+    } catch {
+      setActionError('Erreur réseau.');
     }
   }
 
   const totalAmount = useMemo(() => items.reduce((s, i) => s + i.amount, 0), [items]);
-  const hasActiveFilters = !!modePaiement || !!clientInput;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
   const PERIOD_TABS: { id: Period; label: string; count: number }[] = [
@@ -236,8 +343,8 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
         </div>
       </div>
 
-      {printError && (
-        <p style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 8, marginTop: 12 }}>{printError}</p>
+      {actionError && (
+        <p style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 8, marginTop: 12 }}>{actionError}</p>
       )}
 
       <div className={styles.kpis}>
@@ -274,56 +381,34 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
         ))}
       </div>
 
-      <div className={styles.toolbar}>
-        {hasActiveFilters ? (
-          <button type="button" className={styles.chip} onClick={() => { setModePaiement(''); setClientInput(''); }}>
-            × Réinitialiser
-          </button>
-        ) : (
-          <span className={styles.chip} style={{ cursor: 'default' }}><FilterIcon size={12} /> Filtres</span>
-        )}
-        <select
-          className={styles.chip}
-          value={modePaiement}
-          onChange={e => setModePaiement(e.target.value)}
-          style={{ cursor: 'pointer' }}
-        >
-          <option value="">Paiement</option>
-          {PAYMENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <input
-          type="text"
-          className={styles.chip}
-          placeholder="Client…"
-          value={clientInput}
-          onChange={e => setClientInput(e.target.value)}
-          style={{ minWidth: 120 }}
-        />
-      </div>
-
       <div className={styles.tableWrap}>
         <div className={styles.tableScroll}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>ID</th>
                 <th>Date &amp; heure</th>
+                <th>ID</th>
                 <th>Client</th>
-                <th>Articles</th>
                 <th style={{ textAlign: 'right' }}>Montant</th>
                 <th>Paiement</th>
                 <th>Vendeur</th>
-                <th />
+                <th style={{ width: 108 }} />
               </tr>
             </thead>
             <tbody>
               {!loading && items.length === 0 && (
-                <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '24px 0' }}>Aucune vente pour cette période/ces filtres</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '24px 0' }}>Aucune vente pour cette période</td></tr>
               )}
-              {items.map(s => (
+              {items.map(s => {
+                const pmt = paiementLabelColor(s.statutPaiement);
+                const isPaid = s.statutPaiement === 'paye' || s.statutPaiement === 'paye_total';
+                const isDeposit = s.statutPaiement === 'acompte';
+                const pct = isDeposit && s.montantAcompte != null && s.amount > 0
+                  ? Math.round((s.montantAcompte / s.amount) * 100) : 0;
+                return (
                 <tr key={s.id}>
-                  <td><span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12.5, fontWeight: 500 }}>{s.id}</span></td>
                   <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{s.time}</td>
+                  <td><span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12.5, fontWeight: 500 }}>{s.id}</span></td>
                   <td>
                     {s.client === '—'
                       ? <span style={{ color: 'var(--muted)', fontSize: 13 }}>Anonyme</span>
@@ -334,19 +419,38 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
                         </div>
                       )}
                   </td>
-                  <td style={{ fontSize: 12.5, color: 'var(--muted)', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.items}</td>
                   <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{fmtAmount(s.amount, cfg)}</td>
-                  <td><span className={styles.tag} style={PAYMENT_STYLE[s.payment]}>{s.payment}</span></td>
+                  <td>
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
+                      <span className={styles.tag} style={{ background: pmt.bg, color: pmt.color, alignSelf: 'flex-start' }}>
+                        {isDeposit ? `${pmt.label} · ${pct}%` : pmt.label}
+                      </span>
+                      {!isPaid && (
+                        <div className={styles.stockBar} style={{ width: 60 }}>
+                          <div style={{ width: `${pct}%`, background: pmt.color }} />
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td style={{ fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                     {s.vendeur ?? '—'}
                   </td>
-                  <td className={styles.actionsCell}>
-                    <button type="button" className={styles.rowMenu} title="Imprimer le reçu" onClick={() => handlePrint(s.numericId)}>
-                      <PrinterIcon size={14} />
-                    </button>
+                  <td className={styles.actionsCell} style={{ width: 108 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, opacity: busyId === s.numericId ? 0.5 : 1 }}>
+                      <button type="button" className={styles.rowMenu} title="Voir les détails" disabled={busyId === s.numericId} onClick={() => handleViewDetail(s.numericId)}>
+                        <EyeIcon size={14} />
+                      </button>
+                      <button type="button" className={styles.rowMenu} title="Modifier la vente" disabled={busyId === s.numericId} onClick={() => handleOpenEdit(s.numericId)}>
+                        <PencilIcon size={14} />
+                      </button>
+                      <button type="button" className={styles.rowMenu} title="Supprimer la vente" onClick={() => handleDelete(s)}>
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -362,6 +466,143 @@ export default function VentesPage({ onNewSale }: VentesPageProps) {
 
       {printDoc && (
         <BoutiqueDocPrint {...printDoc} onClose={() => setPrintDoc(null)} />
+      )}
+
+      {/* ── Modale détails ── */}
+      {detailDoc && (() => {
+        const f = detailDoc;
+        const pmt = paiementLabelColor(f.statut_paiement);
+        const isDeposit = f.statut_paiement === 'acompte';
+        const reste = isDeposit ? f.total - (f.montant_acompte ?? 0) : 0;
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(20,17,14,.35)', padding: 16 }}
+            onClick={() => setDetailDoc(null)}>
+            <div style={{ background: 'var(--surface)', borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(20,17,14,.2)' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Vente {f.reference}</h2>
+                  <p style={{ fontSize: 12, color: 'var(--muted)', margin: '2px 0 0' }}>{formatDateTime(f.created_at)}</p>
+                </div>
+                <button type="button" onClick={() => setDetailDoc(null)} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--muted)', padding: 4 }}>
+                  <CloseIcon size={16} />
+                </button>
+              </div>
+              <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 14 }}>{f.client_nom || 'Client anonyme'}</div>
+                  {f.client_tel && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{f.client_tel}</div>}
+                </div>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ color: 'var(--muted-2)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      <th style={{ textAlign: 'left', padding: '4px 0', fontWeight: 500 }}>Article</th>
+                      <th style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500 }}>Qté</th>
+                      <th style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500 }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parseFactureItems(f.items).map((it, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '6px 0' }}>{it.nom}</td>
+                        <td style={{ textAlign: 'right', padding: '6px 0' }}>{it.qty}</td>
+                        <td style={{ textAlign: 'right', padding: '6px 0', fontFamily: 'Geist Mono, monospace' }}>{fmtAmount(it.total, cfg)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}><span>Sous-total</span><span>{fmtAmount(f.sous_total, cfg)}</span></div>
+                  {f.remise > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}><span>Remise</span><span>−{fmtAmount(f.remise, cfg)}</span></div>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 14 }}><span>Total</span><span>{fmtAmount(f.total, cfg)}</span></div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{modePaiementLabel(f.mode_paiement)}</span>
+                  <span className={styles.tag} style={{ background: pmt.bg, color: pmt.color }}>
+                    {isDeposit ? `${pmt.label} · ${fmtAmount(f.montant_acompte ?? 0, cfg)} versé, reste ${fmtAmount(reste, cfg)}` : pmt.label}
+                  </span>
+                </div>
+
+                {f.adresse_livraison && (
+                  <div style={{ fontSize: 12.5 }}>
+                    <span style={{ color: 'var(--muted)' }}>Livraison : </span>{f.adresse_livraison}
+                  </div>
+                )}
+                <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Vendeur : {f.vendeur ?? '—'}</div>
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <button type="button" className={styles.btn} style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setPrintDoc(buildPrintProps(f)); setDetailDoc(null); }}>
+                    <PrinterIcon size={14} /> Imprimer
+                  </button>
+                  <button type="button" className={`${styles.btn} ${styles.primary}`} style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setEditState(toEditState(f)); setDetailDoc(null); }}>
+                    <PencilIcon size={14} /> Modifier
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Modale modifier ── */}
+      {editState && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(20,17,14,.35)', padding: 16 }}
+          onClick={() => setEditState(null)}>
+          <div style={{ background: 'var(--surface)', borderRadius: 16, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(20,17,14,.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Modifier la vente</h2>
+                <p style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'Geist Mono, monospace', margin: '2px 0 0' }}>{editState.reference}</p>
+              </div>
+              <button type="button" onClick={() => setEditState(null)} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--muted)', padding: 4 }}>
+                <CloseIcon size={16} />
+              </button>
+            </div>
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {editState.error && (
+                <p style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 8, margin: 0 }}>{editState.error}</p>
+              )}
+              <div>
+                <label style={labelStyle}>Statut de la facture</label>
+                <select value={editState.statut} onChange={e => setEditState(s => s ? { ...s, statut: e.target.value } : s)} style={inputStyle}>
+                  {STATUT_FACTURE.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Statut du paiement</label>
+                <select value={editState.statutPaiement} onChange={e => setEditState(s => s ? { ...s, statutPaiement: e.target.value } : s)} style={inputStyle}>
+                  {STATUT_PAIEMENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              {editState.statutPaiement === 'acompte' && (
+                <div>
+                  <label style={labelStyle}>Montant de l&apos;acompte (FCFA)</label>
+                  <input type="number" min={0} max={editState.total} value={editState.montantAcompte}
+                    onChange={e => setEditState(s => s ? { ...s, montantAcompte: e.target.value } : s)} style={inputStyle} />
+                  <p style={{ fontSize: 11, color: 'var(--muted)', margin: '4px 0 0' }}>
+                    Total {fmtAmount(editState.total, cfg)} · reste {fmtAmount(Math.max(0, editState.total - (Number(editState.montantAcompte) || 0)), cfg)}
+                  </p>
+                </div>
+              )}
+              <div>
+                <label style={labelStyle}>Mode de paiement</label>
+                <select value={editState.modePaiement} onChange={e => setEditState(s => s ? { ...s, modePaiement: e.target.value } : s)} style={inputStyle}>
+                  {MODE_PAIEMENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                <button type="button" onClick={() => setEditState(null)} className={styles.btn} style={{ flex: 1, justifyContent: 'center' }}>Annuler</button>
+                <button type="button" onClick={submitEdit} disabled={editState.saving} className={`${styles.btn} ${styles.primary}`} style={{ flex: 1, justifyContent: 'center' }}>
+                  {editState.saving ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

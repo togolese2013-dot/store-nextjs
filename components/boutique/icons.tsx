@@ -108,3 +108,23 @@ export const AlertTriangleIcon = ({ size = 12 }: IconProps) => (
     <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
   </svg>
 );
+export const EyeIcon      = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+export const PencilIcon   = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}>
+    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
+  </svg>
+);
+export const TrashIcon    = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}>
+    <path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-.87 14.14A2 2 0 0 1 16.14 22H7.86a2 2 0 0 1-1.99-1.86L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+);
+export const CloseIcon    = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}>
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);

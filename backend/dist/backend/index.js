@@ -2943,7 +2943,7 @@ async function getRecentBoutiqueMovements(limit = 30, shopId = 1) {
   return rows;
 }
 async function listFactures(opts = {}) {
-  const { limit = 50, offset = 0, search, statut, shopId = 1, modePaiement, client, dateFrom, dateTo } = opts;
+  const { limit = 50, offset = 0, search, statut, shopId = 1, dateFrom, dateTo } = opts;
   const conditions = ["f.shop_id = ?"];
   const params = [shopId];
   if (search) {
@@ -2953,14 +2953,6 @@ async function listFactures(opts = {}) {
   if (statut) {
     conditions.push("statut = ?");
     params.push(statut);
-  }
-  if (modePaiement) {
-    conditions.push("f.mode_paiement = ?");
-    params.push(modePaiement);
-  }
-  if (client) {
-    conditions.push("f.client_nom LIKE ?");
-    params.push(`%${client}%`);
   }
   if (dateFrom) {
     conditions.push("DATE(f.created_at) >= ?");
@@ -8431,15 +8423,13 @@ router7.get("/api/admin/ventes/factures", async (req, res) => {
   try {
     const search = req.query.q || void 0;
     const statut = req.query.statut || void 0;
-    const modePaiement = req.query.mode_paiement || void 0;
-    const client = req.query.client || void 0;
     const dateFrom = req.query.date_from || void 0;
     const dateTo = req.query.date_to || void 0;
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const shopId = session.shop_id ?? 1;
     const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes, periodCounts] = await Promise.all([
-      listFactures({ search, statut, modePaiement, client, dateFrom, dateTo, limit, offset, shopId }),
+      listFactures({ search, statut, dateFrom, dateTo, limit, offset, shopId }),
       getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
       getStockBoutiqueStats(shopId).catch(() => null),

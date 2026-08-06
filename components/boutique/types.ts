@@ -20,6 +20,9 @@ export interface Sale {
   payment: PaymentMethod;
   items: string;
   vendeur?: string | null;
+  /** 'paye' | 'paye_total' | 'acompte' | 'non_paye' | null */
+  statutPaiement: string | null;
+  montantAcompte: number | null;
 }
 
 export interface BoutiqueStock {

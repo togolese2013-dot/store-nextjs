@@ -40,6 +40,8 @@ export interface ApiFacture {
   items: string;
   total: number;
   mode_paiement: ApiPaymentMode;
+  statut_paiement?: string | null;
+  montant_acompte?: number | null;
   created_at: string;
   vendeur?: string | null;
 }
@@ -67,5 +69,7 @@ export function mapFacture(f: ApiFacture): Sale {
     payment:   mapPaymentMode(f.mode_paiement),
     items:     itemNames || '—',
     vendeur:   f.vendeur ?? null,
+    statutPaiement: f.statut_paiement ?? null,
+    montantAcompte: f.montant_acompte != null ? Number(f.montant_acompte) : null,
   };
 }

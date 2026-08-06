@@ -2465,15 +2465,13 @@ export interface Facture {
 
 export async function listFactures(opts: {
   limit?: number; offset?: number; search?: string; statut?: string; shopId?: number;
-  modePaiement?: string; client?: string; dateFrom?: string; dateTo?: string;
+  dateFrom?: string; dateTo?: string;
 } = {}): Promise<{ items: Facture[]; total: number }> {
-  const { limit = 50, offset = 0, search, statut, shopId = 1, modePaiement, client, dateFrom, dateTo } = opts;
+  const { limit = 50, offset = 0, search, statut, shopId = 1, dateFrom, dateTo } = opts;
   const conditions: string[] = ["f.shop_id = ?"];
   const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (search) { conditions.push("(client_nom LIKE ? OR reference LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
   if (statut) { conditions.push("statut = ?"); params.push(statut); }
-  if (modePaiement) { conditions.push("f.mode_paiement = ?"); params.push(modePaiement); }
-  if (client)       { conditions.push("f.client_nom LIKE ?"); params.push(`%${client}%`); }
   if (dateFrom)     { conditions.push("DATE(f.created_at) >= ?"); params.push(dateFrom); }
   if (dateTo)       { conditions.push("DATE(f.created_at) <= ?"); params.push(dateTo); }
   conditions.push("(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)");

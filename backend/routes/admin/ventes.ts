@@ -21,15 +21,13 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
   try {
     const search       = (req.query.q as string)             || undefined;
     const statut       = (req.query.statut as string)        || undefined;
-    const modePaiement = (req.query.mode_paiement as string)  || undefined;
-    const client       = (req.query.client as string)        || undefined;
     const dateFrom     = (req.query.date_from as string)      || undefined;
     const dateTo       = (req.query.date_to as string)        || undefined;
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset)  || 0);
     const shopId = session.shop_id ?? 1;
     const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes, periodCounts] = await Promise.all([
-      listFactures({ search, statut, modePaiement, client, dateFrom, dateTo, limit, offset, shopId }),
+      listFactures({ search, statut, dateFrom, dateTo, limit, offset, shopId }),
       getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
       getStockBoutiqueStats(shopId).catch(() => null),
