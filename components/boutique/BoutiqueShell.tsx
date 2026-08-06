@@ -127,7 +127,7 @@ export default function BoutiqueShell({
         </header>
 
         {/* Page routing */}
-        {page === 'overview'  && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} />}
+        {page === 'overview'  && <OverviewPage sales={sales} overviewStats={overviewStats} onNewSale={onNewSale} onViewAllSales={() => setPage('ventes')} />}
         {page === 'ventes'    && <VentesPage sales={sales} onNewSale={onNewSale} />}
         {page === 'stock'     && <StockPage stock={stock} stockMovements={stockMovements} onRequestTransfer={onRequestTransfer} onRefresh={onRefreshStock} />}
         {page === 'finance'   && <FinancePage />}

@@ -9,7 +9,7 @@ import {
   listFactures, createVenteWithStock, getVentesStats,
   updateFactureStatut, updateFacture, deleteFacture, getFactureById,
   listDevis, createDevis, listLivraisons,
-  getFinanceStats, getStockBoutiqueStats,
+  getFinanceStats, getStockBoutiqueStats, getStockBoutiqueList,
 } from "@/lib/admin-db";
 
 const router = express.Router();
@@ -24,11 +24,12 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
     const limit  = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset)  || 0);
     const shopId = session.shop_id ?? 1;
-    const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
+    const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes] = await Promise.all([
       listFactures({ search, statut, limit, offset, shopId }),
       getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
       getStockBoutiqueStats(shopId).catch(() => null),
+      getStockBoutiqueList({ filter: "faible", limit: 5, shopId }).catch(() => ({ items: [], total: 0 })),
     ]);
     const stats = {
       ...ventesStats,
@@ -37,6 +38,7 @@ router.get("/api/admin/ventes/factures", async (req, res) => {
       solde_net:      financeStats?.solde_net      ?? 0,
       stock_produits: stockStats?.total_produits   ?? 0,
       stock_epuises:  stockStats?.epuises          ?? 0,
+      stock_alertes:  stockAlertes.items.map(i => ({ nom: i.nom, quantite: i.quantite, seuil: i.seuil_alerte })),
     };
     res.json({ items, total, stats });
   } catch (err) {

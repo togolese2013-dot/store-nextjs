@@ -220,6 +220,7 @@ export default function BoutiqueDataLoader({
   const [clients,       setClients]       = useState<BoutiqueClient[]>([]);
   const [overviewStats, setOverviewStats] = useState<OverviewStats>({
     ventes_jour_count: 0, ventes_jour_montant: 0, ca_total: 0, factures_payees: 0,
+    clients_servis_jour: 0, paiements_jour: [], top_produits_jour: [], stock_alertes: [],
   });
   const [boutiqueConfig, setBoutiqueConfig] = useState<BoutiqueConfig>(buildConfig({}));
 
@@ -246,6 +247,22 @@ export default function BoutiqueDataLoader({
           ventes_jour_montant: Number(d.stats.ventes_jour_montant ?? 0),
           ca_total:            Number(d.stats.ca_total            ?? 0),
           factures_payees:     Number(d.stats.factures_payees     ?? 0),
+          clients_servis_jour: Number(d.stats.clients_servis_jour ?? 0),
+          paiements_jour: Array.isArray(d.stats.paiements_jour)
+            ? d.stats.paiements_jour.map((p: { mode: ApiPaymentMode; montant: number; pct: number }) => ({
+                mode: mapPaymentMode(p.mode), montant: Number(p.montant ?? 0), pct: Number(p.pct ?? 0),
+              }))
+            : [],
+          top_produits_jour: Array.isArray(d.stats.top_produits_jour)
+            ? d.stats.top_produits_jour.map((p: { nom: string; qty: number; ca: number }) => ({
+                nom: p.nom, qty: Number(p.qty ?? 0), ca: Number(p.ca ?? 0),
+              }))
+            : [],
+          stock_alertes: Array.isArray(d.stats.stock_alertes)
+            ? d.stats.stock_alertes.map((s: { nom: string; quantite: number; seuil: number }) => ({
+                nom: s.nom, quantite: Number(s.quantite ?? 0), seuil: Number(s.seuil ?? 0),
+              }))
+            : [],
         });
       })
       .catch(() => {});

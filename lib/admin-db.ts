@@ -3336,25 +3336,22 @@ export async function deleteFinanceEntry(id: number) {
 }
 
 // ── In-memory cache for getVentesStats — 60s TTL ─────────────────────────────
+export interface PaiementJour { mode: string; cnt: number; montant: number; pct: number }
+export interface TopProduitJour { nom: string; qty: number; ca: number }
 type VentesStatsResult = {
   factures: number; livraisons: number;
   ca_total: number; factures_payees: number;
   ventes_jour_montant: number; ventes_jour_count: number;
   commandes_livrees_jour: number; commandes_livrees_jour_count: number;
   depenses_jour: number; rentrees_jour: number; solde_jour: number;
+  clients_servis_jour: number;
+  paiements_jour: PaiementJour[];
+  top_produits_jour: TopProduitJour[];
 };
 const _ventesStatsCacheMap = new Map<number, { data: VentesStatsResult; expiresAt: number }>();
 export function invalidateVentesStats() { _ventesStatsCacheMap.clear(); }
 
-export async function getVentesStats(shopId = 1): Promise<{
-  factures: number; livraisons: number;
-  ca_total: number; factures_payees: number;
-  ventes_jour_montant: number; ventes_jour_count: number;
-  commandes_livrees_jour: number; commandes_livrees_jour_count: number;
-  depenses_jour: number;
-  rentrees_jour: number;
-  solde_jour: number;
-}> {
+export async function getVentesStats(shopId = 1): Promise<VentesStatsResult> {
   const now = Date.now();
   const cached = _ventesStatsCacheMap.get(shopId);
   if (cached && cached.expiresAt > now) return cached.data;
@@ -3362,7 +3359,9 @@ export async function getVentesStats(shopId = 1): Promise<{
   // LEFT JOIN replaces the correlated EXISTS — one join scanned once instead of one subquery per row
   const SITE_JOIN = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
   const SITE_COND = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
-  const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
+  // Ventes du jour "réelles" (hors brouillon/annulé) — base commune pour clients servis / paiements / top produits
+  const JOUR_COND = "f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut NOT IN ('annule','brouillon')";
+  const [[f], [l], [ca], [fp], [tj], [cj], [cs], pmRows, itemsRows] = await Promise.all([
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN} WHERE f.shop_id = ? AND ${SITE_COND}`, [shopId]),
     db.execute<mysql.RowDataPacket[]>(
@@ -3393,7 +3392,43 @@ export async function getVentesStats(shopId = 1): Promise<{
     db.execute<mysql.RowDataPacket[]>(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE shop_id = ? AND status = 'delivered' AND DATE(delivered_at) = CURDATE()`, [shopId]
     ).catch(() => [[{ montant: 0, cnt: 0 }]] as [mysql.RowDataPacket[]]),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COUNT(DISTINCT NULLIF(TRIM(f.client_nom), '')) AS cnt FROM factures f WHERE ${JOUR_COND}`, [shopId]),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT COALESCE(f.mode_paiement, 'especes') AS mode, COUNT(*) AS cnt, COALESCE(SUM(f.total), 0) AS montant
+       FROM factures f WHERE ${JOUR_COND} GROUP BY COALESCE(f.mode_paiement, 'especes')`, [shopId])
+      .then(([rows]) => rows),
+    db.execute<mysql.RowDataPacket[]>(
+      `SELECT items FROM factures f WHERE ${JOUR_COND}`, [shopId])
+      .then(([rows]) => rows),
   ]);
+
+  const totalPaiements = pmRows.reduce((s, r) => s + Number(r.montant ?? 0), 0);
+  const paiements_jour: PaiementJour[] = pmRows.map(r => ({
+    mode:    String(r.mode),
+    cnt:     Number(r.cnt ?? 0),
+    montant: Number(r.montant ?? 0),
+    pct:     totalPaiements > 0 ? Math.round((Number(r.montant ?? 0) / totalPaiements) * 100) : 0,
+  }));
+
+  const produitTotals = new Map<string, { qty: number; ca: number }>();
+  for (const row of itemsRows) {
+    let items: unknown = row.items;
+    if (typeof items === 'string') { try { items = JSON.parse(items); } catch { items = []; } }
+    if (!Array.isArray(items)) continue;
+    for (const it of items as { nom?: string; qty?: number; total?: number }[]) {
+      const nom = it.nom?.trim();
+      if (!nom) continue;
+      const prev = produitTotals.get(nom) ?? { qty: 0, ca: 0 };
+      prev.qty += Number(it.qty ?? 0);
+      prev.ca  += Number(it.total ?? 0);
+      produitTotals.set(nom, prev);
+    }
+  }
+  const top_produits_jour: TopProduitJour[] = [...produitTotals.entries()]
+    .map(([nom, v]) => ({ nom, qty: v.qty, ca: v.ca }))
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 5);
 
   // Finance queries are optional — table may not exist yet on fresh DBs
   let depenses_jour = 0;
@@ -3432,6 +3467,9 @@ export async function getVentesStats(shopId = 1): Promise<{
     depenses_jour,
     rentrees_jour,
     solde_jour,
+    clients_servis_jour: Number((cs as mysql.RowDataPacket[])[0]?.cnt ?? 0),
+    paiements_jour,
+    top_produits_jour,
   };
   _ventesStatsCacheMap.set(shopId, { data: result, expiresAt: Date.now() + 60_000 });
   return result;

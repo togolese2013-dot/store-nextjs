@@ -94,9 +94,17 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+export interface PaiementJourStat { mode: PaymentMethod; montant: number; pct: number }
+export interface TopProduitJourStat { nom: string; qty: number; ca: number }
+export interface StockAlerteStat { nom: string; quantite: number; seuil: number }
+
 export interface OverviewStats {
   ventes_jour_count: number;
   ventes_jour_montant: number;
   ca_total: number;
   factures_payees: number;
+  clients_servis_jour: number;
+  paiements_jour: PaiementJourStat[];
+  top_produits_jour: TopProduitJourStat[];
+  stock_alertes: StockAlerteStat[];
 }

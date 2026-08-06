@@ -3740,7 +3740,8 @@ async function getVentesStats(shopId = 1) {
   if (cached && cached.expiresAt > now) return cached.data;
   const SITE_JOIN2 = "LEFT JOIN orders _so ON _so.id = f.order_id AND _so.status = 'delivered'";
   const SITE_COND2 = "(f.source IS NULL OR f.source != 'site_order' OR _so.id IS NOT NULL)";
-  const [[f], [l], [ca], [fp], [tj], [cj]] = await Promise.all([
+  const JOUR_COND = "f.shop_id = ? AND DATE(f.created_at) = CURDATE() AND f.statut NOT IN ('annule','brouillon')";
+  const [[f], [l], [ca], [fp], [tj], [cj], [cs], pmRows, itemsRows] = await Promise.all([
     db.execute(
       `SELECT COUNT(*) AS cnt FROM factures f ${SITE_JOIN2} WHERE f.shop_id = ? AND ${SITE_COND2}`,
       [shopId]
@@ -3781,8 +3782,49 @@ async function getVentesStats(shopId = 1) {
     db.execute(
       `SELECT COALESCE(SUM(subtotal - COALESCE(coupon_remise, 0)), 0) AS montant, COUNT(*) AS cnt FROM orders WHERE shop_id = ? AND status = 'delivered' AND DATE(delivered_at) = CURDATE()`,
       [shopId]
-    ).catch(() => [[{ montant: 0, cnt: 0 }]])
+    ).catch(() => [[{ montant: 0, cnt: 0 }]]),
+    db.execute(
+      `SELECT COUNT(DISTINCT NULLIF(TRIM(f.client_nom), '')) AS cnt FROM factures f WHERE ${JOUR_COND}`,
+      [shopId]
+    ),
+    db.execute(
+      `SELECT COALESCE(f.mode_paiement, 'especes') AS mode, COUNT(*) AS cnt, COALESCE(SUM(f.total), 0) AS montant
+       FROM factures f WHERE ${JOUR_COND} GROUP BY COALESCE(f.mode_paiement, 'especes')`,
+      [shopId]
+    ).then(([rows]) => rows),
+    db.execute(
+      `SELECT items FROM factures f WHERE ${JOUR_COND}`,
+      [shopId]
+    ).then(([rows]) => rows)
   ]);
+  const totalPaiements = pmRows.reduce((s, r) => s + Number(r.montant ?? 0), 0);
+  const paiements_jour = pmRows.map((r) => ({
+    mode: String(r.mode),
+    cnt: Number(r.cnt ?? 0),
+    montant: Number(r.montant ?? 0),
+    pct: totalPaiements > 0 ? Math.round(Number(r.montant ?? 0) / totalPaiements * 100) : 0
+  }));
+  const produitTotals = /* @__PURE__ */ new Map();
+  for (const row of itemsRows) {
+    let items = row.items;
+    if (typeof items === "string") {
+      try {
+        items = JSON.parse(items);
+      } catch {
+        items = [];
+      }
+    }
+    if (!Array.isArray(items)) continue;
+    for (const it of items) {
+      const nom = it.nom?.trim();
+      if (!nom) continue;
+      const prev = produitTotals.get(nom) ?? { qty: 0, ca: 0 };
+      prev.qty += Number(it.qty ?? 0);
+      prev.ca += Number(it.total ?? 0);
+      produitTotals.set(nom, prev);
+    }
+  }
+  const top_produits_jour = [...produitTotals.entries()].map(([nom, v]) => ({ nom, qty: v.qty, ca: v.ca })).sort((a, b) => b.qty - a.qty).slice(0, 5);
   let depenses_jour = 0;
   let rentrees_jour = 0;
   let solde_jour = 0;
@@ -3821,7 +3863,10 @@ async function getVentesStats(shopId = 1) {
     commandes_livrees_jour_count: Number(cj[0]?.cnt ?? 0),
     depenses_jour,
     rentrees_jour,
-    solde_jour
+    solde_jour,
+    clients_servis_jour: Number(cs[0]?.cnt ?? 0),
+    paiements_jour,
+    top_produits_jour
   };
   _ventesStatsCacheMap.set(shopId, { data: result, expiresAt: Date.now() + 6e4 });
   return result;
@@ -8315,11 +8360,12 @@ router7.get("/api/admin/ventes/factures", async (req, res) => {
     const limit = Math.min(100, Number(req.query.limit) || 50);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const shopId = session.shop_id ?? 1;
-    const [{ items, total }, ventesStats, financeStats, stockStats] = await Promise.all([
+    const [{ items, total }, ventesStats, financeStats, stockStats, stockAlertes] = await Promise.all([
       listFactures({ search, statut, limit, offset, shopId }),
       getVentesStats(shopId),
       getFinanceStats(shopId).catch(() => null),
-      getStockBoutiqueStats(shopId).catch(() => null)
+      getStockBoutiqueStats(shopId).catch(() => null),
+      getStockBoutiqueList({ filter: "faible", limit: 5, shopId }).catch(() => ({ items: [], total: 0 }))
     ]);
     const stats = {
       ...ventesStats,
@@ -8327,7 +8373,8 @@ router7.get("/api/admin/ventes/factures", async (req, res) => {
       total_depenses: financeStats?.total_depenses ?? 0,
       solde_net: financeStats?.solde_net ?? 0,
       stock_produits: stockStats?.total_produits ?? 0,
-      stock_epuises: stockStats?.epuises ?? 0
+      stock_epuises: stockStats?.epuises ?? 0,
+      stock_alertes: stockAlertes.items.map((i) => ({ nom: i.nom, quantite: i.quantite, seuil: i.seuil_alerte }))
     };
     res.json({ items, total, stats });
   } catch (err) {

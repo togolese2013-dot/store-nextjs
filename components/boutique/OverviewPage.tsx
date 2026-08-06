@@ -4,31 +4,39 @@
  */
 import React from 'react';
 import type { Sale, OverviewStats, KpiItem } from './types';
-import {
-  SAMPLE_SALES, SAMPLE_STOCK,
-  PAYMENT_STYLE, PAY_BREAKDOWN, TOP_PRODUCTS_TODAY,
-} from './sample-data';
+import { SAMPLE_SALES, PAYMENT_STYLE } from './sample-data';
 import Sparkline from './Sparkline';
 import { PrinterIcon, PlusIcon, TrendIcon } from './icons';
 import styles from './Boutique.module.css';
 import { useBoutiqueConfig, fmtNum, fmtAmount } from './BoutiqueSettingsContext';
 import { formatDate } from '@/lib/format-date';
 
+const TOP_PRODUCT_SWATCHES = ['#3B6A8F', '#2D6A4F', '#C9601E', '#5C4A88', '#7A2C3A'];
+
+function isToday(iso: string): boolean {
+  try { return new Date(iso).toDateString() === new Date().toDateString(); }
+  catch { return false; }
+}
+
 interface OverviewPageProps {
   sales?: Sale[];
   overviewStats?: OverviewStats;
   onNewSale?: () => void;
+  onViewAllSales?: () => void;
 }
 
-export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNewSale }: OverviewPageProps) {
+export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNewSale, onViewAllSales }: OverviewPageProps) {
   const cfg = useBoutiqueConfig();
-  const lowStock = SAMPLE_STOCK.filter(p => p.boutique < p.seuil);
+  const todaySales = sales.filter(s => isToday(s.isoDate));
+  const paiementsJour   = overviewStats?.paiements_jour   ?? [];
+  const topProduitsJour = overviewStats?.top_produits_jour ?? [];
+  const stockAlertes    = overviewStats?.stock_alertes     ?? [];
   const today = formatDate(new Date());
 
   const jourCount   = overviewStats?.ventes_jour_count   ?? 0;
   const jourMontant = overviewStats?.ventes_jour_montant ?? 0;
   const panierMoyen = jourCount > 0 ? Math.round(jourMontant / jourCount) : 0;
-  const clientsServis = sales.filter(s => s.client !== '—').length;
+  const clientsServis = overviewStats?.clients_servis_jour ?? 0;
 
   const KPIS: KpiItem[] = [
     {
@@ -90,12 +98,15 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
         <div className={styles.ovCard}>
           <div className={styles.ovCardHead}>
             Ventes du jour
-            <button type="button" className={`${styles.btn} ${styles.sm}`}>Voir tout</button>
+            <button type="button" className={`${styles.btn} ${styles.sm}`} onClick={onViewAllSales}>Voir tout</button>
           </div>
           <table className={styles.miniTable}>
             <thead><tr><th>Heure</th><th>Client</th><th>Articles</th><th>Montant</th><th>Paiement</th></tr></thead>
             <tbody>
-              {sales.slice(0, 5).map(s => (
+              {todaySales.length === 0 && (
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>Aucune vente aujourd&apos;hui</td></tr>
+              )}
+              {todaySales.slice(0, 5).map(s => (
                 <tr key={s.id}>
                   <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12, color: 'var(--muted)' }}>{s.time}</td>
                   <td>
@@ -125,31 +136,40 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
               Paiements
               <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>aujourd&apos;hui</span>
             </div>
-            {PAY_BREAKDOWN.map(m => (
-              <div key={m.name} className={styles.payRow}>
-                <div className={styles.payName}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, flexShrink: 0, display: 'inline-block' }} />
-                  {m.name}
+            {paiementsJour.length === 0 && (
+              <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>Aucun paiement aujourd&apos;hui</div>
+            )}
+            {paiementsJour.map(m => {
+              const color = PAYMENT_STYLE[m.mode]?.color ?? 'var(--ink)';
+              return (
+                <div key={m.mode} className={styles.payRow}>
+                  <div className={styles.payName}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
+                    {m.mode}
+                  </div>
+                  <div className={styles.payBar}>
+                    <div className={styles.payFill} style={{ width: `${m.pct}%`, background: color }} />
+                  </div>
+                  <div className={styles.payPct}>{m.pct}%</div>
+                  <div className={styles.payAmt}>{m.montant.toLocaleString('fr-FR')} FCFA</div>
                 </div>
-                <div className={styles.payBar}>
-                  <div className={styles.payFill} style={{ width: `${m.pct}%`, background: m.color }} />
-                </div>
-                <div className={styles.payPct}>{m.pct}%</div>
-                <div className={styles.payAmt}>{m.amount.toLocaleString('fr-FR')} FCFA</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Stock alerts */}
           <div className={styles.ovCard}>
             <div className={styles.ovCardHead}>Alertes</div>
-            {lowStock.map(p => (
-              <div key={p.sku} className={styles.eventItem}>
+            {stockAlertes.length === 0 && (
+              <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>Aucune alerte stock</div>
+            )}
+            {stockAlertes.map(p => (
+              <div key={p.nom} className={styles.eventItem}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.name}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 500 }}>{p.nom}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 2 }}>
-                    Stock : <span style={{ fontFamily: 'Geist Mono, monospace', color: 'var(--danger)', fontWeight: 600 }}>{p.boutique}</span> / seuil {p.seuil}
+                    Stock : <span style={{ fontFamily: 'Geist Mono, monospace', color: 'var(--danger)', fontWeight: 600 }}>{p.quantite}</span> / seuil {p.seuil}
                   </div>
                 </div>
               </div>
@@ -165,12 +185,15 @@ export default function OverviewPage({ sales = SAMPLE_SALES, overviewStats, onNe
           <table className={styles.miniTable}>
             <thead><tr><th>Produit</th><th style={{ textAlign: 'right' }}>Qté vendue</th><th style={{ textAlign: 'right' }}>CA</th></tr></thead>
             <tbody>
-              {TOP_PRODUCTS_TODAY.map(p => (
-                <tr key={p.name}>
+              {topProduitsJour.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>Aucune vente aujourd&apos;hui</td></tr>
+              )}
+              {topProduitsJour.map((p, i) => (
+                <tr key={p.nom}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 7, background: p.swatch, color: 'white', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{p.init}</div>
-                      <div style={{ fontWeight: 500 }}>{p.name}</div>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: TOP_PRODUCT_SWATCHES[i % TOP_PRODUCT_SWATCHES.length], color: 'white', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{p.nom[0]?.toUpperCase() ?? '?'}</div>
+                      <div style={{ fontWeight: 500 }}>{p.nom}</div>
                     </div>
                   </td>
                   <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 12 }}>{p.qty}</td>
