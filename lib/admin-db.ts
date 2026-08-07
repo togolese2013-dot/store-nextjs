@@ -3172,7 +3172,7 @@ export async function listFinanceEntries(opts: {
   const conditions: string[] = ["f.shop_id = ?"];
   const params: (string | number | boolean | null | Buffer)[] = [shopId];
   if (type)   { conditions.push("f.type = ?");                                                   params.push(type); }
-  if (search) { conditions.push("(f.categorie LIKE ? OR f.reference LIKE ?)");                   params.push(`%${search}%`, `%${search}%`); }
+  if (search) { conditions.push("(f.categorie LIKE ? OR f.reference LIKE ? OR f.description LIKE ?)"); params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
   const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT f.*, COALESCE(f.admin_nom, au.nom, u.nom) AS admin_nom
@@ -3357,7 +3357,7 @@ export async function updateFinanceEntry(id: number, data: {
   description?:   string;
   montant?:       number;
   date_entree?:   string;
-}) {
+}, shopId = 1) {
   const cols   = await financeEntrieCols();
   const fields: string[] = [];
   const params: (string | number | boolean | null | Buffer)[] = [];
@@ -3367,12 +3367,12 @@ export async function updateFinanceEntry(id: number, data: {
   if (data.montant       !== undefined) { fields.push("montant = ?");       params.push(data.montant); }
   if (data.date_entree   !== undefined) { fields.push("date_entree = ?");   params.push(data.date_entree); }
   if (!fields.length) return;
-  params.push(id);
-  await db.execute(`UPDATE finance_entries SET ${fields.join(", ")} WHERE id = ?`, params);
+  params.push(id, shopId);
+  await db.execute(`UPDATE finance_entries SET ${fields.join(", ")} WHERE id = ? AND shop_id = ?`, params);
 }
 
-export async function deleteFinanceEntry(id: number) {
-  await db.execute("DELETE FROM finance_entries WHERE id = ?", [id]);
+export async function deleteFinanceEntry(id: number, shopId = 1) {
+  await db.execute("DELETE FROM finance_entries WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 
 // ── In-memory cache for getVentesStats — 60s TTL ─────────────────────────────
@@ -5231,17 +5231,19 @@ export async function getFinanceDashboard(shopId = 1): Promise<FinanceDashboard>
       [shopId]
     ).then(([[r]]) => r as mysql.RowDataPacket),
 
-    // Wallet balances + today delta by mode_paiement (NULL → especes)
+    // Wallet balances + today delta by mode_paiement (NULL → especes).
+    // 'mix_by_yas' (legacy admin spelling) folded into 'mixx_by_yas' (Boutique
+    // spelling) — same wallet, two names, otherwise its entries are invisible here.
     db.query<mysql.RowDataPacket[]>(
       `SELECT
-         COALESCE(mode_paiement, 'especes') AS mode_paiement,
+         CASE WHEN mode_paiement = 'mix_by_yas' THEN 'mixx_by_yas' ELSE COALESCE(mode_paiement, 'especes') END AS mode_paiement,
          SUM(CASE WHEN type IN ('vente','rentree','caisse') THEN montant ELSE -montant END) AS solde,
          SUM(CASE WHEN DATE(date_entree) = CURDATE() AND type IN ('vente','rentree','caisse') THEN montant
                   WHEN DATE(date_entree) = CURDATE() AND type IN ('depense','transfert')     THEN -montant
                   ELSE 0 END) AS delta_jour
        FROM finance_entries
        WHERE shop_id = ?
-       GROUP BY COALESCE(mode_paiement, 'especes')`,
+       GROUP BY CASE WHEN mode_paiement = 'mix_by_yas' THEN 'mixx_by_yas' ELSE COALESCE(mode_paiement, 'especes') END`,
       [shopId]
     ).then(([rows]) => rows as mysql.RowDataPacket[]),
   ]);

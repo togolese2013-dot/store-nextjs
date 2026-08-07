@@ -65,7 +65,8 @@ router.patch("/api/admin/finance/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    await updateFinanceEntry(Number(req.params.id), req.body);
+    await updateFinanceEntry(Number(req.params.id), req.body, session.shop_id ?? 1);
+    emitAdminEvent("finance");
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -76,7 +77,8 @@ router.delete("/api/admin/finance/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autorisé." });
   try {
-    await deleteFinanceEntry(Number(req.params.id));
+    await deleteFinanceEntry(Number(req.params.id), session.shop_id ?? 1);
+    emitAdminEvent("finance");
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

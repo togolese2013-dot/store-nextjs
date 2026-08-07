@@ -3556,8 +3556,8 @@ async function listFinanceEntries(opts = {}) {
     params.push(type);
   }
   if (search) {
-    conditions.push("(f.categorie LIKE ? OR f.reference LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`);
+    conditions.push("(f.categorie LIKE ? OR f.reference LIKE ? OR f.description LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
@@ -3734,7 +3734,7 @@ async function createFinanceEntry(data) {
   );
   return result.insertId;
 }
-async function updateFinanceEntry(id, data) {
+async function updateFinanceEntry(id, data, shopId = 1) {
   const cols = await financeEntrieCols();
   const fields = [];
   const params = [];
@@ -3759,11 +3759,11 @@ async function updateFinanceEntry(id, data) {
     params.push(data.date_entree);
   }
   if (!fields.length) return;
-  params.push(id);
-  await db.execute(`UPDATE finance_entries SET ${fields.join(", ")} WHERE id = ?`, params);
+  params.push(id, shopId);
+  await db.execute(`UPDATE finance_entries SET ${fields.join(", ")} WHERE id = ? AND shop_id = ?`, params);
 }
-async function deleteFinanceEntry(id) {
-  await db.execute("DELETE FROM finance_entries WHERE id = ?", [id]);
+async function deleteFinanceEntry(id, shopId = 1) {
+  await db.execute("DELETE FROM finance_entries WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
 function invalidateVentesStats() {
   _ventesStatsCacheMap.clear();
@@ -5353,17 +5353,19 @@ async function getFinanceDashboard(shopId = 1) {
        WHERE shop_id = ?`,
       [shopId]
     ).then(([[r]]) => r),
-    // Wallet balances + today delta by mode_paiement (NULL → especes)
+    // Wallet balances + today delta by mode_paiement (NULL → especes).
+    // 'mix_by_yas' (legacy admin spelling) folded into 'mixx_by_yas' (Boutique
+    // spelling) — same wallet, two names, otherwise its entries are invisible here.
     db.query(
       `SELECT
-         COALESCE(mode_paiement, 'especes') AS mode_paiement,
+         CASE WHEN mode_paiement = 'mix_by_yas' THEN 'mixx_by_yas' ELSE COALESCE(mode_paiement, 'especes') END AS mode_paiement,
          SUM(CASE WHEN type IN ('vente','rentree','caisse') THEN montant ELSE -montant END) AS solde,
          SUM(CASE WHEN DATE(date_entree) = CURDATE() AND type IN ('vente','rentree','caisse') THEN montant
                   WHEN DATE(date_entree) = CURDATE() AND type IN ('depense','transfert')     THEN -montant
                   ELSE 0 END) AS delta_jour
        FROM finance_entries
        WHERE shop_id = ?
-       GROUP BY COALESCE(mode_paiement, 'especes')`,
+       GROUP BY CASE WHEN mode_paiement = 'mix_by_yas' THEN 'mixx_by_yas' ELSE COALESCE(mode_paiement, 'especes') END`,
       [shopId]
     ).then(([rows]) => rows)
   ]);
@@ -8854,7 +8856,8 @@ router9.patch("/api/admin/finance/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    await updateFinanceEntry(Number(req.params.id), req.body);
+    await updateFinanceEntry(Number(req.params.id), req.body, session.shop_id ?? 1);
+    emitAdminEvent("finance");
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
@@ -8864,7 +8867,8 @@ router9.delete("/api/admin/finance/:id", async (req, res) => {
   const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
   try {
-    await deleteFinanceEntry(Number(req.params.id));
+    await deleteFinanceEntry(Number(req.params.id), session.shop_id ?? 1);
+    emitAdminEvent("finance");
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

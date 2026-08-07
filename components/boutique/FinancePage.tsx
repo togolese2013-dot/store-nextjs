@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { DownloadIcon, PlusIcon } from './icons';
+import { DownloadIcon, PlusIcon, SearchIcon, PencilIcon, TrashIcon } from './icons';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import styles from './Boutique.module.css';
 import '@/components/admin/sale-modal.css';
@@ -166,6 +166,7 @@ const MODES = [
 ];
 
 interface ModalProps { onClose: () => void; onSaved: () => void; }
+interface MouvementModalProps extends ModalProps { entry?: FinanceEntry | null; }
 
 const ChevronIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
@@ -178,12 +179,13 @@ const CloseIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
-function MouvementModal({ onClose, onSaved }: ModalProps) {
+function MouvementModal({ entry, onClose, onSaved }: MouvementModalProps) {
   const cfg = useBoutiqueConfig();
-  const [type,    setType]    = useState('depense');
-  const [mode,    setMode]    = useState('especes');
-  const [montant, setMontant] = useState('');
-  const [label,   setLabel]   = useState('');
+  const isEdit = !!entry;
+  const [type,    setType]    = useState(entry?.type ?? 'depense');
+  const [mode,    setMode]    = useState(entry?.mode_paiement ?? 'especes');
+  const [montant, setMontant] = useState(entry ? String(entry.montant) : '');
+  const [label,   setLabel]   = useState(entry?.description ?? '');
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState('');
 
@@ -192,11 +194,10 @@ function MouvementModal({ onClose, onSaved }: ModalProps) {
     if (!montant || Number(montant) <= 0) { setErr('Montant invalide'); return; }
     setSaving(true); setErr('');
     try {
-      const res = await fetch('/api/admin/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, mode_paiement: mode, description: label || null, montant: Number(montant), date_entree: new Date().toISOString().slice(0, 10) }),
-      });
+      const body = { type, mode_paiement: mode, description: label || null, montant: Number(montant), date_entree: new Date().toISOString().slice(0, 10) };
+      const res = isEdit
+        ? await fetch(`/api/admin/finance/${entry!.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch('/api/admin/finance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) { setErr(data.error ?? 'Erreur'); setSaving(false); return; }
       onSaved(); onClose();
@@ -210,24 +211,26 @@ function MouvementModal({ onClose, onSaved }: ModalProps) {
         <div className="sm-head">
           <div>
             <div className="sm-eyb">Boutique · Finance</div>
-            <div className="sm-title">Mouvement de <span className="sm-serif">fonds</span></div>
+            <div className="sm-title">{isEdit ? 'Modifier le' : 'Mouvement de'} <span className="sm-serif">{isEdit ? 'mouvement' : 'fonds'}</span></div>
           </div>
           <button className="sm-x" onClick={onClose} aria-label="Fermer"><CloseIcon /></button>
         </div>
 
         <form onSubmit={submit} style={{ display: 'contents' }}>
           <div className="sm-body">
-            <div className="sm-field">
-              <label className="sm-label">Type</label>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {TYPES_MVMT.map(t => (
-                  <button key={t.v} type="button" onClick={() => setType(t.v)}
-                    style={{ flex: 1, padding: '8px 6px', borderRadius: 9, border: `1.5px solid ${type === t.v ? 'var(--accent)' : 'var(--border)'}`, background: type === t.v ? '#FBE9D6' : 'var(--surface)', fontSize: 12, fontWeight: type === t.v ? 600 : 400, color: type === t.v ? 'var(--accent)' : 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                    {t.l}
-                  </button>
-                ))}
+            {!isEdit && (
+              <div className="sm-field">
+                <label className="sm-label">Type</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {TYPES_MVMT.map(t => (
+                    <button key={t.v} type="button" onClick={() => setType(t.v)}
+                      style={{ flex: 1, padding: '8px 6px', borderRadius: 9, border: `1.5px solid ${type === t.v ? 'var(--accent)' : 'var(--border)'}`, background: type === t.v ? '#FBE9D6' : 'var(--surface)', fontSize: 12, fontWeight: type === t.v ? 600 : 400, color: type === t.v ? 'var(--accent)' : 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {t.l}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="sm-field">
               <label className="sm-label">Montant</label>
@@ -260,7 +263,7 @@ function MouvementModal({ onClose, onSaved }: ModalProps) {
           <div className="sm-foot">
             <button type="button" className="sm-btn" onClick={onClose}>Annuler</button>
             <button type="submit" className="sm-btn sm-pri" disabled={saving}>
-              {saving ? 'Enregistrement…' : 'Enregistrer'}
+              {saving ? 'Enregistrement…' : isEdit ? 'Modifier' : 'Enregistrer'}
             </button>
           </div>
         </form>
@@ -363,6 +366,14 @@ function TransfertModal({ onClose, onSaved }: ModalProps) {
 const PAGE_SIZE = 20;
 
 type ModalKind = 'mouvement' | 'transfert' | null;
+type Tab = 'tous' | 'depense' | 'rentree' | 'transfert';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'tous',      label: 'Tout' },
+  { id: 'depense',   label: 'Dépenses' },
+  { id: 'rentree',   label: 'Rentrées' },
+  { id: 'transfert', label: 'Transferts' },
+];
 
 export default function FinancePage() {
   const cfg = useBoutiqueConfig();
@@ -371,8 +382,11 @@ export default function FinancePage() {
   const [entries, setEntries] = useState<FinanceEntry[]>([]);
   const [total,   setTotal]   = useState(0);
   const [page,    setPage]    = useState(0);
+  const [tab,     setTab]     = useState<Tab>('tous');
+  const [search,  setSearch]  = useState('');
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState<ModalKind>(null);
+  const [editEntry, setEditEntry] = useState<FinanceEntry | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -384,9 +398,12 @@ export default function FinancePage() {
     } catch { /* silent */ }
   }, []);
 
-  const fetchEntries = useCallback(async (p: number) => {
+  const fetchEntries = useCallback(async (p: number, t: Tab, q: string) => {
     try {
-      const res = await fetch(`/api/admin/finance?limit=${PAGE_SIZE}&offset=${p * PAGE_SIZE}`);
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(p * PAGE_SIZE) });
+      if (t !== 'tous') params.set('type', t);
+      if (q.trim()) params.set('q', q.trim());
+      const res = await fetch(`/api/admin/finance?${params}`);
       if (!res.ok) return;
       const data = await res.json();
       setEntries(data.items ?? []);
@@ -394,20 +411,28 @@ export default function FinancePage() {
     } catch { /* silent */ }
   }, []);
 
-  const loadAll = useCallback(async (p = 0) => {
+  const loadAll = useCallback(async (p = 0, t: Tab = 'tous', q = '') => {
     setLoading(true);
-    await Promise.all([fetchDashboard(), fetchEntries(p)]);
+    await Promise.all([fetchDashboard(), fetchEntries(p, t, q)]);
     setLoading(false);
   }, [fetchDashboard, fetchEntries]);
 
-  useEffect(() => { loadAll(0); }, [loadAll]);
+  useEffect(() => { loadAll(0, tab, search); }, [loadAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { subscribe } = useAdminSSE();
   useEffect(() => subscribe(e => {
-    if (e.type === 'finance' || e.type === 'vente') loadAll(page);
-  }), [subscribe, loadAll, page]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (e.type === 'finance' || e.type === 'vente') loadAll(page, tab, search);
+  }), [subscribe, loadAll, page, tab, search]);
 
-  function goPage(p: number) { setPage(p); fetchEntries(p); }
+  function goPage(p: number) { setPage(p); fetchEntries(p, tab, search); }
+  function changeTab(t: Tab) { setTab(t); setPage(0); fetchEntries(0, t, search); }
+  function changeSearch(q: string) { setSearch(q); setPage(0); fetchEntries(0, tab, q); }
+
+  async function handleDelete(entry: FinanceEntry) {
+    if (!window.confirm(`Supprimer "${entry.description ?? entry.reference}" (${fmtNum(entry.montant, cfg)} ${cfg.symbol}) ?`)) return;
+    await fetch(`/api/admin/finance/${entry.id}`, { method: 'DELETE' });
+    loadAll(page, tab, search);
+  }
 
   const totalPages  = Math.ceil(total / PAGE_SIZE);
   const deltaColor  = day ? (day.benefice_jour >= day.benefice_hier ? 'var(--ok)' : 'var(--danger)') : 'var(--muted)';
@@ -429,7 +454,7 @@ export default function FinancePage() {
           <button type="button" className={styles.btn} onClick={() => setModal('transfert')}>
             ⇄ Transfert
           </button>
-          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => setModal('mouvement')}>
+          <button type="button" className={`${styles.btn} ${styles.primary}`} onClick={() => { setEditEntry(null); setModal('mouvement'); }}>
             <PlusIcon size={14} /> Mouvement
           </button>
         </div>
@@ -478,8 +503,30 @@ export default function FinancePage() {
         </div>
       </div>
 
+      {/* Tabs + recherche */}
+      <div className={styles.tabsRow}>
+        {TABS.map(t => (
+          <button key={t.id} type="button" className={`${styles.tab} ${tab === t.id ? styles.active : ''}`} onClick={() => changeTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ padding: '12px 28px 0', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ position: 'relative', width: 220 }}>
+          <input
+            value={search}
+            onChange={e => changeSearch(e.target.value)}
+            placeholder="Rechercher…"
+            style={{ width: '100%', padding: '8px 12px 8px 32px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 9, background: 'var(--bg-2,#f9f9f7)', boxSizing: 'border-box' }}
+          />
+          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }}>
+            <SearchIcon size={13} />
+          </span>
+        </div>
+      </div>
+
       {/* Table mouvements */}
-      <div className={styles.tableWrap} style={{ marginTop: 16 }}>
+      <div className={styles.tableWrap} style={{ marginTop: 12 }}>
         <div className={styles.tableScroll}>
           <table className={styles.table}>
             <thead>
@@ -488,20 +535,22 @@ export default function FinancePage() {
                 <th>Compte</th>
                 <th>Type</th>
                 <th>Libellé</th>
+                <th>Utilisateur</th>
                 <th style={{ textAlign: 'right' }}>Montant</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Chargement…</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Chargement…</td></tr>
               )}
               {!loading && entries.length === 0 && (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Aucun mouvement</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Aucun mouvement</td></tr>
               )}
               {!loading && entries.map(m => {
                 const sign   = entrySign(m.type);
                 const amount = sign * m.montant;
-                const mp     = m.mode_paiement ?? '';
+                const mp     = m.mode_paiement === 'mix_by_yas' ? 'mixx_by_yas' : (m.mode_paiement ?? '');
                 const cs     = COMPTE_STYLE[mp];
                 const ts     = TYPE_STYLE[m.type] ?? {};
                 return (
@@ -524,8 +573,23 @@ export default function FinancePage() {
                     <td style={{ fontWeight: 500, fontSize: 13 }}>
                       {m.description ?? m.categorie ?? m.reference}
                     </td>
+                    <td style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+                      {m.admin_nom ?? '—'}
+                    </td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-geist-mono, monospace)', fontSize: 13, fontWeight: 600, color: amount >= 0 ? 'var(--ok)' : 'var(--danger)', whiteSpace: 'nowrap' }}>
                       {amount >= 0 ? '+' : ''}{fmtNum(amount, cfg)} {cfg.symbol}
+                    </td>
+                    <td className={styles.actionsCell}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                        {m.type !== 'transfert' && (
+                          <button type="button" className={styles.rowMenu} title="Modifier" onClick={() => { setEditEntry(m); setModal('mouvement'); }}>
+                            <PencilIcon size={14} />
+                          </button>
+                        )}
+                        <button type="button" className={styles.rowMenu} title="Supprimer" onClick={() => handleDelete(m)}>
+                          <TrashIcon size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -547,8 +611,8 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {modal === 'mouvement'  && <MouvementModal  onClose={() => setModal(null)} onSaved={() => loadAll(page)} />}
-      {modal === 'transfert'  && <TransfertModal  onClose={() => setModal(null)} onSaved={() => loadAll(page)} />}
+      {modal === 'mouvement'  && <MouvementModal  entry={editEntry} onClose={() => { setModal(null); setEditEntry(null); }} onSaved={() => loadAll(page, tab, search)} />}
+      {modal === 'transfert'  && <TransfertModal  onClose={() => setModal(null)} onSaved={() => loadAll(page, tab, search)} />}
     </>
   );
 }
