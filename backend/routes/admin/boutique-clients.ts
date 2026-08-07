@@ -3,7 +3,7 @@ import { getSession } from "../../lib/auth";
 import { logActivity } from "../../lib/activity-log";
 import {
   listBoutiqueClients, countBoutiqueClients, createBoutiqueClient,
-  getBoutiqueClientsStats, updateBoutiqueClient, deleteBoutiqueClient,
+  getBoutiqueClientsStats, getBoutiqueClientsMonthlyStats, updateBoutiqueClient, deleteBoutiqueClient,
   getBoutiqueClientById, getClientFacturesByNom,
 } from "@/lib/admin-db";
 import { db } from "@/lib/db";
@@ -34,11 +34,12 @@ router.get("/api/admin/boutique-clients", async (req, res) => {
   }
 
   try {
-    const [clients, total] = await Promise.all([
+    const [clients, total, monthlyStats] = await Promise.all([
       listBoutiqueClients(limit, offset, search, filtre, shopId),
       countBoutiqueClients(search, filtre, shopId),
+      getBoutiqueClientsMonthlyStats(shopId),
     ]);
-    res.json({ success: true, data: clients, total, page, limit });
+    res.json({ success: true, data: clients, total, page, limit, monthlyStats });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("doesn't exist")) return res.json({ success: true, data: [], total: 0, page, limit, _migrationNeeded: true });
@@ -80,7 +81,7 @@ router.get("/api/admin/boutique-clients/:id", async (req, res) => {
     const shopId = session.shop_id ?? 1;
     const client = await getBoutiqueClientById(Number(req.params.id), shopId);
     if (!client) return res.status(404).json({ error: "Client introuvable." });
-    const factures = await getClientFacturesByNom(client.nom, client.telephone);
+    const factures = await getClientFacturesByNom(client.nom, shopId, client.id);
     res.json({ client, factures });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

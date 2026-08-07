@@ -820,6 +820,7 @@ __export(admin_db_exports, {
   getAdminByUsername: () => getAdminByUsername,
   getAdminByUsernameGlobal: () => getAdminByUsernameGlobal,
   getBoutiqueClientById: () => getBoutiqueClientById,
+  getBoutiqueClientsMonthlyStats: () => getBoutiqueClientsMonthlyStats,
   getBoutiqueClientsStats: () => getBoutiqueClientsStats,
   getCRMStats: () => getCRMStats,
   getClientById: () => getClientById,
@@ -3056,21 +3057,16 @@ async function getFactureById(id) {
   facture.paiements = await getFacturePaiements(id);
   return facture;
 }
-async function getClientFacturesByNom(nom, tel) {
-  const conditions = ["(f.client_nom = ? OR f.client_nom LIKE ?)"];
-  const params = [nom, `%${nom}%`];
-  if (tel) {
-    conditions.push("f.client_tel = ?");
-    params.push(tel);
-  }
+async function getClientFacturesByNom(nom, shopId, clientId) {
+  await ensureFacturesClientIdCol();
   const [rows] = await db.query(
     `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
-     WHERE f.client_nom = ?
+     WHERE f.shop_id = ? AND (f.client_id = ? OR (f.client_id IS NULL AND f.client_nom = ?))
      ORDER BY f.created_at DESC LIMIT 50`,
-    [nom]
+    [shopId, clientId, nom]
   );
   return rows;
 }
@@ -3113,6 +3109,7 @@ async function createFacture(data) {
   return result.insertId;
 }
 async function createVenteWithStock(data) {
+  await ensureFacturesClientIdCol();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -3141,16 +3138,17 @@ async function createVenteWithStock(data) {
     data.client_nom = data.client_nom.trim().toUpperCase();
     const [result] = await conn.execute(
       `INSERT INTO factures
-         (reference, client_nom, client_tel, items,
+         (reference, client_nom, client_tel, client_id, items,
           sous_total, remise, total,
           avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
           mode_paiement, statut_paiement, montant_acompte,
           statut, note, admin_id, shop_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         reference,
         data.client_nom,
         data.client_tel ?? null,
+        data.client_id ?? null,
         JSON.stringify(data.items),
         data.sous_total,
         data.remise ?? 0,
@@ -4608,23 +4606,54 @@ async function ensureBoutiqueClientsTable() {
     }
   });
 }
+async function ensureFacturesClientIdCol() {
+  return runOnce("factures_client_id", async () => {
+    try {
+      await db.execute("ALTER TABLE factures ADD COLUMN client_id INT NULL");
+    } catch (err) {
+      const code = err.code;
+      if (code !== "ER_DUP_FIELDNAME" && code !== "ER_NO_SUCH_TABLE") throw err;
+    }
+    await db.execute(`
+      UPDATE factures f
+      JOIN boutique_clients bc ON bc.nom = f.client_nom AND bc.shop_id = f.shop_id
+      SET f.client_id = bc.id
+      WHERE f.client_id IS NULL
+        AND (SELECT COUNT(*) FROM boutique_clients bc2 WHERE bc2.nom = f.client_nom AND bc2.shop_id = f.shop_id) = 1
+    `).catch(() => {
+    });
+  });
+}
 async function listBoutiqueClients(limit, offset, search, filtre, shopId = 1) {
   await ensureBoutiqueClientsTable();
-  const conditions = ["shop_id = ?"];
+  await ensureFacturesClientIdCol();
+  const conditions = ["bc.shop_id = ?"];
   const params = [shopId];
   if (search) {
-    conditions.push("(nom LIKE ? OR telephone LIKE ?)");
+    conditions.push("(bc.nom LIKE ? OR bc.telephone LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
   }
   if (filtre === "debiteurs") {
-    conditions.push("solde < 0");
+    conditions.push("bc.solde < 0");
   } else if (filtre === "dettes") {
-    conditions.push("solde > 0");
+    conditions.push("bc.solde > 0");
   }
   const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query(
-    `SELECT * FROM boutique_clients ${where} ORDER BY nom ASC LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
+    `SELECT bc.*,
+            IFNULL(agg.nb_achats, 0)    AS nb_achats,
+            IFNULL(agg.ca_reel, 0)      AS ca_reel,
+            agg.dernier_achat           AS dernier_achat
+     FROM boutique_clients bc
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*) AS nb_achats, SUM(f.total) AS ca_reel, MAX(f.created_at) AS dernier_achat
+       FROM factures f
+       WHERE (f.client_id = bc.id OR (f.client_id IS NULL AND f.client_nom = bc.nom))
+         AND f.shop_id = ? AND f.statut != 'annule'
+     ) agg ON true
+     ${where}
+     ORDER BY bc.nom ASC LIMIT ? OFFSET ?`,
+    [shopId, ...params, limit, offset]
   );
   return rows;
 }
@@ -4646,6 +4675,46 @@ async function countBoutiqueClients(search, filtre, shopId = 1) {
     params
   );
   return rows[0].cnt;
+}
+async function getBoutiqueClientsMonthlyStats(shopId = 1) {
+  await ensureFacturesClientIdCol();
+  const [[nouveaux], [clientDuMois], [paniers]] = await Promise.all([
+    db.query(
+      `SELECT COUNT(*) AS cnt FROM boutique_clients
+       WHERE shop_id = ? AND DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')`,
+      [shopId]
+    ),
+    db.query(
+      // Group by client_id when linked so name typos (e.g. "JER" for "JEROME")
+      // don't split one client's purchases into separate rows.
+      `SELECT ANY_VALUE(COALESCE(bc.nom, f.client_nom)) AS nom, SUM(f.total) AS ca, COUNT(*) AS achats
+       FROM factures f
+       LEFT JOIN boutique_clients bc ON bc.id = f.client_id
+       WHERE f.shop_id = ? AND f.statut != 'annule'
+         AND f.client_nom IS NOT NULL AND f.client_nom != ''
+         AND DATE_FORMAT(f.created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+       GROUP BY COALESCE(f.client_id, f.client_nom)
+       ORDER BY ca DESC
+       LIMIT 1`,
+      [shopId]
+    ),
+    db.query(
+      `SELECT
+         AVG(CASE WHEN DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m') THEN total END) AS actuel,
+         AVG(CASE WHEN DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m') THEN total END) AS precedent
+       FROM factures
+       WHERE shop_id = ? AND statut != 'annule'`,
+      [shopId]
+    )
+  ]);
+  const nomRow = clientDuMois[0];
+  const panierRow = paniers[0];
+  return {
+    nouveaux_ce_mois: Number(nouveaux[0]?.cnt ?? 0),
+    client_du_mois: nomRow ? { nom: String(nomRow.nom), ca: Number(nomRow.ca ?? 0), achats: Number(nomRow.achats ?? 0) } : null,
+    panier_moyen: Math.round(Number(panierRow?.actuel ?? 0)),
+    panier_moyen_precedent: Math.round(Number(panierRow?.precedent ?? 0))
+  };
 }
 async function getBoutiqueClientById(id, shopId = 1) {
   const [rows] = await db.execute(
@@ -10015,11 +10084,12 @@ router18.get("/api/admin/boutique-clients", async (req, res) => {
     }
   }
   try {
-    const [clients, total] = await Promise.all([
+    const [clients, total, monthlyStats] = await Promise.all([
       listBoutiqueClients(limit, offset, search, filtre, shopId),
-      countBoutiqueClients(search, filtre, shopId)
+      countBoutiqueClients(search, filtre, shopId),
+      getBoutiqueClientsMonthlyStats(shopId)
     ]);
-    res.json({ success: true, data: clients, total, page, limit });
+    res.json({ success: true, data: clients, total, page, limit, monthlyStats });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("doesn't exist")) return res.json({ success: true, data: [], total: 0, page, limit, _migrationNeeded: true });
@@ -10063,7 +10133,7 @@ router18.get("/api/admin/boutique-clients/:id", async (req, res) => {
     const shopId = session.shop_id ?? 1;
     const client = await getBoutiqueClientById(Number(req.params.id), shopId);
     if (!client) return res.status(404).json({ error: "Client introuvable." });
-    const factures = await getClientFacturesByNom(client.nom, client.telephone);
+    const factures = await getClientFacturesByNom(client.nom, shopId, client.id);
     res.json({ client, factures });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });

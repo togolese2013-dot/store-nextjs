@@ -1,4 +1,4 @@
-import type { Sale, CashMovement, BoutiqueClient, KpiItem } from './types';
+import type { Sale, CashMovement, KpiItem } from './types';
 
 /* ─── Sales ─────────────────────────────────────── */
 export const SAMPLE_SALES: Sale[] = [];
@@ -26,8 +26,6 @@ export const WEEK_REVENUE = [
 ];
 
 /* ─── Clients ───────────────────────────────────── */
-export const SAMPLE_CLIENTS: BoutiqueClient[] = [];
-
 export const CLIENT_STATUS_CLASS: Record<string, string> = {
   VIP: 'cliVip', 'Fidèle': 'cliFidele', 'Régulier': 'cliReg', Nouveau: 'cliNew',
 };

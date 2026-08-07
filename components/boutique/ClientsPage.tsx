@@ -1,12 +1,17 @@
 /**
  * ClientsPage — boutique customers content
  * Mount via BoutiqueShell (page id: 'clients') or standalone.
+ * Self-fetching (own pagination) — /api/admin/boutique-clients.
  */
-import React, { useState } from 'react';
-import type { BoutiqueClient, ClientType } from './types';
-import { SAMPLE_CLIENTS, CLIENT_STATUS_CLASS } from './sample-data';
-import { DownloadIcon, PlusIcon, MoreIcon, StarIcon } from './icons';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { BoutiqueClient, ClientType, KpiItem } from './types';
+import { SWATCHES, hashStr, initials } from './sale-mapping';
+import { CLIENT_STATUS_CLASS } from './sample-data';
+import { DownloadIcon, PlusIcon, StarIcon, TrendIcon, EyeIcon, PencilIcon, TrashIcon } from './icons';
+import Sparkline from './Sparkline';
 import styles from './Boutique.module.css';
+import { formatDate } from '@/lib/format-date';
 
 const sk = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 const CloseIcon = ({ size = 16 }: { size?: number }) => (
@@ -15,10 +20,53 @@ const CloseIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
-export interface ClientsPageProps {
-  clients?: BoutiqueClient[];
-  total?: number;
-  onRefresh?: () => void;
+const LIMIT = 30;
+
+interface ApiBoutiqueClient {
+  id: number;
+  nom: string;
+  telephone: string | null;
+  email: string | null;
+  localisation: string | null;
+  type_client: 'particulier' | 'professionnel';
+  solde: number;
+  notes: string | null;
+  created_at: string;
+  nb_achats?: number;
+  ca_reel?: number;
+  dernier_achat?: string | null;
+}
+
+export interface ClientsMonthlyStats {
+  nouveaux_ce_mois: number;
+  client_du_mois: { nom: string; ca: number; achats: number } | null;
+  panier_moyen: number;
+  panier_moyen_precedent: number;
+}
+
+function mapBoutiqueClient(c: ApiBoutiqueClient): BoutiqueClient {
+  const abs = Math.abs(Number(c.solde));
+  let status: BoutiqueClient['status'] = 'Nouveau';
+  if (c.type_client === 'professionnel' || abs > 100000) status = 'VIP';
+  else if (abs > 50000) status = 'Fidèle';
+  else if (abs > 10000) status = 'Régulier';
+
+  return {
+    id:           c.id,
+    name:         c.nom,
+    init:         initials(c.nom),
+    color:        SWATCHES[hashStr(c.nom) % SWATCHES.length],
+    visits:       Number(c.nb_achats ?? 0),
+    last:         c.dernier_achat ? formatDate(c.dernier_achat) : '—',
+    total:        Number(c.ca_reel ?? 0),
+    status,
+    telephone:    c.telephone,
+    email:        c.email,
+    localisation: c.localisation,
+    type_client:  c.type_client,
+    solde:        Number(c.solde),
+    notes:        c.notes,
+  };
 }
 
 interface ClientFormState {
@@ -47,13 +95,43 @@ function clientToForm(c: BoutiqueClient): ClientFormState {
   };
 }
 
-export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh }: ClientsPageProps) {
+export default function ClientsPage() {
+  const router = useRouter();
   const [modalClient, setModalClient] = useState<BoutiqueClient | 'new' | null>(null);
   const [form,    setForm]    = useState<ClientFormState>(emptyForm());
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState('');
-  const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const [page,  setPage]  = useState(1);
+  const [clients, setClients] = useState<BoutiqueClient[]>([]);
+  const [total,   setTotal]   = useState(0);
+  const [monthlyStats, setMonthlyStats] = useState<ClientsMonthlyStats>({
+    nouveaux_ce_mois: 0, client_du_mois: null, panier_moyen: 0, panier_moyen_precedent: 0,
+  });
+
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  const fetchClients = useCallback(() => {
+    fetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
+    fetch(`/api/admin/boutique-clients?page=${page}`, { signal: controller.signal })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.data)) setClients((d.data as ApiBoutiqueClient[]).map(mapBoutiqueClient));
+        if (typeof d.total === 'number') setTotal(d.total);
+        if (d.monthlyStats) setMonthlyStats(d.monthlyStats as ClientsMonthlyStats);
+      })
+      .catch(e => { if (e?.name !== 'AbortError') setClients([]); });
+  }, [page]);
+
+  useEffect(() => {
+    fetchClients();
+    return () => fetchAbortRef.current?.abort();
+  }, [fetchClients]);
+
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
   async function handleExport() {
     setExporting(true);
@@ -77,15 +155,37 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
     }
   }
 
-  const count = total ?? clients.length;
+  const count = total;
   const vipCount = clients.filter(c => c.status === 'VIP').length;
   const regulierCount = clients.filter(c => c.status === 'Régulier').length;
 
-  const topSpender = [...clients].sort((a, b) => b.total - a.total)[0];
-  const withBalance = clients.filter(c => c.total > 0);
-  const avgBasket = withBalance.length
-    ? Math.round(withBalance.reduce((s, c) => s + c.total, 0) / withBalance.length)
-    : 0;
+  const stats = monthlyStats;
+  const panierDelta = stats.panier_moyen_precedent !== 0
+    ? Math.round(((stats.panier_moyen - stats.panier_moyen_precedent) / stats.panier_moyen_precedent) * 100)
+    : (stats.panier_moyen === 0 ? 0 : null);
+
+  const CLIENTS_KPIS: KpiItem[] = [
+    {
+      label: 'Clients enregistrés', value: String(count),
+      delta: `+${stats.nouveaux_ce_mois} ce mois`, deltaColor: '#2D6A4F',
+      sub: 'ce mois',
+      spark: [18, 20, 19, 22, 21, 25, 24, 26, 25, 28, count % 32 || 30], sparkColor: '#3B6A8F',
+    },
+    {
+      label: 'Client du mois', value: stats.client_du_mois?.nom ?? '—',
+      serif: true,
+      sub: stats.client_du_mois
+        ? `${stats.client_du_mois.achats} achat${stats.client_du_mois.achats > 1 ? 's' : ''} · ${stats.client_du_mois.ca.toLocaleString('fr-FR')} FCFA de CA`
+        : 'Aucun achat ce mois',
+    },
+    {
+      label: 'Panier moyen clients', value: stats.panier_moyen.toLocaleString('fr-FR'), unit: 'FCFA',
+      delta: panierDelta === null ? '—' : `${panierDelta >= 0 ? '+' : ''}${panierDelta}%`,
+      deltaColor: (panierDelta ?? 0) >= 0 ? '#2D6A4F' : '#9C3A14',
+      sub: 'clients identifiés',
+      spark: [120, 128, 132, 140, 136, 148, 156, 168, 172, 180, 194], sparkColor: '#2D6A4F',
+    },
+  ];
 
   function openNew() {
     setForm(emptyForm());
@@ -97,7 +197,10 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
     setForm(clientToForm(c));
     setError('');
     setModalClient(c);
-    setOpenMenu(null);
+  }
+
+  function viewClient(c: BoutiqueClient) {
+    router.push(`/admin/boutique-clients/${c.id}`);
   }
 
   function closeModal() {
@@ -128,7 +231,7 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
       if (!res.ok) { setError(data.error ?? 'Erreur.'); setSaving(false); return; }
       setSaving(false);
       closeModal();
-      onRefresh?.();
+      fetchClients();
     } catch {
       setError('Erreur réseau.');
       setSaving(false);
@@ -136,10 +239,9 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
   }
 
   async function handleDelete(c: BoutiqueClient) {
-    setOpenMenu(null);
     if (!window.confirm(`Supprimer le client "${c.name}" ?`)) return;
     await fetch(`/api/admin/boutique-clients/${c.id}`, { method: 'DELETE' });
-    onRefresh?.();
+    fetchClients();
   }
 
   return (
@@ -148,7 +250,9 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
         <div className={styles.headerLeft}>
           <div className={styles.eyebrow}>Boutique · Clients</div>
           <h1 className={styles.title}>Clients <span className={styles.serif}>physiques</span></h1>
-          <p className={styles.subtitle}>{count} client{count !== 1 ? 's' : ''} enregistré{count !== 1 ? 's' : ''}</p>
+          <p className={styles.subtitle}>
+            {count} client{count !== 1 ? 's' : ''} enregistré{count !== 1 ? 's' : ''} · {stats.panier_moyen.toLocaleString('fr-FR')} F panier moyen · programme de fidélité actif
+          </p>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btn} onClick={handleExport} disabled={exporting}>
@@ -161,21 +265,22 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
       </div>
 
       <div className={styles.kpis3}>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}><div className={styles.kpiLabel}>Clients enregistrés</div></div>
-          <div className={styles.kpiValueRow}><div className={styles.kpiValue}>{count}</div></div>
-          <div className={styles.kpiFoot}><div className={styles.kpiSub}>au total</div></div>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}><div className={styles.kpiLabel}>Meilleur client</div></div>
-          <div className={styles.kpiValueRow}><div className={styles.kpiSerif}>{topSpender?.name ?? '—'}</div></div>
-          <div className={styles.kpiFoot}><div className={styles.kpiSub}>{topSpender ? `${topSpender.total.toLocaleString('fr-FR')} FCFA` : '—'}</div></div>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}><div className={styles.kpiLabel}>Solde moyen clients</div></div>
-          <div className={styles.kpiValueRow}><div className={styles.kpiValue}>{avgBasket.toLocaleString('fr-FR')}</div><div className={styles.kpiUnit}>FCFA</div></div>
-          <div className={styles.kpiFoot}><div className={styles.kpiSub}>clients identifiés</div></div>
-        </div>
+        {CLIENTS_KPIS.map(k => (
+          <div key={k.label} className={styles.kpi}>
+            <div className={styles.kpiHead}>
+              <div className={styles.kpiLabel}>{k.label}</div>
+              {k.delta && <div className={styles.kpiDelta} style={{ color: k.deltaColor }}><TrendIcon size={10} />{k.delta}</div>}
+            </div>
+            <div className={styles.kpiValueRow}>
+              <div className={k.serif ? styles.kpiSerif : styles.kpiValue}>{k.value}</div>
+              {k.unit && <div className={styles.kpiUnit}>{k.unit}</div>}
+            </div>
+            <div className={styles.kpiFoot}>
+              <div className={styles.kpiSub}>{k.sub}</div>
+              {k.spark && k.sparkColor && <Sparkline data={k.spark} color={k.sparkColor} />}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className={styles.tableWrap} style={{ marginTop: 16 }}>
@@ -184,8 +289,8 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
             <thead>
               <tr>
                 <th>Client</th>
-                <th style={{ textAlign: 'right' }}>Visites</th>
-                <th>Dernière visite</th>
+                <th>Téléphone</th>
+                <th>Dernier achat</th>
                 <th style={{ textAlign: 'right' }}>CA total</th>
                 <th>Fidélité</th>
                 <th />
@@ -200,7 +305,7 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
                       <div style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</div>
                     </div>
                   </td>
-                  <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13 }}>{c.visits}</td>
+                  <td style={{ fontFamily: 'Geist Mono, monospace', fontSize: 13, color: 'var(--muted)' }}>{c.telephone ?? '—'}</td>
                   <td style={{ color: 'var(--muted)', fontSize: 13 }}>{c.last}</td>
                   <td style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 500 }}>{c.total.toLocaleString('fr-FR')} FCFA</td>
                   <td>
@@ -209,26 +314,18 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
                       {c.status}
                     </span>
                   </td>
-                  <td className={styles.actionsCell} style={{ position: 'relative' }}>
-                    <button type="button" className={styles.rowMenu} onClick={() => setOpenMenu(openMenu === c.id ? null : c.id)}>
-                      <MoreIcon size={16} />
-                    </button>
-                    {openMenu === c.id && (
-                      <div style={{
-                        position: 'absolute', right: 0, top: '100%', zIndex: 20, minWidth: 140,
-                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
-                        boxShadow: '0 8px 24px rgba(20,17,14,.12)', overflow: 'hidden',
-                      }}>
-                        <button type="button" onClick={() => openEdit(c)} style={{
-                          display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px',
-                          fontSize: 13, background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink)',
-                        }}>Modifier</button>
-                        <button type="button" onClick={() => handleDelete(c)} style={{
-                          display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px',
-                          fontSize: 13, background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--danger)',
-                        }}>Supprimer</button>
-                      </div>
-                    )}
+                  <td className={styles.actionsCell}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                      <button type="button" className={styles.rowMenu} title="Voir la fiche complète" onClick={() => viewClient(c)}>
+                        <EyeIcon size={14} />
+                      </button>
+                      <button type="button" className={styles.rowMenu} title="Modifier le client" onClick={() => openEdit(c)}>
+                        <PencilIcon size={14} />
+                      </button>
+                      <button type="button" className={styles.rowMenu} title="Supprimer le client" onClick={() => handleDelete(c)}>
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -240,6 +337,11 @@ export default function ClientsPage({ clients = SAMPLE_CLIENTS, total, onRefresh
         </div>
         <div className={styles.tableFoot}>
           <span>{count} client{count !== 1 ? 's' : ''} · {vipCount} VIP · {regulierCount} réguliers</span>
+          <div className={styles.pager}>
+            <button type="button" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
+            <button type="button" className={styles.on}>{page}/{totalPages}</button>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
+          </div>
         </div>
       </div>
 

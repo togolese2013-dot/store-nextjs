@@ -5,10 +5,10 @@ import BoutiqueShell from './BoutiqueShell';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import { UIProvider } from '@/components/interaction-layer';
 import { createBoutiqueConfig, setBoutiqueData } from './boutique.config';
-import type { Sale, BoutiqueStock, CashMovement, BoutiqueClient, OverviewStats } from './types';
+import type { Sale, BoutiqueStock, CashMovement, OverviewStats } from './types';
 import { BoutiqueSettingsProvider, buildConfig, type BoutiqueConfig } from './BoutiqueSettingsContext';
 import type { StoreState } from './settings/types';
-import { formatDate, formatDateTime } from '@/lib/format-date';
+import { formatDateTime } from '@/lib/format-date';
 import {
   SWATCHES, hashStr, initials, type ApiFacture, mapFacture, mapPaymentMode, type ApiPaymentMode,
   type ApiStockItem, mapStockItem,
@@ -20,18 +20,6 @@ interface ApiFinanceEntry {
   description: string | null;
   montant: number;
   date_entree: string;
-}
-
-interface ApiBoutiqueClient {
-  id: number;
-  nom: string;
-  telephone: string | null;
-  email: string | null;
-  localisation: string | null;
-  type_client: 'particulier' | 'professionnel';
-  solde: number;
-  notes: string | null;
-  created_at: string;
 }
 
 function mapFinanceEntries(entries: ApiFinanceEntry[]): CashMovement[] {
@@ -61,31 +49,6 @@ function mapFinanceEntries(entries: ApiFinanceEntry[]): CashMovement[] {
   return withBalance.reverse();
 }
 
-function mapBoutiqueClient(c: ApiBoutiqueClient): BoutiqueClient {
-  const abs = Math.abs(Number(c.solde));
-  let status: BoutiqueClient['status'] = 'Nouveau';
-  if (c.type_client === 'professionnel' || abs > 100000) status = 'VIP';
-  else if (abs > 50000) status = 'Fidèle';
-  else if (abs > 10000) status = 'Régulier';
-
-  return {
-    id:           c.id,
-    name:         c.nom,
-    init:         initials(c.nom),
-    color:        SWATCHES[hashStr(c.nom) % SWATCHES.length],
-    visits:       0,
-    last:         formatDate(c.created_at),
-    total:        abs,
-    status,
-    telephone:    c.telephone,
-    email:        c.email,
-    localisation: c.localisation,
-    type_client:  c.type_client,
-    solde:        Number(c.solde),
-    notes:        c.notes,
-  };
-}
-
 interface Props {
   onSwitchWorkspace?: () => void;
   onNewSale?: () => void;
@@ -108,7 +71,6 @@ export default function BoutiqueDataLoader({
   const [sales,            setSales]            = useState<Sale[]>([]);
   const [stock,            setStock]            = useState<BoutiqueStock[]>([]);
   const [movements,        setMovements]        = useState<CashMovement[]>([]);
-  const [clients,       setClients]       = useState<BoutiqueClient[]>([]);
   const [overviewStats, setOverviewStats] = useState<OverviewStats>({
     ventes_jour_count: 0, ventes_jour_montant: 0, ca_total: 0, factures_payees: 0,
     clients_servis_jour: 0, paiements_jour: [], top_produits_jour: [], stock_alertes: [],
@@ -193,18 +155,6 @@ export default function BoutiqueDataLoader({
       .catch(() => {});
   }, []);
 
-  const [clientsTotal, setClientsTotal] = useState(0);
-  const fetchClients = useCallback(() => {
-    fetch('/api/admin/boutique-clients?page=1')
-      .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d.data)) setClients((d.data as ApiBoutiqueClient[]).map(mapBoutiqueClient));
-        if (typeof d.total === 'number') setClientsTotal(d.total);
-      })
-      .catch(() => {});
-  }, []);
-  useEffect(() => { fetchClients(); }, [fetchClients]);
-
   useEffect(() => { setBoutiqueData({ STOCK: stock }); }, [stock]);
   const uiConfig = useMemo(() => createBoutiqueConfig(), []);
 
@@ -214,9 +164,6 @@ export default function BoutiqueDataLoader({
         <BoutiqueShell
           sales={sales}
           movements={movements}
-          clients={clients}
-          clientsTotal={clientsTotal}
-          onRefreshClients={fetchClients}
           overviewStats={overviewStats}
           onSwitchWorkspace={onSwitchWorkspace}
           onNewSale={onNewSale}

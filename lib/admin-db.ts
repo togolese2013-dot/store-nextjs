@@ -2583,18 +2583,16 @@ export async function getFactureById(id: number): Promise<Facture | null> {
   return facture;
 }
 
-export async function getClientFacturesByNom(nom: string, tel?: string | null): Promise<Facture[]> {
-  const conditions = ["(f.client_nom = ? OR f.client_nom LIKE ?)"];
-  const params: (string | number | null)[] = [nom, `%${nom}%`];
-  if (tel) { conditions.push("f.client_tel = ?"); params.push(tel); }
+export async function getClientFacturesByNom(nom: string, shopId: number, clientId: number): Promise<Facture[]> {
+  await ensureFacturesClientIdCol();
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT f.*, CASE WHEN f.source = 'site_order' AND f.admin_id IS NULL THEN 'Site web' ELSE COALESCE(au.nom, util.nom) END AS vendeur
      FROM factures f
      LEFT JOIN admin_users au ON au.id = f.admin_id
      LEFT JOIN utilisateurs util ON util.id = f.admin_id
-     WHERE f.client_nom = ?
+     WHERE f.shop_id = ? AND (f.client_id = ? OR (f.client_id IS NULL AND f.client_nom = ?))
      ORDER BY f.created_at DESC LIMIT 50`,
-    [nom]
+    [shopId, clientId, nom]
   );
   return rows as Facture[];
 }
@@ -2635,6 +2633,7 @@ export async function createFacture(data: {
 export async function createVenteWithStock(data: {
   client_nom:         string;
   client_tel?:        string;
+  client_id?:         number;
   avec_livraison?:    boolean;
   adresse_livraison?: string;
   contact_livraison?: string;
@@ -2650,6 +2649,7 @@ export async function createVenteWithStock(data: {
   shop_id?:           number;
   items: Array<{ produit_id: number; variant_id?: number; nom: string; reference: string; qty: number; prix: number; total: number }>;
 }): Promise<{ id: number; reference: string }> {
+  await ensureFacturesClientIdCol();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -2681,14 +2681,14 @@ export async function createVenteWithStock(data: {
     data.client_nom = data.client_nom.trim().toUpperCase();
     const [result] = await conn.execute<mysql.ResultSetHeader>(
       `INSERT INTO factures
-         (reference, client_nom, client_tel, items,
+         (reference, client_nom, client_tel, client_id, items,
           sous_total, remise, total,
           avec_livraison, adresse_livraison, contact_livraison, lien_localisation,
           mode_paiement, statut_paiement, montant_acompte,
           statut, note, admin_id, shop_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        reference, data.client_nom, data.client_tel ?? null,
+        reference, data.client_nom, data.client_tel ?? null, data.client_id ?? null,
         JSON.stringify(data.items),
         data.sous_total, data.remise ?? 0, data.total,
         data.avec_livraison ? 1 : 0,
@@ -4300,6 +4300,16 @@ export interface BoutiqueClient {
   notes:        string | null;
   created_at:   string;
   updated_at:   string;
+  nb_achats?:     number;
+  ca_reel?:       number;
+  dernier_achat?: string | null;
+}
+
+export interface BoutiqueClientsMonthlyStats {
+  nouveaux_ce_mois:      number;
+  client_du_mois:        { nom: string; ca: number; achats: number } | null;
+  panier_moyen:          number;
+  panier_moyen_precedent: number;
 }
 
 export interface BoutiqueClientStats {
@@ -4348,6 +4358,27 @@ async function ensureBoutiqueClientsTable(): Promise<void> {
   });
 }
 
+async function ensureFacturesClientIdCol(): Promise<void> {
+  return runOnce("factures_client_id", async () => {
+    try {
+      await (db as mysql.Pool).execute("ALTER TABLE factures ADD COLUMN client_id INT NULL");
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code !== "ER_DUP_FIELDNAME" && code !== "ER_NO_SUCH_TABLE") throw err;
+    }
+    // Backfill historical factures — only unambiguous exact name matches (exactly
+    // one boutique_clients candidate for that name/shop). Ambiguous names (several
+    // clients sharing the same nom) are left untouched rather than guessed.
+    await db.execute(`
+      UPDATE factures f
+      JOIN boutique_clients bc ON bc.nom = f.client_nom AND bc.shop_id = f.shop_id
+      SET f.client_id = bc.id
+      WHERE f.client_id IS NULL
+        AND (SELECT COUNT(*) FROM boutique_clients bc2 WHERE bc2.nom = f.client_nom AND bc2.shop_id = f.shop_id) = 1
+    `).catch(() => {});
+  });
+}
+
 export async function listBoutiqueClients(
   limit: number,
   offset: number,
@@ -4356,23 +4387,40 @@ export async function listBoutiqueClients(
   shopId = 1,
 ): Promise<BoutiqueClient[]> {
   await ensureBoutiqueClientsTable();
-  const conditions: string[] = ["shop_id = ?"];
+  await ensureFacturesClientIdCol();
+  const conditions: string[] = ["bc.shop_id = ?"];
   const params: (string | number | boolean | null | Buffer)[] = [shopId];
 
   if (search) {
-    conditions.push("(nom LIKE ? OR telephone LIKE ?)");
+    conditions.push("(bc.nom LIKE ? OR bc.telephone LIKE ?)");
     params.push(`%${search}%`, `%${search}%`);
   }
   if (filtre === "debiteurs") {
-    conditions.push("solde < 0");
+    conditions.push("bc.solde < 0");
   } else if (filtre === "dettes") {
-    conditions.push("solde > 0");
+    conditions.push("bc.solde > 0");
   }
 
+  // Match factures by client_id when linked, falling back to exact-name match
+  // for older/unlinked factures (see ensureFacturesClientIdCol). One LATERAL
+  // join computes all 3 aggregates per client in a single scan of factures
+  // (was 3 separate correlated subqueries — 3x the work per row).
   const where = `WHERE ${conditions.join(" AND ")}`;
   const [rows] = await db.query<mysql.RowDataPacket[]>(
-    `SELECT * FROM boutique_clients ${where} ORDER BY nom ASC LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
+    `SELECT bc.*,
+            IFNULL(agg.nb_achats, 0)    AS nb_achats,
+            IFNULL(agg.ca_reel, 0)      AS ca_reel,
+            agg.dernier_achat           AS dernier_achat
+     FROM boutique_clients bc
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*) AS nb_achats, SUM(f.total) AS ca_reel, MAX(f.created_at) AS dernier_achat
+       FROM factures f
+       WHERE (f.client_id = bc.id OR (f.client_id IS NULL AND f.client_nom = bc.nom))
+         AND f.shop_id = ? AND f.statut != 'annule'
+     ) agg ON true
+     ${where}
+     ORDER BY bc.nom ASC LIMIT ? OFFSET ?`,
+    [shopId, ...params, limit, offset]
   );
   return rows as BoutiqueClient[];
 }
@@ -4401,6 +4449,51 @@ export async function countBoutiqueClients(
     params
   );
   return (rows[0] as mysql.RowDataPacket).cnt as number;
+}
+
+export async function getBoutiqueClientsMonthlyStats(shopId = 1): Promise<BoutiqueClientsMonthlyStats> {
+  await ensureFacturesClientIdCol();
+  const [[nouveaux], [clientDuMois], [paniers]] = await Promise.all([
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM boutique_clients
+       WHERE shop_id = ? AND DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')`,
+      [shopId]
+    ),
+    db.query<mysql.RowDataPacket[]>(
+      // Group by client_id when linked so name typos (e.g. "JER" for "JEROME")
+      // don't split one client's purchases into separate rows.
+      `SELECT ANY_VALUE(COALESCE(bc.nom, f.client_nom)) AS nom, SUM(f.total) AS ca, COUNT(*) AS achats
+       FROM factures f
+       LEFT JOIN boutique_clients bc ON bc.id = f.client_id
+       WHERE f.shop_id = ? AND f.statut != 'annule'
+         AND f.client_nom IS NOT NULL AND f.client_nom != ''
+         AND DATE_FORMAT(f.created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+       GROUP BY COALESCE(f.client_id, f.client_nom)
+       ORDER BY ca DESC
+       LIMIT 1`,
+      [shopId]
+    ),
+    db.query<mysql.RowDataPacket[]>(
+      `SELECT
+         AVG(CASE WHEN DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m') THEN total END) AS actuel,
+         AVG(CASE WHEN DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m') THEN total END) AS precedent
+       FROM factures
+       WHERE shop_id = ? AND statut != 'annule'`,
+      [shopId]
+    ),
+  ]);
+
+  const nomRow    = clientDuMois[0] as mysql.RowDataPacket | undefined;
+  const panierRow = paniers[0] as mysql.RowDataPacket | undefined;
+
+  return {
+    nouveaux_ce_mois: Number((nouveaux[0] as mysql.RowDataPacket)?.cnt ?? 0),
+    client_du_mois: nomRow
+      ? { nom: String(nomRow.nom), ca: Number(nomRow.ca ?? 0), achats: Number(nomRow.achats ?? 0) }
+      : null,
+    panier_moyen:           Math.round(Number(panierRow?.actuel ?? 0)),
+    panier_moyen_precedent: Math.round(Number(panierRow?.precedent ?? 0)),
+  };
 }
 
 export async function getBoutiqueClientById(id: number, shopId = 1): Promise<BoutiqueClient | null> {

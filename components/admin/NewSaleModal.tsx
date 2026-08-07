@@ -132,6 +132,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   /* ── Client ── */
   const [clientNom,        setClientNom]        = useState('');
   const [clientMode,       setClientMode]        = useState<ClientMode>('anon');
+  const [selectedClientId, setSelectedClientId]  = useState<number | null>(null);
   const [clientIndicatif,  setClientIndicatif]   = useState('+228');
   const [clientNumero,     setClientNumero]      = useState('');
   const [suggestions,      setSuggestions]       = useState<Suggestion[]>([]);
@@ -152,7 +153,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   useEffect(() => {
     if (!open) return;
     setItems([]); setProdSearch(''); setShowDrop(false); setActiveIdx(-1);
-    setClientNom(''); setClientMode('anon');
+    setClientNom(''); setClientMode('anon'); setSelectedClientId(null);
     setClientIndicatif('+228'); setClientNumero('');
     setSuggestions([]); setShowSugg(false);
     setPayment('especes'); setStatutPaiement('paye_total'); setMontantAcompte('');
@@ -245,6 +246,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   async function handleNomChange(val: string) {
     setClientNom(val);
     setClientMode('anon');
+    setSelectedClientId(null);
     setClientNumero('');
     if (val.trim().length < 2) { setSuggestions([]); setShowSugg(false); return; }
     setLoadingSugg(true);
@@ -262,6 +264,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
   function selectExisting(c: Suggestion) {
     setClientNom(c.nom);
     setClientMode('existing');
+    setSelectedClientId(c.id);
     if (c.telephone) {
       const match = c.telephone.match(/^(\+\d{1,4})\s*(.+)$/);
       if (match) { setClientIndicatif(match[1]); setClientNumero(match[2].trim()); }
@@ -272,6 +275,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
 
   function selectNew() {
     setClientMode('new');
+    setSelectedClientId(null);
     setSuggestions([]); setShowSugg(false);
   }
 
@@ -309,6 +313,7 @@ export default function NewSaleModal({ open, onClose, onSubmitted }: NewSaleModa
     const payload = {
       client_nom:      clientNomFinal,
       ...(clientTelFinal ? { client_tel: clientTelFinal } : {}),
+      ...(clientMode === 'existing' && selectedClientId ? { client_id: selectedClientId } : {}),
       avec_livraison:  false,
       mode_paiement:   payment,
       statut_paiement: statutPaiement,

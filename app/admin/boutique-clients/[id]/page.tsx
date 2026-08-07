@@ -12,10 +12,10 @@ export default async function BoutiqueClientDetailPage({ params }: Props) {
   if (!session) redirect("/admin/login");
 
   const { id } = await params;
-  const client = await getBoutiqueClientById(Number(id));
+  const client = await getBoutiqueClientById(Number(id), session.shop_id);
   if (!client) notFound();
 
-  const factures = await getClientFacturesByNom(client.nom, client.telephone);
+  const factures = await getClientFacturesByNom(client.nom, session.shop_id, client.id);
 
   return <ClientDetailPage client={client} factures={factures} />;
 }

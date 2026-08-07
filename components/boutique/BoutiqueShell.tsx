@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import type { Sale, CashMovement, BoutiqueClient, OverviewStats } from './types';
+import type { Sale, CashMovement, OverviewStats } from './types';
 import {
-  SAMPLE_SALES, SAMPLE_CASH, SAMPLE_CLIENTS,
+  SAMPLE_SALES, SAMPLE_CASH,
 } from './sample-data';
 import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import OverviewPage from './OverviewPage';
@@ -45,13 +45,10 @@ export interface BoutiqueShellProps {
   defaultPage?: PageId;
   sales?: Sale[];
   movements?: CashMovement[];
-  clients?: BoutiqueClient[];
-  clientsTotal?: number;
   overviewStats?: OverviewStats;
   onSwitchWorkspace?: () => void;
   onNewSale?: () => void;
   onRequestTransfer?: (sku: string) => void;
-  onRefreshClients?: () => void;
   userName?: string;
   userRole?: string;
   shopName?: string;
@@ -61,13 +58,10 @@ export default function BoutiqueShell({
   defaultPage = 'overview',
   sales       = SAMPLE_SALES,
   movements   = SAMPLE_CASH,
-  clients     = SAMPLE_CLIENTS,
-  clientsTotal,
   overviewStats,
   onSwitchWorkspace,
   onNewSale,
   onRequestTransfer,
-  onRefreshClients,
   userName = 'Kent Diallo',
   userRole = 'Propriétaire',
   shopName = 'Ma boutique',
@@ -124,7 +118,7 @@ export default function BoutiqueShell({
         {page === 'ventes'    && <VentesPage onNewSale={onNewSale} />}
         {page === 'stock'     && <StockPage onRequestTransfer={onRequestTransfer} />}
         {page === 'finance'   && <FinancePage />}
-        {page === 'clients'   && <ClientsPage clients={clients} total={clientsTotal} onRefresh={onRefreshClients} />}
+        {page === 'clients'   && <ClientsPage />}
       </main>
     </div>
   );
