@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import type { Sale, CashMovement, OverviewStats } from './types';
 import {
   SAMPLE_SALES, SAMPLE_CASH,
@@ -15,7 +16,7 @@ import { SearchIcon, BellIcon, ChevLeftIcon } from './icons';
 import { useUI, useConfig } from '@/components/interaction-layer';
 import styles from './Boutique.module.css';
 
-type PageId = 'overview' | 'ventes' | 'stock' | 'finance' | 'clients';
+export type PageId = 'overview' | 'ventes' | 'stock' | 'finance' | 'clients';
 
 const PAGE_LABELS: Record<PageId, string> = {
   overview: "Vue d'ensemble",
@@ -67,8 +68,15 @@ export default function BoutiqueShell({
   shopName = 'Ma boutique',
 }: BoutiqueShellProps) {
   const ui = useUI();
+  const router = useRouter();
+  const pathname = usePathname();
   const notifCount = useConfig().notifs?.().length ?? 0;
   const [page, setPage] = useState<PageId>(defaultPage);
+
+  useEffect(() => {
+    const qs = page === 'overview' ? '' : `?page=${page}`;
+    router.replace(`${pathname}${qs}`, { scroll: false });
+  }, [page, pathname, router]);
 
   const groups = useMemo(() =>
     DEFAULT_NAV_GROUPS.map(g => ({

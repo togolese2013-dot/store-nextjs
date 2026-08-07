@@ -5313,7 +5313,7 @@ async function markTombolaNotified(sessionId) {
 }
 async function getFinanceDashboard(shopId = 1) {
   const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-  const [dayRows, hierRows, weekRows, statsRow, walletRows] = await Promise.all([
+  const [dayRows, hierRows, weekRows, statsRow, walletRows, transfersInRows] = await Promise.all([
     // Today's entries/exits from finance_entries
     db.query(
       `SELECT
@@ -5342,12 +5342,14 @@ async function getFinanceDashboard(shopId = 1) {
        GROUP BY DAYOFWEEK(created_at)`,
       [shopId]
     ).then(([rows]) => rows),
-    // Especes balance for solde caisse
+    // Especes balance for solde caisse. Credits a transfert landing IN especes
+    // via compte_destination — see wallet query below for why this is needed.
     db.query(
       `SELECT
          SUM(CASE WHEN type IN ('caisse','rentree','vente') AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN montant
                   WHEN type = 'depense' AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN -montant
                   WHEN type = 'transfert' AND (mode_paiement IS NULL OR mode_paiement = 'especes') THEN -montant
+                  WHEN type = 'transfert' AND compte_destination = 'especes' THEN montant
                   ELSE 0 END) AS solde
        FROM finance_entries
        WHERE shop_id = ?`,
@@ -5356,6 +5358,9 @@ async function getFinanceDashboard(shopId = 1) {
     // Wallet balances + today delta by mode_paiement (NULL → especes).
     // 'mix_by_yas' (legacy admin spelling) folded into 'mixx_by_yas' (Boutique
     // spelling) — same wallet, two names, otherwise its entries are invisible here.
+    // Transferts here only debit the source (mode_paiement) — the credit to
+    // compte_destination is computed separately below and merged in JS, since
+    // a transfert is one row with two accounts, not two rows like vente/depense.
     db.query(
       `SELECT
          CASE WHEN mode_paiement = 'mix_by_yas' THEN 'mixx_by_yas' ELSE COALESCE(mode_paiement, 'especes') END AS mode_paiement,
@@ -5366,6 +5371,19 @@ async function getFinanceDashboard(shopId = 1) {
        FROM finance_entries
        WHERE shop_id = ?
        GROUP BY CASE WHEN mode_paiement = 'mix_by_yas' THEN 'mixx_by_yas' ELSE COALESCE(mode_paiement, 'especes') END`,
+      [shopId]
+    ).then(([rows]) => rows),
+    // Transfert credits landing in compte_destination (the other half of a
+    // transfert row) — without this, a transfert debits its source wallet
+    // but the amount never appears anywhere, silently shrinking the total.
+    db.query(
+      `SELECT
+         CASE WHEN compte_destination = 'mix_by_yas' THEN 'mixx_by_yas' ELSE compte_destination END AS mode_paiement,
+         SUM(montant) AS credit,
+         SUM(CASE WHEN DATE(date_entree) = CURDATE() THEN montant ELSE 0 END) AS credit_jour
+       FROM finance_entries
+       WHERE shop_id = ? AND type = 'transfert' AND compte_destination IS NOT NULL
+       GROUP BY CASE WHEN compte_destination = 'mix_by_yas' THEN 'mixx_by_yas' ELSE compte_destination END`,
       [shopId]
     ).then(([rows]) => rows)
   ]);
@@ -5389,6 +5407,14 @@ async function getFinanceDashboard(shopId = 1) {
     walletMap[r.mode_paiement] = {
       solde: Number(r.solde ?? 0),
       delta: Number(r.delta_jour ?? 0)
+    };
+  }
+  for (const r of transfersInRows) {
+    const key = r.mode_paiement;
+    const prev = walletMap[key] ?? { solde: 0, delta: 0 };
+    walletMap[key] = {
+      solde: prev.solde + Number(r.credit ?? 0),
+      delta: prev.delta + Number(r.credit_jour ?? 0)
     };
   }
   const WALLET_DEFS = [

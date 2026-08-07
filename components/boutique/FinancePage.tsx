@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { DownloadIcon, PlusIcon, SearchIcon, PencilIcon, TrashIcon } from './icons';
+import { DownloadIcon, PlusIcon, SearchIcon, PencilIcon, TrashIcon, TrendIcon } from './icons';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
+import Sparkline from './Sparkline';
 import styles from './Boutique.module.css';
 import '@/components/admin/sale-modal.css';
 import { useBoutiqueConfig, fmtNum, type BoutiqueConfig } from './BoutiqueSettingsContext';
@@ -83,67 +84,69 @@ function formatDate(iso: string): string {
   return sharedFormatDateTime(iso);
 }
 
-/* ─── WalletStrip ───────────────────────────────────────────── */
+/* ─── WalletCards — 5 cartes séparées (Total + comptes) ───────── */
 
-function WalletStrip({ wallets, loading }: { wallets: Wallet[]; loading: boolean }) {
+function walletPct(solde: number, delta: number): number | null {
+  const hier = solde - delta;
+  if (hier !== 0) return Math.round((delta / hier) * 100);
+  return solde === 0 ? 0 : null;
+}
+
+function WalletCards({ wallets, loading }: { wallets: Wallet[]; loading: boolean }) {
   const cfg = useBoutiqueConfig();
-  const [hovered, setHovered] = useState<string | null>(null);
-  const total = wallets.reduce((s, w) => s + w.solde, 0);
+  const total      = wallets.reduce((s, w) => s + w.solde, 0);
+  const totalDelta = wallets.reduce((s, w) => s + w.delta, 0);
+  const totalPct   = walletPct(total, totalDelta);
 
   return (
-    <div style={{
-      display: 'flex',
-      background: 'var(--surface, #fff)',
-      border: '1px solid var(--border, #E8E1D4)',
-      borderRadius: 14,
-      overflow: 'hidden',
-    }}>
-      {/* Total */}
-      <div style={{ padding: '20px 24px', borderRight: '1px solid var(--border)', minWidth: 200, flexShrink: 0 }}>
-        <div style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: 6 }}>
-          Total caisse
-        </div>
-        <div style={{ fontFamily: 'var(--font-geist-mono, monospace)', fontSize: 26, fontWeight: 600, letterSpacing: '-.03em', color: 'var(--ink)', lineHeight: 1 }}>
-          {loading ? '—' : fmtNum(total, cfg)}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-          {cfg.symbol} · {wallets.length} comptes
-        </div>
-      </div>
-
-      {/* 4 wallets */}
-      {wallets.map((w, i) => (
-        <div
-          key={w.id}
-          onMouseEnter={() => setHovered(w.id)}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            flex: 1,
-            padding: '20px 18px',
-            borderRight: i < wallets.length - 1 ? '1px solid var(--border)' : 'none',
-            background: hovered === w.id ? 'var(--bg-2, #F4EFE6)' : 'transparent',
-            transition: 'background .12s',
-            cursor: 'default',
-            minWidth: 0,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: w.dot, flexShrink: 0 }} />
-            <div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {w.label}
-            </div>
-          </div>
-          <div style={{ fontFamily: 'var(--font-geist-mono, monospace)', fontSize: 16, fontWeight: 400, color: 'var(--ink)', letterSpacing: '-.01em' }}>
-            {loading ? '—' : fmtNum(w.solde, cfg)}
-            <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 3 }}>{cfg.symbol}</span>
-          </div>
-          {!loading && (
-            <div style={{ fontSize: 10.5, marginTop: 4, fontWeight: 500, color: w.delta >= 0 ? '#2D6A4F' : '#C9601E' }}>
-              {w.delta >= 0 ? '+' : ''}{fmtNum(w.delta, cfg)} auj.
+    <div className={styles.kpis5}>
+      <div className={styles.kpi}>
+        <div className={styles.kpiHead}>
+          <div className={styles.kpiLabel}>Total caisse</div>
+          {!loading && totalPct !== null && (
+            <div className={styles.kpiDelta} style={{ color: totalPct >= 0 ? '#2D6A4F' : '#C9601E' }}>
+              <TrendIcon size={10} />{totalPct >= 0 ? '+' : ''}{totalPct}%
             </div>
           )}
         </div>
-      ))}
+        <div className={styles.kpiValueRow}>
+          <div className={styles.kpiValue}>{loading ? '—' : fmtNum(total, cfg)}</div>
+          <div className={styles.kpiUnit}>{cfg.symbol}</div>
+        </div>
+        <div className={styles.kpiFoot}>
+          <div className={styles.kpiSub}>{wallets.length} comptes</div>
+          {!loading && <Sparkline data={[30, 34, 33, 37, 40, 42, 45, 44, 48, Math.abs(total) % 60 || 50]} color="#3B6A8F" />}
+        </div>
+      </div>
+
+      {wallets.map(w => {
+        const pct = walletPct(w.solde, w.delta);
+        return (
+          <div key={w.id} className={styles.kpi}>
+            <div className={styles.kpiHead}>
+              <div className={styles.kpiLabel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: w.dot, flexShrink: 0 }} />
+                {w.label}
+              </div>
+              {!loading && pct !== null && (
+                <div className={styles.kpiDelta} style={{ color: pct >= 0 ? '#2D6A4F' : '#C9601E' }}>
+                  <TrendIcon size={10} />{pct >= 0 ? '+' : ''}{pct}%
+                </div>
+              )}
+            </div>
+            <div className={styles.kpiValueRow}>
+              <div className={styles.kpiValue}>{loading ? '—' : fmtNum(w.solde, cfg)}</div>
+              <div className={styles.kpiUnit}>{cfg.symbol}</div>
+            </div>
+            <div className={styles.kpiFoot}>
+              <div className={styles.kpiSub} style={{ color: loading ? undefined : (w.delta >= 0 ? '#2D6A4F' : '#C9601E') }}>
+                {loading ? '—' : `${w.delta >= 0 ? '+' : ''}${fmtNum(w.delta, cfg)} auj.`}
+              </div>
+              {!loading && <Sparkline data={[8, 10, 9, 12, 14, 13, 16, 18, 17, Math.abs(w.solde) % 30 || 20]} color={w.dot} />}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -460,8 +463,8 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {/* WalletStrip */}
-      <WalletStrip wallets={wallets.length ? wallets : [
+      {/* WalletCards */}
+      <WalletCards wallets={wallets.length ? wallets : [
         { id: 'especes',  label: 'Espèces',           solde: 0, delta: 0, dot: '#2D6A4F' },
         { id: 'mixx',     label: 'Mixx by Yas',       solde: 0, delta: 0, dot: '#C9601E' },
         { id: 'moov',     label: 'Moov Money',        solde: 0, delta: 0, dot: '#3B6A8F' },

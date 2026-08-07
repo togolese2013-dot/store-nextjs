@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import BoutiqueShell from './BoutiqueShell';
+import { useSearchParams } from 'next/navigation';
+import BoutiqueShell, { type PageId } from './BoutiqueShell';
 import { useAdminSSE } from '@/components/admin/useAdminSSE';
 import { UIProvider } from '@/components/interaction-layer';
 import { createBoutiqueConfig, setBoutiqueData } from './boutique.config';
@@ -68,6 +69,8 @@ export default function BoutiqueDataLoader({
   shopName,
   refreshRef,
 }: Props) {
+  const searchParams = useSearchParams();
+  const defaultPage  = (searchParams.get('page') as PageId | null) ?? 'overview';
   const [sales,            setSales]            = useState<Sale[]>([]);
   const [stock,            setStock]            = useState<BoutiqueStock[]>([]);
   const [movements,        setMovements]        = useState<CashMovement[]>([]);
@@ -162,6 +165,7 @@ export default function BoutiqueDataLoader({
     <UIProvider config={uiConfig} onNavigate={() => {}}>
       <BoutiqueSettingsProvider cfg={boutiqueConfig} refresh={fetchBoutiqueSettings}>
         <BoutiqueShell
+          defaultPage={defaultPage}
           sales={sales}
           movements={movements}
           overviewStats={overviewStats}
