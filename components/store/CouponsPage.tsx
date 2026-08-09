@@ -1,14 +1,13 @@
 /**
  * CouponsPage — promotional code management content
- * Mount via StoreShell (page id: 'coupons') or standalone.
+ * Mount via StoreShell (page id: 'coupons').
  */
+'use client';
 import React from 'react';
 import type { CSSProperties } from 'react';
 import { useUI } from '@/components/interaction-layer';
 import type { Coupon } from './types';
-import { SAMPLE_COUPONS, COUPONS_KPIS } from './sample-data';
-import Sparkline from './Sparkline';
-import { DownloadIcon, PlusIcon, MoreIcon, CopyIcon, TrendIcon } from './icons';
+import { DownloadIcon, PlusIcon, MoreIcon, CopyIcon } from './icons';
 import styles from './Store.module.css';
 
 const COUPON_STATUS_STYLE: Record<string, CSSProperties> = {
@@ -17,13 +16,26 @@ const COUPON_STATUS_STYLE: Record<string, CSSProperties> = {
   Inactif: { background: 'var(--bg-2)',         color: 'var(--muted-2)' },
 };
 
+function copyCode(code: string, onDone: () => void) {
+  navigator.clipboard?.writeText(code).then(onDone).catch(() => {});
+}
+
 export interface CouponsPageProps {
   coupons?: Coupon[];
 }
 
-export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPageProps) {
+export default function CouponsPage({ coupons = [] }: CouponsPageProps) {
   const ui = useUI();
-  const actifs = coupons.filter(c => c.status === 'Actif').length;
+  const actifs  = coupons.filter(c => c.status === 'Actif').length;
+  const expires = coupons.filter(c => c.status === 'Expiré').length;
+  const utilisationsTotales = coupons.reduce((s, c) => s + c.used, 0);
+
+  const KPIS = [
+    { label: 'Coupons actifs',       value: String(actifs),              sub: `sur ${coupons.length} créé${coupons.length !== 1 ? 's' : ''}` },
+    { label: 'Utilisations totales', value: String(utilisationsTotales), sub: 'tous coupons confondus' },
+    { label: 'Coupons expirés',      value: String(expires),             sub: 'à renouveler ou retirer' },
+  ];
+
   return (
     <>
       <div className={styles.header}>
@@ -42,19 +54,16 @@ export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPagePro
 
       {/* KPIs */}
       <div className={styles.kpis3}>
-        {COUPONS_KPIS.map(k => (
+        {KPIS.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
               <div className={styles.kpiLabel}>{k.label}</div>
-              {k.delta && <div className={styles.kpiDelta} style={{ color: k.deltaColor }}><TrendIcon size={10} />{k.delta}</div>}
             </div>
             <div className={styles.kpiValueRow}>
               <div className={styles.kpiValue}>{k.value}</div>
-              {k.unit && <div className={styles.kpiUnit}>{k.unit}</div>}
             </div>
             <div className={styles.kpiFoot}>
               <div className={styles.kpiSub}>{k.sub}</div>
-              {k.spark && k.sparkColor && <Sparkline data={k.spark} color={k.sparkColor} />}
             </div>
           </div>
         ))}
@@ -84,7 +93,10 @@ export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPagePro
                       <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 13, fontWeight: 600, letterSpacing: '.02em' }}>
                         {c.code}
                       </span>
-                      <button type="button" className={styles.rowMenu} style={{ width: 22, height: 22, color: 'var(--muted-2)' }} title="Copier">
+                      <button
+                        type="button" className={styles.rowMenu} style={{ width: 22, height: 22, color: 'var(--muted-2)' }} title="Copier"
+                        onClick={() => copyCode(c.code, () => ui.toast('Code copié'))}
+                      >
                         <CopyIcon size={12} />
                       </button>
                     </div>
@@ -101,23 +113,21 @@ export default function CouponsPage({ coupons = SAMPLE_COUPONS }: CouponsPagePro
                   <td><span className={styles.tag} style={COUPON_STATUS_STYLE[c.status]}>{c.status}</span></td>
                   <td className={styles.actionsCell}>
                     <button type="button" className={styles.rowMenu} onClick={(e) => { e.stopPropagation(); ui.menu(e, [
-                      { label: 'Copier le code', icon: 'copy', onClick: () => ui.toast('Code copié') },
+                      { label: 'Copier le code', icon: 'copy', onClick: () => copyCode(c.code, () => ui.toast('Code copié')) },
                       { sep: true },
                       { label: 'Supprimer', icon: 'trash', danger: true, onClick: () => ui.confirmDelete('le coupon', c.code) },
                     ], 'right'); }}><MoreIcon size={16} /></button>
                   </td>
                 </tr>
               ))}
+              {coupons.length === 0 && (
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: 13 }}>Aucun coupon</td></tr>
+              )}
             </tbody>
           </table>
         </div>
         <div className={styles.tableFoot}>
-          <span>8 codes promo</span>
-          <div className={styles.pager}>
-            <button type="button">‹</button>
-            <button type="button" className={styles.on}>1</button>
-            <button type="button">›</button>
-          </div>
+          <span>{coupons.length} code{coupons.length !== 1 ? 's' : ''} promo</span>
         </div>
       </div>
     </>

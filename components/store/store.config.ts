@@ -121,9 +121,9 @@ export function createStoreConfig({ onRefresh }: StoreConfigOpts = {}): AppConfi
     /* ── Real API callbacks ── */
 
     onSubmit: async (kind, mode, values) => {
-      if (kind === "order" && values._raw?.ref) {
+      if (kind === "order" && values._raw?.id) {
         const statusApi = STATUS_FR_TO_API[values.status] ?? "pending";
-        await fetch(`/api/admin/orders/${values._raw.ref}`, {
+        await fetch(`/api/admin/orders/${values._raw.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: statusApi }),
@@ -152,6 +152,8 @@ export function createStoreConfig({ onRefresh }: StoreConfigOpts = {}): AppConfi
           fee:        Number(values.price) || 0,
           actif:      values.active ? 1 : 0,
           prix_libre: 0,
+          couverture: values.coverage || null,
+          delai:      values.delay || null,
         };
         await fetch("/api/admin/delivery-zones", {
           method: "POST",

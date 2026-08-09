@@ -9,6 +9,7 @@ import {
   listOrders, countOrders, createOrder, addOrderEvent,
   updateOrderStatus, updateOrderFields, deleteOrder, getOrderById,
   applyOrderDeliveredEffects, ensureOrderVente, invalidateVentesStats,
+  getStoreOrderStats,
 } from "@/lib/admin-db";
 
 let _paymentColReady = false;
@@ -33,7 +34,8 @@ router.get("/api/admin/orders", async (req, res) => {
   const page    = Math.max(1, Number(req.query.page ?? 1));
   const limit   = Math.min(100, Math.max(1, Number(req.query.limit ?? 25)));
   const offset  = (page - 1) * limit;
-  const [orders, total] = await Promise.all([listOrders(limit, offset, shopId), countOrders(shopId)]);
+  const status  = (req.query.status as string) || undefined;
+  const [orders, total] = await Promise.all([listOrders(limit, offset, shopId, status), countOrders(shopId, status)]);
   res.json({ success: true, data: orders, total, page, limit });
 });
 
@@ -81,6 +83,13 @@ router.get("/api/admin/orders/clients-search", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
+});
+
+router.get("/api/admin/orders/stats", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autorisé." });
+  const stats = await getStoreOrderStats(session.shop_id ?? 1);
+  res.json({ success: true, data: stats });
 });
 
 router.get("/api/admin/orders/:id", async (req, res) => {

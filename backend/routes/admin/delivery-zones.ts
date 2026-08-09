@@ -62,6 +62,8 @@ router.post("/api/admin/delivery-zones", async (req, res) => {
       actif:      body.actif !== false && body.actif !== 0,
       sort_order: Number(body.sort_order ?? 0),
       prix_libre: Boolean(body.prix_libre),
+      couverture: body.couverture ? String(body.couverture).trim() : null,
+      delai:      body.delai ? String(body.delai).trim() : null,
     }, shopId);
 
     res.json({ ok: true });

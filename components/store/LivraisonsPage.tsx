@@ -2,21 +2,37 @@
  * LivraisonsPage — delivery zone management content
  * Mount via StoreShell (page id: 'livraisons') or standalone.
  */
+'use client';
 import React from 'react';
 import { useUI } from '@/components/interaction-layer';
 import type { DeliveryZone } from './types';
-import { SAMPLE_ZONES, LIVRAISONS_KPIS } from './sample-data';
-import Sparkline from './Sparkline';
-import { DownloadIcon, PlusIcon, MoreIcon, TrendIcon, MapPinIcon, CartIcon } from './icons';
+import { DownloadIcon, PlusIcon, MoreIcon, MapPinIcon, CartIcon } from './icons';
 import styles from './Store.module.css';
+
+function avgDelayDays(zones: DeliveryZone[]): string {
+  const days = zones
+    .map(z => /J\+?\s*(\d+)/i.exec(z.delay)?.[1])
+    .filter((d): d is string => Boolean(d))
+    .map(Number);
+  if (days.length === 0) return '—';
+  return (days.reduce((s, d) => s + d, 0) / days.length).toFixed(1);
+}
 
 export interface LivraisonsPageProps {
   zones?: DeliveryZone[];
 }
 
-export default function LivraisonsPage({ zones = SAMPLE_ZONES }: LivraisonsPageProps) {
+export default function LivraisonsPage({ zones = [] }: LivraisonsPageProps) {
   const ui = useUI();
-  const zonesActives = zones.filter(z => z.active).length;
+  const zonesActives     = zones.filter(z => z.active).length;
+  const livraisonsMois   = zones.reduce((s, z) => s + z.orders, 0);
+  const delaiMoyen       = avgDelayDays(zones);
+
+  const KPIS = [
+    { label: 'Zones actives',      value: `${zonesActives} / ${zones.length}`, sub: 'configurées' },
+    { label: 'Livraisons ce mois', value: String(livraisonsMois),              sub: 'commandes livrées par zone' },
+    { label: 'Délai moyen',        value: delaiMoyen, unit: delaiMoyen !== '—' ? 'j' : undefined, sub: 'zones avec délai renseigné' },
+  ];
   return (
     <>
       <div className={styles.header}>
@@ -35,11 +51,10 @@ export default function LivraisonsPage({ zones = SAMPLE_ZONES }: LivraisonsPageP
 
       {/* KPIs */}
       <div className={styles.kpis3}>
-        {LIVRAISONS_KPIS.map(k => (
+        {KPIS.map(k => (
           <div key={k.label} className={styles.kpi}>
             <div className={styles.kpiHead}>
               <div className={styles.kpiLabel}>{k.label}</div>
-              {k.delta && <div className={styles.kpiDelta} style={{ color: k.deltaColor }}><TrendIcon size={10} />{k.delta}</div>}
             </div>
             <div className={styles.kpiValueRow}>
               <div className={styles.kpiValue}>{k.value}</div>
@@ -47,7 +62,6 @@ export default function LivraisonsPage({ zones = SAMPLE_ZONES }: LivraisonsPageP
             </div>
             <div className={styles.kpiFoot}>
               <div className={styles.kpiSub}>{k.sub}</div>
-              {k.spark && k.sparkColor && <Sparkline data={k.spark} color={k.sparkColor} />}
             </div>
           </div>
         ))}

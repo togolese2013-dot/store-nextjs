@@ -43,8 +43,8 @@ export default function Sidebar({
   groups = DEFAULT_NAV_GROUPS,
   onSwitchWorkspace,
   onNav,
-  userName = 'Kent Diallo',
-  userRole = 'Propriétaire',
+  userName = '',
+  userRole = '',
 }: SidebarProps) {
   const initialActive = groups.flatMap(g => g.items).find(i => i.active)?.id ?? 'overview';
   const [activeId, setActiveId] = useState<string | null>(initialActive);

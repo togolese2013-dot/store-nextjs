@@ -4,35 +4,12 @@
  * Wraps Sidebar + Topbar and routes between 5 pages:
  *   overview · commandes · coupons · livraisons · paiements
  *
- * Usage — Next.js App Router:
- *
- *   // app/admin/store/page.tsx
- *   'use client';
- *   import StoreShell from '@/components/store/StoreShell';
- *   import { useRouter } from 'next/navigation';
- *
- *   export default function Page() {
- *     const router = useRouter();
- *     return (
- *       <StoreShell
- *         onSwitchWorkspace={() => router.push('/admin')}
- *         onCreateOrder={() => router.push('/admin/store/commandes/new')}
- *       />
- *     );
- *   }
- *
- * Live data:
- *   const { data: orders }   = useSWR<Order[]>('/api/orders', fetcher);
- *   const { data: coupons }  = useSWR<Coupon[]>('/api/coupons', fetcher);
- *   <StoreShell orders={orders ?? []} coupons={coupons ?? []} ... />
+ * Mounted via StoreDataLoader, which fetches real data and passes it down.
  */
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import type { Order, Coupon, DeliveryZone, Payment } from './types';
-import {
-  SAMPLE_ORDERS, SAMPLE_COUPONS, SAMPLE_ZONES, SAMPLE_PAYMENTS,
-} from './sample-data';
+import type { Order, Coupon, DeliveryZone, Payment, StoreOrderStats } from './types';
 import Sidebar, { DEFAULT_NAV_GROUPS } from './Sidebar';
 import OverviewPage from './OverviewPage';
 import CommandesPage from './CommandesPage';
@@ -85,8 +62,10 @@ export interface StoreShellProps {
   coupons?: Coupon[];
   zones?: DeliveryZone[];
   payments?: Payment[];
+  stats?: StoreOrderStats;
   onSwitchWorkspace?: () => void;
-  onCreateOrder?: () => void;
+  onOrderChanged?: () => void;
+  shopName?: string;
   userName?: string;
   userRole?: string;
 }
@@ -94,14 +73,16 @@ export interface StoreShellProps {
 /* ─── Shell ─────────────────────────────────────────────────────── */
 export default function StoreShell({
   defaultPage = 'overview',
-  orders      = SAMPLE_ORDERS,
-  coupons     = SAMPLE_COUPONS,
-  zones       = SAMPLE_ZONES,
-  payments    = SAMPLE_PAYMENTS,
+  orders      = [],
+  coupons     = [],
+  zones       = [],
+  payments    = [],
+  stats,
   onSwitchWorkspace,
-  onCreateOrder,
-  userName = 'Kent Diallo',
-  userRole = 'Propriétaire',
+  onOrderChanged = () => {},
+  shopName = '',
+  userName = '',
+  userRole = '',
 }: StoreShellProps) {
   const ui = useUI();
   const notifCount = useConfig().notifs?.().length ?? 0;
@@ -132,7 +113,7 @@ export default function StoreShell({
             <ChevLeftIcon size={16} />
           </button>
           <div className={styles.crumbs}>
-            <span>Maison Diallo</span>
+            <span>{shopName}</span>
             <span className={styles.sep}>/</span>
             <span>Store</span>
             {page !== 'overview' && (
@@ -151,11 +132,11 @@ export default function StoreShell({
         </header>
 
         {/* Page routing */}
-        {page === 'overview'   && <OverviewPage orders={orders} onCreateOrder={onCreateOrder} />}
-        {page === 'commandes'  && <CommandesPage orders={orders} onCreateOrder={onCreateOrder} />}
+        {page === 'overview'   && <OverviewPage orders={orders} zones={zones} payments={payments} stats={stats} onOrderChanged={onOrderChanged} onViewAllOrders={() => setPage('commandes')} />}
+        {page === 'commandes'  && <CommandesPage zones={zones} stats={stats} onOrderChanged={onOrderChanged} />}
         {page === 'coupons'    && <CouponsPage coupons={coupons} />}
         {page === 'livraisons' && <LivraisonsPage zones={zones} />}
-        {page === 'paiements'  && <PaiementsPage payments={payments} />}
+        {page === 'paiements'  && <PaiementsPage payments={payments} stats={stats} />}
         {page === 'contenu'    && <ContenuVitrinePage />}
         {page === 'settings'   && <ReglagesPage />}
       </main>

@@ -972,33 +972,61 @@ export async function setSettings(entries: Record<string, string>, shopId = 1) {
 
 /* ─── Delivery Zones ─── */
 export interface DeliveryZone {
-  id:          number;
-  nom:         string;
-  fee:         number;
-  actif:       boolean;
-  sort_order:  number;
-  prix_libre:  boolean;
+  id:           number;
+  nom:          string;
+  fee:          number;
+  actif:        boolean;
+  sort_order:   number;
+  prix_libre:   boolean;
+  couverture:   string | null;
+  delai:        string | null;
+  orders_count: number;
+}
+
+let _zoneColsReady = false;
+async function ensureDeliveryZoneCols() {
+  if (_zoneColsReady) return;
+  for (const ddl of [
+    "ALTER TABLE delivery_zones ADD COLUMN couverture VARCHAR(255) NULL",
+    "ALTER TABLE delivery_zones ADD COLUMN delai VARCHAR(50) NULL",
+  ]) {
+    try { await (db as mysql.Pool).execute(ddl); }
+    catch (err: unknown) { if ((err as { code?: string }).code !== "ER_DUP_FIELDNAME") throw err; }
+  }
+  _zoneColsReady = true;
 }
 
 export async function getDeliveryZones(activeOnly = false, shopId = 1): Promise<DeliveryZone[]> {
-  const conds = [`shop_id = ${Number(shopId)}`];
-  if (activeOnly) conds.push("actif = 1");
+  await ensureDeliveryZoneCols();
+  const conds = [`z.shop_id = ${Number(shopId)}`];
+  if (activeOnly) conds.push("z.actif = 1");
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    `SELECT * FROM delivery_zones WHERE ${conds.join(" AND ")} ORDER BY sort_order ASC, id ASC`
+    `SELECT z.*,
+       (SELECT COUNT(*) FROM orders o
+        WHERE o.zone_livraison = z.nom AND o.shop_id = z.shop_id AND o.status != 'cancelled'
+          AND YEAR(o.created_at) = YEAR(CURDATE()) AND MONTH(o.created_at) = MONTH(CURDATE())
+       ) AS orders_count
+     FROM delivery_zones z WHERE ${conds.join(" AND ")} ORDER BY z.sort_order ASC, z.id ASC`
   );
-  return rows.map(r => ({ ...r, actif: Boolean(r.actif), prix_libre: Boolean(r.prix_libre) })) as DeliveryZone[];
+  return rows.map(r => ({
+    ...r,
+    actif: Boolean(r.actif),
+    prix_libre: Boolean(r.prix_libre),
+    orders_count: Number(r.orders_count ?? 0),
+  })) as DeliveryZone[];
 }
 
-export async function upsertDeliveryZone(zone: Omit<DeliveryZone, "id"> & { id?: number }, shopId = 1) {
+export async function upsertDeliveryZone(zone: Omit<DeliveryZone, "id" | "orders_count"> & { id?: number }, shopId = 1) {
+  await ensureDeliveryZoneCols();
   if (zone.id) {
     await db.execute(
-      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=? AND shop_id=?",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id, shopId]
+      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=?, couverture=?, delai=? WHERE id=? AND shop_id=?",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.couverture ?? null, zone.delai ?? null, zone.id, shopId]
     );
   } else {
     await db.execute(
-      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre, shop_id) VALUES (?,?,?,?,?,?)",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, shopId]
+      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre, couverture, delai, shop_id) VALUES (?,?,?,?,?,?,?,?)",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.couverture ?? null, zone.delai ?? null, shopId]
     );
   }
 }
@@ -1009,39 +1037,116 @@ export async function deleteDeliveryZone(id: number, shopId = 1) {
 
 /* ─── Orders ─── */
 export interface Order {
-  id:              number;
-  reference:       string;
-  nom:             string;
-  telephone:       string;
-  adresse:         string;
-  zone_livraison:  string;
-  delivery_fee:    number;
-  note:            string;
-  items:           string;
-  subtotal:        number;
-  total:           number;
-  status:          string;
-  statut_paiement: string | null;
-  created_at:      string;
+  id:                 number;
+  reference:          string;
+  nom:                string;
+  telephone:          string;
+  adresse:            string;
+  zone_livraison:     string;
+  delivery_fee:       number;
+  note:               string;
+  items:              string;
+  subtotal:           number;
+  total:              number;
+  status:             string;
+  statut_paiement:    string | null;
+  mm_transaction_ref: string | null;
+  payment_mode:       string | null;
+  created_at:         string;
 }
 
-export async function listOrders(limit = 50, offset = 0, shopId = 1): Promise<Order[]> {
+export async function listOrders(limit = 50, offset = 0, shopId = 1, status?: string): Promise<Order[]> {
+  const statusCond = status ? "AND status = ?" : "";
+  const params = status ? [shopId, status] : [shopId];
   const [rows] = await db.query<mysql.RowDataPacket[]>(
     `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
-            items, subtotal, total, status, statut_paiement,
+            items, subtotal, total, status, statut_paiement, mm_transaction_ref, payment_mode,
             livreur_id, livraison_statut, created_at, updated_at
-     FROM orders WHERE shop_id = ${Number(shopId)}
-     ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+     FROM orders WHERE shop_id = ? ${statusCond}
+     ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+    params
   );
   return rows as Order[];
 }
 
-export async function countOrders(shopId = 1): Promise<number> {
+export async function countOrders(shopId = 1, status?: string): Promise<number> {
+  const statusCond = status ? "AND status = ?" : "";
+  const params = status ? [shopId, status] : [shopId];
   const [rows] = await db.execute<mysql.RowDataPacket[]>(
-    "SELECT COUNT(*) as cnt FROM orders WHERE shop_id = ?",
-    [shopId]
+    `SELECT COUNT(*) as cnt FROM orders WHERE shop_id = ? ${statusCond}`,
+    params
   );
   return Number(rows[0]?.cnt ?? 0);
+}
+
+export interface StoreOrderStats {
+  ca_jour:              number;
+  ca_hier:               number;
+  commandes_en_cours:    number;
+  commandes_en_attente:  number;
+  commandes_mois:        number;
+  commandes_mois_prec:   number;
+  ca_mois:               number;
+  ca_mois_prec:          number;
+  livrees_mois:          number;
+  paye_mois:             number;
+  ca_paye_mois:          number;
+  ca_paye_mois_prec:     number;
+  total_toutes:          number;
+  total_pending:         number;
+  total_confirmed:       number;
+  total_shipped:         number;
+  total_delivered:       number;
+  total_cancelled:       number;
+}
+
+export async function getStoreOrderStats(shopId = 1): Promise<StoreOrderStats> {
+  const MOIS_ACTUEL = "YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())";
+  const MOIS_PREC    = "YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH) AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)";
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_jour,
+       COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_hier,
+       COUNT(CASE WHEN status IN ('pending','confirmed') THEN 1 END) AS commandes_en_cours,
+       COUNT(CASE WHEN status = 'pending' THEN 1 END) AS commandes_en_attente,
+       COUNT(CASE WHEN ${MOIS_ACTUEL} AND status != 'cancelled' THEN 1 END) AS commandes_mois,
+       COUNT(CASE WHEN ${MOIS_PREC} AND status != 'cancelled' THEN 1 END) AS commandes_mois_prec,
+       COALESCE(SUM(CASE WHEN ${MOIS_ACTUEL} AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_mois,
+       COALESCE(SUM(CASE WHEN ${MOIS_PREC} AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_mois_prec,
+       COUNT(CASE WHEN ${MOIS_ACTUEL} AND status = 'delivered' THEN 1 END) AS livrees_mois,
+       COUNT(CASE WHEN ${MOIS_ACTUEL} AND statut_paiement IN ('paye','paye_total') THEN 1 END) AS paye_mois,
+       COALESCE(SUM(CASE WHEN ${MOIS_ACTUEL} AND statut_paiement IN ('paye','paye_total') THEN total ELSE 0 END), 0) AS ca_paye_mois,
+       COALESCE(SUM(CASE WHEN ${MOIS_PREC} AND statut_paiement IN ('paye','paye_total') THEN total ELSE 0 END), 0) AS ca_paye_mois_prec,
+       COUNT(*) AS total_toutes,
+       COUNT(CASE WHEN status = 'pending'   THEN 1 END) AS total_pending,
+       COUNT(CASE WHEN status = 'confirmed' THEN 1 END) AS total_confirmed,
+       COUNT(CASE WHEN status = 'shipped'   THEN 1 END) AS total_shipped,
+       COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS total_delivered,
+       COUNT(CASE WHEN status = 'cancelled' THEN 1 END) AS total_cancelled
+     FROM orders WHERE shop_id = ?`,
+    [shopId]
+  );
+  const r = rows[0] ?? {};
+  return {
+    ca_jour:              Number(r.ca_jour ?? 0),
+    ca_hier:               Number(r.ca_hier ?? 0),
+    commandes_en_cours:    Number(r.commandes_en_cours ?? 0),
+    commandes_en_attente:  Number(r.commandes_en_attente ?? 0),
+    commandes_mois:        Number(r.commandes_mois ?? 0),
+    commandes_mois_prec:   Number(r.commandes_mois_prec ?? 0),
+    ca_mois:               Number(r.ca_mois ?? 0),
+    ca_mois_prec:          Number(r.ca_mois_prec ?? 0),
+    livrees_mois:          Number(r.livrees_mois ?? 0),
+    paye_mois:             Number(r.paye_mois ?? 0),
+    ca_paye_mois:          Number(r.ca_paye_mois ?? 0),
+    ca_paye_mois_prec:     Number(r.ca_paye_mois_prec ?? 0),
+    total_toutes:          Number(r.total_toutes ?? 0),
+    total_pending:         Number(r.total_pending ?? 0),
+    total_confirmed:       Number(r.total_confirmed ?? 0),
+    total_shipped:         Number(r.total_shipped ?? 0),
+    total_delivered:       Number(r.total_delivered ?? 0),
+    total_cancelled:       Number(r.total_cancelled ?? 0),
+  };
 }
 
 async function ensureOrderLifecycleCols() {

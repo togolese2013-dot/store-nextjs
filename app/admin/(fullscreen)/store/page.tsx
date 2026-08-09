@@ -1,12 +1,15 @@
-'use client';
-import { useRouter } from 'next/navigation';
-import StoreDataLoader from '@/components/store/StoreDataLoader';
+import { getAdminSession } from '@/lib/auth';
+import { getShopById } from '@/lib/shops';
+import StorePageClient from './StorePageClient';
 
-export default function Page() {
-  const router = useRouter();
+export default async function Page() {
+  const session = await getAdminSession();
+  const shop = session ? await getShopById(session.shop_id).catch(() => null) : null;
   return (
-    <StoreDataLoader
-      onSwitchWorkspace={() => router.push('/admin')}
+    <StorePageClient
+      shopName={shop?.nom ?? ''}
+      userName={session?.nom ?? ''}
+      userRole={session?.role ?? ''}
     />
   );
 }

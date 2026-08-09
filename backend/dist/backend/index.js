@@ -857,6 +857,7 @@ __export(admin_db_exports, {
   getStockMovementCounts: () => getStockMovementCounts,
   getStockMovements: () => getStockMovements,
   getStockStats: () => getStockStats,
+  getStoreOrderStats: () => getStoreOrderStats,
   getTokenVersion: () => getTokenVersion,
   getTombolaParticipants: () => getTombolaParticipants,
   getTombolaSession: () => getTombolaSession,
@@ -1738,46 +1739,125 @@ async function setSettings(entries, shopId = 1) {
   );
   invalidateSettingsCache(shopId);
 }
+async function ensureDeliveryZoneCols() {
+  if (_zoneColsReady) return;
+  for (const ddl of [
+    "ALTER TABLE delivery_zones ADD COLUMN couverture VARCHAR(255) NULL",
+    "ALTER TABLE delivery_zones ADD COLUMN delai VARCHAR(50) NULL"
+  ]) {
+    try {
+      await db.execute(ddl);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") throw err;
+    }
+  }
+  _zoneColsReady = true;
+}
 async function getDeliveryZones(activeOnly = false, shopId = 1) {
-  const conds = [`shop_id = ${Number(shopId)}`];
-  if (activeOnly) conds.push("actif = 1");
+  await ensureDeliveryZoneCols();
+  const conds = [`z.shop_id = ${Number(shopId)}`];
+  if (activeOnly) conds.push("z.actif = 1");
   const [rows] = await db.execute(
-    `SELECT * FROM delivery_zones WHERE ${conds.join(" AND ")} ORDER BY sort_order ASC, id ASC`
+    `SELECT z.*,
+       (SELECT COUNT(*) FROM orders o
+        WHERE o.zone_livraison = z.nom AND o.shop_id = z.shop_id AND o.status != 'cancelled'
+          AND YEAR(o.created_at) = YEAR(CURDATE()) AND MONTH(o.created_at) = MONTH(CURDATE())
+       ) AS orders_count
+     FROM delivery_zones z WHERE ${conds.join(" AND ")} ORDER BY z.sort_order ASC, z.id ASC`
   );
-  return rows.map((r) => ({ ...r, actif: Boolean(r.actif), prix_libre: Boolean(r.prix_libre) }));
+  return rows.map((r) => ({
+    ...r,
+    actif: Boolean(r.actif),
+    prix_libre: Boolean(r.prix_libre),
+    orders_count: Number(r.orders_count ?? 0)
+  }));
 }
 async function upsertDeliveryZone(zone, shopId = 1) {
+  await ensureDeliveryZoneCols();
   if (zone.id) {
     await db.execute(
-      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=? WHERE id=? AND shop_id=?",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.id, shopId]
+      "UPDATE delivery_zones SET nom=?, fee=?, actif=?, sort_order=?, prix_libre=?, couverture=?, delai=? WHERE id=? AND shop_id=?",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.couverture ?? null, zone.delai ?? null, zone.id, shopId]
     );
   } else {
     await db.execute(
-      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre, shop_id) VALUES (?,?,?,?,?,?)",
-      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, shopId]
+      "INSERT INTO delivery_zones (nom, fee, actif, sort_order, prix_libre, couverture, delai, shop_id) VALUES (?,?,?,?,?,?,?,?)",
+      [zone.nom, zone.fee, zone.actif ? 1 : 0, zone.sort_order, zone.prix_libre ? 1 : 0, zone.couverture ?? null, zone.delai ?? null, shopId]
     );
   }
 }
 async function deleteDeliveryZone(id, shopId = 1) {
   await db.execute("DELETE FROM delivery_zones WHERE id = ? AND shop_id = ?", [id, shopId]);
 }
-async function listOrders(limit = 50, offset = 0, shopId = 1) {
+async function listOrders(limit = 50, offset = 0, shopId = 1, status) {
+  const statusCond = status ? "AND status = ?" : "";
+  const params = status ? [shopId, status] : [shopId];
   const [rows] = await db.query(
     `SELECT id, reference, nom, telephone, adresse, zone_livraison, delivery_fee,
-            items, subtotal, total, status, statut_paiement,
+            items, subtotal, total, status, statut_paiement, mm_transaction_ref, payment_mode,
             livreur_id, livraison_statut, created_at, updated_at
-     FROM orders WHERE shop_id = ${Number(shopId)}
-     ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+     FROM orders WHERE shop_id = ? ${statusCond}
+     ORDER BY created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+    params
   );
   return rows;
 }
-async function countOrders(shopId = 1) {
+async function countOrders(shopId = 1, status) {
+  const statusCond = status ? "AND status = ?" : "";
+  const params = status ? [shopId, status] : [shopId];
   const [rows] = await db.execute(
-    "SELECT COUNT(*) as cnt FROM orders WHERE shop_id = ?",
-    [shopId]
+    `SELECT COUNT(*) as cnt FROM orders WHERE shop_id = ? ${statusCond}`,
+    params
   );
   return Number(rows[0]?.cnt ?? 0);
+}
+async function getStoreOrderStats(shopId = 1) {
+  const MOIS_ACTUEL = "YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())";
+  const MOIS_PREC = "YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH) AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)";
+  const [rows] = await db.execute(
+    `SELECT
+       COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_jour,
+       COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_hier,
+       COUNT(CASE WHEN status IN ('pending','confirmed') THEN 1 END) AS commandes_en_cours,
+       COUNT(CASE WHEN status = 'pending' THEN 1 END) AS commandes_en_attente,
+       COUNT(CASE WHEN ${MOIS_ACTUEL} AND status != 'cancelled' THEN 1 END) AS commandes_mois,
+       COUNT(CASE WHEN ${MOIS_PREC} AND status != 'cancelled' THEN 1 END) AS commandes_mois_prec,
+       COALESCE(SUM(CASE WHEN ${MOIS_ACTUEL} AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_mois,
+       COALESCE(SUM(CASE WHEN ${MOIS_PREC} AND status != 'cancelled' THEN total ELSE 0 END), 0) AS ca_mois_prec,
+       COUNT(CASE WHEN ${MOIS_ACTUEL} AND status = 'delivered' THEN 1 END) AS livrees_mois,
+       COUNT(CASE WHEN ${MOIS_ACTUEL} AND statut_paiement IN ('paye','paye_total') THEN 1 END) AS paye_mois,
+       COALESCE(SUM(CASE WHEN ${MOIS_ACTUEL} AND statut_paiement IN ('paye','paye_total') THEN total ELSE 0 END), 0) AS ca_paye_mois,
+       COALESCE(SUM(CASE WHEN ${MOIS_PREC} AND statut_paiement IN ('paye','paye_total') THEN total ELSE 0 END), 0) AS ca_paye_mois_prec,
+       COUNT(*) AS total_toutes,
+       COUNT(CASE WHEN status = 'pending'   THEN 1 END) AS total_pending,
+       COUNT(CASE WHEN status = 'confirmed' THEN 1 END) AS total_confirmed,
+       COUNT(CASE WHEN status = 'shipped'   THEN 1 END) AS total_shipped,
+       COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS total_delivered,
+       COUNT(CASE WHEN status = 'cancelled' THEN 1 END) AS total_cancelled
+     FROM orders WHERE shop_id = ?`,
+    [shopId]
+  );
+  const r = rows[0] ?? {};
+  return {
+    ca_jour: Number(r.ca_jour ?? 0),
+    ca_hier: Number(r.ca_hier ?? 0),
+    commandes_en_cours: Number(r.commandes_en_cours ?? 0),
+    commandes_en_attente: Number(r.commandes_en_attente ?? 0),
+    commandes_mois: Number(r.commandes_mois ?? 0),
+    commandes_mois_prec: Number(r.commandes_mois_prec ?? 0),
+    ca_mois: Number(r.ca_mois ?? 0),
+    ca_mois_prec: Number(r.ca_mois_prec ?? 0),
+    livrees_mois: Number(r.livrees_mois ?? 0),
+    paye_mois: Number(r.paye_mois ?? 0),
+    ca_paye_mois: Number(r.ca_paye_mois ?? 0),
+    ca_paye_mois_prec: Number(r.ca_paye_mois_prec ?? 0),
+    total_toutes: Number(r.total_toutes ?? 0),
+    total_pending: Number(r.total_pending ?? 0),
+    total_confirmed: Number(r.total_confirmed ?? 0),
+    total_shipped: Number(r.total_shipped ?? 0),
+    total_delivered: Number(r.total_delivered ?? 0),
+    total_cancelled: Number(r.total_cancelled ?? 0)
+  };
 }
 async function ensureOrderLifecycleCols() {
   const pool2 = db;
@@ -5437,13 +5517,14 @@ async function getFinanceDashboard(shopId = 1) {
     wallets
   };
 }
-var _ensurePromises, _settingsCacheMap, _finCols, _ventesStatsCacheMap;
+var _ensurePromises, _settingsCacheMap, _zoneColsReady, _finCols, _ventesStatsCacheMap;
 var init_admin_db = __esm({
   "../lib/admin-db.ts"() {
     "use strict";
     init_db();
     _ensurePromises = /* @__PURE__ */ new Map();
     _settingsCacheMap = /* @__PURE__ */ new Map();
+    _zoneColsReady = false;
     _finCols = null;
     _ventesStatsCacheMap = /* @__PURE__ */ new Map();
   }
@@ -9058,7 +9139,8 @@ router11.get("/api/admin/orders", async (req, res) => {
   const page = Math.max(1, Number(req.query.page ?? 1));
   const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 25)));
   const offset = (page - 1) * limit;
-  const [orders, total] = await Promise.all([listOrders(limit, offset, shopId), countOrders(shopId)]);
+  const status = req.query.status || void 0;
+  const [orders, total] = await Promise.all([listOrders(limit, offset, shopId, status), countOrders(shopId, status)]);
   res.json({ success: true, data: orders, total, page, limit });
 });
 router11.post("/api/admin/orders", async (req, res) => {
@@ -9104,6 +9186,12 @@ router11.get("/api/admin/orders/clients-search", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Erreur" });
   }
+});
+router11.get("/api/admin/orders/stats", async (req, res) => {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Non autoris\xE9." });
+  const stats = await getStoreOrderStats(session.shop_id ?? 1);
+  res.json({ success: true, data: stats });
 });
 router11.get("/api/admin/orders/:id", async (req, res) => {
   const session = await getSession(req);
@@ -14377,7 +14465,9 @@ router42.post("/api/admin/delivery-zones", async (req, res) => {
       fee: Number(body.fee ?? 0),
       actif: body.actif !== false && body.actif !== 0,
       sort_order: Number(body.sort_order ?? 0),
-      prix_libre: Boolean(body.prix_libre)
+      prix_libre: Boolean(body.prix_libre),
+      couverture: body.couverture ? String(body.couverture).trim() : null,
+      delai: body.delai ? String(body.delai).trim() : null
     }, shopId);
     res.json({ ok: true });
   } catch (err) {
