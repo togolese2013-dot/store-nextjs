@@ -59,7 +59,12 @@ function AdminShellContent({ nom, role, permissions, children }: Props) {
     !STORE_EXCEPTIONS.some(s => pathname.startsWith(s))
   );
 
-  if (isAdminZone) return <>{children}</>;
+  // La session peut expirer pendant qu'AdminShell est déjà monté (navigation client
+  // réutilisant le layout parent) — /admin/login et /admin/onboarding ne doivent
+  // jamais afficher AdminSidebar, même si le layout serveur ne s'est pas ré-exécuté.
+  const isBypassRoute = pathname.startsWith("/admin/login") || pathname.startsWith("/admin/onboarding");
+
+  if (isBypassRoute || isAdminZone) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-slate-50 overflow-x-hidden">
